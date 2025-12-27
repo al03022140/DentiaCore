@@ -1,0 +1,66 @@
+/* =========================
+   Estilos para PatientInfoHeader
+   ========================= */
+
+/* Clase para elementos solo accesibles por lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Contenedor principal de la sección de información */
+.patient-detail__info {
+  display: flex;
+  align-items: flex-start;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 2rem;
+  position: relative; /* Para posicionar el botón Editar */
+}
+
+/* Estilos para la foto del paciente */
+.patient-detail__photo img {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ccc;
+  margin-right: 2rem;
+}
+
+/* Contenedor de los detalles textuales */
+.patient-detail__details {
+  flex-grow: 1; /* Ocupa el espacio restante */
+}
+
+/* Nombre del paciente */
+.patient-detail__details h1 {
+  margin-bottom: 0.5rem;
+  font-size: 3rem;
+  font-weight: 600;
+  color: #2e2e2e;
+}
+
+/* Párrafos de detalles */
+.patient-detail__details p {
+  margin: 0.3rem 0;
+  line-height: 1.5;
+  color: #444;
+  font-size: 1.2rem; /* Asegurar tamaño de fuente */
+}
+
+/* Los estilos para strong y span están centralizados en patient-detail-shared.css */
+
+/* Botón Editar - reutiliza estilos globales de button-primary */
+.Boton_Editar {
+  position: absolute;
+  top: 1rem; /* Ajustar según sea necesario */
+  right: 1rem; /* Ajustar según sea necesario */
+}

@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\.2101ed9d4b2bed9e5bf57cfe6ffb19755a6c8087-audit.json",
+    "files": [
+        {
+            "date": 1761013487196,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\dent-2025-10-20.log",
+            "hash": "fd5fcdaa4cbe3bb654d48ce992f0cf3d4f78ce666821a1032120c23022f832f5"
+        },
+        {
+            "date": 1761101190753,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\dent-2025-10-21.log",
+            "hash": "266ac0a1231644869d2be5e88c417eb5d844e19544dd31f21d924be9e58d1f0a"
+        }
+    ],
+    "hashType": "sha256"
+}

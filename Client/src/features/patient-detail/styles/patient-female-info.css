@@ -1,0 +1,141 @@
+/* Estilos específicos para la información femenina del paciente */
+@import '../../../shared/styles/variables.css';
+/* patient-detail-shared.css se importa centralmente desde patient-detail.css */
+
+/* El contenedor principal ya está definido en patient-detail-shared.css como .patient-detail__section */
+/* Los títulos H2 y H3 ya están definidos en patient-detail-shared.css */
+
+/* Estilo para los contenedores de cada subsección */
+.patient-detail__subsection {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  background-color: var(--color-bg-white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-medium);
+}
+
+/* Último elemento sin margen inferior */
+.patient-detail__subsection:last-child {
+  margin-bottom: 0;
+}
+
+/* Títulos de cada subsección */
+.patient-detail__section h3 {
+  font-size: var(--font-size-large);
+  font-weight: bolder;
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-light);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Estilos generales para las listas dentro de la información femenina */
+.patient-detail__section ul {
+  list-style: disc;
+  padding-left: var(--spacing-xl);
+  margin-top: var(--spacing-sm);
+  margin-bottom: 0;
+}
+
+/* Estilos generales para los items de lista */
+.patient-detail__section li {
+  margin-bottom: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* Estilos para párrafos */
+.patient-detail__section p {
+  margin: var(--spacing-sm) 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* Mensaje cuando no hay items */
+.no-items-message {
+  color: var(--color-text-light);
+  font-style: italic;
+  list-style: none !important;
+  margin-left: calc(-1 * var(--spacing-lg));
+}
+
+/* Estilos para listas de definición */
+.medical-history-list,
+.medical-data-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--spacing-md);
+  margin: 0;
+}
+
+/* Cada contenedor de término/descripción */
+.medical-history-list > div,
+.medical-data-list > div {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-white);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+}
+
+/* Los estilos para dt y dd ya están definidos en patient-detail-shared.css */
+
+/* Los estilos para strong y span ya están definidos en patient-detail-shared.css */
+
+/* Estilos mejorados para párrafos generales en subsecciones */
+.patient-detail__subsection > p {
+  margin: var(--spacing-sm) 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* Estilos específicos para impresión */
+@media print {
+  .patient-detail__subsection {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    background-color: transparent !important;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid #ddd;
+    page-break-inside: avoid;
+  }
+  
+  .patient-detail__subsection:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+  
+  .patient-detail__section ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  
+  .patient-detail__section li {
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+  }
+  
+  .medical-history-list,
+  .medical-data-list {
+    display: block;
+    margin: 0;
+  }
+  
+  .medical-history-list > div,
+  .medical-data-list > div {
+    display: block;
+    background-color: transparent !important;
+    border-radius: 0;
+    padding: 0.25rem 0;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .no-items-message {
+    background-color: transparent !important;
+    padding: 0.5rem 0;
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "dentrct-create",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/google-calendar": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "antd": "^5.24.6",
+    "axios": "^1.7.9",
+    "chart.js": "^4.5.1",
+    "cropperjs": "^1.6.2",
+    "gapi-script": "^1.2.0",
+    "html2canvas": "^1.4.1",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-cropper": "^2.3.3",
+    "react-dom": "^18.3.1",
+    "react-easy-crop": "^5.4.1",
+    "react-router-dom": "^7.1.4",
+    "react-toastify": "^11.0.5",
+    "web-vitals": "^2.1.4",
+    "winston": "^3.17.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "jest"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@babel/preset-env": "^7.28.0",
+    "@babel/preset-react": "^7.27.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "http-proxy-middleware": "^3.0.3",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
+    "vite": "^6.2.0"
+  }
+}

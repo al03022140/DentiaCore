@@ -1,0 +1,119 @@
+{
+  "statistics": {},
+  "teeth": {
+    "11": {
+      "absent": false,
+      "plaque": {
+        "vestibularSuperior": [
+          0,
+          0,
+          0
+        ],
+        "vestibularInferior": [
+          0,
+          0,
+          0
+        ],
+        "palatinoSuperior": [
+          0,
+          0,
+          0
+        ],
+        "lingualInferior": [
+          0,
+          0,
+          0
+        ]
+      },
+      "gingivalMargin": {
+        "vestibularSuperior": [
+          0,
+          0,
+          0
+        ],
+        "vestibularInferior": [
+          0,
+          0,
+          0
+        ],
+        "palatinoSuperior": [
+          0,
+          0,
+          0
+        ],
+        "lingualInferior": [
+          0,
+          0,
+          0
+        ]
+      },
+      "bleeding": {
+        "vestibularSuperior": [
+          0,
+          0,
+          0
+        ],
+        "vestibularInferior": [
+          0,
+          0,
+          0
+        ],
+        "palatinoSuperior": [
+          0,
+          0,
+          0
+        ],
+        "lingualInferior": [
+          0,
+          0,
+          0
+        ]
+      },
+      "probingDepth": {
+        "vestibularSuperior": [
+          0,
+          0,
+          0
+        ],
+        "vestibularInferior": [
+          0,
+          0,
+          0
+        ],
+        "palatinoSuperior": [
+          0,
+          0,
+          0
+        ],
+        "lingualInferior": [
+          0,
+          0,
+          0
+        ]
+      },
+      "suppuration": {
+        "vestibularSuperior": [
+          0,
+          0,
+          0
+        ],
+        "vestibularInferior": [
+          0,
+          0,
+          0
+        ],
+        "palatinoSuperior": [
+          0,
+          0,
+          0
+        ],
+        "lingualInferior": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "versionName": "06-09-2025_22-07-34"
+}

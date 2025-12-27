@@ -1,0 +1,25 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\DENT -1.1\\server\\logs\\.6ca5f91df3367ca0a8c1e663cf7a84120ae491e1-audit.json",
+    "files": [
+        {
+            "date": 1761108797871,
+            "name": "D:\\DENT -1.1\\server\\logs\\exceptions-2025-10-21.log",
+            "hash": "2e008da7ea95e4d18ded6e362ea3e5cd05719fb7bba9da3d11a4dba7d1d1b1db"
+        },
+        {
+            "date": 1761582316807,
+            "name": "D:\\DENT -1.1\\server\\logs\\exceptions-2025-10-27.log",
+            "hash": "c07df6dab0239d56794684587face295f59243be31a6472c575f33062378ceef"
+        },
+        {
+            "date": 1762388367013,
+            "name": "D:\\DENT -1.1\\server\\logs\\exceptions-2025-11-05.log",
+            "hash": "fb54854592146bc7fcbfd0478c01ce6368cdbcda17969540d1b61ac83dce7f6b"
+        }
+    ],
+    "hashType": "sha256"
+}

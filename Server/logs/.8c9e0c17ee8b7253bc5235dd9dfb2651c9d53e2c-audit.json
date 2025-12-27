@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\DNETTTT\\DENT -1.1\\DENT -1.1\\Server\\logs\\.8c9e0c17ee8b7253bc5235dd9dfb2651c9d53e2c-audit.json",
+    "files": [
+        {
+            "date": 1766803702119,
+            "name": "D:\\DNETTTT\\DENT -1.1\\DENT -1.1\\Server\\logs\\exceptions-2025-12-26.log",
+            "hash": "0f8f30470357baea502dd3eaadd635136ab8e481fff72102650a617007054a81"
+        }
+    ],
+    "hashType": "sha256"
+}

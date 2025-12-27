@@ -1,0 +1,1559 @@
+/* Estilos generales del periodontograma */
+
+
+.periodontogram-title {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: bolder;
+}
+
+/* Secciones del arco dental */
+.arch-section {
+  margin-bottom: 20px;
+  background: white;
+  border: 1px solid #dee2e6;
+  padding: 20px; /* Unificado con periodontogram-data-table.css */
+  border-radius: 6px; /* Añadido para consistencia */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05); /* Añadido para consistencia */
+  box-sizing: border-box; /* Asegurar cálculo correcto de dimensiones */
+  width: 100%; /* Asegurar ancho completo */
+  text-align: center; /* Centrar el contenido, incluyendo el título */
+}
+
+.arch-title {
+  text-align: center !important;
+  margin-bottom: 15px;
+  margin-left: auto;
+  margin-right: auto;
+  color: #030303;
+  font-size: 1.5rem;
+  font-weight: bolder;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: none !important; /* Sin borde inferior - título centrado sin líneas */
+  border: none !important;
+  padding-bottom: 0 !important;
+  display: block;
+  width: 100%;
+}
+
+/* Filas de datos */
+.data-row {
+  display: grid;
+  grid-template-columns: 120px repeat(16, 65px);
+  gap: 1px;
+  margin-bottom: 1px;
+  align-items: center;
+  position: relative;
+  justify-content: center;
+}
+
+.data-row.images {
+  grid-template-columns: 120px repeat(16, 65px);
+  justify-content: center;
+}
+
+/* Secciones de imágenes */
+.images-section {
+  margin-bottom: 1px;
+}
+
+.images-row {
+  display: grid;
+  grid-template-columns: 120px repeat(16, 65px);
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Header con números de dientes */
+.tooth-numbers-header {
+  display: grid;
+  grid-template-columns: 120px repeat(16, 65px);
+  gap: 1px;
+  margin-bottom: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.tooth-number {
+  background: #495057;
+  color: white;
+  padding: 6px 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid #343a40;
+}
+
+
+
+
+
+/* Consolidación de propiedades comunes de flexbox */
+
+.row-label,
+.data-cell,
+.image-cell,
+.tooth-image-container,
+.tooth-background,
+.tooth-foreground,
+.triple-checkbox,
+.triple-input,
+.select-cell,
+.tooth-number-cell,
+.tooth-number-btn,
+.checkbox-btn,
+.mini-input-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Consolidación de border-radius común */
+.mini-input,
+.mini-select {
+  border-radius: 3px;
+}
+
+/* Consolidación de text-align: center */
+.tooth-number,
+
+.data-cell,
+.mini-input,
+.mini-select,
+.small-input,
+.stat-item,
+.mobility-input,
+.furca-input,
+.furca-select,
+.mobility-select,
+.triple-input input,
+.data-cell input {
+  text-align: center;
+}
+
+/* Estilos consolidados para elementos ausentes */
+
+
+
+
+/* Estilos consolidados para elementos deshabilitados */
+.mini-select:disabled,
+.data-cell input:disabled,
+.data-cell select:disabled,
+.triple-input input:disabled,
+.mini-input:disabled {
+  background-color: #f8f9fa !important;
+  color: #6c757d !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+  border: 1px solid #dc3545 !important;
+}
+
+/* Gradiente para celdas con elementos deshabilitados - SOLO en edición */
+.periodontogram-consolidated.edit .select-cell:has(.mini-select:disabled),
+.periodontogram-consolidated.edit .data-cell:has(input:disabled),
+.periodontogram-consolidated.edit .data-cell:has(select:disabled),
+.periodontogram-consolidated.edit .triple-input:has(input:disabled),
+.periodontogram-consolidated.edit .triple-checkbox:has(input:disabled),
+.periodontogram-consolidated.edit .mini-input-cell:has(.mini-input:disabled),
+.periodontogram-container:not([data-read-only="true"]) .select-cell:has(.mini-select:disabled),
+.periodontogram-container:not([data-read-only="true"]) .data-cell:has(input:disabled),
+.periodontogram-container:not([data-read-only="true"]) .data-cell:has(select:disabled),
+.periodontogram-container:not([data-read-only="true"]) .triple-input:has(input:disabled),
+.periodontogram-container:not([data-read-only="true"]) .triple-checkbox:has(input:disabled),
+.periodontogram-container:not([data-read-only="true"]) .mini-input-cell:has(.mini-input:disabled) {
+  background: linear-gradient(
+    135deg,
+    rgba(220, 53, 69, 0.1) 0%,
+    rgba(248, 249, 250, 0.9) 25%,
+    rgba(220, 53, 69, 0.1) 50%,
+    rgba(248, 249, 250, 0.9) 75%,
+    rgba(220, 53, 69, 0.1) 100%
+  );
+  opacity: 0.8;
+  position: relative;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+/* Líneas diagonales para elementos deshabilitados - SOLO en edición */
+.periodontogram-consolidated.edit .select-cell:has(.mini-select:disabled)::before,
+.periodontogram-consolidated.edit .data-cell:has(input:disabled)::before,
+.periodontogram-consolidated.edit .triple-input:has(input:disabled)::after,
+.periodontogram-consolidated.edit .triple-checkbox:has(input:disabled)::after,
+.periodontogram-consolidated.edit .mini-input-cell:has(.mini-input:disabled)::before,
+.periodontogram-container:not([data-read-only="true"]) .select-cell:has(.mini-select:disabled)::before,
+.periodontogram-container:not([data-read-only="true"]) .data-cell:has(input:disabled)::before,
+.periodontogram-container:not([data-read-only="true"]) .triple-input:has(input:disabled)::after,
+.periodontogram-container:not([data-read-only="true"]) .triple-checkbox:has(input:disabled)::after,
+.periodontogram-container:not([data-read-only="true"]) .mini-input-cell:has(.mini-input:disabled)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 65px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(220, 53, 69, 0.15) 6px,
+    rgba(220, 53, 69, 0.15) 8px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+
+
+.header-spacer {
+  background: transparent;
+}
+
+.row-label {
+  background: #f8f9fa;
+  padding: 6px 8px;
+  font-weight: bold;
+  color: #000000;
+  text-align: left;
+  border: 1px solid #dee2e6;
+  font-size: 0.85rem;
+  justify-content: flex-start;
+  min-height: 32px;
+  padding-left: 12px;
+}
+
+.row-label.image-label {
+  min-height: 150px;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+}
+
+.data-cell {
+  background: white;
+  border: 1px solid #dee2e6;
+  padding: 3px;
+  font-size: 0.8rem;
+  min-height: 28px;
+  position: relative;
+}
+
+/* Hover consolidado más abajo */
+
+.data-cell input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 2px;
+}
+
+
+
+/* Estilos específicos para checkboxes deshabilitados */
+.data-cell input[type="checkbox"]:disabled:not(.mini-checkbox) {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+  margin: 0 auto;
+}
+
+/* Inputs dentro de triple-input */
+.triple-input input {
+  position: relative;
+  z-index: 3;
+}
+
+/* Estilos específicos para triple-input deshabilitados */
+.triple-input input:disabled {
+  opacity: 0.5;
+}
+
+/* Estilos específicos para checkboxes deshabilitados - mantener dimensiones originales */
+.mini-checkbox:disabled,
+.triple-checkbox input:disabled {
+  width: 12px !important;
+  height: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  display: inline-block !important;
+  outline: none !important;
+  position: relative !important;
+  z-index: 3 !important;
+  filter: grayscale(50%);
+}
+
+/* Mantener colores para checkboxes marcados y deshabilitados */
+.mini-checkbox[data-type="suppuration"]:checked:disabled,
+.triple-checkbox input[data-type="suppuration"]:checked:disabled {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background: #ff8c00 !important;
+  border: 1px solid #ff8c00 !important;
+  border-radius: 2px !important;
+  width: 12px !important;
+  height: 12px !important;
+  position: relative !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.mini-checkbox[data-type="plaque"]:checked:disabled,
+.triple-checkbox input[data-type="plaque"]:checked:disabled {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background: #9b59b6 !important;
+  border: 1px solid #9b59b6 !important;
+  border-radius: 2px !important;
+  width: 12px !important;
+  height: 12px !important;
+  position: relative !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Mantener borde visible (gris) en visualización para checkboxes deshabilitados de supuración y placa cuando no están marcados */
+.triple-checkbox input.mini-checkbox[data-type="suppuration"]:disabled:not(:checked),
+.triple-checkbox input.mini-checkbox[data-type="plaque"]:disabled:not(:checked),
+.data-cell .triple-checkbox input.mini-checkbox[data-type="suppuration"]:disabled:not(:checked),
+.data-cell .triple-checkbox input.mini-checkbox[data-type="plaque"]:disabled:not(:checked) {
+  border: 1px solid #666 !important;
+  background: #fff !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 2px !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Línea horizontal específica para triple inputs deshabilitados */
+.triple-input:has(input:disabled)::after,
+.triple-checkbox:has(input:disabled)::after {
+  top: 50%;
+  height: 2px;
+  background: rgba(220, 53, 69, 0.4);
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+/* Contenedor para triple checkbox - Sincronizado con DataTable */
+.triple-checkbox {
+  flex-direction: row;
+  gap: 3px;
+  justify-content: space-evenly;
+  padding: 4px;
+  width: 100%;
+  max-width: 55px;
+  min-width: 55px;
+  flex-wrap: nowrap !important;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+}
+
+/* Números de dientes - Consolidado */
+.tooth-number {
+  background: #495057;
+  color: white;
+  padding: 6px 4px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid #343a40;
+}
+
+/* Celdas de imágenes - Dimensiones optimizadas para imágenes reales */
+.image-cell {
+  background: white;
+  padding: 4px;
+  border: 1px solid #dee2e6;
+  min-height: 150px;
+  height: 150px;
+  width: 65px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Estados de hover consolidados */
+.image-cell:hover,
+.data-cell:hover {
+  background: #f8f9fa;
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+}
+
+/* Contenedor de imagen de diente - Tamaño exacto para fondos */
+.tooth-image-container {
+  position: relative;
+  width: 60px;
+  height: 135px;
+}
+
+.tooth-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55px;
+  height: 135px;
+  z-index: 1;
+}
+
+.tooth-foreground {
+  position: relative;
+  z-index: 2;
+  width: 55px;
+  height: 115px;
+}
+
+.background-image {
+  width: 55px;
+  height: 135px;
+  object-fit: contain;
+  opacity: 0.3;
+}
+
+.tooth-image {
+  width: 55px;
+  height: 115px;
+  object-fit: contain;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.tooth-image:hover {
+  transform: scale(1.05);
+}
+
+/* Fondo removido para dientes ausentes */
+
+/* === ESTILOS PARA COMPONENTE TOOTHIMAGE === */
+.tooth-image-wrapper {
+  position: relative;
+  width: 60px;
+  height: 135px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.tooth-image-wrapper:hover {
+  transform: scale(1.05);
+}
+
+.tooth-image-wrapper.selected {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+.tooth-number-overlay {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.selection-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 123, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.selection-indicator {
+  font-size: 20px;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.5));
+}
+
+/* Superposición para dientes ausentes en sección de imágenes */
+.absence-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(220, 53, 69, 0.20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #dc3545;
+  font-family: Arial, sans-serif;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 6.5. RAYADO PARA DIENTES AUSENTES EN EDICIÓN Y VISUALIZACIÓN */
+/* Rayado rojo diagonal para celdas de propiedades cuando el diente está ausente */
+.data-cell-container.absent .select-cell::before,
+.data-cell-container.absent .data-cell::before,
+.data-cell-container.absent .triple-input::after,
+.data-cell-container.absent .triple-checkbox::after,
+.data-cell-container.absent .mini-input-cell::before,
+.data-cell-container.absent .checkbox-cell::before,
+.data-cell-container.absent .number-cell::before,
+.data-cell-container.absent .array-checkbox-cell::before,
+.data-cell-container.absent .array-number-cell::before,
+.data-cell-container.absent .double-furca-cell::before,
+.data-cell-container.absent .bleeding-multi-state::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 65px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(220, 53, 69, 0.15) 6px,
+    rgba(220, 53, 69, 0.15) 8px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Controles de entrada */
+.mini-input {
+  width: 100%;
+  max-width: 25px;
+  height: 17px;
+  border: 1px solid #007bff;
+  font-size: 0.9rem;
+  padding: 1px;
+  background: #ffffff;
+  box-shadow: 0 3px 3px rgba(126, 126, 126, 0.1);
+  outline: 1px solid #eeeeee;
+  position: relative;
+  z-index: 3;
+}
+
+/* Ocultar flechas de incremento/decremento en inputs number */
+.mini-input::-webkit-outer-spin-button,
+.mini-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.mini-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.mini-input:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  transform: scale(1.05);
+}
+
+/* Contenedor para inputs horizontales */
+.triple-input {
+  flex-direction: row;
+  gap: 4px;
+  padding: 4px;
+  width: 100%;
+  max-width: 65px;
+  min-width: 65px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+}
+
+.mini-select {
+  width: 100%;
+  max-width: 50px;
+  height: 24px;
+  border: 1px solid #ced4da;
+  font-size: 0.7rem;
+  padding: 1px;
+  background: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Ocultar flecha desplegable */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none;
+}
+
+.mini-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.select-cell {
+  width: 100%;
+  min-width: 50px;
+}
+
+/* Estilos para diferentes tipos de datos */
+.profundidad {
+  background-color: #fff3cd;
+}
+
+.margen-gingival {
+  background-color: #d1ecf1;
+}
+
+.placa {
+  background-color: #f8d7da;
+}
+
+
+
+.sangrado {
+  background-color: #d4edda;
+}
+
+.supuracion {
+  background-color: #e2e3e5;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .data-row,
+  .data-row.images,
+  .images-row,
+  .tooth-numbers-header {
+    grid-template-columns: 100px repeat(16, 70px);
+    justify-content: center;
+  }
+  
+  .image-cell,
+  .row-label.image-label {
+    width: 70px;
+    height: 163px;
+    min-height: 163px;
+  }
+}
+
+@media (max-width: 768px) {
+  .data-row,
+  .data-row.images,
+  .images-row,
+  .tooth-numbers-header {
+    grid-template-columns: 80px repeat(16, 60px);
+    gap: 1px;
+    justify-content: center;
+  }
+  
+  .image-cell,
+  .row-label.image-label {
+    width: 60px;
+    height: 155px;
+    min-height: 155px;
+    padding: 4px;
+  }
+  
+  .tooth-image-container,
+  .tooth-background,
+  .background-image {
+    width: 52px;
+    height: 145px;
+  }
+  
+  .tooth-foreground,
+  .tooth-image {
+    width: 52px;
+    height: 123px;
+  }
+}
+
+/* Hover ya consolidado arriba */
+
+/* Transiciones consolidadas - Base común */
+.image-cell, 
+.data-cell,
+
+.mini-input,
+.mini-checkbox,
+.small-input,
+.tooth-number-btn {
+  transition: all 0.2s ease;
+}
+
+.tooth-image:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+.mini-input:invalid {
+  border-color: #dc3545;
+}
+
+
+
+/* Estilos para mini-checkbox - Sincronizados con DataTable */
+.mini-checkbox {
+  width: 12px !important;
+  height: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  display: inline-block !important;
+  outline: none !important;
+  position: relative;
+  z-index: 3;
+}
+
+/* Colores específicos para tipos de checkbox */
+
+/* Estilos específicos para gumWidth */
+.gum-width-red {
+  color: #dc3545 !important;
+  font-weight: bold;
+}
+
+/* Asegurar que el color rojo se aplique incluso en campos deshabilitados */
+.mini-input.gum-width-red:disabled {
+  color: #dc3545 !important;
+  font-weight: bold !important;
+}
+
+/* Especificidad adicional para contenedores con inputs deshabilitados */
+.mini-input-cell:has(.mini-input.gum-width-red:disabled) .mini-input.gum-width-red {
+  color: #dc3545 !important;
+  font-weight: bold !important;
+}
+
+/* Placeholder que se ve igual al texto normal */
+.mini-input::placeholder {
+  color: #000;
+  opacity: 1;
+  font-weight: normal;
+  font-size: inherit;
+}
+.mini-checkbox[data-type="bleeding"]:checked { accent-color: #e74c3c; }
+.mini-checkbox[data-type="suppuration"]:checked { accent-color: #f39c12; }
+.mini-checkbox[data-type="plaque"]:checked { accent-color: #2ecc71; }
+
+/* Checkbox completamente relleno de naranja para supuración */
+.triple-checkbox .mini-checkbox[data-type="suppuration"]:checked,
+.data-cell .triple-checkbox .mini-checkbox[data-type="suppuration"]:checked,
+.arch-section .data-row .data-cell .triple-checkbox .mini-checkbox[data-type="suppuration"]:checked {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: #ff8c00 !important;
+  border: 1px solid #ff8c00 !important;
+  border-radius: 2px;
+  width: 12px !important;
+  height: 12px !important;
+  position: relative;
+}
+
+/* Checkbox completamente relleno de lila para placa */
+.triple-checkbox .mini-checkbox[data-type="plaque"]:checked,
+.data-cell .triple-checkbox .mini-checkbox[data-type="plaque"]:checked,
+.arch-section .data-row .data-cell .triple-checkbox .mini-checkbox[data-type="plaque"]:checked {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: #9b59b6 !important;
+  border: 1px solid #9b59b6 !important;
+  border-radius: 2px;
+  width: 12px !important;
+  height: 12px !important;
+  position: relative;
+}
+
+/* Checkbox cuadrado con círculo rojo para sangrado */
+.mini-checkbox[data-type="bleeding"]:checked {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: #fff;
+  border: 1px solid #666;
+  border-radius: 2px;
+  width: 12px !important;
+  height: 12px !important;
+  position: relative;
+}
+
+.mini-checkbox[data-type="bleeding"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #e74c3c;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3);
+}
+
+
+.implant-checkbox:hover {
+  transform: scale(1.2);
+}
+
+.implant-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: scale(1);
+}
+
+/* Contenedor del checkbox de implante (solo para checkbox personalizado) */
+.checkbox-cell:has(.checkbox-btn) {
+  background-color: rgba(40, 167, 69, 0.05);
+  border-radius: 4px;
+}
+
+.checkbox-cell:has(.checkbox-btn input:checked) {
+  background-color: rgba(40, 167, 69, 0.15);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+/* Estilos legacy para checkboxes de implante */
+.implant-row .mini-checkbox,
+.checkbox-visual.implant-checkbox {
+  width: 12px !important;
+  height: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 1px solid #606062 !important;
+  border-radius: 2px !important;
+  cursor: pointer;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  display: inline-block !important;
+  outline: none !important;
+  position: relative;
+  z-index: 3;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+.implant-row .mini-checkbox:checked,
+.checkbox-visual.implant-checkbox:checked {
+  background-image: linear-gradient(#b9e9b3, #a8e4a0) !important;
+  border-color: #a8e4a0 !important;
+}
+
+/* Estilos personalizados para checkbox de implante */
+/* Customize the label (the checkbox-btn) */
+.checkbox-btn {
+  display: block;
+  position: relative;
+  padding-left: 30px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  width: 100%;
+  height: 100%;
+}
+
+/* Hide the browser's default checkbox */
+.checkbox-btn input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+
+/* Hacer que el label sea clickeable en lugar del input */
+body .data-cell.checkbox-cell .checkbox-btn,
+body .checkbox-cell .checkbox-btn,
+body div.data-cell.checkbox-cell label.checkbox-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Estados checked sin focus */
+body .data-cell.checkbox-cell .checkbox-btn input[type="checkbox"]:checked,
+body .checkbox-cell .checkbox-btn input[type="checkbox"]:checked,
+body div.data-cell.checkbox-cell label.checkbox-btn input[type="checkbox"]:checked {
+  outline: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+/* Asegurar que el contenedor del checkbox no tenga estilos conflictivos */
+body .data-cell.checkbox-cell .checkbox-btn,
+body .checkbox-cell .checkbox-btn,
+body div.data-cell.checkbox-cell label.checkbox-btn {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Forzar que el checkmark sea visible cuando está marcado */
+body .data-cell.checkbox-cell .checkbox-btn input:checked ~ .checkmark:after,
+body .checkbox-cell .checkbox-btn input:checked ~ .checkmark:after,
+body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkmark:after {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translate(-50%, -50%) rotate(0deg) scale(1) !important;
+  animation: pulse 1s ease-in !important;
+}
+
+/* Forzar rotación del checkmark cuando está marcado */
+body .data-cell.checkbox-cell .checkbox-btn input:checked ~ .checkmark,
+body .checkbox-cell .checkbox-btn input:checked ~ .checkmark,
+body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkmark {
+  transform: rotate(45deg) !important;
+  border: none !important;
+}
+
+.checkbox-btn label {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Create a custom checkbox */
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  border: 2.5px solid #ffffff;
+  transition: .2s linear;
+  background-color: transparent;
+}
+
+.checkbox-btn input:checked ~ .checkmark {
+  background-color: transparent;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkmark:after {
+  content: "";
+  position: absolute;
+  visibility: hidden;
+  opacity: 0;
+  left: 50%;
+  top: 40%;
+  width: 10px;
+  height: 14px;
+  border: 2px solid #0ea021;
+  filter: drop-shadow(0px 0px 10px #0ea021);
+  border-width: 0 2.5px 2.5px 0;
+  transition: .2s linear;
+  transform: translate(-50%, -50%) rotate(-90deg) scale(0.2);
+}
+
+/* Show the checkmark when checked */
+.checkbox-btn input:checked ~ .checkmark:after {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  animation: pulse 1s ease-in;
+}
+
+.checkbox-btn input:checked ~ .checkmark {
+  transform: rotate(45deg);
+  border: none;
+}
+
+/* Disabled state */
+.checkbox-btn input:disabled ~ .checkmark {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkbox-btn input:disabled {
+  cursor: not-allowed;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.6);
+  }
+}
+
+/* Crear la palomita para checkboxes de implante (legacy) */
+.implant-row .mini-checkbox:checked::after,
+.checkbox-visual.implant-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 3px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  display: block;
+}
+
+/* Botón de número de diente mejorado */
+.tooth-number-cell {
+  padding: 2px;
+}
+
+.tooth-number-btn {
+  background: transparent;
+  color: #333;
+  border: none;
+  padding: 4px;
+  font-weight: bolder;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  min-width: auto;
+  min-height: auto;
+  font-family: inherit;
+}
+
+.tooth-number-btn:hover {
+  color: #333;
+}
+
+.tooth-number-btn:active {
+  color: #333;
+}
+
+.tooth-number-btn.selected {
+  color: #333;
+  text-decoration: none;
+}
+
+.tooth-number-btn.absent {
+  color: #dc3545;
+  text-decoration: line-through;
+}
+
+.tooth-number-btn.absent:hover {
+  color: #dc3545;
+}
+
+.tooth-number-btn:disabled {
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Campos de entrada pequeños mejorados */
+.mini-input-cell {
+  padding: 2px;
+}
+
+.small-input {
+  width: 50px;
+  height: 32px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 4px;
+}
+
+.small-input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Campo específico para anchura de encía */
+.mini-input-cell .mini-input {
+  background-color: #f8f9fa;
+  border-color: #6c757d;
+}
+
+.mini-input-cell .mini-input:focus {
+  background-color: white;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Estilos específicos para mini-inputs deshabilitados - Consolidado con estilos generales */
+
+/* === Overrides para Modo Visualización (read-only) ===
+   Objetivo: que la vista de visualización se vea limpia como el modo render,
+   sin fondos rayados rojos ni bordes de error en elementos deshabilitados. */
+
+/* Aplicar tanto a PeriodontogramConsolidated como a PeriodontogramDesign */
+.periodontogram-consolidated.read-only .mini-select:disabled,
+.periodontogram-consolidated.read-only .data-cell input:disabled,
+.periodontogram-consolidated.read-only .data-cell select:disabled,
+.periodontogram-consolidated.read-only .triple-input input:disabled,
+.periodontogram-consolidated.read-only .mini-input:disabled,
+.periodontogram-container[data-read-only="true"] .mini-select:disabled,
+.periodontogram-container[data-read-only="true"] .data-cell input:disabled,
+.periodontogram-container[data-read-only="true"] .data-cell select:disabled,
+.periodontogram-container[data-read-only="true"] .triple-input input:disabled,
+.periodontogram-container[data-read-only="true"] .mini-input:disabled {
+  background-color: transparent !important;
+  color: inherit !important;
+  opacity: 1 !important;
+  cursor: default !important;
+  border: none !important;
+  filter: none !important;
+}
+
+/* Quitar fondos con gradientes y bordes rojos en celdas que contienen elementos deshabilitados */
+.periodontogram-consolidated.read-only .select-cell:has(.mini-select:disabled),
+.periodontogram-consolidated.read-only .data-cell:has(input:disabled),
+.periodontogram-consolidated.read-only .data-cell:has(select:disabled),
+.periodontogram-consolidated.read-only .triple-input:has(input:disabled),
+.periodontogram-consolidated.read-only .triple-checkbox:has(input:disabled),
+.periodontogram-consolidated.read-only .mini-input-cell:has(.mini-input:disabled),
+.periodontogram-container[data-read-only="true"] .select-cell:has(.mini-select:disabled),
+.periodontogram-container[data-read-only="true"] .data-cell:has(input:disabled),
+.periodontogram-container[data-read-only="true"] .data-cell:has(select:disabled),
+.periodontogram-container[data-read-only="true"] .triple-input:has(input:disabled),
+.periodontogram-container[data-read-only="true"] .triple-checkbox:has(input:disabled),
+.periodontogram-container[data-read-only="true"] .mini-input-cell:has(.mini-input:disabled) {
+  background: white !important;
+  opacity: 1 !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+/* Ocultar pseudo-elementos que generan el rayado diagonal */
+.periodontogram-consolidated.read-only .select-cell:has(.mini-select:disabled)::before,
+.periodontogram-consolidated.read-only .data-cell:has(input:disabled)::before,
+.periodontogram-consolidated.read-only .triple-input:has(input:disabled)::after,
+.periodontogram-consolidated.read-only .triple-checkbox:has(input:disabled)::after,
+.periodontogram-consolidated.read-only .mini-input-cell:has(.mini-input:disabled)::before,
+.periodontogram-container[data-read-only="true"] .select-cell:has(.mini-select:disabled)::before,
+.periodontogram-container[data-read-only="true"] .data-cell:has(input:disabled)::before,
+.periodontogram-container[data-read-only="true"] .triple-input:has(input:disabled)::after,
+.periodontogram-container[data-read-only="true"] .triple-checkbox:has(input:disabled)::after,
+.periodontogram-container[data-read-only="true"] .mini-input-cell:has(.mini-input:disabled)::before {
+  display: none !important;
+}
+
+/* EXCEPCIÓN: Forzar visualización del rayado para dientes ausentes en AMBOS modos (read-only y edit) */
+.periodontogram-consolidated.read-only .data-cell-container.absent .select-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .data-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .triple-input::after,
+.periodontogram-consolidated.read-only .data-cell-container.absent .triple-checkbox::after,
+.periodontogram-consolidated.read-only .data-cell-container.absent .mini-input-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .checkbox-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .number-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .array-checkbox-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .array-number-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .double-furca-cell::before,
+.periodontogram-consolidated.read-only .data-cell-container.absent .bleeding-multi-state::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .select-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .data-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .triple-input::after,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .triple-checkbox::after,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .mini-input-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .checkbox-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .number-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .array-checkbox-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .array-number-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .double-furca-cell::before,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .bleeding-multi-state::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .select-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .data-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .triple-input::after,
+.periodontogram-consolidated.edit .data-cell-container.absent .triple-checkbox::after,
+.periodontogram-consolidated.edit .data-cell-container.absent .mini-input-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .checkbox-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .number-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .array-checkbox-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .array-number-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .double-furca-cell::before,
+.periodontogram-consolidated.edit .data-cell-container.absent .bleeding-multi-state::before,
+/* Agregado: aplicar también en modo rendered (visualización) */
+.periodontogram-consolidated.rendered .data-cell-container.absent .select-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .data-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .triple-input::after,
+.periodontogram-consolidated.rendered .data-cell-container.absent .triple-checkbox::after,
+.periodontogram-consolidated.rendered .data-cell-container.absent .mini-input-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .checkbox-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .number-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .array-checkbox-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .array-number-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .double-furca-cell::before,
+.periodontogram-consolidated.rendered .data-cell-container.absent .bleeding-multi-state::before {
+  display: block !important;
+}
+
+/* Modo visualización: aplicar el MISMO fondo/borde de edición SOLO para dientes ausentes */
+.periodontogram-consolidated.read-only .data-cell-container.absent .select-cell,
+.periodontogram-consolidated.read-only .data-cell-container.absent .data-cell,
+.periodontogram-consolidated.read-only .data-cell-container.absent .triple-input,
+.periodontogram-consolidated.read-only .data-cell-container.absent .triple-checkbox,
+.periodontogram-consolidated.read-only .data-cell-container.absent .mini-input-cell,
+.periodontogram-consolidated.rendered .data-cell-container.absent .select-cell,
+.periodontogram-consolidated.rendered .data-cell-container.absent .data-cell,
+.periodontogram-consolidated.rendered .data-cell-container.absent .triple-input,
+.periodontogram-consolidated.rendered .data-cell-container.absent .triple-checkbox,
+.periodontogram-consolidated.rendered .data-cell-container.absent .mini-input-cell,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .select-cell,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .data-cell,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .triple-input,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .triple-checkbox,
+.periodontogram-container[data-read-only="true"] .data-cell-container.absent .mini-input-cell {
+  background: linear-gradient(
+    135deg,
+    rgba(220, 53, 69, 0.1) 0%,
+    rgba(248, 249, 250, 0.9) 25%,
+    rgba(220, 53, 69, 0.1) 50%,
+    rgba(248, 249, 250, 0.9) 75%,
+    rgba(220, 53, 69, 0.1) 100%
+  ) !important;
+  opacity: 0.8 !important;
+  position: relative;
+  border: 1px solid rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Restablecer línea horizontal de triple-input en read-only */
+.periodontogram-consolidated.read-only .triple-input:has(input:disabled)::after,
+.periodontogram-consolidated.read-only .triple-checkbox:has(input:disabled)::after,
+.periodontogram-container[data-read-only="true"] .triple-input:has(input:disabled)::after,
+.periodontogram-container[data-read-only="true"] .triple-checkbox:has(input:disabled)::after {
+  content: none !important;
+}
+
+/* Forzar rotación del checkmark cuando está marcado */
+body .data-cell.checkbox-cell .checkbox-btn input:checked ~ .checkmark,
+body .checkbox-cell .checkbox-btn input:checked ~ .checkmark,
+body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkmark {
+  transform: rotate(45deg) !important;
+  border: none !important;
+}
+
+.checkbox-btn label {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Visualización (rendered): normalizar caja del MultiStateCheckbox y desactivar interacciones */
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator {
+   width: 16px;
+   height: 16px;
+   border: 1px solid #606062;
+   border-radius: 2px;
+   background: #fff;
+   box-shadow: none;
+   cursor: default;
+   position: relative;
+   z-index: 3;
+ }
+
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:hover,
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:focus {
+  border-color: #606062;
+  box-shadow: none;
+}
+
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:active::after {
+  transform: translate(-50%, -50%);
+}
+
+/* Visualización/solo-lectura: asegurar contorno visible en BleedingMultiStateCheckbox deshabilitado */
+.periodontogram-consolidated.rendered .triple-checkbox input.bleeding-multi-state:disabled,
+.periodontogram-consolidated.read-only .triple-checkbox input.bleeding-multi-state:disabled {
+  border: 1px solid #606062 !important;
+  background: #fff !important;
+  z-index: 3 !important;
+}
+
+.checkbox-btn label {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Visualización (rendered): normalizar caja del MultiStateCheckbox y desactivar interacciones */
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator {
+   width: 16px;
+   height: 16px;
+   border: 1px solid #606062;
+   border-radius: 2px;
+   background: #fff;
+   box-shadow: none;
+   cursor: default;
+   position: relative;
+   z-index: 3;
+ }
+
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:hover,
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:focus {
+  border-color: #606062;
+  box-shadow: none;
+}
+
+.periodontogram-consolidated.rendered .multi-state-checkbox__indicator:active::after {
+  transform: translate(-50%, -50%);
+}
+
+/* ============================================
+   ESTILOS DE IMPRESIÓN PARA PERIODONTOGRAMA
+   ============================================ */
+@media print {
+  /* Configurar página VERTICAL (portrait) */
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  /* ESCALAR TODO EL PERIODONTOGRAMA MUY PEQUEÑO para que quepa en vertical */
+  .periodontogram-design,
+  .periodontogram-container {
+    transform: scale(0.52) !important;
+    transform-origin: top left !important;
+    width: 192% !important; /* Compensar la escala (100% / 0.52) */
+    max-width: 192% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-bottom: -140px !important; /* Reducir espacio después del escalado */
+  }
+
+  /* Asegurar que el periodontograma se muestre completo en impresión */
+  .arch-section {
+    page-break-inside: auto !important; /* Permitir salto entre superior e inferior si es necesario */
+    break-inside: auto !important;
+    margin-bottom: 8px !important;
+    background: white !important;
+    border: 1px solid #000 !important;
+    padding: 5px !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .arch-title {
+    color: #000 !important;
+    font-size: 10pt !important;
+    margin-bottom: 3px !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Ajustar filas de datos para impresión */
+  .data-row {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 0px !important;
+    display: grid !important;
+  }
+
+  .row-label {
+    font-size: 6.5pt !important;
+    padding: 1px 4px !important;
+    min-height: 14px !important;
+  }
+
+  .triple-input {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.3px !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    align-items: stretch !important;
+  }
+
+  .triple-input input,
+  .triple-input .mini-input {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 5.2pt !important;
+    height: 12px !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ajustar celdas para impresión - MUY PEQUEÑAS */
+  .data-cell,
+  .label-cell {
+    font-size: 6pt !important;
+    padding: 1px 2px !important;
+    border: 0.5px solid #333 !important;
+    min-height: 14px !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Ajustar inputs para que sean muy pequeños */
+  .data-cell input[type="text"],
+  .data-cell input[type="number"] {
+    border: 1px solid #333 !important;
+    background: white !important;
+    color: #000 !important;
+    font-size: 6pt !important;
+    padding: 0.2px !important;
+    height: 13px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    letter-spacing: 0.1px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Mostrar valores de checkboxes en impresión - MUY PEQUEÑOS */
+  .multi-state-checkbox__indicator,
+  input[type="checkbox"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    border: 1px solid #000 !important;
+    width: 8px !important;
+    height: 8px !important;
+  }
+
+  /* Compactar contenedores de checkboxes múltiples (sangrado, supuración, placa) */
+  .triple-checkbox {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    justify-items: center !important;
+    align-items: center !important;
+    gap: 0.4px !important;
+    padding: 0 !important;
+    max-width: 26px !important;
+    min-width: 26px !important;
+    width: 100% !important;
+  }
+
+  .triple-checkbox .mini-checkbox,
+  .triple-checkbox input[type="checkbox"] {
+    width: 6px !important;
+    height: 6px !important;
+    margin: 0 !important;
+  }
+
+  .furca-single-cell {
+    max-width: 22px !important;
+    min-width: 22px !important;
+    padding: 0 !important;
+  }
+
+  .furca-single-cell .furca-input-single {
+    width: 100% !important;
+    font-size: 5pt !important;
+    height: 12px !important;
+    padding: 0 !important;
+  }
+
+  .double-furca-cell {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.4px !important;
+    padding: 0 !important;
+    max-width: 32px !important;
+    min-width: 32px !important;
+  }
+
+  .double-furca-cell .furca-input-double {
+    width: 100% !important;
+    font-size: 5pt !important;
+    height: 12px !important;
+    padding: 0 !important;
+  }
+
+  /* Asegurar que las líneas de gráficas se impriman - MÁS COMPACTAS */
+  .linear-graphics-canvas {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    page-break-inside: avoid !important;
+    max-height: 100px !important;
+  }
+
+  /* Ajustar imágenes de dientes - MUY PEQUEÑAS */
+  .tooth-image {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    max-width: 25px !important;
+    height: auto !important;
+  }
+
+  /* Asegurar que toda la sección del periodontograma sea visible */
+  .periodontogram-section {
+    page-break-before: always !important; /* Nueva página para el periodontograma */
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    margin: 0 !important;
+    padding: 3px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Ocultar botones en impresión */
+  .periodontogram-section button,
+  .section-header button {
+    display: none !important;
+  }
+
+  /* Forzar visibilidad de canvas */
+  canvas {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    page-break-inside: avoid !important;
+    max-width: 100% !important;
+  }
+
+  /* Asegurar que las tablas de datos se muestren completas */
+  .periodontogram-data-table {
+    width: 100% !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Grid MUY compacto para impresión vertical */
+  .data-row {
+    grid-template-columns: 70px repeat(16, 42px) !important;
+    gap: 1px !important;
+  }
+
+  .data-row.images,
+  .images-row,
+  .tooth-numbers-header {
+    grid-template-columns: 70px repeat(16, 42px) !important;
+    gap: 1px !important;
+  }
+
+  /* Título del periodontograma más compacto */
+  .periodontogram-title {
+    font-size: 12pt !important;
+    margin-bottom: 3px !important;
+  }
+
+  /* Reducir espacio entre elementos */
+  .section-header {
+    margin-bottom: 5px !important;
+    padding: 5px !important;
+  }
+}

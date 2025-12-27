@@ -1,0 +1,56 @@
+/* =========================
+   Estilos para PatientMedicalCards
+   ========================= */
+
+/* Importar estilos compartidos */
+@import '../../../shared/styles/variables.css';
+/* patient-detail-shared.css se importa centralmente desde patient-detail.css */
+
+/* Contenedor específico para las tarjetas médicas */
+.patient-detail__medical-cards-container {
+  display: flex;
+  flex-wrap: wrap; /* Permitir que las tarjetas fluyan en pantallas pequeñas */
+  gap: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem; /* Añadir margen inferior */
+}
+
+/* Los estilos de .patient-detail__info-card y h2 ya están definidos en patient-detail-shared.css */
+
+/* Lista dentro de la tarjeta */
+.patient-detail__info-card ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0; /* Quitar margen inferior por defecto */
+  /* Aplicar estilo de valor (Gris / Bolder) a la lista */
+  color: #7f8c8d; /* Actualizado para consistencia */
+  font-weight: 500;
+}
+
+/* Elementos de la lista */
+.patient-detail__info-card li {
+  margin-bottom: 0.5rem; /* Ajustar espaciado entre items */
+  /* El color y peso lo hereda de UL ahora */
+}
+
+/* Mensaje cuando no hay items */
+.patient-detail__info-card .no-items-message {
+  color: #95a5a6;
+  font-style: italic;
+  list-style: none;
+  margin-left: -1rem; /* Compensar el padding-left de la lista */
+}
+
+/* Estilos estándar para strong en elementos de medicamentos */
+.patient-detail__info-card li strong {
+  color: #000;
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+/* Estilos estándar para span en elementos de medicamentos */
+.patient-detail__info-card li span {
+  color: #868686;
+  font-weight: bolder;
+}

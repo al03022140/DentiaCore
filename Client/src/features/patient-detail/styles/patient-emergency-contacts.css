@@ -1,0 +1,107 @@
+/* Estilos específicos para los contactos de emergencia del paciente */
+@import '../../../shared/styles/variables.css';
+/* patient-detail-shared.css se importa centralmente desde patient-detail.css */
+
+/* El contenedor principal ya está definido en patient-detail-shared.css como .patient-detail__section */
+/* Los títulos H2 y H3 ya están definidos en patient-detail-shared.css */
+
+.patient-detail__section ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* Estilo para cada item de contacto */
+.patient-detail__section li {
+  margin-bottom: 1.5rem; /* Espacio entre contactos */
+  padding: 0.8rem;
+  background-color: white; /* Ajuste: usar fondo blanco para que el único gris sea el de los items internos, igual que Documento de Identificación */
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Último elemento sin margen inferior */
+.patient-detail__section li:last-child {
+  margin-bottom: 0;
+}
+
+/* Estilos para la lista de definición */
+.emergency-contact-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+/* Cada contenedor de término/descripción */
+.emergency-contact-details > div {
+  display: flex;
+  flex-direction: column;
+  background-color: #f9f9f9; /* Ajuste: fondo gris suave para cada item interno, consistente con Documento de Identificación */
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+/* Estilos para los términos (dt) */
+.emergency-contact-details dt {
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 0.25rem;
+}
+
+/* Estilos para las descripciones (dd) */
+.emergency-contact-details dd {
+  color: #868686;
+  font-weight: bolder;
+  margin-left: 0; /* Eliminar margen izquierdo predeterminado */
+}
+
+/* Mensaje cuando no hay contactos */
+.no-contacts-message {
+  color: #777;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Estilos específicos para impresión */
+@media print {
+  .patient-detail__section ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  
+  .patient-detail__section li {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    background-color: transparent !important;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid #ddd;
+    page-break-inside: avoid;
+  }
+  
+  .patient-detail__section li:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+  
+  .emergency-contact-details {
+    display: block;
+    margin: 0;
+  }
+  
+  .emergency-contact-details > div {
+    display: block;
+    background-color: transparent !important;
+    border-radius: 0;
+    padding: 0.25rem 0;
+    margin-bottom: 0.25rem;
+  }
+  
+  .no-contacts-message {
+    background-color: transparent !important;
+    padding: 0.5rem 0;
+  }
+}

@@ -1,0 +1,57 @@
+.clock {
+  font-size: 8vw; /* Usa viewport width para que el tamaño se ajuste según el ancho de la pantalla */
+  background-color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 1rem;
+  padding: 0.5rem;
+  border: 2px solid #ddd;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  font-family: 'Montserrat', sans-serif;
+  margin: 0.5rem auto;
+  max-width: 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 1200px) {
+  .clock {
+    font-size: 5.5vw; /* Reduce el tamaño de la fuente para pantallas más pequeñas */
+  }
+}
+
+@media (max-width: 992px) {
+  .clock {
+    font-size: 5vw; /* Reduce aún más el tamaño de la fuente */
+  }
+}
+
+@media (max-width: 768px) {
+  .clock {
+    font-size: 4.5vw; /* Reduce el tamaño de la fuente para pantallas medianas */
+  }
+}
+
+@media (max-width: 576px) {
+  .clock {
+    font-size: 4vw; /* Reduce el tamaño de la fuente para pantallas pequeñas */
+    padding: 0.75rem; /* Reduce el padding para que se vea mejor en pantallas pequeñas */
+  }
+}
+
+@media (max-width: 480px) {
+  .clock {
+    font-size: 3.5vw; /* Reduce aún más el tamaño de la fuente para pantallas muy pequeñas */
+    padding: 0.5rem; /* Reduce aún más el padding */
+  }
+}
+
+/* Ajustes para escala de 125% */
+@media (resolution: 125dpi) {
+  .clock {
+    font-size: 5.5vw; /* Ajusta el tamaño de la fuente para escala de 125% */
+    padding: 0.4rem; /* Ajusta el padding para escala de 125% */
+  }
+}

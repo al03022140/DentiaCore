@@ -1,0 +1,40 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\.75f8babe2b91948654398915dadefb880600bf8a-audit.json",
+    "files": [
+        {
+            "date": 1759254543000,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-09-30.log",
+            "hash": "d0ba129a0b4c2fec18ca86ec3a5399dc865c2e8353dc9b36b7eb1553e5050515"
+        },
+        {
+            "date": 1759339923715,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-10-01.log",
+            "hash": "fa163f26384ea18de44a696299d7c63433c087d1b24f44d7d1fb3d3628d3c9cb"
+        },
+        {
+            "date": 1759441782754,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-10-02.log",
+            "hash": "912b90d2ba7231673cf9060f91b02e7cd50338c91e765a2f39bc5da575155f60"
+        },
+        {
+            "date": 1759510886882,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-10-03.log",
+            "hash": "18b3aa987bf1f153a1f15532501ba106d188a53879cf88844bfa777448f2156e"
+        },
+        {
+            "date": 1761013487219,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-10-20.log",
+            "hash": "685453ca3eaeb8579f48dd54e64d34f59bd9db7cb163d3b3eb23c899f797a84b"
+        },
+        {
+            "date": 1761101190760,
+            "name": "C:\\Users\\arley\\OneDrive\\Documentos\\DENT -1.1  REVISION\\DENT -1.1\\Server\\logs\\exceptions-2025-10-21.log",
+            "hash": "2f7ed2983452a481b909569cf3ff20a8629a34d3a4b69156a4adc30aa38db19e"
+        }
+    ],
+    "hashType": "sha256"
+}
