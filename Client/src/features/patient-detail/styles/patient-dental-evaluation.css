@@ -1,0 +1,79 @@
+/* Estilos específicos para la evaluación dental del paciente */
+@import '../../../shared/styles/variables.css';
+/* patient-detail-shared.css se importa centralmente desde patient-detail.css */
+
+/* El contenedor principal ya está definido en patient-detail-shared.css como .patient-detail__section */
+/* Los títulos H2 y H3 ya están definidos en patient-detail-shared.css */
+
+/* Estilo para los contenedores de cada subsección */
+.patient-detail__subsection {
+  margin-bottom: var(--spacing-xl); /* Espacio entre subsecciones */
+  padding: var(--spacing-lg);
+  background-color: var(--color-bg-white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-medium);
+}
+
+/* Último elemento sin margen inferior */
+.patient-detail__subsection:last-child {
+  margin-bottom: 0;
+}
+
+/* Títulos de cada subsección (Línea de sonrisa, Evaluación ATM, etc.) */
+.patient-detail__section h3 {
+  font-size: var(--font-size-large);
+  font-weight: bolder;
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-light);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Estilos para párrafos */
+.patient-detail__section p {
+  margin: var(--spacing-sm) 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* Los estilos para strong y span ya están definidos en patient-detail-shared.css */
+
+/* Estilos para párrafos generales en subsecciones */
+.patient-detail__subsection > p {
+  margin: var(--spacing-sm) 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* Estilos para contenedores de datos bilaterales */
+.patient-detail__subsection > div {
+  margin: var(--spacing-sm) 0;
+}
+
+.patient-detail__subsection > div > p:first-child {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .patient-detail__section {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  .patient-detail__subsection {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .patient-detail__section h2 {
+    font-size: var(--font-size-xl);
+  }
+  
+  .patient-detail__section h3 {
+    font-size: var(--font-size-medium);
+  }
+}

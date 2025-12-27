@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Web site created using Vite" />
+    
+    <!-- Agregar política de referencia -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://*.gstatic.com blob: data:;
+      connect-src 'self' http://localhost:* http://127.0.0.1:* https://accounts.google.com https://www.googleapis.com https://www.gstatic.com data: ws: wss:;
+      frame-src 'self' https://accounts.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https://www.gstatic.com https://via.placeholder.com;
+">
+    <script src="/js/dateUtils.js"></script>
+    <script src="/js/engine.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <link rel="manifest" href="/manifest.json" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200&display=swap" rel="stylesheet">
+    <link rel="icon" href="/favicon.ico" />
+    <title>React App</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

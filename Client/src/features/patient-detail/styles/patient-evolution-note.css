@@ -1,0 +1,234 @@
+/* Styles scoped to patient-evolution-note section */
+.patient-evolution-note {
+  margin-top: 16px;
+}
+
+.patient-evolution-note__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.patient-evolution-note__header h2 {
+  margin: 0;
+  text-align: left;
+}
+
+/* Igualar formato del h2 al estilo unificado de patient-detail */
+.patient-evolution-note__header h2 {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 2px solid var(--color-primary-light);
+  flex: none;
+  order: 0;
+}
+
+.patient-evolution-note__header .Boton_Imprimir {
+  margin-left: auto; /* Asegura que el botón se quede a la derecha */
+  order: 1; /* Anula el order global (-1) y coloca el botón después del título */
+  flex-shrink: 0;
+  background-color: #1890ff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.patient-evolution-note__header .Boton_Imprimir:hover {
+  background-color: #40a9ff;
+}
+
+/* Form layout: horizontal fields */
+.patient-evolution-note__form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr; /* Procedimiento | Observaciones | Correcciones */
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+/* Each form-row uses Montserrat and full width inside its grid cell */
+.patient-evolution-note__form .form-row {
+  font-family: var(--font-family-primary);
+  min-width: 0; /* allow shrinking without overflow */
+}
+
+.patient-evolution-note__form .form-row label {
+  display: block;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 4px;
+  font-size: var(--font-size-base);
+}
+
+/* Ensure textareas and inputs use Montserrat and wrap text */
+.patient-evolution-note__form .form-row .ant-input,
+.patient-evolution-note__form .form-row .ant-input-textarea,
+.patient-evolution-note__form .form-row .ant-input-textarea textarea {
+  font-family: var(--font-family-primary);
+  white-space: pre-wrap; /* preserve newlines and wrap long lines */
+  word-wrap: break-word;
+  word-break: break-word; /* break long unspaced strings */
+  font-weight: 600; /* make text bolder */
+}
+
+/* Actions aligned to the right under the grid (span full row) */
+.patient-evolution-note__form .actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* History */
+.patient-evolution-note__history h3 {
+  margin: 12px 0 8px;
+  font-size: var(--font-size-large);
+  font-weight: bolder;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-light);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Prevent horizontal overflow on table, but prefer vertical growth */
+.patient-evolution-note__table-wrapper {
+  overflow-x: auto;
+}
+
+.patient-evolution-note__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* enable cell wrapping and fixed layout */
+}
+
+.patient-evolution-note__table th,
+.patient-evolution-note__table td {
+  border: 1px solid #e5e5e5;
+  padding: 8px;
+  text-align: left;
+  white-space: pre-wrap; /* allow wrapping within cells */
+  word-break: break-word;
+  overflow-wrap: anywhere; /* break long strings when necessary */
+  font-family: var(--font-family-primary);
+}
+
+.patient-evolution-note__table thead th {
+  background: #fafafa;
+  font-weight: bold;
+  color: #000;
+}
+
+/* Hacer más bolder la información del historial (manteniendo color) */
+.patient-evolution-note__table tbody td {
+  font-weight: bolder;
+  color: #868686; /* color para datos guardados */
+}
+
+/* Mantener el mensaje de "sin datos" con peso normal */
+.patient-evolution-note__table tbody td.no-data {
+  font-weight: 400;
+}
+
+.patient-evolution-note__table .no-data {
+  text-align: center;
+  color: #888;
+}
+
+/* Responsive: stack fields vertically on small screens */
+@media (max-width: 992px) {
+  .patient-evolution-note__form {
+    grid-template-columns: 1fr; /* stack */
+  }
+}
+/* Printable Area Styles */
+.printable-evolution-notes {
+  display: none;
+}
+
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the printable area and its children */
+  .printable-evolution-notes,
+  .printable-evolution-notes * {
+    visibility: visible;
+  }
+
+  /* Position the printable area absolutely to cover the page */
+  .printable-evolution-notes {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    padding: 20px;
+    z-index: 9999; /* Ensure it's on top */
+  }
+  
+  /* Ensure the printable area is displayed */
+  .printable-evolution-notes {
+    display: block !important;
+  }
+
+  /* Styling for the printed content */
+  .printable-evolution-notes h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 24px;
+    color: black;
+  }
+
+  .printable-evolution-notes table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 40px;
+  }
+
+  .printable-evolution-notes th,
+  .printable-evolution-notes td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: left;
+    font-size: 12px;
+    color: black;
+  }
+
+  .printable-evolution-notes th {
+    background-color: #f0f0f0;
+  }
+
+  .printable-signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 50px;
+    page-break-inside: avoid;
+  }
+
+  .signature-block {
+    width: 40%;
+    text-align: center;
+    border-top: 1px solid #000;
+    padding-top: 10px;
+    color: black;
+  }
+  
+  .print-date {
+    text-align: right;
+    margin-top: 20px;
+    font-size: 12px;
+    color: black;
+  }
+}
+
