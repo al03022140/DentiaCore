@@ -1,0 +1,38 @@
+{
+  "name": "dent",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "kill-port": "npx kill-port 5002 || echo Port 5002 cleared",
+    "kill-client-port": "npx kill-port 5173 || echo Port 5173 cleared && npx kill-port 5174 || echo Port 5174 cleared",
+    "mongod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\start-mongo.ps1",
+    "client": "npm run dev --prefix Client",
+    "server": "nodemon Server/scripts/dent.js",
+    "dev": "npm run kill-port && cross-env NODE_ENV=development concurrently \"npm run mongod\" \"npm run client\" \"npm run server\"",
+    "start": "npm run kill-port && npm run kill-client-port && concurrently \"npm run mongod\" \"npm run client\" \"npm run server\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "canvas": "^3.1.0",
+    "concurrently": "^9.1.2",
+    "cropperjs": "^1.6.2",
+    "form-data": "^4.0.4",
+    "fs-extra": "^11.3.0",
+    "html2canvas": "^1.4.1",
+    "joi": "^17.13.3",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.10",
+    "path": "^0.12.7",
+    "react-cropper": "^2.3.3",
+    "react-easy-crop": "^5.4.1",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "kill-port": "^2.0.1"
+  }
+}

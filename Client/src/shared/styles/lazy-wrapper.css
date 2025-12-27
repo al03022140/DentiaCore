@@ -1,0 +1,116 @@
+/* Estilos para LazyWrapper - Componente de carga lazy */
+
+.lazy-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  min-height: 200px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.lazy-loading-spinner {
+  margin-bottom: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e9ecef;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.lazy-loading-text {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: center;
+}
+
+/* Estilos para error boundary */
+.lazy-error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  min-height: 200px;
+  background-color: #fff5f5;
+  border-radius: 8px;
+  border: 1px solid #fed7d7;
+  text-align: center;
+}
+
+.lazy-error-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.lazy-error-container h3 {
+  color: #e53e3e;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+}
+
+.lazy-error-container p {
+  color: #718096;
+  margin: 0 0 1.5rem 0;
+  font-size: 0.9rem;
+}
+
+.lazy-error-retry {
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.lazy-error-retry:hover {
+  background-color: #c53030;
+}
+
+.lazy-error-retry:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .lazy-loading-container,
+  .lazy-error-container {
+    padding: 1rem;
+    min-height: 150px;
+  }
+  
+  .spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+  }
+  
+  .lazy-loading-text {
+    font-size: 0.8rem;
+  }
+  
+  .lazy-error-container h3 {
+    font-size: 1.1rem;
+  }
+  
+  .lazy-error-container p {
+    font-size: 0.8rem;
+  }
+}

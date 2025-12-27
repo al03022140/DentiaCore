@@ -1,0 +1,459 @@
+/**
+ * PeriodontogramLinearGraphics.css
+ * Estilos específicos para gráficas lineales del periodontograma
+ * 
+ * EXTENSIÓN del sistema de estilos existente - NO duplicación
+ */
+
+/* Canvas de gráficas lineales */
+.linear-graphics-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* Asegurar que el contenedor principal tenga position relative */
+.periodontogram-container {
+  position: relative;
+  overflow: visible;
+}
+
+/* Contenedor de arch-section debe permitir overlay */
+.arch-section {
+  position: relative;
+}
+
+/* Contenedores de imágenes deben permitir overlay */
+.images-section {
+  position: relative;
+}
+
+.images-row {
+  position: relative;
+}
+
+.image-cell {
+  position: relative;
+}
+
+/* Tooth image container debe permitir overlay */
+.tooth-image-container {
+  position: relative;
+  overflow: visible;
+}
+
+/* Efectos hover para inputs de medición */
+.mini-input:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.mini-input:hover {
+  border-color: #007bff;
+  transition: border-color 0.2s ease;
+}
+
+/* Estados de validación para inputs */
+.mini-input.validation-error {
+  border-color: #FF6B6B !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
+}
+
+.mini-input.validation-warning {
+  border-color: #FFA500 !important;
+  box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.2) !important;
+}
+
+.mini-input.validation-success {
+  border-color: #28a745;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
+}
+
+/* Indicadores de gráficas lineales activas */
+.linear-graphics-active .tooth-image-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .linear-graphics-canvas {
+    z-index: 8;
+  }
+}
+
+@media (max-width: 480px) {
+  .linear-graphics-canvas {
+    z-index: 6;
+  }
+  
+  .mini-input:focus {
+    outline-width: 1px;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+  }
+}
+
+/* Debug mode styles */
+.linear-graphics-debug .linear-graphics-canvas {
+  border: 2px dashed #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.05);
+}
+
+.linear-graphics-debug .tooth-image-container {
+  border: 1px dashed #4ecdc4;
+  background-color: rgba(78, 205, 196, 0.05);
+}
+
+/* Performance optimizations */
+.linear-graphics-canvas {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Accessibility improvements */
+.linear-graphics-canvas[aria-hidden="true"] {
+  speak: none;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mini-input:focus {
+    outline: 3px solid;
+    outline-offset: 2px;
+  }
+  
+  .linear-graphics-active .tooth-image-container::after {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .linear-graphics-canvas,
+  .mini-input,
+  .tooth-image-container::after,
+  .clinical-indicator,
+  .hover-tooltip,
+  .feedback-indicator {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ============================================================================ */
+/* ESTILOS AVANZADOS PARA NUEVAS FUNCIONALIDADES */
+/* ============================================================================ */
+
+/* Indicadores clínicos avanzados */
+.clinical-indicator {
+  position: absolute;
+  pointer-events: none;
+  z-index: 15;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.clinical-indicator.pathological-pocket {
+  background-color: #FF4444;
+  box-shadow: 0 0 6px rgba(255, 68, 68, 0.6);
+  animation: pulse-red 1s infinite alternate;
+}
+
+.clinical-indicator.severe-recession {
+  background-color: #FF8800;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  animation: fade-orange 0.8s infinite alternate;
+}
+
+.clinical-indicator.attachment-loss {
+  background-color: #CC0000;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  animation: bounce-red 1.2s infinite;
+}
+
+.clinical-indicator.bleeding {
+  background-color: #FF6666;
+  opacity: 0.7;
+  width: 4px;
+  height: 4px;
+}
+
+.clinical-indicator.suppuration {
+  background-color: #FFFF00;
+  opacity: 0.9;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+/* Animaciones para indicadores clínicos */
+@keyframes pulse-red {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes fade-orange {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+@keyframes bounce-red {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  60% { transform: translateY(-2px); }
+}
+
+/* Tooltips avanzados */
+.hover-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: #FFFFFF;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 200px;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.hover-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hover-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
+}
+
+/* Efectos de highlight mejorados */
+.measurement-highlight {
+  position: absolute;
+  pointer-events: none;
+  z-index: 12;
+  border: 3px solid #4A90E2;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: glow-blue 0.3s ease-in-out;
+}
+
+.measurement-highlight.active {
+  opacity: 0.3;
+}
+
+@keyframes glow-blue {
+  0% { box-shadow: 0 0 0 rgba(74, 144, 226, 0); }
+  50% { box-shadow: 0 0 20px rgba(74, 144, 226, 0.5); }
+  100% { box-shadow: 0 0 0 rgba(74, 144, 226, 0); }
+}
+
+/* Indicadores de feedback en tiempo real */
+.feedback-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  z-index: 16;
+  transition: all 0.3s ease;
+}
+
+.feedback-indicator.valid {
+  background-color: #4CAF50;
+  box-shadow: 0 0 4px rgba(76, 175, 80, 0.5);
+}
+
+.feedback-indicator.warning {
+  background-color: #FF9800;
+  box-shadow: 0 0 4px rgba(255, 152, 0, 0.5);
+  animation: pulse-warning 1s infinite;
+}
+
+.feedback-indicator.error {
+  background-color: #F44336;
+  box-shadow: 0 0 4px rgba(244, 67, 54, 0.5);
+  animation: shake-error 0.5s ease-in-out;
+}
+
+.feedback-indicator.info {
+  background-color: #2196F3;
+  box-shadow: 0 0 4px rgba(33, 150, 243, 0.5);
+}
+
+@keyframes pulse-warning {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes shake-error {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* Indicadores de progreso */
+.progress-indicator {
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  height: 2px;
+  background-color: #E0E0E0;
+  border-radius: 1px;
+  overflow: hidden;
+  z-index: 14;
+}
+
+.progress-indicator .progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  border-radius: 1px;
+  transition: width 0.5s ease;
+  transform-origin: left;
+}
+
+/* Estados de calidad de mediciones */
+.quality-score {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  z-index: 17;
+  border: 2px solid #FFFFFF;
+}
+
+.quality-score.excellent {
+  background-color: #4CAF50;
+}
+
+.quality-score.good {
+  background-color: #8BC34A;
+}
+
+.quality-score.fair {
+  background-color: #FF9800;
+}
+
+.quality-score.poor {
+  background-color: #F44336;
+}
+
+/* Efectos de auto-save */
+.auto-save-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: all 0.3s ease;
+}
+
+.auto-save-indicator.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.auto-save-indicator.success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.auto-save-indicator.error {
+  background-color: #F44336;
+  color: white;
+}
+
+/* Mejoras para inputs con validación avanzada */
+.mini-input.has-clinical-indicator {
+  position: relative;
+}
+
+.mini-input.pathological {
+  border-color: #FF4444 !important;
+  box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3) !important;
+}
+
+.mini-input.severe-condition {
+  border-color: #CC0000 !important;
+  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3) !important;
+  animation: urgent-attention 2s infinite;
+}
+
+@keyframes urgent-attention {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(204, 0, 0, 0.5); }
+}
+
+/* Optimizaciones de rendimiento */
+.linear-graphics-canvas.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+.tooth-image-container.optimized {
+  contain: layout style paint;
+}
+
+/* Modo debug mejorado */
+.linear-graphics-debug .clinical-indicator {
+  border: 1px solid #000;
+  opacity: 0.8;
+}
+
+.linear-graphics-debug .hover-tooltip {
+  border: 1px dashed #ff6b6b;
+}
+
+.linear-graphics-debug .feedback-indicator {
+  border: 1px solid #333;
+}
+
+/* Soporte para temas oscuros */
+@media (prefers-color-scheme: dark) {
+  .hover-tooltip {
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
+  }
+  
+  .hover-tooltip::after {
+    border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
+  }
+  
+  .auto-save-indicator.success {
+    background-color: #388E3C;
+  }
+  
+  .auto-save-indicator.error {
+    background-color: #D32F2F;
+  }
+}

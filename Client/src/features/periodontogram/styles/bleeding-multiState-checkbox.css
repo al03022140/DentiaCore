@@ -1,0 +1,234 @@
+/**
+ * Estilos para BleedingMultiStateCheckbox
+ * Mantiene exactamente la misma apariencia que el checkbox original
+ * pero agrega soporte para múltiples estados de sangrado
+ */
+
+/* Estilos base - copiados exactamente del checkbox original */
+.bleeding-multi-state,
+input.bleeding-multi-state,
+input.bleeding-multi-state.mini-checkbox {
+  width: 12px !important;
+  height: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff !important;
+  border: 1px solid #666 !important;
+  border-radius: 2px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  display: inline-block !important;
+  outline: none !important;
+  position: relative !important;
+  z-index: 10 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+}
+
+/* Estado base (sin marcar): hereda estilos base, no se necesita regla específica */
+
+/* Estado 1: Punto rojo (sangrado al sondaje) */
+.bleeding-multi-state.bleeding-state-1::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: #e74c3c !important;
+  border-radius: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+}
+
+/* Estado 2: Rectángulo horizontal rojo (sangrado persistente) */
+.bleeding-multi-state.bleeding-state-2::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 10px !important; /* Ancho que llega casi hasta los bordes */
+  height: 4px !important;  /* Altura pequeña para hacer rectángulo horizontal */
+  background: #e74c3c !important;
+  border-radius: 1px !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+}
+
+/* Estado 3: Cuadrado rojo completo (exudado purulento) */
+.bleeding-multi-state.bleeding-state-3::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 10px !important;  /* Llena casi todo el checkbox */
+  height: 10px !important; /* Llena casi todo el checkbox */
+  background: #e74c3c !important;
+  border-radius: 1px !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+}
+
+/* Estados hover - mantener consistencia */
+.bleeding-multi-state:hover:not(:disabled) {
+  border-color: #555;
+}
+
+/* Estado disabled */
+.bleeding-multi-state:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bleeding-multi-state:disabled::after {
+  opacity: 0.5;
+}
+
+/* El borde ya está definido en el estilo base para todos los estados */
+
+/* Transiciones suaves solo para estados con indicadores */
+.bleeding-multi-state.bleeding-state-1::after,
+.bleeding-multi-state.bleeding-state-2::after,
+.bleeding-multi-state.bleeding-state-3::after {
+  transition: all 0.2s ease;
+}
+
+/* Anular TODOS los estilos conflictivos de otros archivos CSS con máxima especificidad */
+.triple-checkbox .bleeding-multi-state[data-bleeding-type="multi-state"]:checked::after,
+.data-cell .bleeding-multi-state[data-bleeding-type="multi-state"]:checked::after,
+.bleeding-multi-state[data-bleeding-type="multi-state"]:checked::after,
+.bleeding-multi-state.mini-checkbox[data-bleeding-type="multi-state"]:checked::after,
+input.bleeding-multi-state[data-bleeding-type="multi-state"]:checked::after,
+input.bleeding-multi-state.mini-checkbox[data-bleeding-type="multi-state"]:checked::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  border: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Forzar que solo nuestros estados específicos sean visibles con máxima especificidad */
+.triple-checkbox .bleeding-multi-state.bleeding-state-1::after,
+.data-cell .bleeding-multi-state.bleeding-state-1::after,
+.bleeding-multi-state.bleeding-state-1::after {
+  display: block !important;
+}
+
+.triple-checkbox .bleeding-multi-state.bleeding-state-2::after,
+.data-cell .bleeding-multi-state.bleeding-state-2::after,
+.bleeding-multi-state.bleeding-state-2::after {
+  display: block !important;
+}
+
+.triple-checkbox .bleeding-multi-state.bleeding-state-3::after,
+.data-cell .bleeding-multi-state.bleeding-state-3::after,
+.bleeding-multi-state.bleeding-state-3::after {
+  display: block !important;
+}
+
+/* Compatibilidad con estilos existentes */
+.bleeding-multi-state[data-bleeding-type="multi-state"] {
+  /* Mantener compatibilidad con selectores existentes */
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Focus states para accesibilidad */
+.bleeding-multi-state:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 1px;
+}
+
+.bleeding-multi-state:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* REGLAS DE MÁXIMA PRIORIDAD - Estas deben estar al final del archivo */
+/* Usar especificidad extrema para garantizar que nuestros estilos prevalezcan */
+body .arch-section .data-section .data-row .data-cell .triple-checkbox .bleeding-multi-state.bleeding-state-1::after,
+body .bleeding-multi-state.bleeding-state-1::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: #e74c3c !important;
+  border-radius: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  z-index: 999 !important;
+}
+
+body .arch-section .data-section .data-row .data-cell .triple-checkbox .bleeding-multi-state.bleeding-state-2::after,
+body .bleeding-multi-state.bleeding-state-2::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 10px !important;
+  height: 4px !important;
+  background: #e74c3c !important;
+  border-radius: 1px !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  z-index: 999 !important;
+}
+
+body .arch-section .data-section .data-row .data-cell .triple-checkbox .bleeding-multi-state.bleeding-state-3::after,
+body .bleeding-multi-state.bleeding-state-3::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: #e74c3c !important;
+  border-radius: 1px !important;
+  transform: translate(-50%, -50%) !important;
+  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  z-index: 999 !important;
+}
+
+/* Anular cualquier pseudo-elemento conflictivo con especificidad extrema */
+body .arch-section .data-section .data-row .data-cell .triple-checkbox .bleeding-multi-state[data-type="bleeding"]:checked::after,
+body .bleeding-multi-state[data-type="bleeding"]:checked::after {
+  display: none !important;
+  content: none !important;
+  background: transparent !important;
+  width: 0 !important;
+  height: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  z-index: -1 !important;
+}
+
+/* Mantener el borde visible en modo visualización (disabled) para bleeding */
+/* Regla con alta especificidad para sobreescribir estilos genéricos que quitan el borde */
+.triple-checkbox input.bleeding-multi-state:disabled,
+.data-cell .triple-checkbox input.bleeding-multi-state:disabled,
+body .arch-section .data-section .data-row .data-cell .triple-checkbox input.bleeding-multi-state:disabled {
+  border: 1px solid #666 !important;
+  background: #fff !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 2px !important;
+  opacity: 1 !important;
+  filter: none !important;
+  cursor: default !important;
+}

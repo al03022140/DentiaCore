@@ -1,0 +1,219 @@
+/* Contenedor de estadísticas de pacientes */
+.patient-stats-container {
+  background-color: #fff;
+  border-radius: 1rem; /* Usamos rem para que el radio de borde sea relativo */
+  padding: 1.25rem; /* Usamos rem para que el padding sea relativo */
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  border: 2px solid #ddd;
+  flex-grow: 2; /* Asegura que crezca más en relación al reloj */
+  box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
+  width: 100%; /* Asegura que ocupe todo el ancho disponible */
+  height: 45vh; /* Asegura que ocupe todo el alto disponible */
+  min-height: 70%;
+  font-size: 1vw; /* Ajusta el tamaño de fuente según la escala */
+  display: flex; /* Usa flexbox para asegurar que el canvas ocupe todo el espacio */
+  flex-direction: column; /* Asegura que el canvas ocupe todo el alto disponible */
+}
+
+.patient-stats-container canvas {
+  flex-grow: 1; /* Asegura que el canvas ocupe todo el alto disponible */
+  width: 100%; /* Asegura que el canvas ocupe todo el ancho disponible */
+  min-height: 100%;
+  height: 100%; /* Asegura que el canvas ocupe todo el alto disponible */
+}
+
+/* Ajustes responsivos */
+@media (max-width: 1200px) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 80px);
+  }
+  .content {
+    gap: 1.5vw;
+    padding: 1.5vw;
+  }
+  .home {
+    height: calc(100vh - 80px);
+  }
+  .left-section,
+  .right-section {
+    padding: 1vw;
+  }
+  .patient-stats-container {
+    padding: 1vw;
+    font-size: 0.9vw; /* Reduce ligeramente el tamaño de fuente */
+  }
+}
+
+@media (max-width: 992px) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 70px);
+  }
+  .content {
+    gap: 1vw;
+    padding: 1vw;
+  }
+  .home {
+    height: calc(100vh - 70px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.9vw;
+  }
+  .patient-stats-container {
+    padding: 0.9vw;
+    font-size: 0.85vw; /* Reduce aún más el tamaño de fuente */
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 60px);
+  }
+  .content {
+    gap: 0.75vw;
+    padding: 0.75vw;
+  }
+  .home {
+    height: calc(100vh - 60px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.75vw;
+  }
+  .patient-stats-container {
+    padding: 0.75vw;
+    font-size: 0.8vw; /* Reduce aún más el tamaño de fuente */
+  }
+}
+
+@media (max-width: 576px) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 50px);
+  }
+  .content {
+    gap: 0.6vw;
+    padding: 0.6vw;
+  }
+  .home {
+    height: calc(100vh - 50px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.6vw;
+  }
+  .patient-stats-container {
+    padding: 0.6vw;
+    font-size: 0.75vw; /* Reduce aún más el tamaño de fuente */
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 40px);
+  }
+  .content {
+    gap: 0.5vw;
+    padding: 0.5vw;
+  }
+  .home {
+    height: calc(100vh - 40px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.5vw;
+  }
+  .patient-stats-container {
+    padding: 0.5vw;
+    font-size: 0.65vw; /* Reduce aún más el tamaño de fuente */
+  }
+}
+
+/* Ajustes para escala de 125% */
+@media (resolution: 125dpi) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 80px);
+  }
+  .content {
+    gap: 1vw;
+    padding: 1vw;
+  }
+  .home {
+    height: calc(100vh - 80px);
+  }
+  .left-section,
+  .right-section {
+    padding: 1vw;
+  }
+  .patient-stats-container {
+    padding: 0.8vw;
+    font-size: 0.85vw; /* Reduce ligeramente el tamaño de fuente para escala de 125% */
+  }
+}
+
+/* Ajustes para escala de 150% */
+@media (resolution: 150dpi) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 70px);
+  }
+  .content {
+    gap: 0.9vw;
+    padding: 0.9vw;
+  }
+  .home {
+    height: calc(100vh - 70px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.9vw;
+  }
+  .patient-stats-container {
+    padding: 0.7vw;
+    font-size: 0.75vw; /* Reduce aún más el tamaño de fuente para escala de 150% */
+  }
+}
+
+/* Ajustes para escala de 200% */
+@media (resolution: 200dpi) {
+  .dashboard {
+    height: 100vh;
+  }
+  .main {
+    height: calc(100vh - 60px);
+  }
+  .content {
+    gap: 0.75vw;
+    padding: 0.75vw;
+  }
+  .home {
+    height: calc(100vh - 60px);
+  }
+  .left-section,
+  .right-section {
+    padding: 0.75vw;
+  }
+  .patient-stats-container {
+    padding: 0.6vw;
+    font-size: 0.65vw; /* Reduce aún más el tamaño de fuente para escala de 200% */
+  }
+}

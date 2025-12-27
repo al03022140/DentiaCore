@@ -1,0 +1,899 @@
+/* Estilos base */
+ .add-patient-wrapper {
+  font-family: 'Montserrat', sans-serif;
+  color: #2e2e2e;
+  padding: 20px;
+  box-sizing: border-box;
+  padding-left: 0.5rem; /* Se reduce para evitar que el contenido se salga */
+  display: flex;
+  flex-direction: column;
+}
+
+.add-patient-wrapper h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0;
+  padding: 1rem 0;
+  border-top: 1px solid #ccc;
+  padding-bottom: 2rem;
+  /* Otros estilos comunes que desees */
+}
+
+
+/* Contenedor scrollable */
+.add-patient-wrapper .scrollable-form {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding: 0 10px 50px 10px; /* Aumentamos el padding-bottom para los botones */
+  scrollbar-width: thin;
+  scrollbar-color: #cccccc transparent;
+}
+.add-patient-wrapper .scrollable-form::-webkit-scrollbar {
+  width: 8px;
+}
+.add-patient-wrapper .scrollable-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+.add-patient-wrapper .scrollable-form::-webkit-scrollbar-thumb {
+  background-color: #cccccc;
+  border-radius: 10px;
+}
+
+/* Contenedor principal del formulario */
+.add-patient-wrapper .add-patient-container {
+  padding: 10px;
+  /* Se usa overflow auto para limpiar los floats */
+  overflow: auto;
+  overflow-x: hidden;
+  max-width: 1500px;
+  width: 95vw;
+}
+
+/* Cabecera: imagen a la izquierda y título a la derecha */
+.add-patient-wrapper .add-patient-header {
+  display: flex;
+  align-items: center; /* Alinea la imagen y el título a la misma altura */
+  justify-content: space-between; /* Mantiene la imagen a la izquierda y el texto a la derecha */
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 0 20px; /* Ajusta si es necesario */
+}
+
+
+
+/* Contenedor de la foto del paciente */
+.add-patient-wrapper .patient-photo-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Controles de imagen fuera de la foto */
+.add-patient-wrapper .image-controls-outside {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translate(10px, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9;
+}
+
+/* Botón de eliminar en los controles externos */
+.add-patient-wrapper .image-controls-outside .trash-button {
+  background-color: #ffebee;
+  border: 2px solid #ffcdd2;
+  border-radius: 8px;
+  color: #d32f2f;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.add-patient-wrapper .image-controls-outside .trash-button:hover {
+  background-color: #ffcdd2;
+  border-color: #ef9a9a;
+  transform: scale(1.05);
+}
+
+/* Botón de eliminar foto - SOLO dentro del contenedor de foto */
+.add-patient-wrapper .patient-photo-container .trash-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  background-color: #ffebee;
+  border: 2px solid #ffcdd2;
+  color: #d32f2f;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.add-patient-wrapper .patient-photo-container .trash-button:hover {
+  background-color: #ffcdd2;
+  border-color: #ef9a9a;
+  transform: scale(1.05);
+}
+
+.add-patient-wrapper .patient-photo-container:hover:not(.cropping-mode) {
+  transform: scale(1.05);
+  background-color: #ccc; /* Se pone en gris al hacer hover */
+}
+.add-patient-wrapper .patient-photo-container:hover:not(.cropping-mode) .upload-text {
+  opacity: 1;
+}
+
+/* Estilos específicos para el modo cropping */
+.add-patient-wrapper .patient-photo-container.cropping-mode {
+  cursor: move;
+  border: 2px solid #4CAF50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.add-patient-wrapper .patient-photo-container.cropping-mode:hover {
+  transform: none;
+  background-color: transparent;
+}
+.add-patient-wrapper .patient-photo-container input[type="file"] {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Imagen dentro del contenedor */
+.add-patient-wrapper .patient-photo-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Texto de "Subir" en hover */
+.add-patient-wrapper .upload-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  font-size: 1.2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.add-patient-wrapper .patient-photo-container:hover .upload-text {
+  opacity: 1;
+}
+
+/* Formulario general */
+.add-patient-wrapper .add-patient-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  clear: both; /* Asegura que el formulario se ubique debajo de la cabecera flotante */
+  padding-right: 2rem;
+}
+
+/* Secciones del formulario */
+.add-patient-wrapper .form-section {
+  margin-bottom: 0rem;
+}
+
+
+/* Grilla para campos en línea */
+.add-patient-wrapper .form-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* Estilo para cada grupo de campo */
+.add-patient-wrapper .form-group {
+  display: flex;
+  flex-direction: column;
+  max-width: 600px;
+  width: 100%;
+  margin-right: auto;
+  margin-bottom: 1rem;
+}
+
+/* Reducir espaciado para checkboxes en evaluación dental */
+.add-patient-wrapper .form-group:has(input[type="checkbox"]) {
+  margin-bottom: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Ajustar el label para checkboxes */
+.add-patient-wrapper .form-group:has(input[type="checkbox"]) label {
+  margin-bottom: 0.3rem;
+  font-size: 0.95rem;
+}
+.add-patient-wrapper .form-group label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+/* Inputs y selects */
+.add-patient-wrapper .form-group input,
+.add-patient-wrapper .form-group select,
+.add-patient-wrapper .form-group textarea {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-family: inherit;
+  font-weight: bold;
+  color: #1a1a1a;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+/* Placeholder */
+.add-patient-wrapper .form-group input::placeholder,
+.add-patient-wrapper .form-group textarea::placeholder {
+  color: #999;
+  font-weight: normal;
+}
+
+/* Select con scroll */
+.add-patient-wrapper .form-group select {
+  max-height: 200px;
+  overflow-y: auto;
+  color: #000;
+  font-weight: bold;
+}
+.add-patient-wrapper .form-group select option {
+  color: #000 !important;
+  background-color: #fff !important;
+  font-weight: bold !important;
+  width: 286.2px;
+  height: 42px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.add-patient-wrapper .form-group select option:first-child {
+  color: #999;
+  width: 286.2px;
+  height: 42px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+/* Estilo para checkboxes */
+.add-patient-wrapper .form-group input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  background-color: transparent;
+  transition: all 0.3s ease;
+  margin: 0;
+  flex-shrink: 0;
+}
+.add-patient-wrapper .form-group input[type="checkbox"]:checked {
+  background-color: #4caf50;
+  border-color: #4caf50;
+}
+.add-patient-wrapper .form-group input[type="checkbox"]::before {
+  content: '✔';
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+.add-patient-wrapper .form-group input[type="checkbox"]:checked::before {
+  display: block;
+}
+
+/* Contenedor de acciones (botones) */
+.add-patient-wrapper .actions-container {
+  display: flex;
+  justify-content: flex-end; /* Alinea los botones a la derecha */
+  gap: 7rem;
+  margin-top: 20px;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Botones */
+.add-patient-wrapper .confirm-button,
+.add-patient-wrapper .cancel-button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.add-patient-wrapper .confirm-button {
+  background-color: #80bf82;
+  color: #fff;
+}
+.add-patient-wrapper .cancel-button {
+  background-color: #f2746b;
+  color: #fff;
+}
+.add-patient-wrapper .confirm-button:hover {
+  background-color: #70a872;
+}
+.add-patient-wrapper .cancel-button:hover {
+  background-color: #e0635a;
+}
+
+/* Todos los inputs mantienen el tamaño estándar de 286.2x42px */
+.add-patient-wrapper .form-group input[type="text"],
+.add-patient-wrapper .form-group input[type="number"],
+.add-patient-wrapper .form-group input[type="date"],
+.add-patient-wrapper .form-group input[type="email"],
+.add-patient-wrapper .form-group input[type="password"],
+.add-patient-wrapper .form-group select {
+  width: 286.2px !important;
+  height: 42px !important;
+  box-sizing: border-box;
+}
+
+/* Grid para la sección de Identificación */
+.add-patient-wrapper .form-section:first-of-type .form-group-grid {
+  grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+  gap: 0rem;
+  max-width: 620px;
+}
+
+/* Textareas más grandes */
+.add-patient-wrapper .form-group textarea {
+  width: 100%;
+  max-width: 500px;
+  height: 100px;
+  resize: vertical;
+}
+
+/* Botones para recorte y subida de imagen */
+.add-patient-wrapper .upload-button,
+.add-patient-wrapper .crop-button {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  background-color: #4caf50;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.add-patient-wrapper .upload-button:hover,
+.add-patient-wrapper .crop-button:hover {
+  background-color: #45a049;
+}
+
+/* Plantilla de alineación (Cropper) */
+.add-patient-wrapper .overlay-template {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 80%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* =========================
+   Muestra/Oculta campos de cepillo
+========================= */
+.add-patient-wrapper .cepillo-dental-fields {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; 
+  opacity: 0;
+  max-height: none;
+  visibility: hidden;
+  overflow: visible;
+}
+
+/* Mostrar cuando 'show' está activo */
+.add-patient-wrapper .cepillo-dental-fields.show {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Ajuste del título principal (evitar la coma extra en font-weight) */
+.add-patient-wrapper .add-patient-title {
+  font-size: 4rem !important;
+  font-weight: bolder !important;
+  font-family: 'Montserrat', sans-serif !important;
+  text-align: right;
+  flex-grow: 1;
+  margin: 0;
+  padding-left: 20px;
+  color: #000;
+  padding-right: 2rem;
+}
+
+/* Ajustes para react-easy-crop */
+.add-patient-wrapper .image-container {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Estilos para el cropper en modo activo */
+.add-patient-wrapper .image-container .reactEasyCrop_Container {
+  border-radius: 50%;
+}
+
+.add-patient-wrapper .image-container .reactEasyCrop_CropArea {
+  border: 2px solid #4CAF50 !important;
+  box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Indicador visual para el modo de edición */
+.add-patient-wrapper .cropping-mode::after {
+  content: "Arrastra para mover • Scroll para zoom";
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(76, 175, 80, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+/* Controles de imagen dentro de la foto */
+.add-patient-wrapper .image-controls {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 8px;
+}
+
+.add-patient-wrapper .crop-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: Montserrat, sans-serif;
+  font-weight: bold;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.add-patient-wrapper .crop-button:hover {
+  background-color: #45a049;
+  transform: scale(1.05);
+}
+
+
+
+.add-patient-wrapper .upload-button {
+  margin-top: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.add-patient-wrapper .right-section {
+  display: flex !important;
+  gap: 2rem !important;
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+  flex-direction: row !important;
+}
+
+
+.add-patient-wrapper .medicacion-col, 
+.add-patient-wrapper .alergias-col {
+  padding-left: 1rem;
+  flex: 1 1 0;
+  min-width: 5rem;
+  display: flex;
+  flex-direction: column;
+  max-height: 64rem; /* Ajusta la altura máxima fija según el contenedor de la encuesta médica */
+  width: 100%; /* Se mantiene dentro del layout */
+  overflow-y: auto; /* Scroll solo en Y */
+  scrollbar-width: thin;
+  scrollbar-color: #cccccc transparent;
+  border: 1px solid #ccc;
+  border-radius: 1rem;
+  padding-bottom: 1rem;
+  padding-right: 1rem;
+}
+
+/* Ajuste del scroll para navegadores Webkit */
+.add-patient-wrapper .medicacion-col::-webkit-scrollbar, 
+.add-patient-wrapper .alergias-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.add-patient-wrapper .medicacion-col::-webkit-scrollbar-track, 
+.add-patient-wrapper .alergias-col::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.add-patient-wrapper .medicacion-col::-webkit-scrollbar-thumb, 
+.add-patient-wrapper .alergias-col::-webkit-scrollbar-thumb {
+  background-color: #cccccc;
+  border-radius: 10px;
+}
+
+
+.add-patient-wrapper .encuesta-medica-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  min-width: 100%;
+}
+.encuesta-medica-container .left-section {
+  width: 50% !important;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* Dos columnas de igual ancho */
+  gap: 2rem; /* Espaciado entre las celdas */
+  overflow-y: hidden;
+}
+
+.encuesta-medica-container .left-section .enfermedades-multiples-section {
+  grid-column: 1 / -1;
+}
+
+/* Estilos específicos para inputs dentro de la left-section */
+.encuesta-medica-container .left-section .form-group input[type="text"],
+.encuesta-medica-container .left-section .form-group input[type="number"],
+.encuesta-medica-container .left-section .form-group input[type="date"],
+.encuesta-medica-container .left-section .form-group input[type="email"],
+.encuesta-medica-container .left-section .form-group input[type="password"],
+.encuesta-medica-container .left-section .form-group select {
+  width: 286.2px !important;
+  height: 42px !important;
+  box-sizing: border-box;
+}
+
+/* Estilos específicos para textareas dentro de la left-section */
+.encuesta-medica-container .left-section .form-group textarea {
+  width: 100%;
+  max-width: 100%; /* Limita el ancho al contenedor del grid */
+  min-width: 0; /* Permite que se reduzca si es necesario */
+  box-sizing: border-box;
+  resize: vertical; /* Solo permite redimensionar verticalmente */
+}
+
+/* Estilos específicos para la sección de información femenina */
+.add-patient-wrapper .form-section .form-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Asegurar que los inputs en la sección femenina se acomoden correctamente */
+.add-patient-wrapper .form-section .form-group-grid .form-group {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.add-patient-wrapper .form-section .form-group-grid .form-group input,
+.add-patient-wrapper .form-section .form-group-grid .form-group textarea,
+.add-patient-wrapper .form-section .form-group-grid .form-group select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.add-patient-wrapper .form-section .form-group-grid .form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Estilos específicos para checkboxes en la sección femenina */
+.add-patient-wrapper .form-section .form-group-grid .form-group input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  min-width: 18px !important;
+  flex-shrink: 0;
+}
+/* Estilo para mostrar enfermedades en dos columnas */
+.enfermedades-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  align-items: start;
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.enfermedades-grid h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 15px 0;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.enfermedades-grid .form-group {
+  margin-bottom: 8px;
+}
+
+.enfermedades-grid .form-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.enfermedades-grid .form-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.encuesta-medica-container .right-section {
+  width: 50% !important; /* Deja un pequeño margen para el gap */
+  height: 100%;
+  overflow-y: hidden;
+}
+
+
+
+/* Ajustar el grid dentro de Hábitos de Higiene Bucodental */
+.habitos-higiene-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(250px, 1fr)); /* 3 columnas ajustables */
+  gap: 1rem; /* Espaciado entre los elementos */
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Ajustar cada campo dentro del grid */
+.habitos-higiene-grid .form-group {
+  width: 100%;
+  max-width: none; /* Asegurar que los inputs se expandan correctamente */
+}
+
+/* Asegurar que select y input tengan el mismo ancho */
+.habitos-higiene-grid .form-group input,
+.habitos-higiene-grid .form-group select {
+  width: 100%;
+}
+
+/* Estilos para el botón de agregar contacto de emergencia */
+.action-button {
+  font-family: Montserrat, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #f8f8f8;
+  border: 2px solid #e0e0e0;
+  border-radius: 1rem;
+  color: rgb(0, 0, 0);
+  padding: 10px 15px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  margin-top: 2rem; /* Added margin-bottom to create space below the button */
+}
+/* Los botones de cirugías previas ahora usan las clases existentes: action-button y trash-button */
+
+/* Estilos para la sección de array inputs (cirugías previas) */
+.array-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.array-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.array-item:hover {
+  background-color: #f0f0f0;
+}
+
+.array-item input[type="text"] {
+  flex: 1;
+  margin: 0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-family: Montserrat, sans-serif;
+  font-weight: bold;
+}
+
+.array-item input[type="text"]::placeholder {
+  color: #666;
+  font-weight: bolder;
+}
+
+/* Estilo para placeholder de Motivo de Consulta Odontológica */
+textarea[placeholder*="Describa el motivo principal"]::placeholder {
+  color: #666;
+  font-weight: bolder;
+}
+
+.action-button:hover {
+  background-color: #e0e0e0;
+  border-color: #bdbdbd;
+  transform: scale(1.05);
+}
+
+.actiont-button:active {
+  transform: scale(0.95);
+}
+
+/* Botón de trash para arrays (NO para foto del paciente) */
+.array-item .trash-button {
+  font-family: Montserrat, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffebee;
+  border: 2px solid #ffcdd2;
+  border-radius: 0.8rem;
+  color: #d32f2f;
+  padding: 8px 12px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
+  min-width: 40px;
+  height: 40px;
+}
+
+.array-item .trash-button:hover {
+  background-color: #ffcdd2;
+  border-color: #ef9a9a;
+  transform: scale(1.05);
+}
+
+.array-item .trash-button:active {
+  transform: scale(0.95);
+  background-color: #ef5350;
+  color: white;
+}
+
+.medicacion-input,
+.alergia-input {
+  width: 100%;
+  min-width: none;
+  max-width: 90%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 1rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  font-weight: bolder;
+  color: #1a1a1a;
+  background-color: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Efecto cuando el input está en foco */
+.medicacion-input:focus,
+.alergia-input:focus {
+  border-color: #000000;
+  outline: none;
+}
+
+/* Placeholder estilizado */
+.medicacion-input::placeholder,
+.alergia-input::placeholder {
+  color: #a4a4a4;
+  font-weight: bolder;
+}
+
+/* Espaciado vertical entre contactos de emergencia y antecedentes familiares */
+.form-group-grid {
+  margin-bottom: 2rem;
+}
+
+/* Último elemento sin margen inferior */
+.form-group-grid:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Estilos específicos para Antecedentes Heredo Familiares */
+.form-section .form-group-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+/* Separación visual para minisecciones de Evaluación Dental y Oclusal */
+.form-section h3 {
+  border-top: 1px solid #ccc;
+  padding-top: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.form-section .form-group-grid .form-group:first-child {
+  flex: 0 0 200px; /* Ancho fijo para el campo de parentesco */
+}
+
+.form-section .form-group-grid .form-group:nth-child(2) {
+  flex: 0 0 200px; /* Ancho fijo para el campo de parentesco específico cuando aparece */
+}
+
+.form-section .form-group-grid .form-group:last-of-type {
+  flex: 1; /* El campo de antecedentes toma el espacio restante */
+  min-width: 300px;
+}
+
+.form-section .form-group-grid .array-item .trash-button {
+  flex: 0 0 auto; /* El botón mantiene su tamaño natural */
+  width: 40px; /* Ancho fijo para evitar que se expanda */
+  min-width: 40px;
+  max-width: 40px;
+  align-self: flex-end;
+  margin-bottom: 1rem;
+}
+

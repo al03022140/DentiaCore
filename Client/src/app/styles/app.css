@@ -1,0 +1,105 @@
+/* Dashboard General */
+/* Dashboard General */
+.dashboard {
+  display: block;
+  min-height: 100vh;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  margin-left: 220px; /* Espacio para la sidebar fija */
+}
+
+
+
+/* Main layout */
+.main {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding-left: 0; /* Elimina padding izquierdo */
+  height: 100%;
+  min-height: 100vh;
+}
+
+/* Content */
+.content {
+  display: grid;
+  grid-template-columns: 2fr auto; /* => la derecha se ajusta */
+  padding: 20px;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+
+.home {
+  display: grid;
+  /* Distribución 2 partes izq. / 1 parte der. */
+  grid-template-columns: 1fr 1fr; 
+  width: 100%;
+  /* Para que ocupe alto completo menos la cabecera, si lo deseas */
+  min-height: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 100%;
+}
+
+.left-section,
+.right-section {
+  display: flex;              /* para alinear internamente */
+  flex-direction: column;     /* contenido apilado verticalmente */
+  /* Elimina width: 500px; max-width: 600px; etc. */
+  box-sizing: border-box; 
+  overflow-y: auto;    
+  height: 100%;   
+  min-height: 100%;      
+  overflow-x: hidden;
+}
+
+.left-section {
+  /* Quita max-width: 500px o cualquier width fijo */
+  display: flex;
+  flex-direction: column;
+  overflow: auto; /* Si quieres scroll interno cuando crezca demasiado */
+  box-sizing: border-box;
+  padding-right: 10px;
+}
+
+.right-section {
+  /* Quita width: 500px para que la grid le asigne el ancho 1fr */
+    padding-left: 10px;
+    /* sin width fijo */
+  
+}
+
+/* Específico para la tabla de calendario */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-left: 0;
+}
+
+td, th {
+  text-align: left;
+  padding: 8px 10px; /* Reduce espacio entre celdas */
+}
+
+/* Estilos específicos para impresión */
+@media print {
+  .dashboard {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+  }
+  
+  .content {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}

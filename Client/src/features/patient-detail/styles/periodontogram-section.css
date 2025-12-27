@@ -1,0 +1,422 @@
+@import '../../../shared/styles/variables.css';
+
+/* Contenedor general del periodontograma dentro de Patient Detail */
+.periodontogram-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  background: var(--color-background-white, #ffffff);
+  border: 1px solid var(--color-border-light, #dee2e6);
+  border-radius: var(--border-radius-lg, 12px);
+  padding: var(--spacing-xl, 1.5rem);
+  box-shadow: var(--shadow-card, 0 4px 12px rgba(0, 0, 0, 0.08));
+  margin-bottom: var(--spacing-xxl, 2.5rem);
+}
+
+/* Estilos para la sección de imágenes del periodontograma */
+.periodontogram-image-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin: 1rem 0;
+}
+
+.image-control-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  background-color: #fafafa;
+}
+
+.image-control-section h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 0.5rem;
+}
+
+.saved-images-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  background: #f9f9f9;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+}
+
+.saved-image-section {
+  width: 100%;
+  max-width: none;
+  background: white;
+  border-radius: 8px; /* Mismo border-radius que .periodontogram-container */
+  padding: 20px; /* Mismo padding que .periodontogram-container */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Misma sombra que .periodontogram-container */
+  border: 1px solid #e9ecef;
+}
+
+.saved-image-section h4 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #495057;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 0.5rem;
+}
+
+.saved-image-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.saved-periodontogram-image {
+  width: 100%;
+  height: auto;
+  max-width: none;
+  border: 1px solid #dee2e6; /* Mismo borde que .arch-section */
+  border-radius: 6px; /* Mismo border-radius que .arch-section */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05); /* Misma sombra que .arch-section */
+  transition: all 0.3s ease;
+  background: white;
+  padding: 20px; /* Mismo padding que .arch-section */
+  box-sizing: border-box; /* Mismo box-sizing que .arch-section */
+  object-fit: contain; /* Mantener proporciones exactas */
+  display: block;
+  margin: 0 auto; /* Centrar la imagen */
+}
+
+.image-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.image-controls .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+.saved-periodontogram-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Estilos para estadísticas guardadas - Siguiendo el estilo del panel de estadísticas del periodontograma */
+.saved-statistics {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #dee2e6;
+  margin-top: 0;
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+}
+
+.saved-statistics h5 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.stat-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2c3e50;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  
+  .stat-item {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .saved-statistics {
+    padding: 15px;
+  }
+  
+  .saved-statistics h5 {
+    font-size: 1.1rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .stat-value {
+    font-size: 1.1rem;
+  }
+}
+
+/* Estilos de botones específicos para periodontogram-section */
+.periodontogram-section .btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.periodontogram-section .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.periodontogram-section .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.periodontogram-section .btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.periodontogram-section .btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.periodontogram-section .btn-secondary:hover:not(:disabled) {
+  background-color: #545b62;
+}
+
+/* Estilos para el mensaje cuando no hay imágenes guardadas */
+.no-images-message {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px dashed #dee2e6;
+  border-radius: 12px;
+  color: #6c757d;
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.no-images-message p {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.no-images-message p:first-child {
+  font-weight: 600;
+  color: #495057;
+  font-size: 1.2rem;
+}
+
+.no-images-message p:last-child {
+  font-style: italic;
+  color: #6c757d;
+  font-size: 1rem;
+}
+
+.periodontogram-section .btn-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.periodontogram-superior,
+.periodontogram-inferior {
+  margin-bottom: 1rem;
+}
+
+/* Contenedor principal del periodontograma para captura */
+.periodontogram-container {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .periodontogram-image-controls {
+    gap: 1rem;
+  }
+  
+  .image-control-section {
+    padding: 1rem;
+  }
+  
+  .image-control-section h4 {
+    font-size: 1.1rem;
+  }
+  
+  .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85rem;
+  }
+  
+  .saved-statistics {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .periodontogram-image-controls {
+    margin: 0.5rem 0;
+  }
+  
+  .image-control-section {
+    padding: 0.75rem;
+  }
+  
+  .btn {
+    width: 100%;
+    padding: 0.75rem;
+  }
+}
+
+/* Animaciones de carga específicas para periodontogram-section */
+.periodontogram-section .btn:disabled {
+  position: relative;
+}
+
+.periodontogram-section .btn:disabled::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  border: 2px solid transparent;
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Estados de éxito y error */
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+/* --- Mezcla: acciones de imagen guardada (desde CSS duplicado no importado) --- */
+.saved-image-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.saved-image-actions .btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.saved-image-actions .btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.saved-image-actions .btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.saved-image-actions .btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.saved-image-actions .btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+  transform: translateY(-1px);
+}
+
+.saved-image-actions .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}

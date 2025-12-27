@@ -1,0 +1,83 @@
+.header {
+  grid-row: 1 / 2; /* Está en la primera fila */
+  grid-column: 2 / -1; /* Ocupa desde la segunda columna hacia la derecha */
+  background-color: #d5d5d573;
+  padding: 1rem 2rem; /* Uniforme */
+  display: flex; /* Flexbox para alinear título y reloj */
+  align-items: center;
+  justify-content: space-between; /* Título a la izquierda, reloj a la derecha */
+  font-size: 2rem; /* Tamaño base en rem */
+  color: #555;
+  border-bottom: 1px solid #ccc;
+  box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
+}
+
+.header h1 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 3rem; /* Tamaño base en rem */
+  color: #555;
+  flex: 1;
+  text-align: left;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 1200px) {
+  .header {
+    font-size: 1.875rem; /* Reduce el tamaño de la fuente para pantallas más pequeñas */
+    padding: 0.75rem 1.5rem;
+  }
+  .header h1 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .header {
+    font-size: 1.75rem; /* Reduce aún más el tamaño de la fuente */
+    padding: 0.75rem 1.25rem;
+  }
+  .header h1 {
+    font-size: 1.875rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    font-size: 1.5rem; /* Reduce el tamaño de la fuente para pantallas medianas */
+    padding: 0.5rem 1rem;
+  }
+  .header h1 {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .header {
+    font-size: 1.25rem; /* Reduce el tamaño de la fuente para pantallas pequeñas */
+    padding: 0.5rem 0.75rem;
+  }
+  .header h1 {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    font-size: 1rem; /* Reduce aún más el tamaño de la fuente para pantallas muy pequeñas */
+    padding: 0.5rem 0.5rem;
+  }
+  .header h1 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Ajustes para escala de 125% */
+@media (resolution: 125dpi) {
+  .header {
+    font-size: 1.5rem; /* Ajusta el tamaño de la fuente para escala de 125% */
+    padding: 0.4rem 1rem;
+  }
+  .header h1 {
+    font-size: 1.875rem;
+  }
+}

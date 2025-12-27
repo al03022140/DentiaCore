@@ -1,0 +1,75 @@
+/* =========================
+   VARIABLES CSS GLOBALES
+   Sistema de Design Tokens
+   ========================= */
+
+:root {
+  /* Paleta de Colores Principal */
+  --color-primary: #084888;
+  --color-primary-hover: #025db8;
+  --color-primary-light: #3498db;
+  
+  /* Colores de Texto */
+  --color-text-primary: #2c3e50;
+  --color-text-secondary: #555;
+  --color-text-muted: #7f8c8d;
+  --color-text-light: #95a5a6;
+  --color-text-black: #000;
+  --color-text-dark: #2e2e2e;
+  
+  /* Colores de Fondo */
+  --color-bg-white: #fff;
+  --color-bg-light: #f9f9f9;
+  --color-bg-section: #fdf2f2;
+  
+  /* Colores de Estado */
+  --color-success: #27ae60;
+  --color-warning: #f39c12;
+  --color-danger: #e74c3c;
+  --color-info: #3498db;
+  
+  /* Colores de Borde */
+  --color-border-light: #e8e8e8;
+  --color-border-medium: #ccc;
+  --color-border-dark: #ddd;
+  
+  /* Sombras */
+  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 0 5px rgba(0, 0, 0, 0.1);
+  
+  /* Tipografía */
+  --font-family-primary: 'Montserrat', sans-serif;
+  --font-size-small: 1rem;
+  --font-size-base: 1.1rem;
+  --font-size-medium: 1.2rem;
+  --font-size-large: 1.4rem;
+  --font-size-xl: 1.6rem;
+  --font-size-xxl: 1.8rem;
+  --font-size-title: 2.5rem;
+  --font-size-hero: 3rem;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Espaciado */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --spacing-lg: 1rem;
+  --spacing-xl: 1.5rem;
+  --spacing-xxl: 2rem;
+  
+  /* Bordes */
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+  --border-radius-circle: 50%;
+  
+  /* Transiciones */
+  --transition-fast: 0.2s ease;
+  --transition-medium: 0.3s ease;
+  --transition-slow: 0.5s ease;
+}
