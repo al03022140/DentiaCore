@@ -1,4 +1,10 @@
-# Ignore OS-specific files
-**/desktop.ini
-**/.DS_Store
-**/Thumbs.db
+@'
+node_modules/
+.env
+.DS_Store
+__pycache__/
+*.pyc
+dist/
+build/
+.vscode/
+'@ | Out-File -Encoding utf8 .gitignore
