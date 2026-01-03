@@ -153,82 +153,113 @@
   display: none;
 }
 
+/* Estilos para el modo de impresión específico de notas de evolución */
 @media print {
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
+  /* Configuración de página carta */
+  @page {
+    size: letter;
+    margin: 1.5cm;
   }
 
-  /* Show only the printable area and its children */
-  .printable-evolution-notes,
-  .printable-evolution-notes * {
-    visibility: visible;
+  /* Si estamos en modo impresión de evolución (clase añadida al body) */
+  body.printing-evolution-mode {
+    background: white;
+    height: auto;
+    overflow: visible;
   }
 
-  /* Position the printable area absolutely to cover the page */
-  .printable-evolution-notes {
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
+  /* Ocultar todo el contenido normal cuando estamos en este modo */
+  body.printing-evolution-mode > *:not(.printing-portal) {
+    display: none !important;
+  }
+
+  /* Mostrar y estilizar el portal de impresión */
+  .printing-portal {
+    display: block !important;
+    position: relative; /* Relative para respetar márgenes de página */
     width: 100%;
     background: white;
-    padding: 20px;
-    z-index: 9999; /* Ensure it's on top */
-  }
-  
-  /* Ensure the printable area is displayed */
-  .printable-evolution-notes {
-    display: block !important;
+    color: black;
+    font-family: var(--font-family-primary, sans-serif);
   }
 
-  /* Styling for the printed content */
-  .printable-evolution-notes h1 {
+  /* Estilos internos del contenido impreso */
+  .printing-portal h1 {
     text-align: center;
     margin-bottom: 20px;
-    font-size: 24px;
+    font-size: 20px; /* Ajustado para carta */
     color: black;
+    text-transform: uppercase;
   }
 
-  .printable-evolution-notes table {
+  .printing-portal table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
+    font-size: 11px; /* Letra más pequeña para que quepa mejor */
   }
 
-  .printable-evolution-notes th,
-  .printable-evolution-notes td {
+  .printing-portal th,
+  .printing-portal td {
     border: 1px solid #000;
-    padding: 8px;
+    padding: 6px;
     text-align: left;
-    font-size: 12px;
     color: black;
+    vertical-align: top;
   }
 
-  .printable-evolution-notes th {
-    background-color: #f0f0f0;
+  .printing-portal th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold;
+    -webkit-print-color-adjust: exact; /* Para que salga el gris */
+    print-color-adjust: exact;
   }
 
-  .printable-signatures {
+  /* Ajuste de anchos de columna sugeridos */
+  .printing-portal th:nth-child(1) { width: 5%; } /* # */
+  .printing-portal th:nth-child(2) { width: 10%; } /* Fecha */
+  .printing-portal th:nth-child(3) { width: 30%; } /* Procedimiento */
+  .printing-portal th:nth-child(4) { width: 30%; } /* Observaciones */
+  .printing-portal th:nth-child(5) { width: 25%; } /* Correcciones */
+
+  .printing-portal .signatures-container {
     display: flex;
     justify-content: space-between;
-    margin-top: 50px;
-    page-break-inside: avoid;
+    margin-top: 40px;
+    page-break-inside: avoid; /* Evitar cortar firmas */
+    gap: 40px;
   }
 
-  .signature-block {
-    width: 40%;
+  .printing-portal .signature-block {
+    flex: 1;
     text-align: center;
-    border-top: 1px solid #000;
-    padding-top: 10px;
-    color: black;
+  }
+
+  .printing-portal .signature-line {
+    border-bottom: 1px solid #000;
+    margin-bottom: 8px;
+    height: 40px;
+  }
+
+  .printing-portal .signature-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  .printing-portal .signature-title {
+    font-size: 11px;
+    color: #333;
+    margin: 0;
   }
   
-  .print-date {
+  .printing-portal .print-date {
     text-align: right;
     margin-top: 20px;
-    font-size: 12px;
-    color: black;
+    font-size: 10px;
+    color: #666;
+    border-top: 1px solid #eee;
+    padding-top: 5px;
   }
 }
 

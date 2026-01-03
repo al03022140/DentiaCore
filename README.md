@@ -106,11 +106,6 @@ Construir una aplicación fiable y mantenible que permita a profesionales dental
 
 - Integración final entre correcciones locales (como el fragmento en `tipoValueFix.txt`) y el código fuente principal.
 
-**Pendiente o planeado a futuro**
-
-- Formalizar despliegue en entorno cloud (MongoDB Atlas, hosting del servidor).
-- Añadir pruebas end-to-end y CI/CD.
-- Definir y aplicar un design system y guías de accesibilidad.
 
 **Cómo se está trabajando actualmente**
 
@@ -218,3 +213,80 @@ Si quieres, puedo:
 - Añadir scripts `npm` útiles al `package.json` raíz para facilitar arranque de todo el stack.
 
 Indica cuál de estas acciones prefieres y la realizo a continuación.
+
+---
+
+## Plan de cierre y siguiente implementación
+
+### Resumen del estado actual
+- Stack: frontend en Vite/JS, backend Node.js/Express con MongoDB (WiredTiger local) y scripts de migración.
+- Modelos: `Patient` modularizado, odontograma separado, migraciones y validaciones disponibles (`scripts/migratePatientData.js`, `validateMigrationImprovements.js`).
+- Ops: launcher y scripts PowerShell para instalar, iniciar Mongo, cliente y API; PM2 opcional para producción.
+- Docs backend: convenciones de nombres, backups y restauración documentados en [Server/README.md](Server/README.md) y mejoras de modelo en [Server/PATIENT_MODEL_IMPROVEMENTS.md](Server/PATIENT_MODEL_IMPROVEMENTS.md).
+
+### Backlog crítico (orden sugerido de prioridad)
+1) Autenticación y autorización
+	- Implementar login con almacenamiento seguro de hash (bcrypt/argon2), refresco de tokens y expiración.
+	- Roles: admin, doctor, asistente, secretaria; permisos por módulo (pacientes, caja, configuraciones, auditoría).
+	- Auditoría de sesiones: quién inicia/cierra sesión, IP/UA opcional.
+2) Auditoría e integridad de datos clínicos
+	- Bitácora inmutable por entidad sensible (pacientes, odontogramas, tratamientos): quién creó/editó, diffs, fecha/hora.
+	- Firmas o sellos de integridad (hash + firma lógica) para detectar modificaciones no autorizadas.
+	- Retención y exportación segura de logs.
+3) Caja/finanzas
+	- Movimientos: ingresos, egresos, método de pago, concepto, paciente relacionado (opcional), usuario que registró.
+	- Saldos: cálculo de saldo actual y conciliaciones básicas; vista de últimos movimientos.
+	- Permisos: quién puede crear/editar/anular; trazabilidad completa.
+4) Estadísticas
+	- Métricas: pacientes por año/mes, procedencia, edad promedio/rangos, tratamientos más frecuentes.
+	- Fuentes: consultas agregadas en Mongo (pipelines) y cache ligero si es necesario.
+	- Exportes: CSV/Excel de estadísticas filtradas.
+5) Configuración y administración
+	- Gestión de usuarios y roles, cambio de credenciales y políticas de contraseña.
+	- Configuración de acceso por módulo y límites (p.ej. anular movimientos de caja requiere rol alto).
+	- Parámetros de clínica (datos fiscales, logotipo, correo de notificación, rutas de uploads/logs).
+6) Operaciones y seguridad en producción
+	- `.env` por entorno, rotación de claves, copias de seguridad automatizadas (DB + uploads + logs).
+	- Despliegue estable con PM2 o servicio Windows, healthchecks y firewall configurado.
+	- Monitoreo básico: uptime y alertas de error.
+
+### Plan de iteraciones (sugerencia en 4 fases)
+**Fase 0 – Endurecer fundamentos (previa a nuevas features)**
+- Revisar conexión Mongo y variables de entorno; asegurar `Server/.env` completo.
+- Añadir ESLint/Prettier si no existe; tests smoke del API (`/api/health`).
+- Integrar la corrección pendiente de `tipoValueFix` en el frontend y validar que el flujo de guardado de odontograma sigue operando.
+
+**Fase 1 – Seguridad y roles**
+- Implementar autenticación (tokens + refresh), hashing de contraseñas y expiración de sesión.
+- Definir roles y matriz de permisos; middleware de autorización en rutas.
+- Auditoría de login/logout y bloqueo tras intentos fallidos.
+
+**Fase 2 – Auditoría clínica e integridad**
+- Crear bitácora por entidad: modelo `auditLog` con referencia, tipo de cambio y diffs.
+- Añadir hash/firma a snapshots críticos (odontograma y tratamientos) para detección de cambios.
+- Endpoints de consulta de auditoría con filtros y exporte.
+
+**Fase 3 – Caja y estadísticas**
+- Modelo `cashMovement` con tipo (ingreso/egreso), monto, concepto, usuario, paciente opcional, timestamps y estado (activo/anulado).
+- Vistas: lista de movimientos recientes, saldo calculado, detalle y anulación controlada.
+- Pipelines de estadística: pacientes por periodo, procedencia, edades, tratamientos; cache ligero si aplica; exporte CSV.
+
+**Fase 4 – Configuración y operación**
+- Panel de configuración: usuarios, roles, parámetros de clínica, rutas de almacenamiento, políticas de contraseña.
+- Backups programados (mongodump y uploads), rotación de logs y healthchecks automatizados.
+- Guías de despliegue: PM2/servicio Windows, reglas de firewall y checklist de producción.
+
+### Metodología recomendada
+- Kanban o sprints cortos (1-2 semanas) con tablero: Backlog → En progreso → Code review → QA → Listo.
+- Definir DoD por feature: pruebas de API (Jest/Supertest), pruebas de UI básicas, checklist de seguridad (roles, logs, validaciones), notas de despliegue.
+- PRs pequeñas y revisadas; mantener documentos de decisión (ADR) para cambios de seguridad o datos.
+
+### Entregables mínimos por feature
+- Código + pruebas + migraciones de datos (si aplica) + documentación de API/uso en el README o docs/.
+- Registro de permisos tocados y endpoints afectados.
+- Scripts de seed/rollback cuando se agregan modelos nuevos (p.ej. caja, auditoría).
+
+### Riesgos y mitigaciones
+- Integridad de datos: usar transacciones (o sesiones) en operaciones críticas y validar esquemas con Mongoose y JOI/Zod.
+- Seguridad: proteger endpoints públicos, sanitizar entradas, limitar cargas a rutas de uploads, rotar tokens y claves.
+- Producción: configurar backups automáticos, monitoreo básico y plan de restauración probado.

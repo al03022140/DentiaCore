@@ -11,6 +11,7 @@ import PatientList from '../features/patient-list/patient-list';
 import AddPatient from '../features/add-patient/add-patient';
 import PatientDetail from '../features/patient-detail/patient-detail';
 import ErrorBoundary from '../shared/components/error-boundary';
+import CashPage from '../features/cash/CashPage';
 
 const App = () => {
   return (
@@ -57,6 +58,9 @@ const App = () => {
                 <Route path="/pacientes" element={<PatientList />} />
                 <Route path="/add-patient" element={<AddPatient />} /> 
                 <Route path="/patient/:patientId" element={<PatientDetail />} />
+                
+                {/* Ruta de caja */}
+                <Route path="/caja" element={<CashPage />} />
               </Routes>
             </ErrorBoundary>
           </div>

@@ -652,6 +652,31 @@ class DentLauncher:
         except Exception:
             pass  # Ignorar errores si el puerto ya está libre
 
+    def _install_missing_dependencies(self):
+        """Intenta instalar las dependencias faltantes automáticamente."""
+        try:
+            print("🔄 Instalando dependencias faltantes...")
+            
+            # Instalar en raíz
+            print("📦 Instalando dependencias en raíz...")
+            subprocess.run(['npm', 'install'], cwd=self.project_dir, shell=True, check=True)
+            
+            # Instalar en Server
+            print("📦 Instalando dependencias en Server...")
+            subprocess.run(['npm', 'install'], cwd=self.server_dir, shell=True, check=True)
+            
+            # Instalar en Client
+            print("📦 Instalando dependencias en Client...")
+            subprocess.run(['npm', 'install'], cwd=self.client_dir, shell=True, check=True)
+            
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error instalando dependencias: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Error inesperado instalando dependencias: {e}")
+            return False
+
     def _verify_system_requirements(self):
         """Verificar todos los requisitos del sistema antes de iniciar"""
         try:
@@ -660,7 +685,11 @@ class DentLauncher:
             # 1. Verificar dependencias npm
             deps_ok, deps_error = self._check_npm_dependencies()
             if not deps_ok:
-                return False, f"Dependencias npm: {deps_error}\n\nEjecuta: npm install"
+                print("⚠️ Faltan dependencias, intentando instalar automáticamente...")
+                if self._install_missing_dependencies():
+                     print("✅ Dependencias instaladas correctamente.")
+                else:
+                     return False, f"Dependencias npm: {deps_error}\n\nEjecuta: npm install"
             
             # 2. Verificar puertos disponibles
             ports_to_check = [5002, 5173, 5174]
@@ -740,9 +769,16 @@ class DentLauncher:
         env_vars.setdefault('PORT', '5002')
         # Asegurar NODE_ENV
         env_vars.setdefault('NODE_ENV', 'development' if mode == 'local' else 'production')
-        # No forzar MONGODB_URI aquí: dejar que scripts/dent.js cargue .env
-        # Si el entorno ya define MONGODB_URI lo respetamos; de lo contrario
-        # dotenv en el servidor usará el valor de .env del proyecto.
+        
+        # Asegurar MONGODB_URI por defecto si no existe
+        if 'MONGODB_URI' not in env_vars:
+             # Intentar leer del .env del servidor para ver si está ahí
+             server_env = self._parse_env_file(str(self.server_dir / '.env'))
+             if 'MONGODB_URI' in server_env:
+                 env_vars['MONGODB_URI'] = server_env['MONGODB_URI']
+             else:
+                 # Valor por defecto seguro
+                 env_vars['MONGODB_URI'] = 'mongodb://127.0.0.1:27017/Dent'
 
         self.current_env = env_vars
         return env_vars
@@ -1160,6 +1196,7 @@ class DentLauncher:
                         db_dir = self.project_dir / 'DB'
                         try:
                             db_dir.mkdir(exist_ok=True)
+                            (db_dir / 'logs').mkdir(exist_ok=True)
                         except Exception:
                             pass
                         if exe_path:
@@ -1441,6 +1478,7 @@ class DentLauncher:
         """Abre una ventana de PowerShell o CMD y ejecuta mongod con la configuración dada."""
         try:
             db_dir.mkdir(exist_ok=True)
+            (db_dir / 'logs').mkdir(exist_ok=True)
         except Exception:
             pass
         exe = exe_path if exe_path else 'mongod'

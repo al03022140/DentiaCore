@@ -545,7 +545,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
 
       <div className="patient-detail__content">
         <Modal
-          title="Edit Patient"
           open={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}
           footer={null}
@@ -579,6 +578,7 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
           <PatientEvolutionNote 
             patientId={patientId}
             initialEvolutionNotes={patientData.patient.notas_evolucion}
+            patientData={patientData.patient}
           />
           
           <PatientContactInfo contacto={patientData.patient.contacto} email={patientData.patient.email} />

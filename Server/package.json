@@ -24,8 +24,13 @@
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "jest": "^30.2.0",
     "mongodb-memory-server": "^10.3.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.7.4",
     "supertest": "^7.1.4"
   }
 }

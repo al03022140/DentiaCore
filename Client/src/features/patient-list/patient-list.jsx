@@ -8,7 +8,7 @@ import filtroIcon from '../../assets/images/icons/filtro.png';
 import arrowIcon from '../../assets/images/icons/arrow.png';
 import arrowLeft from '../../assets/images/icons/arrow-left.png';
 import arrowRight from '../../assets/images/icons/arrow-right.png';
-import plusIcon from '../../assets/images/icons/plus.png';
+import plusIcon from '../../assets/images/icons/plus.svg';
 
 // Utilidades y API
 import { formatName, removeAccents, formatDate, formatAge, formatAgeYearsOnly } from '../../shared/utils/formatters';

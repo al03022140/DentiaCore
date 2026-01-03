@@ -607,6 +607,49 @@ PatientSchema.pre('validate', async function(next) {
     }
 });
 
+// Middleware para hacer inmutables las notas de evolución: sólo se permite añadir nuevas,
+// no se permite modificar o eliminar notas ya existentes.
+PatientSchema.pre('save', async function(next) {
+    try {
+        if (this.isNew) return next();
+
+        // Sólo validar si hubo cambio en notas_evolucion
+        if (!this.isModified('notas_evolucion')) return next();
+
+        const original = await this.constructor.findById(this._id).lean();
+        if (!original) return next();
+
+        const oldNotes = Array.isArray(original.notas_evolucion) ? original.notas_evolucion : [];
+        const newNotes = Array.isArray(this.notas_evolucion) ? this.notas_evolucion : [];
+
+        // No permitir eliminación de notas
+        if (newNotes.length < oldNotes.length) {
+            return next(new Error('Las notas de evolución no pueden eliminarse una vez creadas.'));
+        }
+
+        // Verificar que las notas existentes no hayan sido modificadas
+        const fieldsToCheck = ['numero_procedimiento','procedimiento','observaciones','correcciones','fecha','fechaFormateada'];
+        for (let i = 0; i < oldNotes.length; i++) {
+            const oldN = oldNotes[i];
+            const newN = newNotes[i];
+            if (!newN) {
+                return next(new Error('No se pueden modificar las notas de evolución existentes.'));
+            }
+            for (const f of fieldsToCheck) {
+                const oldVal = oldN && oldN[f] !== undefined && oldN[f] !== null ? (oldN[f] instanceof Date ? new Date(oldN[f]).toISOString() : String(oldN[f])) : '';
+                const newVal = newN && newN[f] !== undefined && newN[f] !== null ? (newN[f] instanceof Date ? new Date(newN[f]).toISOString() : String(newN[f])) : '';
+                if (oldVal !== newVal) {
+                    return next(new Error('Las notas de evolución no pueden editarse una vez creadas.'));
+                }
+            }
+        }
+
+        return next();
+    } catch (err) {
+        return next(err);
+    }
+});
+
 // Middleware para calcular edad y crear carpetas antes de guardar
 PatientSchema.pre('save', async function(next) {
     try {

@@ -182,13 +182,46 @@ const OdontogramClinicalSection = ({
                 return;
             }
             
-            // Agregar fecha actual solo a datos nuevos sin fecha
-            // Normalizar engineData para asegurar que sea un array
+            // --- INICIO CORRECCIÓN TIPO VALUE FIX ---
             const normalizedEngineData = Array.isArray(engineData) ? engineData : [];
-            const dataWithDates = normalizedEngineData.map(item => ({
-                ...item,
-                fecha: item.fecha || getCurrentDateFormatted() // Solo asignar fecha si no existe
-            }));
+            
+            const dataWithDates = normalizedEngineData.map(item => {
+                // 1. Recuperar o inferir el valor de 'tipo'
+                let tipoValue = item.tipo;
+
+                // Si es numérico (ID interno), convertir a texto
+                if (typeof item.tipo === 'number') {
+                    tipoValue = getDamageNameFromId(item.tipo);
+                } 
+                // Si no existe, buscar en propiedades alternativas
+                else if (!tipoValue) {
+                    tipoValue = item.name || item.damage || item.value || 
+                        (item.damages && item.damages.length > 0 
+                            ? item.damages.map(d => d.name || d.value).join(", ") 
+                            : null); // CAMBIO: null en lugar de "Daño aplicado" para permitir verificaciones posteriores
+                }
+
+                // Lógica adicional del fix: buscar en propiedades internas con guion bajo
+                if ((!tipoValue || tipoValue === "") && item._damageType) {
+                    tipoValue = item._damageType;
+                }
+                
+                if ((!tipoValue || tipoValue === "") && item._damages && item._damages.length > 0) {
+                    tipoValue = item._damages.map(d => d.name || d.value).join(", ");
+                }
+
+                // 2. Fallback final para evitar strings vacíos
+                if (!tipoValue || tipoValue === "") {
+                    tipoValue = "Daño aplicado";
+                }
+
+                return {
+                    ...item,
+                    tipo: tipoValue, // Aseguramos que siempre haya un string descriptivo
+                    fecha: item.fecha || getCurrentDateFormatted()
+                };
+            });
+            // --- FIN CORRECCIÓN ---
             
             if (onDataSave && typeof onDataSave === 'function') {
                 await onDataSave(dataWithDates);
@@ -204,7 +237,7 @@ const OdontogramClinicalSection = ({
         } finally {
             setIsSaving(false);
         }
-    }, [isEngineInitialized, onDataSave, loadClinicalHistory]);
+    }, [isEngineInitialized, onDataSave, loadClinicalHistory, getDamageNameFromId]);
 
     // Columnas de la tabla - Estado Actual (usa datos directos sin prepareDataSource)
     const odontogramColumns = [

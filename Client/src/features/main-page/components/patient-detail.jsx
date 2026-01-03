@@ -441,7 +441,6 @@ const PatientDetail = () => {
 
       <div className="patient-detail__content">
         <Modal
-          title="Edit Patient"
           open={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}
           footer={null}

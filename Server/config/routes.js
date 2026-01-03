@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const patientRoutes = require('../routes/patientRoutes');
 const periodontogramRoutes = require('../routes/periodontogramRoutes');
+const cashRoutes = require('../routes/cashRoutes');
 
 // Configuración de rutas
 const configureRoutes = () => {
@@ -11,10 +12,12 @@ const configureRoutes = () => {
   console.log('🔍 DEBUG: Configurando rutas principales');
   console.log('  - Montando /patients');
   console.log('  - Montando /periodontograms');
+  console.log('  - Montando /cash');
 
   // Montar rutas - las subrutas se manejan dentro
   router.use('/patients', patientRoutes);
   router.use('/periodontograms', periodontogramRoutes);
+  router.use('/cash', cashRoutes);
 
   // Ruta de estado de salud (incluye estado de conexión a DB)
   router.get('/health', (req, res) => {

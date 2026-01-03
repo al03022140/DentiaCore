@@ -71,6 +71,13 @@ try {
 
     if (-not $SkipMongo) {
         Write-Header "2. CONFIGURACION DE MONGODB"
+        
+        # Asegurar directorios siempre
+        $DataDir = Join-Path $RepoRoot "DB"
+        $LogDir = Join-Path $RepoRoot "DB\logs"
+        if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
+        if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
+
         $Service = Get-Service "MongoDB" -ErrorAction SilentlyContinue
 
         if (-not $Service) {
@@ -81,11 +88,7 @@ try {
             }
 
             if ($LocalMongoBin -and (Test-Path $LocalMongoBin)) {
-                $DataDir = Join-Path $RepoRoot "DB"
-                $LogDir = Join-Path $RepoRoot "DB\logs"
                 $ConfigPath = Join-Path $RepoRoot "mongod.cfg"
-                if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
-                if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
                 
                 $LogFile = "$LogDir\mongod.log"
                 $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
@@ -165,6 +168,12 @@ try {
         Write-Warn "Instalando Node.js..."
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent 2>$null
     }
+
+    Write-Step "Instalando dependencias del Proyecto Raíz..."
+    Push-Location $RepoRoot
+    npm install --no-audit --no-fund 2>&1 | Out-Null
+    Pop-Location
+    Write-Ok "Dependencias Raíz instaladas."
 
     Write-Step "Instalando dependencias del Servidor..."
     Push-Location $ServerDir
