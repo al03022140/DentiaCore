@@ -7,4 +7,9 @@ __pycache__/
 dist/
 build/
 .vscode/
+# MongoDB / WiredTiger
+DB/
+*.wt
+WiredTiger*
+DB/journal/
 '@ | Out-File -Encoding utf8 .gitignore
