@@ -13,3 +13,17 @@ DB/**
 *.wt
 WiredTiger*
 DB/journal/
+DB-backup*/
+
+# Repo mirror and large artifacts
+repo-mirror.git/
+
+# MongoDB tools and dumps
+tools/mongo/
+tools/mongo/bin/
+tools/mongo/bin/*.mdmp
+tools/mongo/bin/mongod.exe
+
+# Optional: ignore local OS/editor files
+.idea/
+.vscode/
