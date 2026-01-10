@@ -28,14 +28,6 @@ const METRICS = [
     visualizations: ['barra', 'heatmap']
   },
   {
-    id: 'patient-cohorts',
-    title: 'Cohortes de Pacientes',
-    description: 'Retencion mensual de pacientes por cohorte.',
-    category: 'Pacientes',
-    temporalities: ['mensual', 'anual'],
-    visualizations: ['linea', 'barra']
-  },
-  {
     id: 'patient-type-trend',
     title: 'Nuevos vs Recurrentes',
     description: 'Comparativa de pacientes nuevos contra recurrentes.',
@@ -52,28 +44,12 @@ const METRICS = [
     visualizations: ['linea', 'barra']
   },
   {
-    id: 'inventory-alerts',
-    title: 'Alertas de Inventario',
-    description: 'Consumo e items en riesgo de agotarse.',
-    category: 'Inventario',
-    temporalities: ['semanal', 'mensual'],
-    visualizations: ['barra', 'heatmap']
-  },
-  {
     id: 'productivity',
     title: 'Productividad por Hora',
     description: 'Consultas e ingresos promedio por hora.',
     category: 'Operaciones',
     temporalities: ['diaria', 'semanal'],
     visualizations: ['linea', 'barra']
-  },
-  {
-    id: 'service-comparison',
-    title: 'Ingresos por Servicio',
-    description: 'Comparativa de ingresos por tipo de servicio.',
-    category: 'Finanzas',
-    temporalities: ['mensual', 'anual'],
-    visualizations: ['barra', 'linea', 'pastel']
   }
 ];
 
