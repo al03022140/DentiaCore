@@ -1,6 +1,6 @@
 **Descripción General del Proyecto**
 
-Este repositorio contiene la aplicación DENT, una plataforma destinada a la gestión y registro de odontogramas, pacientes y datos clínicos relacionados con prácticas odontológicas. Provee herramientas para capturar, almacenar y visualizar información dental (odontogramas clínicos y radiográficos, antecedentes, tratamientos, etc.).
+Este repositorio contiene la aplicación DentiaCore, una plataforma destinada a la gestión y registro de odontogramas, pacientes y datos clínicos relacionados con prácticas odontológicas. Provee herramientas para capturar, almacenar y visualizar información dental (odontogramas clínicos y radiográficos, antecedentes, tratamientos, etc.).
 
 **Qué problema resuelve**
 
