@@ -174,16 +174,8 @@ const StatisticsPage = () => {
   }
   const bootState = bootStateRef.current;
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const contentEl = document.querySelector('.content');
-    if (contentEl) contentEl.classList.add('with-statistics');
-    document.body.classList.add('with-statistics');
-    return () => {
-      if (contentEl) contentEl.classList.remove('with-statistics');
-      document.body.classList.remove('with-statistics');
-    };
-  }, []);
+  // Estadísticas ya no modifica clases globales; dejamos el layout comportarse como el resto de vistas.
+  useEffect(() => {}, []);
 
   const metricMap = useMemo(() => {
     const map = new Map();

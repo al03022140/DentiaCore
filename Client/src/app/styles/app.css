@@ -17,8 +17,7 @@
   display: grid;
   grid-template-rows: auto 1fr;
   padding-left: 0; /* Elimina padding izquierdo */
-  height: 100%;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 /* Content */
@@ -28,6 +27,7 @@
   padding: 20px;
   box-sizing: border-box;
   height: 100%;
+  min-height: 0; /* permitir que hijos con height:100% encogan sin forzar overflow */
 }
 
 

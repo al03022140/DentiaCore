@@ -1,22 +1,6 @@
-/* Desactivar scroll de página únicamente en la vista de lista de pacientes */
-html:has(.patient-list-wrapper),
-body:has(.patient-list-wrapper),
-#root:has(.patient-list-wrapper) {
-  overflow-y: hidden !important;
-  overflow-x: hidden !important;
-}
-
-/* Compatibilidad adicional por si contenedores superiores generan scroll */
-.dashboard:has(.patient-list-wrapper),
-.main:has(.patient-list-wrapper),
+/* Vista de pacientes: permitir scroll natural del documento y usar todo el ancho. */
 .content:has(.patient-list-wrapper) {
-  overflow: hidden !important;
-}
-
-/* Regla previa (se mantiene por compatibilidad) */
-body:has(.patient-list-wrapper) {
-  overflow-y: hidden;
-  overflow-x: hidden;
+  grid-template-columns: 1fr;
 }
 
 .patient-list-wrapper {
@@ -36,17 +20,20 @@ body:has(.patient-list-wrapper) {
 }
 /* Contenedor principal */
 .patient-list-wrapper .patient-list-container {
-  overflow-y: hidden;
+  /* Permitir scroll interno sin empujar las tarjetas al fondo. */
+  overflow: visible;
   padding: 1rem;
   padding-top: 0.5rem;
   padding-left: 0rem;
   font-family: var(--pl-font-family);
   text-align: center;
-  height: calc(100vh - 150px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 /* Mensaje si no hay pacientes */
@@ -57,39 +44,19 @@ body:has(.patient-list-wrapper) {
   padding: 1.5rem;
 }
 
-/* Contenedor scrollable */
-.patient-list-wrapper .scrollable-list {
-  overflow-y: hidden;
-  max-height: calc(100vh - 200px);
-  padding: 1rem 0;
-  scrollbar-width: thin;
-  scrollbar-color: #cccccc transparent;
-  width: 100%;
-  box-sizing: border-box;
-  scroll-behavior: smooth;
-}
-
-.patient-list-wrapper .scrollable-list::-webkit-scrollbar {
-  width: 8px;
-}
-.patient-list-wrapper .scrollable-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.patient-list-wrapper .scrollable-list::-webkit-scrollbar-thumb {
-  background-color: #cccccc;
-  border-radius: 10px;
-}
-
 /* Grid de pacientes */
 .patient-list-wrapper .patient-list {
   display: grid;
+  /* Configuración específica: 5 columnas horizontalmente */
   grid-template-columns: repeat(5, 1fr);
-  gap: 1.5rem;
+  gap: 1rem;
   width: 100%;
-  max-width: 1800px;
+  max-width: 100%;
   box-sizing: border-box;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: visible;
+  /* Alinear el contenido al inicio para que las tarjetas queden arriba */
+  align-content: start;
+  justify-items: stretch;
 }
 
 /* Tarjeta de paciente */
@@ -100,9 +67,11 @@ body:has(.patient-list-wrapper) {
   justify-content: space-between;
   background-color: var(--pl-background-color);
   border-radius: var(--pl-border-radius);
-  padding: 1rem !important;
   padding-top: 0rem !important;
-  padding-bottom: 0rem  !important;
+  padding-bottom: 0rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  /* Ajuste de dimensiones para el grid de 5x3 */
   width: 18rem !important;
   height: 10rem !important;
   min-height: 120px !important;
@@ -223,10 +192,18 @@ body:has(.patient-list-wrapper) {
 
 /* Paginación */
 .patient-list-wrapper .pagination {
-  margin: 2rem auto;
+  /* Fijar la paginación siempre en la parte más baja posible de la ventana
+     sin afectar el flujo del contenido. */
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 8px; /* lo más bajo posible */
+  z-index: 1200;
   display: flex;
-  justify-content: center;
   gap: 0.3125rem;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  pointer-events: auto;
 }
 .patient-list-wrapper .page-number {
   padding: 0.625rem 1.25rem;

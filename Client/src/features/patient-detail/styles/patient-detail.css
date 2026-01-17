@@ -10,14 +10,13 @@
   font-family: var(--font-family-primary);
   font-size: var(--font-size-medium);
   color: var(--color-text-dark); /* Color base para títulos y textos */
-  /* Hacer que PatientDetail sea el contenedor scrollable propio */
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* Permitir que el documento maneje el scroll sin barras internas */
+  overflow: visible;
   padding: 0;
 }
 
@@ -45,8 +44,7 @@
 .patient-detail__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: visible;
-  overflow-x: hidden;
+  overflow: visible;
   padding-bottom: 100px;
   scrollbar-width: thin;
   scrollbar-color: #cccccc transparent;
@@ -154,8 +152,7 @@
    (Estilos tomados de add-patient-wrapper .scrollable-form)
    ========================= */
 .patient-detail__scrollable-form {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 0 10px 50px 10px;
   scrollbar-width: thin;
   scrollbar-color: #cccccc transparent;
@@ -177,7 +174,7 @@
 /* Contenedor principal del formulario dentro de patient-detail */
 .patient-detail__container {
   padding: 10px;
-  overflow: auto;
+  overflow: visible;
   box-sizing: border-box;
 }
 

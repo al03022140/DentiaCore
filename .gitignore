@@ -17,6 +17,15 @@ DB-backup*/
 
 # Repo mirror and large artifacts
 repo-mirror.git/
+DENT-mirror*
+*.bfg-report/
+bfg.jar
+
+# Server runtime data
+Server/logs/
+Server/uploads/
+Server/tmp/
+
 
 # MongoDB tools and dumps
 tools/mongo/

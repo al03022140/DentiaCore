@@ -12,6 +12,8 @@ import AddPatient from '../features/add-patient/add-patient';
 import PatientDetail from '../features/patient-detail/patient-detail';
 import ErrorBoundary from '../shared/components/error-boundary';
 import CashPage from '../features/cash/CashPage';
+import ConsultasPage from '../features/consultas/ConsultasPage';
+import StatisticsPage from '../features/statistics/StatisticsPage';
 
 const App = () => {
   return (
@@ -59,8 +61,14 @@ const App = () => {
                 <Route path="/add-patient" element={<AddPatient />} /> 
                 <Route path="/patient/:patientId" element={<PatientDetail />} />
                 
+                {/* Ruta de consultas */}
+                <Route path="/consultas" element={<ConsultasPage />} />
+
                 {/* Ruta de caja */}
                 <Route path="/caja" element={<CashPage />} />
+
+                {/* Ruta de estadisticas */}
+                <Route path="/estadisticas" element={<StatisticsPage />} />
               </Routes>
             </ErrorBoundary>
           </div>

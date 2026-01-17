@@ -22,8 +22,6 @@ import WomenSection from './sections/women-section';
 const API_URL = import.meta.env.VITE_API_URL;
 
 const REQUIRED_FIELDS = [
-  { path: ["documento", "tipo"], label: "Tipo de documento" },
-  { path: ["documento", "numero"], label: "Número de documento" },
   { path: ["primer_nombre"], label: "Primer nombre" },
   { path: ["apellido_paterno"], label: "Apellido paterno" },
   { path: ["fecha_nacimiento"], label: "Fecha de nacimiento" },
