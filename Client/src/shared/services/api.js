@@ -1,15 +1,7 @@
-import axios from 'axios';
+import API from './axios-instance';
 
-const API_URL = import.meta.env.VITE_API_URL; // Leer la variable del .env
-
-// Crear una instancia de axios con configuración base
-const api = axios.create({
-    baseURL: `${API_URL}/api`,
-    timeout: 30000, // 30 segundos para consultas complejas
-    // headers: {
-    //     'Content-Type': 'application/json'
-    // }
-});
+// Reusar la instancia `API` (ya configura baseURL, withCredentials y Authorization)
+const api = API;
 
 // Interceptor para manejar errores de forma global
 api.interceptors.response.use(

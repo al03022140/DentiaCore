@@ -1,5 +1,5 @@
 @echo off
-:: Ejecutar instalador de DENT con permisos de administrador
+:: Ejecutar instalador de DentiaCore con permisos de administrador
 
 :: Cambiar al directorio donde esta este archivo .bat
 cd /d "%~dp0"
@@ -8,7 +8,7 @@ cd /d "%~dp0"
 net session >nul 2>&1
 if %errorlevel% == 0 (
     echo ========================================
-    echo  Instalador DENT - Sistema Dental
+    echo  Instalador DentiaCore - Sistema Dental
     echo ========================================
     echo.
     echo Directorio actual: %CD%

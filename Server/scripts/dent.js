@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
 const { getUploadsBase } = require('../utils/uploads');
@@ -77,10 +78,11 @@ app.use(cors({
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false // Cambiar a true si usas cookies/sesiones
+    credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
 
 // Middleware urlencoded condicional aplicado después de morgan

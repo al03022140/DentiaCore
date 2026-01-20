@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Instalador Maestro para Sistema Dent - Infraestructura Hibrida
+    Instalador Maestro para Sistema DentiaCore - Infraestructura Hibrida
 #>
 
 [CmdletBinding()]
@@ -21,6 +21,39 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Ejecuta 'npm install' en un directorio y valida el resultado
+function Run-NpmInstall {
+    param([string]$TargetDir)
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Warn "npm no encontrado en PATH. Intentando instalar Node.js (incluye npm)..."
+        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent 2>$null
+        Start-Sleep -Seconds 3
+    }
+
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Err "npm sigue sin estar disponible. Instala Node.js y npm manualmente y vuelve a ejecutar el instalador."
+        throw "npm_not_found"
+    }
+
+    Write-Step "Ejecutando 'npm install' en $TargetDir..."
+    Push-Location $TargetDir
+    try {
+        $output = npm install --no-audit --no-fund 2>&1
+    } catch {
+        $output = $_ | Out-String
+    }
+    $exit = $LASTEXITCODE
+    Pop-Location
+
+    if ($exit -ne 0) {
+        Write-Err "'npm install' falló en: $TargetDir"
+        Write-Err $output
+        throw "npm_install_failed"
+    }
+
+    Write-Ok "Dependencias instaladas en $TargetDir."
+}
 
 function Write-Header { param([string]$Msg) Write-Host "`n=== $Msg ===" -ForegroundColor Cyan }
 function Write-Step { param([string]$Msg) Write-Host " [>] $Msg" -ForegroundColor Yellow }
@@ -49,7 +82,7 @@ function Get-LocalIP {
 
 try {
     Clear-Host
-    Write-Header "INSTALACION DE INFRAESTRUCTURA DENT (MODO SEGURO)"
+    Write-Header "INSTALACION DE INFRAESTRUCTURA DENTIACORE (MODO SEGURO)"
     Assert-Admin
 
     $RepoRoot = $PSScriptRoot
@@ -62,7 +95,7 @@ try {
     Write-Ok "IP detectada: $DetectedIP"
     
     Write-Step "Abriendo puertos en Firewall (5002, 27017)..."
-    $rules = @(@{ Name="Dent API"; Port=5002 }, @{ Name="Dent MongoDB"; Port=27017 })
+    $rules = @(@{ Name="DentiaCore API"; Port=5002 }, @{ Name="DentiaCore MongoDB"; Port=27017 })
     foreach ($r in $rules) {
         Remove-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue
         New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -LocalPort $r.Port -Protocol TCP -Action Allow -Profile Any | Out-Null
@@ -95,7 +128,7 @@ try {
                 
                 Set-Content -Path $ConfigPath -Value $ConfigContent -Encoding UTF8
                 $BinPathCmd = $LocalMongoBin + ' --config ' + $ConfigPath + ' --service'
-                New-Service -Name "MongoDB" -BinaryPathName $BinPathCmd -DisplayName "MongoDB Server (Dent)" -StartupType Automatic -ErrorAction SilentlyContinue
+                New-Service -Name "MongoDB" -BinaryPathName $BinPathCmd -DisplayName "MongoDB Server (DentiaCore)" -StartupType Automatic -ErrorAction SilentlyContinue
                 Start-Service "MongoDB" -ErrorAction SilentlyContinue
                 Write-Ok "Servicio instalado e iniciado."
             } else {
@@ -129,7 +162,7 @@ try {
     $NetworkConfig = @{
         "PORT" = "5002"
         "HOST" = "0.0.0.0"
-        "MONGODB_URI" = "mongodb://127.0.0.1:27017/Dent"
+        "MONGODB_URI" = "mongodb://127.0.0.1:27017/DentiaCore"
         "CLIENT_URL" = "http://$DetectedIP`:5002"
         "PUBLIC_URL" = "http://$DetectedIP`:5002"
     }
@@ -169,23 +202,11 @@ try {
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent 2>$null
     }
 
-    Write-Step "Instalando dependencias del Proyecto Raíz..."
-    Push-Location $RepoRoot
-    npm install --no-audit --no-fund 2>&1 | Out-Null
-    Pop-Location
-    Write-Ok "Dependencias Raíz instaladas."
+    Run-NpmInstall $RepoRoot
 
-    Write-Step "Instalando dependencias del Servidor..."
-    Push-Location $ServerDir
-    npm install --no-audit --no-fund 2>&1 | Out-Null
-    Pop-Location
-    Write-Ok "Dependencias Server instaladas."
+    Run-NpmInstall $ServerDir
 
-    Write-Step "Instalando dependencias del Cliente..."
-    Push-Location $ClientDir
-    npm install --no-audit --no-fund 2>&1 | Out-Null
-    Pop-Location
-    Write-Ok "Dependencias Client instaladas."
+    Run-NpmInstall $ClientDir
     
     if (-not $SkipFrontendBuild) {
         Write-Step "Compilando Frontend para LAN..."
@@ -198,6 +219,48 @@ try {
             Write-Warn "Build del frontend omitido (opcional). Puedes ejecutar 'npm run build' manualmente en Client/"
         }
         Pop-Location
+    }
+
+    if ($CreateShortcut) {
+        Write-Header "5. CREANDO ACCESOS DIRECTOS"
+        $pythonPath = (Get-Command pythonw.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+        if (-not $pythonPath) {
+            $pythonPath = (Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+        }
+        if (-not $pythonPath) {
+            Write-Warn "No se encontró Python en el PATH. Instala Python para que el Launcher pueda ejecutarse desde el acceso directo."
+        } else {
+            $launcherScript = Join-Path $RepoRoot 'launcher.py'
+            if (-not (Test-Path $launcherScript)) {
+                Write-Warn "No se encontró launcher.py en el repositorio. No se crearon accesos directos."
+            } else {
+                $desktopFolder = [Environment]::GetFolderPath('Desktop')
+                $startMenuRoot = [Environment]::GetFolderPath('Programs')
+                $programFolder = Join-Path $startMenuRoot 'Dentia Core'
+                if (-not (Test-Path $programFolder)) {
+                    New-Item -ItemType Directory -Path $programFolder -Force | Out-Null
+                }
+                $shell = New-Object -ComObject WScript.Shell
+                $iconPath = Join-Path $ClientDir 'public\favicon.ico'
+                if (-not (Test-Path $iconPath)) {
+                    $iconPath = $pythonPath
+                }
+                $shortcuts = @(
+                    @{ Path = Join-Path $desktopFolder 'Dentia Core.lnk'; Description = 'Dentia Core'; },
+                    @{ Path = Join-Path $programFolder 'Dentia Core.lnk'; Description = 'Dentia Core'; }
+                )
+                foreach ($entry in $shortcuts) {
+                    $link = $shell.CreateShortcut($entry.Path)
+                    $link.TargetPath = $pythonPath
+                    $link.Arguments = "`"$launcherScript`""
+                    $link.WorkingDirectory = $RepoRoot
+                    $link.IconLocation = $iconPath
+                    $link.Description = $entry.Description
+                    $link.Save()
+                }
+                Write-Ok "Accesos directos Dentia Core creados en Escritorio y Menú Inicio."
+            }
+        }
     }
 
     Write-Header "INSTALACION EXITOSA"

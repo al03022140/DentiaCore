@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'dent-api',
+      name: 'dentiacore-api',
       script: 'scripts/dent.js',
       cwd: __dirname,
       instances: 1,

@@ -21,6 +21,7 @@
     height: 100vh;
     box-sizing: border-box;
     overflow-y: auto;
+    font-weight: bolder
   }
 
   /* Imagen adaptativa */

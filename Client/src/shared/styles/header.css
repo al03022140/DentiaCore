@@ -24,6 +24,27 @@
   text-align: left;
 }
 
+/* Contenedor de acciones del header (botones a la derecha) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logout-button {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.08);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.logout-button:hover {
+  background: rgba(0,0,0,0.04);
+}
+
 /* Ajustes responsivos */
 @media (max-width: 1200px) {
   .header {

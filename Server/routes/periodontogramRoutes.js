@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const periodontogramController = require('../controllers/periodontogramController');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
+const authorize = require('../middlewares/authorize');
 
 // mergeParams: true permite acceder a req.params.id del padre (el id del paciente)
 const router = express.Router({ mergeParams: true });
@@ -10,21 +11,6 @@ const router = express.Router({ mergeParams: true });
 // Middleware de seguridad
 router.use(helmet());
 
-// Middleware temporal para simular usuario autenticado
-router.use((req, res, next) => {
-  const mongoose = require('mongoose');
-  req.user = {
-    id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
-    role: 'dentist',
-    permissions: [
-      'read_periodontogram',
-      'create_periodontogram',
-      'update_periodontogram',
-      'delete_periodontogram'
-    ]
-  };
-  next();
-});
 
 // Rate limiting para operaciones de escritura
 const writeRateLimit = rateLimit({
@@ -52,24 +38,6 @@ const readRateLimit = rateLimit({
   skip: (req) => req.method !== 'GET'
 });
 
-// Middleware de autorización para verificar permisos
-const authorize = (permissions = []) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
-    }
-    if (permissions.length > 0) {
-      const userPermissions = req.user.permissions || [];
-      const hasPermission = permissions.some(permission => 
-        userPermissions.includes(permission) || req.user.role === 'admin'
-      );
-      if (!hasPermission) {
-        return res.status(403).json({ success: false, message: 'Permisos insuficientes para esta operación' });
-      }
-    }
-    next();
-  };
-};
 
 // RUTAS PRINCIPALES
 router.get('/', readRateLimit, periodontogramController.getPeriodontogram);

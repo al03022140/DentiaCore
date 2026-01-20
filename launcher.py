@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Dent Application Launcher
-Aplicación de escritorio para iniciar y detener el servidor y frontend de Dent
+DentiaCore Application Launcher
+Aplicación de escritorio para iniciar y detener el servidor y frontend de DentiaCore
 Usa la paleta de colores del programa para mantener consistencia visual
 """
 
@@ -21,7 +21,7 @@ import urllib.error
 import shutil
 import socket
 
-class DentLauncher:
+class DentiaCoreLauncher:
     def __init__(self):
         # Colores del programa (extraídos de variables.css)
         self.colors = {
@@ -70,7 +70,7 @@ class DentLauncher:
     def setup_window(self):
         """Configurar la ventana principal"""
         self.root = tk.Tk()
-        self.root.title("Dent Application Launcher")
+        self.root.title("DentiaCore Application Launcher")
         self.root.geometry("520x780")
         self.root.minsize(520, 720)
         self.root.configure(bg=self.colors['bg_light'])
@@ -100,7 +100,7 @@ class DentLauncher:
         # Título
         title_label = tk.Label(
             main_frame,
-            text="🦷 Dent Application Launcher",
+            text="🦷 DentiaCore Application Launcher",
             font=('Montserrat', 20, 'bold'),
             fg=self.colors['primary'],
             bg=self.colors['bg_light']
@@ -390,9 +390,6 @@ class DentLauncher:
                 ))
                 return
             
-            # Cambiar al directorio del proyecto
-            os.chdir(self.project_dir)
-            
             # Matar puertos antes de iniciar (ya verificados en _verify_system_requirements)
             self._kill_port(5002)  # Puerto del servidor
             self._kill_port(5173)  # Puerto del cliente Vite
@@ -448,9 +445,9 @@ class DentLauncher:
                 # 2. Iniciar solo el servidor primero
                 print("🔄 Iniciando servidor backend...")
                 self.server_process = subprocess.Popen(
-                    ['npm', 'run', 'server'],
+                    ['npm', 'run', 'dev'],
                     shell=True,
-                    cwd=self.project_dir,
+                    cwd=self.server_dir,
                     env=env,
                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
                 )
@@ -487,9 +484,6 @@ class DentLauncher:
                         "3. Las dependencias estén instaladas (npm install)"
                     ))
             
-            # Actualizar UI en el hilo principal
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar: {str(e)}\n\nAsegurate de:\n1. Tener MongoDB ejecutandose\n2. Haber instalado dependencias (npm install)\n3. No tener otros servicios en los puertos 5002, 5173, 5174"
             print(f"❌ Error en _start_all_thread: {error_msg}")
@@ -513,6 +507,8 @@ class DentLauncher:
             self.is_client_running = False
             
             self.root.after(0, lambda: messagebox.showerror("Error al Iniciar", error_msg))
+        finally:
+            # Asegurar que la UI se actualice incluso si hubo retornos tempranos
             self.root.after(0, self.update_ui_state)
             
     def stop_all(self):
@@ -524,8 +520,8 @@ class DentLauncher:
         """Hilo para detener todos los servicios"""
         try:
             if self.using_pm2:
-                subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-                subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
                 self.using_pm2 = False
 
             # Terminar procesos si existen (cliente primero, luego servidor)
@@ -778,7 +774,7 @@ class DentLauncher:
                  env_vars['MONGODB_URI'] = server_env['MONGODB_URI']
              else:
                  # Valor por defecto seguro
-                 env_vars['MONGODB_URI'] = 'mongodb://127.0.0.1:27017/Dent'
+                 env_vars['MONGODB_URI'] = 'mongodb://127.0.0.1:27017/DentiaCore'
 
         self.current_env = env_vars
         return env_vars
@@ -893,7 +889,7 @@ class DentLauncher:
         try:
             # Comprobar si ya existe la app en PM2
             exists = subprocess.run(
-                ['pm2', 'describe', 'dent-api'],
+                ['pm2', 'describe', 'dentiacore-api'],
                 shell=True,
                 cwd=server_dir,
                 env=env,
@@ -902,7 +898,7 @@ class DentLauncher:
             if exists.returncode == 0 and b"status" in exists.stdout.lower():
                 # Reiniciar actualizando variables de entorno del demonio
                 subprocess.run(
-                    ['pm2', 'restart', 'dent-api', '--update-env'],
+                    ['pm2', 'restart', 'dentiacore-api', '--update-env'],
                     shell=True,
                     cwd=server_dir,
                     env=env,
@@ -910,7 +906,7 @@ class DentLauncher:
                 )
             else:
                 subprocess.run(
-                    ['pm2', 'start', 'ecosystem.config.cjs', '--only', 'dent-api', '--update-env'],
+                    ['pm2', 'start', 'ecosystem.config.cjs', '--only', 'dentiacore-api', '--update-env'],
                     shell=True,
                     cwd=server_dir,
                     env=env,
@@ -1010,17 +1006,17 @@ class DentLauncher:
                 )
                 self.root.after(0, lambda: messagebox.showerror("Servidor no disponible", msg))
 
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar servidor: {str(e)}\n\nVerifica:\n1. MongoDB esta corriendo\n2. El puerto 5002 esta libre\n3. Dependencias instaladas"
             self.root.after(0, lambda: messagebox.showerror("Error Servidor", error_msg))
+        finally:
+            self.root.after(0, self.update_ui_state)
             
     def stop_server(self):
         """Detener solo el servidor"""
         if self.using_pm2:
-            subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-            subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
             self.using_pm2 = False
         if self.server_process:
             self.server_process.terminate()
@@ -1067,7 +1063,9 @@ class DentLauncher:
             self.root.after(0, self.update_ui_state)
             
         except Exception as e:
+            self.is_client_running = False
             self.root.after(0, lambda: messagebox.showerror("Error", f"Error al iniciar frontend: {str(e)}"))
+            self.root.after(0, self.update_ui_state)
             
     def stop_client(self):
         """Detener solo el frontend"""
@@ -1567,7 +1565,7 @@ class DentLauncher:
                 
                 # Crear request con timeout específico
                 request = urllib.request.Request(health_url)
-                request.add_header('User-Agent', 'DENT-Launcher/1.0')
+                request.add_header('User-Agent', 'DentiaCore-Launcher/1.0')
                 
                 with urllib.request.urlopen(request, timeout=5) as response:
                     if response.status == 200:
@@ -1705,7 +1703,7 @@ class DentLauncher:
 def main():
     """Función principal"""
     try:
-        app = DentLauncher()
+        app = DentiaCoreLauncher()
         app.run()
     except Exception as e:
         messagebox.showerror("Error Fatal", f"Error al iniciar la aplicación: {str(e)}")

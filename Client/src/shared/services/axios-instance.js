@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAccessToken, getAccessToken, setAccessToken } from './auth-token';
 
 const API_URL = (
   typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL
@@ -10,12 +11,45 @@ const API_URL = (
 const API = axios.create({
   baseURL: `${API_URL}/api`,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Accept': 'application/json'
     // Content-Type se omite intencionalmente para permitir que Axios
     // lo maneje automáticamente según el tipo de datos (FormData, JSON, etc.)
   }
 });
+
+const authClient = axios.create({
+  baseURL: `${API_URL}/api`,
+  timeout: 10000,
+  withCredentials: true,
+  headers: {
+    'Accept': 'application/json'
+  }
+});
+
+let isRefreshing = false;
+let pendingRequests = [];
+
+const processQueue = (error, token = null) => {
+  pendingRequests.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  pendingRequests = [];
+};
+
+const refreshAccessToken = async () => {
+  const response = await authClient.post('/auth/refresh');
+  const accessToken = response.data?.accessToken;
+  if (accessToken) {
+    setAccessToken(accessToken);
+  }
+  return accessToken;
+};
 
 // Interceptor para logging de peticiones (solo en desarrollo)
 if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
@@ -24,6 +58,14 @@ if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
     return request;
   });
 }
+
+API.interceptors.request.use(config => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 API.interceptors.response.use(
   response => {
@@ -36,10 +78,44 @@ API.interceptors.response.use(
     if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
       console.error('API Error:', error.response?.status, error.config?.url, error.message);
     }
-    // Manejo global de errores de autenticación
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      // TODO: Implementar logout() o redirección a login
-      // Por ejemplo: window.location.href = '/login';
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      if (originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh')) {
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingRequests.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return API(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      return refreshAccessToken()
+        .then(token => {
+          processQueue(null, token);
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return API(originalRequest);
+        })
+        .catch(refreshError => {
+          processQueue(refreshError, null);
+          clearAccessToken();
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        })
+        .finally(() => {
+          isRefreshing = false;
+        });
+    }
+
+    if (error.response?.status === 403) {
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

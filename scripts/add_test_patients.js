@@ -1,8 +1,20 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const HOST = process.env.HOST || 'localhost';
 const PORT = process.env.PORT || 5002;
 const PATH = '/api/patients/batch';
+const TOKEN_FILE = process.env.TOKEN_FILE || path.resolve(__dirname, '..', 'token.txt');
+let AUTH_TOKEN = process.env.AUTH_TOKEN;
+try {
+  if (!AUTH_TOKEN && fs.existsSync(TOKEN_FILE)) {
+    AUTH_TOKEN = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+  }
+} catch (e) {
+  // ignore
+}
+const COUNT = parseInt(process.env.COUNT, 10) || 25;
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -50,7 +62,7 @@ function generatePatient(index) {
   };
 }
 
-const patients = Array.from({length:25}, (_,i) => generatePatient(i+1));
+const patients = Array.from({length: COUNT}, (_,i) => generatePatient(i+1));
 const payload = JSON.stringify(patients);
 
 const options = {
@@ -64,7 +76,13 @@ const options = {
   }
 };
 
+if (AUTH_TOKEN) {
+  options.headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
+}
+
 console.log(`Enviando ${patients.length} pacientes a http://${HOST}:${PORT}${PATH} ...`);
+if (AUTH_TOKEN) console.log('Usando token de autorización.');
+else console.log(`No se encontró token en AUTH_TOKEN ni en ${TOKEN_FILE}; enviando petición sin Authorization header.`);
 
 const req = http.request(options, (res) => {
   let data = '';

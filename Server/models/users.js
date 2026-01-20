@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (e) {
+  // Fallback a bcryptjs si bcrypt n está disponible (evita compilaciones nativas en Windows)
+  bcrypt = require('bcryptjs');
+}
 
 const userSchema = new mongoose.Schema({
   nombre: {
@@ -22,8 +28,40 @@ const userSchema = new mongoose.Schema({
   },
   rol: {
     type: String,
-    enum: ["doctor", "recepcionista", "administrador"],
+    enum: ["doctor", "recepcionista", "administrador", "asistente"],
     default: "recepcionista"
+  },
+  permissions: {
+    type: [String],
+    default: []
+  },
+  active: {
+    type: Boolean,
+    default: true
+  },
+  failedLoginAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockUntil: {
+    type: Date,
+    default: null
+  },
+  lastLoginAt: {
+    type: Date,
+    default: null
+  },
+  lastPasswordChangeAt: {
+    type: Date,
+    default: null
+  },
+  refreshToken: {
+    type: String,
+    default: null
+  },
+  refreshTokenExpiresAt: {
+    type: Date,
+    default: null
   },
   fecha_registro: {
     type: Date,
