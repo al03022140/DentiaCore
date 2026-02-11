@@ -1,19 +1,16 @@
-/* Importar variables globales */
-@import '../../../shared/styles/variables.css';
-
 /* Estilos para la sección del periodontograma */
 .periodontogram-section {
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 12px;
   padding: 20px;
   margin: 20px 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e6ed;
+  box-shadow: 0 4px 12px var(--color-black-10);
+  border: 1px solid var(--color-neutral-650);
   transition: all 0.3s ease;
 }
 
 .periodontogram-section:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px var(--color-black-15);
 }
 
 /* Header de la sección */
@@ -23,7 +20,7 @@
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 2px solid #f0f2f5;
+  border-bottom: 2px solid var(--color-neutral-620);
 }
 
 /* Controles del header */
@@ -44,69 +41,30 @@
 
 .history-selector label {
   font-weight: 500;
-  color: #495057;
+  color: var(--color-neutral-1000);
   white-space: nowrap;
 }
 
 .version-select {
   padding: 6px 12px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-neutral-800);
   border-radius: 4px;
-  background-color: white;
+  background-color: var(--color-bg-white);
   font-size: 14px;
-  color: #495057;
+  color: var(--color-neutral-1000);
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 200px;
 }
 
 .version-select:hover {
-  border-color: #80bdff;
+  border-color: var(--color-blue-200);
 }
 
 .version-select:focus {
   outline: none;
-  border-color: #80bdff;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-/* Botón de alternar vista */
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #0056b3;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #545b62;
+  border-color: var(--color-blue-200);
+  box-shadow: 0 0 0 0.2rem var(--color-blue-500-25);
 }
 
 .section-header h2 {
@@ -126,19 +84,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 193, 7, 0.1);
-  color: #856404;
+  background: var(--color-amber-500-10);
+  color: var(--color-yellow-700);
   padding: 8px 12px;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  border: 1px solid var(--color-amber-500-30);
 }
 
 .changes-dot {
   width: 8px;
   height: 8px;
-  background: #ffc107;
+  background: var(--color-amber-500);
   border-radius: 50%;
   animation: pulse 2s infinite;
 }
@@ -165,8 +123,8 @@
   justify-content: flex-start;
   gap: 15px;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-bottom: 2px solid #dee2e6;
+  background: linear-gradient(135deg, var(--color-neutral-100) 0%, var(--color-neutral-400) 100%);
+  border-bottom: 2px solid var(--color-neutral-500);
   border-radius: 8px 8px 0 0;
   margin-bottom: 10px;
   flex-wrap: wrap;
@@ -174,8 +132,8 @@
 
 /* Botón unificado de guardado */
 .save-complete-button {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--color-blue-500);
+  color: var(--color-bg-white);
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
@@ -192,13 +150,13 @@
 }
 
 .save-complete-button:hover:not(:disabled) {
-  background-color: #0056b3;
+  background-color: var(--color-blue-600);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 4px 8px var(--color-blue-500-30);
 }
 
 .save-complete-button:disabled {
-  background-color: #6c757d;
+  background-color: var(--color-neutral-900);
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
@@ -215,35 +173,35 @@
 }
 
 .view-toggle-button.btn-primary {
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-  border-color: #007bff;
+  background: linear-gradient(135deg, var(--color-blue-500) 0%, var(--color-blue-600) 100%);
+  border-color: var(--color-blue-500);
 }
 
 .view-toggle-button.btn-secondary {
-  background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
-  border-color: #6c757d;
+  background: linear-gradient(135deg, var(--color-neutral-900) 0%, var(--color-neutral-950) 100%);
+  border-color: var(--color-neutral-900);
 }
 
 .view-toggle-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 6px var(--color-black-20);
 }
 
 /* Selector de versiones mejorado */
 .periodontogram-controls .history-selector {
-  background: white;
+  background: var(--color-bg-white);
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid #ced4da;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-neutral-800);
+  box-shadow: 0 1px 3px var(--color-black-10);
 }
 
 .periodontogram-controls .version-select {
   min-width: 250px;
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid #ced4da;
-  background: white;
+  border: 1px solid var(--color-neutral-800);
+  background: var(--color-bg-white);
   font-size: 13px;
 }
 
@@ -251,9 +209,9 @@
 .periodontogram-container {
   width: 100%;
   min-height: 600px;
-  background: #fafbfc;
+  background: var(--color-neutral-50);
   border-radius: 8px;
-  border: 1px solid #e1e5e9;
+  border: 1px solid var(--color-neutral-700);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -267,10 +225,10 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--color-black-10);
 }
 
 /* Canvas del periodontograma */
@@ -278,8 +236,8 @@
   position: relative;
   width: 100%;
   height: auto;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-500);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -289,8 +247,8 @@
 }
 
 .periodontogram-canvas {
-  border: 1px solid #ccc;
-  background: white;
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-white);
   cursor: default;
   display: block;
   margin: 0;
@@ -302,7 +260,7 @@
 }
 
 .periodontogram-canvas:hover {
-  border-color: #007bff;
+  border-color: var(--color-blue-500);
 }
 
 
@@ -333,7 +291,7 @@
 }
 
 .tooth-component.selected {
-  outline: 3px solid #007bff;
+  outline: 3px solid var(--color-blue-500);
   outline-offset: 2px;
   transform: scale(1.05);
 }
@@ -346,7 +304,7 @@
 }
 
 .tooth-component.implant {
-  border: 2px solid #20c997;
+  border: 2px solid var(--color-teal-500);
 }
 
 .tooth-image {
@@ -370,25 +328,25 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 1px solid white;
+  border: 1px solid var(--color-bg-white);
   font-size: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--color-bg-white);
   font-weight: bold;
 }
 
 .tooth-indicator.mobility {
-  background: #ffc107;
+  background: var(--color-amber-500);
 }
 
 .tooth-indicator.furcation {
-  background: #dc3545;
+  background: var(--color-red-500);
 }
 
 .tooth-indicator.implant {
-  background: #20c997;
+  background: var(--color-teal-500);
 }
 
 /* Zonas del diente */
@@ -412,29 +370,29 @@
 }
 
 .tooth-zone:hover {
-  background: rgba(0, 123, 255, 0.2);
-  border-color: #007bff;
+  background: var(--color-blue-500-20);
+  border-color: var(--color-blue-500);
 }
 
 .tooth-zone.bleeding {
-  background: rgba(220, 53, 69, 0.3);
+  background: var(--color-red-500-30);
 }
 
 .tooth-zone.plaque {
-  background: rgba(255, 193, 7, 0.3);
+  background: var(--color-amber-500-30);
 }
 
 .tooth-zone.suppuration {
-  background: rgba(108, 117, 125, 0.3);
+  background: var(--color-neutral-900-30);
 }
 
 /* Panel de controles */
 .control-panel {
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px var(--color-black-10);
+  border: 1px solid var(--color-neutral-500);
 }
 
 .control-section {
@@ -449,7 +407,7 @@
   margin: 0 0 15px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-neutral-1000);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -463,49 +421,49 @@
 
 .control-button {
   padding: 8px 16px;
-  border: 2px solid #dee2e6;
-  background: white;
+  border: 2px solid var(--color-neutral-500);
+  background: var(--color-bg-white);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 500;
-  color: #495057;
+  color: var(--color-neutral-1000);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .control-button:hover {
-  border-color: #007bff;
-  color: #007bff;
+  border-color: var(--color-blue-500);
+  color: var(--color-blue-500);
   transform: translateY(-1px);
 }
 
 .control-button.active {
-  background: #007bff;
-  border-color: #007bff;
-  color: white;
+  background: var(--color-blue-500);
+  border-color: var(--color-blue-500);
+  color: var(--color-bg-white);
 }
 
 .control-button.danger {
-  border-color: #dc3545;
-  color: #dc3545;
+  border-color: var(--color-red-500);
+  color: var(--color-red-500);
 }
 
 .control-button.danger:hover {
-  background: #dc3545;
-  color: white;
+  background: var(--color-red-500);
+  color: var(--color-bg-white);
 }
 
 .control-button.success {
-  border-color: #28a745;
-  color: #28a745;
+  border-color: var(--color-green-500);
+  color: var(--color-green-500);
 }
 
 .control-button.success:hover {
-  background: #28a745;
-  color: white;
+  background: var(--color-green-500);
+  color: var(--color-bg-white);
 }
 
 /* Controles de zoom */
@@ -519,14 +477,14 @@
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: #dee2e6;
+  background: var(--color-neutral-500);
   outline: none;
   cursor: pointer;
 }
 
 .zoom-value {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-neutral-1000);
   min-width: 50px;
   text-align: center;
 }
@@ -554,17 +512,17 @@
 
 .view-control label {
   font-size: 14px;
-  color: #495057;
+  color: var(--color-neutral-1000);
   cursor: pointer;
 }
 
 /* Panel de estadísticas */
 .statistics-panel {
-  background: white;
-  border-radius: 8px;
+  background: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #dee2e6;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
 }
 
 .statistics-grid {
@@ -575,11 +533,12 @@
 }
 
 .statistic-card {
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: var(--color-neutral-100);
+  border-radius: var(--card-border-radius);
   padding: 15px;
   text-align: center;
-  border: 1px solid #e9ecef;
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
 }
 
 .statistic-value {
@@ -590,12 +549,12 @@
 
 .statistic-label {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-neutral-900);
 }
 
 .statistic-detail {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-neutral-900);
   margin-top: 5px;
 }
 
@@ -612,8 +571,8 @@
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
+  border: 4px solid var(--color-neutral-110);
+  border-top: 4px solid var(--color-primary-light);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
@@ -626,7 +585,7 @@
 
 .loading-container p {
   margin: 0;
-  color: #7f8c8d;
+  color: var(--color-text-muted);
   font-size: 16px;
   font-weight: 500;
 }
@@ -639,34 +598,31 @@
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
-  background: rgba(244, 67, 54, 0.05);
-  border: 1px solid rgba(244, 67, 54, 0.2);
+  background: var(--color-red-750-05);
+  border: 1px solid var(--color-red-750-20);
   border-radius: 8px;
 }
 
 .error-container p {
   margin: 0 0 20px 0;
-  color: #d32f2f;
+  color: var(--color-red-650);
   font-size: 16px;
   font-weight: 500;
 }
 
 .retry-button {
-  background: #f44336;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  --btn-bg: var(--color-red-750);
+  --btn-hover-bg: var(--color-red-650);
+  --btn-text: var(--color-bg-white);
+  --btn-border: transparent;
+  --btn-padding: 12px 24px;
+  --btn-radius: 6px;
+  --btn-font: var(--text-label-strong);
 }
 
 .retry-button:hover {
-  background: #d32f2f;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+  box-shadow: 0 4px 12px var(--color-red-750-30);
 }
 
 .retry-button:active {
@@ -791,9 +747,9 @@
 /* Modo de impresión */
 @media print {
   .periodontogram-section {
-    background: white !important;
+    background: var(--color-bg-white) !important;
     box-shadow: none;
-    border: 1px solid #000;
+    border: 1px solid var(--color-text-black);
     page-break-before: always !important; /* Nueva página */
     page-break-inside: auto !important; /* Permitir salto si es muy grande */
     break-inside: auto !important;
@@ -810,13 +766,13 @@
   }
   
   .section-header {
-    border-bottom-color: #000;
+    border-bottom-color: var(--color-text-black);
     page-break-after: avoid !important;
     display: block !important;
   }
   
   .section-header h2 {
-    color: black !important;
+    color: var(--color-text-black) !important;
     font-size: 16pt !important;
   }
   
@@ -825,8 +781,8 @@
   }
   
   .periodontogram-container {
-    background: white !important;
-    border-color: #000;
+    background: var(--color-bg-white) !important;
+    border-color: var(--color-text-black);
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
@@ -866,63 +822,63 @@
 
 /* Estados de focus para accesibilidad */
 .retry-button:focus {
-  outline: 2px solid #3498db;
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
 /* Mejoras de contraste para accesibilidad */
 @media (prefers-contrast: high) {
   .periodontogram-section {
-    border-color: #000;
+    border-color: var(--color-text-black);
   }
   
   .section-header {
-    border-bottom-color: #000;
+    border-bottom-color: var(--color-text-black);
   }
   
   .section-header h2 {
-    color: #000;
+    color: var(--color-text-black);
   }
   
   .changes-indicator {
-    background: #fff3cd;
-    border-color: #856404;
-    color: #000;
+    background: var(--color-yellow-100);
+    border-color: var(--color-yellow-700);
+    color: var(--color-text-black);
   }
   
   .periodontogram-container {
-    border-color: #000;
+    border-color: var(--color-text-black);
   }
 }
 
 /* Modo oscuro (si se implementa en el futuro) */
 @media (prefers-color-scheme: dark) {
   .periodontogram-section {
-    background: #2c3e50;
-    border-color: #34495e;
-    color: white;
+    background: var(--color-text-primary);
+    border-color: var(--color-bluegray-900);
+    color: var(--color-bg-white);
   }
   
   .section-header {
-    border-bottom-color: #34495e;
+    border-bottom-color: var(--color-bluegray-900);
   }
   
   .section-header h2 {
-    color: white;
+    color: var(--color-bg-white);
   }
   
   .periodontogram-container {
-    background: #34495e;
-    border-color: #4a5f7a;
+    background: var(--color-bluegray-900);
+    border-color: var(--color-bluegray-800);
   }
   
   .loading-container p {
-    color: #bdc3c7;
+    color: var(--color-bluegray-300);
   }
   
   .error-container {
-    background: rgba(231, 76, 60, 0.1);
-    border-color: rgba(231, 76, 60, 0.3);
+    background: var(--color-danger-10);
+    border-color: var(--color-danger-30);
   }
 }
 
@@ -932,9 +888,9 @@
   flex-direction: column;
   gap: 20px;
   padding: 20px;
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--color-black-10);
 }
 
 .saved-image-section {
@@ -942,16 +898,16 @@
   flex-direction: column;
   gap: 15px;
   padding: 20px;
-  background: #f8f9fa;
+  background: var(--color-neutral-100);
   border-radius: 8px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-neutral-400);
 }
 
 .saved-image-section h4 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--color-text-primary);
   text-align: center;
 }
 
@@ -959,17 +915,17 @@
   width: 100%;
   max-width: 800px;
   height: auto;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-neutral-500);
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--color-black-10);
   margin: 0 auto;
   display: block;
 }
 
 .saved-statistics {
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--color-black-10);
   margin-top: 20px;
   overflow: hidden;
   width: 1521px;
@@ -980,13 +936,13 @@
   margin: 0 0 10px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-neutral-1000);
 }
 
 .saved-statistics p {
   margin: 5px 0;
   font-size: 13px;
-  color: #6c757d;
+  color: var(--color-neutral-900);
 }
 
 .saved-image-actions {
@@ -997,43 +953,19 @@
 }
 
 .saved-image-actions .btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  --btn-padding: 10px 20px;
+  --btn-radius: 6px;
+  --btn-font-size: 14px;
+  --btn-font-weight: 500;
   min-width: 120px;
 }
 
-.saved-image-actions .btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.saved-image-actions .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.saved-image-actions .btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
+.saved-image-actions .btn-primary:hover:not(:disabled),
 .saved-image-actions .btn-secondary:hover:not(:disabled) {
-  background: #545b62;
   transform: translateY(-1px);
 }
 
 .saved-image-actions .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
   transform: none;
 }
 

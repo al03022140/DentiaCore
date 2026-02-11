@@ -1,7 +1,7 @@
 /* Estilos base */
  .add-patient-wrapper {
-    font-family: 'Montserrat', sans-serif;
-    color: #2e2e2e;
+    font-family: var(--font-family-primary);
+   color: var(--color-text-dark);
     padding: 20px;
     box-sizing: border-box;
     padding-left: 0.5rem; /* Se reduce para evitar que el contenido se salga */
@@ -14,7 +14,7 @@
     font-weight: bold;
     margin: 0;
     padding: 1rem 0;
-    border-top: 1px solid #ccc;
+    border-top: 1px solid var(--color-border-medium);
     /* Otros estilos comunes que desees */
   }
   
@@ -24,18 +24,6 @@
     max-height: calc(100vh - 200px);
     overflow-y: auto;
     padding: 0 10px 50px 10px; /* Aumentamos el padding-bottom para los botones */
-    scrollbar-width: thin;
-    scrollbar-color: #cccccc transparent;
-  }
-  .add-patient-wrapper .scrollable-form::-webkit-scrollbar {
-    width: 8px;
-  }
-  .add-patient-wrapper .scrollable-form::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .add-patient-wrapper .scrollable-form::-webkit-scrollbar-thumb {
-    background-color: #cccccc;
-    border-radius: 10px;
   }
   
   /* Contenedor principal del formulario */
@@ -66,7 +54,7 @@
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    border: 2px solid #ccc;
+    border: 2px solid var(--color-border-medium);
     border-radius: 50%;
     cursor: pointer;
   }
@@ -84,7 +72,7 @@
   
   .add-patient-wrapper .patient-photo-container:hover {
     transform: scale(1.05);
-    background-color: #ccc; /* Se pone en gris al hacer hover */
+    background-color: var(--color-border-medium); /* Se pone en gris al hacer hover */
   }
   .add-patient-wrapper .patient-photo-container:hover .upload-text {
     opacity: 1;
@@ -111,8 +99,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    color: white;
+    background: var(--color-black-40);
+    color: var(--color-bg-white);
     font-size: 1.2rem;
     display: flex;
     justify-content: center;
@@ -167,19 +155,19 @@
 .add-patient-wrapper .form-group select,
 .add-patient-wrapper .form-group textarea {
   padding: 12px;
-  border: 1px solid #ccc;
+    border: 1px solid var(--color-border-medium);
   border-radius: 5px;
   font-family: inherit;
   font-weight: bold;
-  color: #1a1a1a;
-  background-color: #fff;
+    color: var(--color-text-strong);
+    background-color: var(--color-bg-white);
   box-sizing: border-box;
 }
   
   /* Placeholder */
   .add-patient-wrapper .form-group input::placeholder,
   .add-patient-wrapper .form-group textarea::placeholder {
-    color: #999;
+    color: var(--color-text-light);
     font-weight: normal;
   }
   
@@ -187,12 +175,12 @@
   .add-patient-wrapper .form-group select {
     max-height: 200px;
     overflow-y: auto;
-    color: #000;
+    color: var(--color-text-black);
     font-weight: bold;
   }
   .add-patient-wrapper .form-group select option {
-  color: #000 !important;
-  background-color: #fff !important;
+  color: var(--color-text-black) !important;
+  background-color: var(--color-bg-white) !important;
   font-weight: bold !important;
   width: 286.2px;
   height: 42px;
@@ -200,7 +188,7 @@
   box-sizing: border-box;
 }
 .add-patient-wrapper .form-group select option:first-child {
-  color: #999;
+  color: var(--color-text-light);
   width: 286.2px;
   height: 42px;
   padding: 12px;
@@ -213,7 +201,7 @@
     -webkit-appearance: none;
     width: 18px;
     height: 18px;
-    border: 2px solid #666;
+    border: 2px solid var(--color-border-strong);
     border-radius: 4px;
     cursor: pointer;
     position: relative;
@@ -222,12 +210,12 @@
     margin-right: 8px;
   }
   .add-patient-wrapper .form-group input[type="checkbox"]:checked {
-    background-color: #4caf50;
-    border-color: #4caf50;
+    background-color: var(--color-green-700);
+    border-color: var(--color-green-700);
   }
   .add-patient-wrapper .form-group input[type="checkbox"]::before {
     content: '✔';
-    color: white;
+    color: var(--color-bg-white);
     font-weight: bold;
     font-size: 14px;
     position: absolute;
@@ -248,30 +236,6 @@
     margin-top: 20px;
     max-width: 100%;
     width: 100%;
-  }
-  
-  /* Botones */
-  .add-patient-wrapper .confirm-button,
-  .add-patient-wrapper .cancel-button {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .add-patient-wrapper .confirm-button {
-    background-color: #80bf82;
-    color: #fff;
-  }
-  .add-patient-wrapper .cancel-button {
-    background-color: #f2746b;
-    color: #fff;
-  }
-  .add-patient-wrapper .confirm-button:hover {
-    background-color: #70a872;
-  }
-  .add-patient-wrapper .cancel-button:hover {
-    background-color: #e0635a;
   }
   
   /* Todos los inputs mantienen el tamaño estándar de 286.2x42px */
@@ -305,16 +269,6 @@
   .add-patient-wrapper .crop-button {
     display: block;
     margin: 10px auto;
-    padding: 10px;
-    background-color: #4caf50;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    border-radius: 5px;
-  }
-  .add-patient-wrapper .upload-button:hover,
-  .add-patient-wrapper .crop-button:hover {
-    background-color: #45a049;
   }
   
   /* Plantilla de alineación (Cropper) */
@@ -359,7 +313,7 @@
     flex-grow: 1; /* Permite que el texto ocupe el espacio restante */
     margin: 0;
     padding-left: 20px; /* Ajuste opcional para separación */
-    color: #000;
+    color: var(--color-text-black);
     padding-right: 2rem;
   }
   
@@ -382,22 +336,12 @@
   }
   
   .add-patient-wrapper .crop-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 6px 10px;
-    border-radius: 5px;
-    cursor: pointer;
+    --btn-padding: 6px 10px;
   }
   
   .add-patient-wrapper .upload-button {
     margin-top: 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 5px;
-    cursor: pointer;
+    --btn-padding: 6px 12px;
   }
   
   .add-patient-wrapper .right-section {
@@ -419,29 +363,10 @@
     max-height: 400px; /* Ajusta la altura máxima fija según el contenedor de la encuesta médica */
     width: 100%; /* Se mantiene dentro del layout */
     overflow-y: auto; /* Scroll solo en Y */
-    scrollbar-width: thin;
-    scrollbar-color: #cccccc transparent;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-border-medium);
     border-radius: 1rem;
     padding-bottom: 1rem;
     padding-right: 1rem;
-  }
-  
-  /* Ajuste del scroll para navegadores Webkit */
-  .add-patient-wrapper .medicacion-col::-webkit-scrollbar, 
-  .add-patient-wrapper .alergias-col::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .add-patient-wrapper .medicacion-col::-webkit-scrollbar-track, 
-  .add-patient-wrapper .alergias-col::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  .add-patient-wrapper .medicacion-col::-webkit-scrollbar-thumb, 
-  .add-patient-wrapper .alergias-col::-webkit-scrollbar-thumb {
-    background-color: #cccccc;
-    border-radius: 10px;
   }
   
   
@@ -548,47 +473,7 @@
   
   /* Estilos para el botón de agregar contacto de emergencia */
   .action-button {
-    font-family: Montserrat, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background-color: #f8f8f8;
-    border: 2px solid #e0e0e0;
-    border-radius: 1rem;
-    color: rgb(0, 0, 0);
-    padding: 10px 15px;
-    font-size: 1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-  }
-  
-  .action-button:hover {
-    background-color: #e0e0e0;
-    border-color: #bdbdbd;
-    transform: scale(1.05);
-  }
-  
-  .actiont-button:active {
-    transform: scale(0.95);
-  }
-  
-  .trash-button {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: color 0.3s ease, transform 0.2s ease;
-    padding-bottom: 1rem;
-  }
-  
-  .trash-button:hover {
-    transform: scale(1.1);
-  }
-  
-  .trash-button:active {
-    transform: scale(0.9);
+    margin-top: 2rem;
   }
   
   .medicacion-input,
@@ -597,26 +482,26 @@
     min-width: none;
     max-width: 90%;
     padding: 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--color-neutral-600);
     border-radius: 1rem;
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-family-primary);
     font-size: 1rem;
     font-weight: bolder;
-    color: #1a1a1a;
-    background-color: #fff;
+    color: var(--color-text-strong);
+    background-color: var(--color-bg-white);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
   }
   
   /* Efecto cuando el input está en foco */
   .medicacion-input:focus,
   .alergia-input:focus {
-    border-color: #000000;
+    border-color: var(--color-text-black);
     outline: none;
   }
   
   /* Placeholder estilizado */
   .medicacion-input::placeholder,
   .alergia-input::placeholder {
-    color: #a4a4a4;
+    color: var(--color-text-placeholder);
     font-weight: bolder;
   }

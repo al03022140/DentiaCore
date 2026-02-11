@@ -14,10 +14,10 @@
   width: 100%;
   max-width: 460px;
   background: var(--color-bg-white);
-  border-radius: 1rem;
+  border-radius: var(--card-border-radius);
   padding: 2rem;
-  border: 2px solid var(--color-border-light);
-  box-shadow: var(--shadow-medium);
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
 }
 
 .login-card h1 {
@@ -48,7 +48,7 @@
   padding: 0.75rem 0.9rem;
   border-radius: var(--border-radius-md);
   border: 1px solid var(--color-border-medium);
-  background: #ffffff;
+  background: var(--color-bg-white);
   font-size: 0.95rem;
   font-family: var(--font-family-primary);
   color: var(--color-text-primary);
@@ -61,7 +61,7 @@
 .login-form input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(8, 72, 136, 0.2);
+  box-shadow: 0 0 0 3px var(--color-blue-500-20);
 }
 
 /* Password wrapper with toggle button */
@@ -97,17 +97,17 @@
 
 .password-toggle:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(8, 72, 136, 0.15);
+  box-shadow: 0 0 0 3px var(--color-blue-500-15);
   border-radius: 6px;
 }
 
 .login-error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--color-red-50);
+  color: var(--color-red-600);
   padding: 0.75rem 0.9rem;
   border-radius: var(--border-radius-md);
   font-size: 0.95rem;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--color-red-250);
 }
 
 .login-form button {
@@ -116,15 +116,15 @@
   background: var(--color-primary);
   border: none;
   border-radius: var(--border-radius-md);
-  color: #ffffff;
+  color: var(--color-bg-white);
   font-weight: var(--font-weight-bold);
   cursor: pointer;
   transition: var(--transition-medium);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px var(--color-black-10);
 }
 
 .login-form button:disabled {
-  background: #9bb2c8;
+  background: var(--color-slate-600);
   cursor: not-allowed;
   box-shadow: none;
 }

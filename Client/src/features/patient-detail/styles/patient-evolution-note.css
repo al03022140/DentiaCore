@@ -18,9 +18,7 @@
 
 /* Igualar formato del h2 al estilo unificado de patient-detail */
 .patient-evolution-note__header h2 {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
+  font: var(--pd-font-section-h2);
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-md) 0;
   padding-bottom: var(--spacing-sm);
@@ -33,18 +31,18 @@
   margin-left: auto; /* Asegura que el botón se quede a la derecha */
   order: 1; /* Anula el order global (-1) y coloca el botón después del título */
   flex-shrink: 0;
-  background-color: #1890ff;
-  color: white;
+  background-color: var(--color-blue-500);
+  color: var(--color-bg-white);
   border: none;
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: background-color 0.3s;
 }
 
 .patient-evolution-note__header .Boton_Imprimir:hover {
-  background-color: #40a9ff;
+  background-color: var(--color-blue-400);
 }
 
 /* Form layout: horizontal fields */
@@ -64,8 +62,8 @@
 
 .patient-evolution-note__form .form-row label {
   display: block;
-  font-weight: bold;
-  color: #000;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-black);
   margin-bottom: 4px;
   font-size: var(--font-size-base);
 }
@@ -78,7 +76,7 @@
   white-space: pre-wrap; /* preserve newlines and wrap long lines */
   word-wrap: break-word;
   word-break: break-word; /* break long unspaced strings */
-  font-weight: 600; /* make text bolder */
+  font-weight: var(--font-weight-semibold); /* make text bolder */
 }
 
 /* Actions aligned to the right under the grid (span full row) */
@@ -91,8 +89,7 @@
 /* History */
 .patient-evolution-note__history h3 {
   margin: 12px 0 8px;
-  font-size: var(--font-size-large);
-  font-weight: bolder;
+  font: var(--pd-font-section-h3);
   color: var(--color-text-primary);
   border-bottom: 1px solid var(--color-border-light);
   padding-bottom: var(--spacing-sm);
@@ -111,7 +108,7 @@
 
 .patient-evolution-note__table th,
 .patient-evolution-note__table td {
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--color-border-light);
   padding: 8px;
   text-align: left;
   white-space: pre-wrap; /* allow wrapping within cells */
@@ -121,25 +118,25 @@
 }
 
 .patient-evolution-note__table thead th {
-  background: #fafafa;
-  font-weight: bold;
-  color: #000;
+  background: var(--color-neutral-50);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-black);
 }
 
 /* Hacer más bolder la información del historial (manteniendo color) */
 .patient-evolution-note__table tbody td {
-  font-weight: bolder;
-  color: #868686; /* color para datos guardados */
+  font-weight: var(--font-weight-bold);
+  color: var(--color-neutral-680); /* color para datos guardados */
 }
 
 /* Mantener el mensaje de "sin datos" con peso normal */
 .patient-evolution-note__table tbody td.no-data {
-  font-weight: 400;
+  font-weight: var(--font-weight-normal);
 }
 
 .patient-evolution-note__table .no-data {
   text-align: center;
-  color: #888;
+  color: var(--color-text-light);
 }
 
 /* Responsive: stack fields vertically on small screens */
@@ -163,7 +160,7 @@
 
   /* Si estamos en modo impresión de evolución (clase añadida al body) */
   body.printing-evolution-mode {
-    background: white;
+    background: var(--color-bg-white);
     height: auto;
     overflow: visible;
   }
@@ -178,8 +175,8 @@
     display: block !important;
     position: relative; /* Relative para respetar márgenes de página */
     width: 100%;
-    background: white;
-    color: black;
+    background: var(--color-bg-white);
+    color: var(--color-text-black);
     font-family: var(--font-family-primary, sans-serif);
   }
 
@@ -187,8 +184,8 @@
   .printing-portal h1 {
     text-align: center;
     margin-bottom: 20px;
-    font-size: 20px; /* Ajustado para carta */
-    color: black;
+    font-size: var(--font-size-print-title); /* Ajustado para carta */
+    color: var(--color-text-black);
     text-transform: uppercase;
   }
 
@@ -196,21 +193,21 @@
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 30px;
-    font-size: 11px; /* Letra más pequeña para que quepa mejor */
+    font-size: var(--font-size-print-table); /* Letra más pequeña para que quepa mejor */
   }
 
   .printing-portal th,
   .printing-portal td {
-    border: 1px solid #000;
+    border: 1px solid var(--color-text-black);
     padding: 6px;
     text-align: left;
-    color: black;
+    color: var(--color-text-black);
     vertical-align: top;
   }
 
   .printing-portal th {
-    background-color: #f0f0f0 !important;
-    font-weight: bold;
+    background-color: var(--color-neutral-180) !important;
+    font-weight: var(--font-weight-bold);
     -webkit-print-color-adjust: exact; /* Para que salga el gris */
     print-color-adjust: exact;
   }
@@ -236,29 +233,29 @@
   }
 
   .printing-portal .signature-line {
-    border-bottom: 1px solid #000;
+    border-bottom: 1px solid var(--color-text-black);
     margin-bottom: 8px;
     height: 40px;
   }
 
   .printing-portal .signature-label {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     margin-bottom: 4px;
-    font-size: 12px;
+    font-size: var(--font-size-print-signature-label);
   }
 
   .printing-portal .signature-title {
-    font-size: 11px;
-    color: #333;
+    font-size: var(--font-size-print-signature-title);
+    color: var(--color-neutral-1100);
     margin: 0;
   }
   
   .printing-portal .print-date {
     text-align: right;
     margin-top: 20px;
-    font-size: 10px;
-    color: #666;
-    border-top: 1px solid #eee;
+    font-size: var(--font-size-print-date);
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-neutral-175);
     padding-top: 5px;
   }
 }

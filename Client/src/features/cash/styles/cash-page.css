@@ -19,13 +19,13 @@
 
 /* Common Card Style */
 .cash-card {
-  background-color: #fff;
-  border-radius: 1rem;
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
   padding: 1.5rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
-  border: 2px solid #ddd;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
   box-sizing: border-box;
-  font-family: 'Montserrat', sans-serif;
+  font: var(--text-body-default);
   overflow: hidden; /* Prevent content spill */
 }
 
@@ -60,7 +60,7 @@
 }
 
 .cash-card .ant-card-head {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-neutral-180);
   padding: 0 0 10px 0;
   margin-bottom: 15px;
   min-height: auto;
@@ -68,9 +68,8 @@
 
 .cash-card .ant-card-head-title {
   padding: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
+  font: var(--text-body-strong);
+  color: var(--color-text-dark);
 }
 
 /* Dashboard Specifics */
@@ -80,16 +79,14 @@
 }
 
 .balance-amount {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #333;
+  font: var(--text-display-xl);
+  color: var(--color-text-dark);
   margin: 0;
-  line-height: 1.2;
 }
 
 .balance-label {
-  color: #888;
-  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font: var(--text-label-sm);
 }
 
 .filter-container {
@@ -109,7 +106,7 @@
 .action-button {
   height: 80px !important;
   width: 160px !important;
-  font-size: 1.1rem !important;
+  font: var(--text-body-strong) !important;
   border-radius: 12px !important;
   display: flex !important;
   flex-direction: column;
@@ -119,7 +116,7 @@
 }
 
 .action-button .anticon {
-  font-size: 24px !important;
+  font: var(--text-data-xl) !important;
 }
 
 /* Movements List Specifics */
@@ -129,39 +126,20 @@
   padding-right: 5px; /* Space for scrollbar */
 }
 
-/* Custom Scrollbar for movements */
-.movements-list-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.movements-list-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.movements-list-container::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 3px;
-}
-
-.movements-list-container::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
-}
-
 .movement-item-title {
   display: flex;
   justify-content: space-between;
-  font-weight: 500;
+  font: var(--text-body-default);
 }
 
 .movement-amount-income {
-  color: #52c41a;
-  font-weight: 600;
+  color: var(--color-success);
+  font: var(--text-body-strong);
 }
 
 .movement-amount-expense {
-  color: #f5222d;
-  font-weight: 600;
+  color: var(--color-danger);
+  font: var(--text-body-strong);
 }
 
 .movement-meta {

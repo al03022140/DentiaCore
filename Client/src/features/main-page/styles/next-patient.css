@@ -1,42 +1,42 @@
 .patient-info-wrapper {
   /* Variables locales para personalización */
-  --patient-bg-color: #fff;
-  --patient-border-color: #ddd;
-  --patient-text-color: #888;
-  --patient-heading-color: #333;
-  --patient-font-family: 'Montserrat', sans-serif;
-  --patient-border-radius: 1.25rem;
-  --patient-box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  --patient-bg-color: var(--home-nextpatient-bg);
+  --patient-border-color: var(--home-nextpatient-border-color);
+  --patient-text-color: var(--home-nextpatient-text-color);
+  --patient-heading-color: var(--home-nextpatient-heading-color);
+  --patient-font-family: var(--home-nextpatient-font-family);
+  --patient-border-radius: var(--home-nextpatient-border-radius);
+  --patient-box-shadow: var(--home-nextpatient-box-shadow);
 }
 
 /* Contenedor de información del paciente */
 .patient-info-wrapper .patient-info {
   display: flex;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: var(--home-nextpatient-padding);
   border-radius: var(--patient-border-radius);
   background-color: var(--patient-bg-color);
-  border: 1px solid var(--patient-border-color);
+  border: var(--card-border);
   box-shadow: var(--patient-box-shadow);
   width: 100%;
-  height: 15vh;
+  height: var(--home-nextpatient-height);
   box-sizing: border-box;
-  margin-top: 1rem;
-  min-height: 40%;
+  margin-top: var(--home-nextpatient-margin-top);
+  min-height: var(--home-nextpatient-min-height);
 }
 
 /* Imagen del paciente */
 .patient-info-wrapper .patient-image img {
-  width: 4rem;
-  height: 4rem;
+  width: var(--home-nextpatient-image-size);
+  height: var(--home-nextpatient-image-size);
   border-radius: 50%;
   object-fit: cover;
-  margin-right: 1rem;
+  margin-right: var(--home-nextpatient-image-margin);
 }
 
 /* Detalles del paciente */
 .patient-info-wrapper .patient-details {
-  font-family: var(--patient-font-family);
+  font: var(--home-nextpatient-text);
   display: flex;
   flex-direction: column;
   flex-grow: 1;
@@ -45,11 +45,11 @@
 .patient-info-wrapper .patient-details p {
   margin: 0;
   color: var(--patient-text-color);
-  font-size: 0.875rem;
+  font: var(--home-nextpatient-text-secondary);
 }
 
 .patient-info-wrapper .patient-details strong {
-  font-size: 1rem;
+  font: var(--home-nextpatient-text-strong);
   color: var(--patient-heading-color);
   margin: 0.3125rem 0;
 }
@@ -57,95 +57,95 @@
 /* 📌 Ajustes Responsivos */
 @media (max-width: 1200px) {
   .patient-info-wrapper .patient-info {
-    padding: 1rem 1.25rem;
-    margin-top: 0.75rem;
+    padding: var(--home-nextpatient-padding-1200);
+    margin-top: var(--home-nextpatient-margin-top-1200);
   }
   .patient-info-wrapper .patient-image img {
-    width: 3.75rem;
-    height: 3.75rem;
-    margin-right: 0.75rem;
+    width: var(--home-nextpatient-image-size-1200);
+    height: var(--home-nextpatient-image-size-1200);
+    margin-right: var(--home-nextpatient-image-margin-1200);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.8125rem;
+    font: var(--home-nextpatient-text-secondary-1200);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.9375rem;
+    font: var(--home-nextpatient-text-strong-1200);
     margin: 0.25rem 0;
   }
 }
 
 @media (max-width: 992px) {
   .patient-info-wrapper .patient-info {
-    padding: 0.75rem 1rem;
-    margin-top: 0.75rem;
+    padding: var(--home-nextpatient-padding-992);
+    margin-top: var(--home-nextpatient-margin-top-1200);
   }
   .patient-info-wrapper .patient-image img {
-    width: 3.5rem;
-    height: 3.5rem;
-    margin-right: 0.75rem;
+    width: var(--home-nextpatient-image-size-992);
+    height: var(--home-nextpatient-image-size-992);
+    margin-right: var(--home-nextpatient-image-margin-1200);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.8125rem;
+    font: var(--home-nextpatient-text-secondary-1200);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.9375rem;
+    font: var(--home-nextpatient-text-strong-1200);
     margin: 0.25rem 0;
   }
 }
 
 @media (max-width: 768px) {
   .patient-info-wrapper .patient-info {
-    padding: 0.75rem 1rem;
-    margin-top: 0.75rem;
+    padding: var(--home-nextpatient-padding-992);
+    margin-top: var(--home-nextpatient-margin-top-1200);
   }
   .patient-info-wrapper .patient-image img {
-    width: 3.5rem;
-    height: 3.5rem;
-    margin-right: 0.75rem;
+    width: var(--home-nextpatient-image-size-992);
+    height: var(--home-nextpatient-image-size-992);
+    margin-right: var(--home-nextpatient-image-margin-1200);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.8125rem;
+    font: var(--home-nextpatient-text-secondary-1200);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.9375rem;
+    font: var(--home-nextpatient-text-strong-1200);
     margin: 0.25rem 0;
   }
 }
 
 @media (max-width: 576px) {
   .patient-info-wrapper .patient-info {
-    padding: 0.5rem 0.75rem;
-    margin-top: 0.5rem;
+    padding: var(--home-nextpatient-padding-576);
+    margin-top: var(--home-nextpatient-margin-top-576);
   }
   .patient-info-wrapper .patient-image img {
-    width: 3rem;
-    height: 3rem;
-    margin-right: 0.5rem;
+    width: var(--home-nextpatient-image-size-576);
+    height: var(--home-nextpatient-image-size-576);
+    margin-right: var(--home-nextpatient-image-margin-576);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.75rem;
+    font: var(--home-nextpatient-text-secondary-576);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.875rem;
+    font: var(--home-nextpatient-text-strong-576);
     margin: 0.2rem 0;
   }
 }
 
 @media (max-width: 480px) {
   .patient-info-wrapper .patient-info {
-    padding: 0.5rem 0.5rem;
-    margin-top: 0.5rem;
+    padding: var(--home-nextpatient-padding-480);
+    margin-top: var(--home-nextpatient-margin-top-576);
   }
   .patient-info-wrapper .patient-image img {
-    width: 2.5rem;
-    height: 2.5rem;
-    margin-right: 0.5rem;
+    width: var(--home-nextpatient-image-size-480);
+    height: var(--home-nextpatient-image-size-480);
+    margin-right: var(--home-nextpatient-image-margin-576);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.7rem;
+    font: var(--home-nextpatient-text-secondary-480);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.8rem;
+    font: var(--home-nextpatient-text-strong-480);
     margin: 0.15rem 0;
   }
 }
@@ -153,19 +153,19 @@
 /* 📌 Ajustes para escala de 125% */
 @media (resolution: 125dpi) {
   .patient-info-wrapper .patient-info {
-    padding: 0.8rem 1.2rem;
-    margin-top: 0.8rem;
+    padding: var(--home-nextpatient-padding-1200);
+    margin-top: var(--home-nextpatient-margin-top-1200);
   }
   .patient-info-wrapper .patient-image img {
-    width: 3.2rem;
-    height: 3.2rem;
-    margin-right: 0.9rem;
+    width: var(--home-nextpatient-image-size-992);
+    height: var(--home-nextpatient-image-size-992);
+    margin-right: var(--home-nextpatient-image-margin-1200);
   }
   .patient-info-wrapper .patient-details p {
-    font-size: 0.75rem;
+    font: var(--home-nextpatient-text-secondary-125dpi);
   }
   .patient-info-wrapper .patient-details strong {
-    font-size: 0.9rem;
+    font: var(--home-nextpatient-text-strong-125dpi);
     margin: 0.25rem 0;
   }
 }

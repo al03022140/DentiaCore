@@ -1,7 +1,7 @@
 /* Estilos base */
  .add-patient-wrapper {
-  font-family: 'Montserrat', sans-serif;
-  color: #2e2e2e;
+  font: var(--text-body-default);
+  color: var(--color-text-dark);
   padding: 20px;
   box-sizing: border-box;
   padding-left: 0.5rem; /* Se reduce para evitar que el contenido se salga */
@@ -10,11 +10,10 @@
 }
 
 .add-patient-wrapper h2 {
-  font-size: 2.5rem;
-  font-weight: bold;
+  font: var(--text-display-xl);
   margin: 0;
   padding: 1rem 0;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--color-border-medium);
   padding-bottom: 2rem;
   /* Otros estilos comunes que desees */
 }
@@ -25,18 +24,6 @@
   max-height: calc(100vh - 200px);
   overflow-y: auto;
   padding: 0 10px 50px 10px; /* Aumentamos el padding-bottom para los botones */
-  scrollbar-width: thin;
-  scrollbar-color: #cccccc transparent;
-}
-.add-patient-wrapper .scrollable-form::-webkit-scrollbar {
-  width: 8px;
-}
-.add-patient-wrapper .scrollable-form::-webkit-scrollbar-track {
-  background: transparent;
-}
-.add-patient-wrapper .scrollable-form::-webkit-scrollbar-thumb {
-  background-color: #cccccc;
-  border-radius: 10px;
 }
 
 /* Contenedor principal del formulario */
@@ -70,7 +57,7 @@
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  border: 2px solid #ccc;
+  border: 2px solid var(--color-border-medium);
   border-radius: 50%;
   cursor: pointer;
 }
@@ -89,26 +76,12 @@
 
 /* Botón de eliminar en los controles externos */
 .add-patient-wrapper .image-controls-outside .trash-button {
-  background-color: #ffebee;
-  border: 2px solid #ffcdd2;
   border-radius: 8px;
-  color: #d32f2f;
   padding: 8px 12px;
-  font-size: 0.9rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-family: 'Montserrat', sans-serif;
-}
-
-.add-patient-wrapper .image-controls-outside .trash-button:hover {
-  background-color: #ffcdd2;
-  border-color: #ef9a9a;
-  transform: scale(1.05);
 }
 
 /* Botón de eliminar foto - SOLO dentro del contenedor de foto */
@@ -122,25 +95,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
   z-index: 10;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  background-color: #ffebee;
-  border: 2px solid #ffcdd2;
-  color: #d32f2f;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.add-patient-wrapper .patient-photo-container .trash-button:hover {
-  background-color: #ffcdd2;
-  border-color: #ef9a9a;
-  transform: scale(1.05);
+  box-shadow: 0 2px 4px var(--color-black-20);
 }
 
 .add-patient-wrapper .patient-photo-container:hover:not(.cropping-mode) {
   transform: scale(1.05);
-  background-color: #ccc; /* Se pone en gris al hacer hover */
+  background-color: var(--color-border-medium); /* Se pone en gris al hacer hover */
 }
 .add-patient-wrapper .patient-photo-container:hover:not(.cropping-mode) .upload-text {
   opacity: 1;
@@ -149,8 +110,8 @@
 /* Estilos específicos para el modo cropping */
 .add-patient-wrapper .patient-photo-container.cropping-mode {
   cursor: move;
-  border: 2px solid #4CAF50;
-  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+  border: 2px solid var(--color-green-700);
+  box-shadow: 0 0 10px var(--color-green-500-30);
 }
 
 .add-patient-wrapper .patient-photo-container.cropping-mode:hover {
@@ -179,9 +140,9 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  color: white;
-  font-size: 1.2rem;
+  background: var(--color-black-40);
+  color: var(--color-bg-white);
+  font: var(--text-body-lg);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -238,10 +199,10 @@
 /* Ajustar el label para checkboxes */
 .add-patient-wrapper .form-group:has(input[type="checkbox"]) label {
   margin-bottom: 0.3rem;
-  font-size: 0.95rem;
+  font: var(--text-label);
 }
 .add-patient-wrapper .form-group label {
-  font-weight: bold;
+  font: var(--text-label-strong);
   margin-bottom: 5px;
 }
 
@@ -250,40 +211,39 @@
 .add-patient-wrapper .form-group select,
 .add-patient-wrapper .form-group textarea {
   padding: 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-medium);
   border-radius: 5px;
-  font-family: inherit;
-  font-weight: bold;
-  color: #1a1a1a;
-  background-color: #fff;
+  font: var(--text-body-strong);
+  color: var(--color-text-strong);
+  background-color: var(--color-bg-white);
   box-sizing: border-box;
 }
 
 /* Placeholder */
 .add-patient-wrapper .form-group input::placeholder,
 .add-patient-wrapper .form-group textarea::placeholder {
-  color: #999;
-  font-weight: normal;
+  color: var(--color-text-light);
+  font: var(--text-body-xs);
 }
 
 /* Select con scroll */
 .add-patient-wrapper .form-group select {
   max-height: 200px;
   overflow-y: auto;
-  color: #000;
-  font-weight: bold;
+  color: var(--color-text-black);
+  font: var(--text-body-strong);
 }
 .add-patient-wrapper .form-group select option {
-  color: #000 !important;
-  background-color: #fff !important;
-  font-weight: bold !important;
+  color: var(--color-text-black) !important;
+  background-color: var(--color-bg-white) !important;
+  font: var(--text-body-strong) !important;
   width: 286.2px;
   height: 42px;
   padding: 12px;
   box-sizing: border-box;
 }
 .add-patient-wrapper .form-group select option:first-child {
-  color: #999;
+  color: var(--color-text-light);
   width: 286.2px;
   height: 42px;
   padding: 12px;
@@ -296,7 +256,7 @@
   -webkit-appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid #666;
+  border: 2px solid var(--color-border-strong);
   border-radius: 4px;
   cursor: pointer;
   position: relative;
@@ -306,14 +266,13 @@
   flex-shrink: 0;
 }
 .add-patient-wrapper .form-group input[type="checkbox"]:checked {
-  background-color: #4caf50;
-  border-color: #4caf50;
+  background-color: var(--color-green-700);
+  border-color: var(--color-green-700);
 }
 .add-patient-wrapper .form-group input[type="checkbox"]::before {
   content: '✔';
-  color: white;
-  font-weight: bold;
-  font-size: 14px;
+  color: var(--color-bg-white);
+  font: var(--text-dense-md);
   position: absolute;
   top: 50%;
   left: 50%;
@@ -332,30 +291,6 @@
   margin-top: 20px;
   max-width: 100%;
   width: 100%;
-}
-
-/* Botones */
-.add-patient-wrapper .confirm-button,
-.add-patient-wrapper .cancel-button {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-family: inherit;
-}
-.add-patient-wrapper .confirm-button {
-  background-color: #80bf82;
-  color: #fff;
-}
-.add-patient-wrapper .cancel-button {
-  background-color: #f2746b;
-  color: #fff;
-}
-.add-patient-wrapper .confirm-button:hover {
-  background-color: #70a872;
-}
-.add-patient-wrapper .cancel-button:hover {
-  background-color: #e0635a;
 }
 
 /* Todos los inputs mantienen el tamaño estándar de 286.2x42px */
@@ -390,16 +325,6 @@
 .add-patient-wrapper .crop-button {
   display: block;
   margin: 10px auto;
-  padding: 10px;
-  background-color: #4caf50;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  border-radius: 5px;
-}
-.add-patient-wrapper .upload-button:hover,
-.add-patient-wrapper .crop-button:hover {
-  background-color: #45a049;
 }
 
 /* Plantilla de alineación (Cropper) */
@@ -438,14 +363,12 @@
 
 /* Ajuste del título principal (evitar la coma extra en font-weight) */
 .add-patient-wrapper .add-patient-title {
-  font-size: 4rem !important;
-  font-weight: bolder !important;
-  font-family: 'Montserrat', sans-serif !important;
+  font: var(--text-display-xxl) !important;
   text-align: right;
   flex-grow: 1;
   margin: 0;
   padding-left: 20px;
-  color: #000;
+  color: var(--color-text-black);
   padding-right: 2rem;
 }
 
@@ -464,8 +387,8 @@
 }
 
 .add-patient-wrapper .image-container .reactEasyCrop_CropArea {
-  border: 2px solid #4CAF50 !important;
-  box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.5) !important;
+  border: 2px solid var(--color-green-700) !important;
+  box-shadow: 0 0 0 9999em var(--color-black-50) !important;
 }
 
 /* Indicador visual para el modo de edición */
@@ -475,11 +398,11 @@
   bottom: -30px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(76, 175, 80, 0.9);
-  color: white;
+  background: var(--color-green-700-90);
+  color: var(--color-bg-white);
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 0.8rem;
+  font: var(--text-caption-xs);
   white-space: nowrap;
   z-index: 1001;
   pointer-events: none;
@@ -494,33 +417,18 @@
   gap: 8px;
 }
 
-.add-patient-wrapper .crop-button {
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-family: Montserrat, sans-serif;
-  font-weight: bold;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+.add-patient-wrapper .image-controls .crop-button {
+  --btn-padding: 6px 10px;
+  --btn-font: var(--text-label);
 }
 
-.add-patient-wrapper .crop-button:hover {
-  background-color: #45a049;
+.add-patient-wrapper .image-controls .crop-button:hover {
   transform: scale(1.05);
 }
 
-
-
 .add-patient-wrapper .upload-button {
   margin-top: 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
+  --btn-padding: 6px 12px;
 }
 
 .add-patient-wrapper .right-section {
@@ -542,29 +450,10 @@
   max-height: 64rem; /* Ajusta la altura máxima fija según el contenedor de la encuesta médica */
   width: 100%; /* Se mantiene dentro del layout */
   overflow-y: auto; /* Scroll solo en Y */
-  scrollbar-width: thin;
-  scrollbar-color: #cccccc transparent;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-medium);
   border-radius: 1rem;
   padding-bottom: 1rem;
   padding-right: 1rem;
-}
-
-/* Ajuste del scroll para navegadores Webkit */
-.add-patient-wrapper .medicacion-col::-webkit-scrollbar, 
-.add-patient-wrapper .alergias-col::-webkit-scrollbar {
-  width: 6px;
-}
-
-.add-patient-wrapper .medicacion-col::-webkit-scrollbar-track, 
-.add-patient-wrapper .alergias-col::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.add-patient-wrapper .medicacion-col::-webkit-scrollbar-thumb, 
-.add-patient-wrapper .alergias-col::-webkit-scrollbar-thumb {
-  background-color: #cccccc;
-  border-radius: 10px;
 }
 
 
@@ -652,17 +541,16 @@
   align-items: start;
   margin-top: 15px;
   padding: 15px;
-  background-color: #f9f9f9;
+  background-color: var(--color-bg-light);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border-light);
 }
 
 .enfermedades-grid h4 {
   grid-column: 1 / -1;
   margin: 0 0 15px 0;
-  font-size: 1.1rem;
-  color: #333;
-  font-weight: 600;
+  font: var(--text-body-strong);
+  color: var(--color-text-dark);
 }
 
 .enfermedades-grid .form-group {
@@ -673,8 +561,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.95rem;
-  color: #555;
+  font: var(--text-label);
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
@@ -715,20 +603,6 @@
 
 /* Estilos para el botón de agregar contacto de emergencia */
 .action-button {
-  font-family: Montserrat, sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background-color: #f8f8f8;
-  border: 2px solid #e0e0e0;
-  border-radius: 1rem;
-  color: rgb(0, 0, 0);
-  padding: 10px 15px;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
   margin-top: 2rem; /* Added margin-bottom to create space below the button */
 }
 /* Los botones de cirugías previas ahora usan las clases existentes: action-button y trash-button */
@@ -746,76 +620,41 @@
   align-items: center;
   gap: 10px;
   padding: 10px;
-  background-color: #f9f9f9;
-  border: 1px solid #e0e0e0;
+  background-color: var(--color-bg-light);
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
   transition: background-color 0.3s ease;
 }
 
 .array-item:hover {
-  background-color: #f0f0f0;
+  background-color: var(--color-neutral-180);
 }
 
 .array-item input[type="text"] {
   flex: 1;
   margin: 0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-medium);
   border-radius: 5px;
   padding: 8px 12px;
-  font-family: Montserrat, sans-serif;
-  font-weight: bold;
+  font: var(--text-body-strong);
 }
 
 .array-item input[type="text"]::placeholder {
-  color: #666;
-  font-weight: bolder;
+  color: var(--color-text-light);
+  font: var(--text-body-xs);
 }
 
 /* Estilo para placeholder de Motivo de Consulta Odontológica */
 textarea[placeholder*="Describa el motivo principal"]::placeholder {
-  color: #666;
-  font-weight: bolder;
-}
-
-.action-button:hover {
-  background-color: #e0e0e0;
-  border-color: #bdbdbd;
-  transform: scale(1.05);
-}
-
-.actiont-button:active {
-  transform: scale(0.95);
+  color: var(--color-text-light);
+  font: var(--text-body-xs);
 }
 
 /* Botón de trash para arrays (NO para foto del paciente) */
 .array-item .trash-button {
-  font-family: Montserrat, sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #ffebee;
-  border: 2px solid #ffcdd2;
-  border-radius: 0.8rem;
-  color: #d32f2f;
   padding: 8px 12px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
   min-width: 40px;
   height: 40px;
-}
-
-.array-item .trash-button:hover {
-  background-color: #ffcdd2;
-  border-color: #ef9a9a;
-  transform: scale(1.05);
-}
-
-.array-item .trash-button:active {
-  transform: scale(0.95);
-  background-color: #ef5350;
-  color: white;
 }
 
 .medicacion-input,
@@ -824,28 +663,26 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
   min-width: none;
   max-width: 90%;
   padding: 12px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border-light);
   border-radius: 1rem;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1rem;
-  font-weight: bolder;
-  color: #1a1a1a;
-  background-color: #fff;
+  font: var(--text-body-strong);
+  color: var(--color-text-strong);
+  background-color: var(--color-bg-white);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Efecto cuando el input está en foco */
 .medicacion-input:focus,
 .alergia-input:focus {
-  border-color: #000000;
+  border-color: var(--color-text-black);
   outline: none;
 }
 
 /* Placeholder estilizado */
 .medicacion-input::placeholder,
 .alergia-input::placeholder {
-  color: #a4a4a4;
-  font-weight: bolder;
+  color: var(--color-text-placeholder);
+  font: var(--text-body-xs);
 }
 
 /* Espaciado vertical entre contactos de emergencia y antecedentes familiares */
@@ -869,7 +706,7 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
 
 /* Separación visual para minisecciones de Evaluación Dental y Oclusal */
 .form-section h3 {
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--color-border-medium);
   padding-top: 1.5rem;
   margin-top: 2rem;
   margin-bottom: 1rem;

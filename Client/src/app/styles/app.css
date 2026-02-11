@@ -3,7 +3,7 @@
 .dashboard {
   display: block;
   min-height: 100vh;
-  background-color: #f9f9f9;
+  background-color: var(--color-bg-light);
   margin: 0;
   padding: 0;
   box-sizing: border-box;

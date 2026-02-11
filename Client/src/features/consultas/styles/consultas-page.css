@@ -13,7 +13,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  font-family: var(--font-family-primary);
+  font: var(--text-body-default);
   background-color: transparent;
   overflow: hidden;
   overflow-x: hidden;
@@ -34,11 +34,11 @@
 
 /* Panel Detalle Seleccionado */
 .selected-detail-panel {
-  background-color: #fff;
-  border-radius: 1rem;
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
   padding: 1.25rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
-  border: 2px solid #ddd;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
   box-sizing: border-box;
   flex: 1; 
   display: flex;
@@ -55,10 +55,10 @@
 .consultas-right {
   display: flex;
   flex-direction: column;
-  background-color: #fff;
-  border-radius: 1rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
-  border: 2px solid #ddd;
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
   box-sizing: border-box;
   padding: 1.25rem;
   overflow: hidden;
@@ -69,11 +69,11 @@
 
 /* Panel Siguiente Paciente (Highlight) */
 .next-patient-card {
-  background-color: #fff;
-  border-radius: 1.25rem;
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
   padding: 1rem 1.5rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
-  border: 1px solid #ddd;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -100,16 +100,14 @@
 }
 
 .next-patient-info h2 {
-  font-size: var(--font-size-large);
+  font: var(--text-heading-xxs);
   color: var(--color-primary);
   margin: 0 0 0.25rem 0;
-  font-weight: var(--font-weight-bold);
 }
 
 .next-patient-time {
-  font-size: var(--font-size-medium);
+  font: var(--text-body-lg);
   color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
   display: block;
 }
 
@@ -117,20 +115,19 @@
   display: inline-block;
   padding: 0.25rem 0.75rem;
   border-radius: 1rem;
-  font-size: 0.8rem;
-  font-weight: var(--font-weight-bold);
+  font: var(--text-overline);
   text-transform: uppercase;
   margin-top: 0.5rem;
 }
 
 .badge-status.confirmed {
-  background-color: #d4edda;
-  color: #155724;
+  background-color: var(--color-success-100);
+  color: var(--color-success);
 }
 
 .badge-status.waiting {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: var(--color-yellow-100);
+  color: var(--color-yellow-700);
 }
 
 .next-patient-reason {
@@ -148,18 +145,17 @@
 
 .start-consultation-btn {
   background-color: var(--color-primary);
-  color: white;
+  color: var(--color-bg-white);
   border: none;
   padding: 1rem;
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-base);
+  font: var(--text-label-strong);
   transition: var(--transition-medium);
   width: 100%;
   text-align: center;
   margin-top: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px var(--color-black-10);
 }
 
 .start-consultation-btn:hover {
@@ -176,11 +172,11 @@
 }
 
 .patient-tags span {
-  background-color: #ffeeba;
-  color: #856404;
+  background-color: var(--color-yellow-100);
+  color: var(--color-yellow-700);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font: var(--text-caption-sm);
   margin-right: 0.5rem;
 }
 
@@ -188,7 +184,7 @@
   color: var(--color-primary);
   margin-top: 0;
   margin-bottom: 1rem;
-  font-size: var(--font-size-medium);
+  font: var(--text-subtitle-md);
   border-bottom: 2px solid var(--color-bg-section);
   padding-bottom: 0.5rem;
 }
@@ -220,13 +216,13 @@
 }
 
 .timeline-date {
-  font-size: 0.8rem;
+  font: var(--text-caption-xs);
   color: var(--color-text-muted);
   margin-bottom: 0.25rem;
 }
 
 .timeline-content {
-  font-weight: var(--font-weight-medium);
+  font: var(--text-body-default);
   color: var(--color-text-secondary);
 }
 
@@ -242,7 +238,7 @@
   margin-bottom: 0.5rem;
   border-radius: var(--border-radius-sm);
   border-left: 4px solid var(--color-warning);
-  font-weight: var(--font-weight-medium);
+  font: var(--text-body-default);
 }
 
 .detail-actions {
@@ -258,6 +254,7 @@
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius-md);
   cursor: pointer;
+  font: var(--text-label);
   transition: all 0.2s;
 }
 
@@ -267,7 +264,7 @@
 
 .consultas-right h3 {
   color: var(--color-primary);
-  font-size: var(--font-size-xl);
+  font: var(--text-heading-sm);
   margin-top: 0;
   margin-bottom: 1.5rem;
 }
@@ -279,9 +276,8 @@
 }
 
 .list-section-title {
-  font-size: var(--font-size-medium);
+  font: var(--text-overline);
   color: var(--color-text-muted);
-  font-weight: var(--font-weight-bold);
   margin: 1.5rem 0 0.5rem 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -310,7 +306,7 @@
 }
 
 .consultation-item.active {
-  background-color: #e3f2fd;
+  background-color: var(--color-blue-500-15);
   border-left: 4px solid var(--color-primary);
 }
 
@@ -320,16 +316,16 @@
   align-items: center;
   min-width: 70px;
   color: var(--color-primary);
-  font-weight: var(--font-weight-bold);
+  font: var(--text-label-strong);
   margin-right: 1rem;
 }
 
 .time-hour {
-  font-size: 1.2rem;
+  font: var(--text-body-lg);
 }
 
 .time-ampm {
-  font-size: 0.8rem;
+  font: var(--text-caption-xs);
   color: var(--color-text-muted);
 }
 
@@ -338,14 +334,13 @@
 }
 
 .consultation-patient-name {
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-base);
+  font: var(--text-body-strong);
   color: var(--color-text-primary);
   margin-bottom: 0.25rem;
   display: block;
 }
 
 .consultation-reason {
-  font-size: 0.9rem;
+  font: var(--text-body-sm);
   color: var(--color-text-secondary);
 }

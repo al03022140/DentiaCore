@@ -1,15 +1,13 @@
-@import '../../../shared/styles/variables.css';
-
 /* Contenedor general del periodontograma dentro de Patient Detail */
 .periodontogram-section {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
-  background: var(--color-background-white, #ffffff);
-  border: 1px solid var(--color-border-light, #dee2e6);
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-border-light);
   border-radius: var(--border-radius-lg, 12px);
   padding: var(--spacing-xl, 1.5rem);
-  box-shadow: var(--shadow-card, 0 4px 12px rgba(0, 0, 0, 0.08));
+  box-shadow: var(--shadow-card);
   margin-bottom: var(--spacing-xxl, 2.5rem);
 }
 
@@ -22,18 +20,18 @@
 }
 
 .image-control-section {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
   padding: 1.5rem;
-  background-color: #fafafa;
+  background-color: var(--color-neutral-50);
 }
 
 .image-control-section h4 {
   margin: 0 0 1rem 0;
-  color: #333;
-  font-size: 1.2rem;
-  font-weight: 600;
-  border-bottom: 2px solid #007bff;
+  color: var(--color-neutral-1100);
+  font-size: var(--font-size-medium);
+  font-weight: var(--font-weight-semibold);
+  border-bottom: 2px solid var(--color-blue-500);
   padding-bottom: 0.5rem;
 }
 
@@ -42,31 +40,31 @@
   flex-direction: column;
   align-items: center;
   gap: 2rem;
-  background: #f9f9f9;
+  background: var(--color-bg-light);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-neutral-500);
 }
 
 .saved-image-section {
   width: 100%;
   max-width: none;
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 8px; /* Mismo border-radius que .periodontogram-container */
   padding: 20px; /* Mismo padding que .periodontogram-container */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Misma sombra que .periodontogram-container */
-  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 10px var(--color-black-10); /* Misma sombra que .periodontogram-container */
+  border: 1px solid var(--color-neutral-400);
 }
 
 .saved-image-section h4 {
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #495057;
-  font-size: 1.3rem;
-  font-weight: 600;
+  color: var(--color-neutral-1000);
+  font-size: var(--font-size-ml);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-bottom: 2px solid #007bff;
+  border-bottom: 2px solid var(--color-blue-500);
   padding-bottom: 0.5rem;
 }
 
@@ -81,11 +79,11 @@
   width: 100%;
   height: auto;
   max-width: none;
-  border: 1px solid #dee2e6; /* Mismo borde que .arch-section */
+  border: 1px solid var(--color-neutral-500); /* Mismo borde que .arch-section */
   border-radius: 6px; /* Mismo border-radius que .arch-section */
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05); /* Misma sombra que .arch-section */
+  box-shadow: 0 1px 4px var(--color-black-05); /* Misma sombra que .arch-section */
   transition: all 0.3s ease;
-  background: white;
+  background: var(--color-bg-white);
   padding: 20px; /* Mismo padding que .arch-section */
   box-sizing: border-box; /* Mismo box-sizing que .arch-section */
   object-fit: contain; /* Mantener proporciones exactas */
@@ -107,16 +105,16 @@
 
 .saved-periodontogram-image:hover {
   transform: scale(1.02);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 12px var(--color-black-15);
 }
 
 /* Estilos para estadísticas guardadas - Siguiendo el estilo del panel de estadísticas del periodontograma */
 .saved-statistics {
-  background: white;
+  background: var(--color-bg-white);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px var(--color-black-10);
+  border: 1px solid var(--color-neutral-500);
   margin-top: 0;
   width: 100%;
   max-width: none;
@@ -124,11 +122,11 @@
 }
 
 .saved-statistics h5 {
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: var(--font-size-medium);
+  font-weight: var(--font-weight-semibold);
   margin-bottom: 15px;
-  color: #2c3e50;
-  border-bottom: 2px solid #3498db;
+  color: var(--color-text-primary);
+  border-bottom: 2px solid var(--color-primary-light);
   padding-bottom: 8px;
 }
 
@@ -140,31 +138,31 @@
 }
 
 .stat-item {
-  background: #f8f9fa;
+  background: var(--color-neutral-100);
   border-radius: 8px;
   padding: 15px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-neutral-400);
   transition: all 0.3s ease;
   text-align: center;
 }
 
 .stat-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px var(--color-black-15);
 }
 
 .stat-label {
-  font-size: 0.9rem;
-  color: #6c757d;
-  font-weight: 500;
+  font-size: var(--font-size-xxs);
+  color: var(--color-neutral-900);
+  font-weight: var(--font-weight-medium);
   margin-bottom: 8px;
   display: block;
 }
 
 .stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #2c3e50;
+  font-size: var(--font-size-l);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   display: block;
 }
 
@@ -179,7 +177,7 @@
   }
   
   .stat-value {
-    font-size: 1.2rem;
+    font-size: var(--font-size-medium);
   }
 }
 
@@ -189,7 +187,7 @@
   }
   
   .saved-statistics h5 {
-    font-size: 1.1rem;
+    font-size: var(--font-size-base);
   }
   
   .stats-grid {
@@ -198,82 +196,58 @@
   }
   
   .stat-value {
-    font-size: 1.1rem;
+    font-size: var(--font-size-base);
   }
 }
 
 /* Estilos de botones específicos para periodontogram-section */
 .periodontogram-section .btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
   border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-block;
+  --btn-padding: 0.75rem 1.5rem;
+  --btn-radius: 6px;
+  --btn-font-size: var(--font-size-xxs);
+  --btn-font-weight: var(--font-weight-medium);
   text-align: center;
 }
 
-.periodontogram-section .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.periodontogram-section .btn-primary {
-  background-color: #007bff;
-  color: white;
-}
-
 .periodontogram-section .btn-primary:hover:not(:disabled) {
-  background-color: #0056b3;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-}
-
-.periodontogram-section .btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.periodontogram-section .btn-secondary:hover:not(:disabled) {
-  background-color: #545b62;
+  box-shadow: 0 4px 8px var(--color-blue-500-30);
 }
 
 /* Estilos para el mensaje cuando no hay imágenes guardadas */
 .no-images-message {
   text-align: center;
   padding: 3rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border: 2px dashed #dee2e6;
+  background: linear-gradient(135deg, var(--color-neutral-100) 0%, var(--color-neutral-400) 100%);
+  border: 2px dashed var(--color-neutral-500);
   border-radius: 12px;
-  color: #6c757d;
+  color: var(--color-neutral-900);
   max-width: 600px;
   margin: 2rem auto;
 }
 
 .no-images-message p {
   margin: 0.5rem 0;
-  font-size: 1.1rem;
+  font-size: var(--font-size-base);
   line-height: 1.6;
 }
 
 .no-images-message p:first-child {
-  font-weight: 600;
-  color: #495057;
-  font-size: 1.2rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-1000);
+  font-size: var(--font-size-medium);
 }
 
 .no-images-message p:last-child {
   font-style: italic;
-  color: #6c757d;
-  font-size: 1rem;
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-small);
 }
 
 .periodontogram-section .btn-secondary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+  box-shadow: 0 4px 8px var(--color-neutral-900-30);
 }
 
 .periodontogram-superior,
@@ -283,10 +257,10 @@
 
 /* Contenedor principal del periodontograma para captura */
 .periodontogram-container {
-  background-color: #f9f9f9;
+  background-color: var(--color-bg-light);
   padding: 1rem;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--color-black-10);
 }
 
 /* Responsive design */
@@ -300,12 +274,12 @@
   }
   
   .image-control-section h4 {
-    font-size: 1.1rem;
+    font-size: var(--font-size-base);
   }
   
   .btn {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.85rem;
+    --btn-padding: 0.6rem 1.2rem;
+    --btn-font-size: var(--font-size-xs);
   }
   
   .saved-statistics {
@@ -324,7 +298,7 @@
   
   .btn {
     width: 100%;
-    padding: 0.75rem;
+    --btn-padding: 0.75rem;
   }
 }
 
@@ -340,7 +314,7 @@
   height: 16px;
   margin: auto;
   border: 2px solid transparent;
-  border-top-color: #ffffff;
+  border-top-color: var(--color-bg-white);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   top: 50%;
@@ -355,18 +329,18 @@
 
 /* Estados de éxito y error */
 .success-message {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: var(--color-success-100);
+  color: var(--color-success);
+  border: 1px solid var(--color-green-250);
   border-radius: 4px;
   padding: 0.75rem;
   margin: 0.5rem 0;
 }
 
 .error-message {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: var(--color-danger-100);
+  color: var(--color-red-650);
+  border: 1px solid var(--color-red-200);
   border-radius: 4px;
   padding: 0.75rem;
   margin: 0.5rem 0;
@@ -381,42 +355,18 @@
 }
 
 .saved-image-actions .btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  --btn-padding: 10px 20px;
+  --btn-radius: 6px;
+  --btn-font-size: var(--font-size-xs);
+  --btn-font-weight: var(--font-weight-medium);
   min-width: 120px;
 }
 
-.saved-image-actions .btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.saved-image-actions .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.saved-image-actions .btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
+.saved-image-actions .btn-primary:hover:not(:disabled),
 .saved-image-actions .btn-secondary:hover:not(:disabled) {
-  background: #545b62;
   transform: translateY(-1px);
 }
 
 .saved-image-actions .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
   transform: none;
 }
