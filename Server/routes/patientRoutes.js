@@ -47,18 +47,12 @@ const {
   UnsupportedMediaTypeError
 } = require('../helpers/odontograma');
 const {
-  verificarOdontogramaInicial,
-  guardarOdontogramaInicial,
-  obtenerHistorialInicial,
-  agregarHistorialInicial,
   manejarError,
-  getClinicalHistory,
-  saveClinicalHistoryEntries,
-  deleteClinicalHistoryEntry,
-  getOdontogramaById
 } = require('../controllers/odontogramaController');
 const patientCtrl = require('../controllers/patientsController');
 const checkPatient = require('../middlewares/checkPatient');
+const { authorize, filterPatientFields, requireClinicalRole } = require('../middlewares/authorize');
+const backdatedEntry = require('../middlewares/backdatedEntry');
 
 // Middleware de validación de ID
 const validateId = (req, res, next) => {
@@ -108,7 +102,7 @@ const uploadFoto = multer({
 
 
 // Middleware para manejar errores de Multer
-const handleMulterError = (err, req, res, next) => {
+const handleMulterError = (err, req, res, _next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
@@ -173,19 +167,19 @@ const handleMulterError = (err, req, res, next) => {
 // ── Rutas básicas de pacientes ───────────────────────────────────
 router
   .route('/')
-  .get(patientCtrl.getAllPatients)
-  .post(uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
-  .delete(patientCtrl.deleteAllPatients);
+  .get(authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getAllPatients)
+  .post(authorize(['patients.create']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
+  .delete(authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 
-router.post('/batch', uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
+router.post('/batch', authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
 
 // ── Rutas de paciente específico ─────────────────────────────────
 router
   .route('/:id')
   .all(validateId)
-  .get(patientCtrl.getPatientById)
-  .put(uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
-  .delete(patientCtrl.deletePatient);
+  .get(authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getPatientById)
+  .put(authorize(['patients.update']), uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
+  .delete(authorize(['patients.delete']), patientCtrl.deletePatient);
 
 /**
  * @swagger
@@ -318,11 +312,9 @@ router
  *       415:
  *         description: Tipo de archivo no soportado
  */
-router
-  .route('/:id/odontograma-inicial')
-  .all(validateId, checkPatient)
-  .get(verificarOdontogramaInicial);
-
+// NOTA: Las rutas GET/POST/DELETE de odontograma-inicial se manejan en
+// odontogramaRoutes.js con la autorización correcta (authorize()).
+// Solo se conserva aquí el endpoint de imagen que NO existe en odontogramaRoutes.
 
 // Endpoint para servir la imagen del odontograma inicial
 router
@@ -429,11 +421,8 @@ router
  *                 data:
  *                   $ref: '#/components/schemas/Odontograma'
  */
-router
-  .route('/:id/odontograma-inicial/history')
-  .all(validateId, checkPatient)
-  .get(obtenerHistorialInicial)
-  .post(agregarHistorialInicial);
+// NOTA: Las rutas de historial se manejan en odontogramaRoutes.js con
+// la autorización y validación correctas (authorize + validarEntradasOdontograma).
 
 // ── Anidar rutas de odontograma ────────────────────────
 const odontogramaRoutes = require('./odontogramaRoutes');
@@ -443,12 +432,12 @@ router.use('/:id', validateId, odontogramaRoutes);
 router
   .route('/:id/treatment-plan')
   .all(validateId, checkPatient)
-  .post(patientCtrl.addTreatmentPlan);
+  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addTreatmentPlan);
 
 router
   .route('/:id/evolution-note')
   .all(validateId, checkPatient)
-  .post(patientCtrl.addEvolutionNote);
+  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addEvolutionNote);
 
 // ── Anidar rutas de periodontograma ────────────────────────
 router.use('/:id/periodontogram', validateId, checkPatient, periodontogramRoutes);

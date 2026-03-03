@@ -1,4 +1,3 @@
-const PeriodontogramDataUtils = require('../utils/periodontogramUtils');
 const { validationResult, body, param } = require('express-validator');
 
 /**
@@ -26,15 +25,6 @@ class PeriodontogramValidationMiddleware {
   static validatePatientIdAsId() {
     return [
       param('id')
-        .custom((value, { req }) => {
-          console.log('🔍 DEBUG validatePatientIdAsId:');
-          console.log('  - req.params:', req.params);
-          console.log('  - req.params.id:', req.params.id);
-          console.log('  - value:', value);
-          console.log('  - req.url:', req.url);
-          console.log('  - req.originalUrl:', req.originalUrl);
-          return true;
-        })
         .isMongoId()
         .withMessage('ID de paciente debe ser un ObjectId válido')
         .notEmpty()
@@ -117,7 +107,7 @@ class PeriodontogramValidationMiddleware {
           if (typeof value === 'string') {
             try {
               parsedStats = JSON.parse(value);
-            } catch (error) {
+            } catch (_error) {
               throw new Error('Las estadísticas deben ser un JSON válido');
             }
           } else if (typeof value === 'object' && value !== null) {
@@ -147,7 +137,7 @@ class PeriodontogramValidationMiddleware {
             try {
               JSON.parse(data);
               return true;
-            } catch (error) {
+            } catch (_error) {
               throw new Error('data debe ser un JSON válido');
             }
           }
@@ -167,17 +157,9 @@ class PeriodontogramValidationMiddleware {
    */
   static checkValidationErrors() {
     return (req, res, next) => {
-      console.log('🔍 DEBUG checkValidationErrors:');
-      console.log('  - req.params:', req.params);
-      console.log('  - req.body:', req.body);
-      console.log('  - req.url:', req.url);
-      
       const errors = validationResult(req);
-      console.log('  - validation errors:', errors.array());
       
       if (!errors.isEmpty()) {
-        console.log('❌ Validation failed, returning 400');
-        
         return res.status(400).json({
           success: false,
           message: 'Errores de validación',
@@ -189,7 +171,6 @@ class PeriodontogramValidationMiddleware {
         });
       }
       
-      console.log('✅ Validation passed, calling next()');
       next();
     };
   }
@@ -229,7 +210,7 @@ class PeriodontogramValidationMiddleware {
           if (typeof value === 'string') {
             try {
               parsedStats = JSON.parse(value);
-            } catch (error) {
+            } catch (_error) {
               throw new Error('Las estadísticas superiores deben ser un JSON válido');
             }
           } else if (typeof value === 'object' && value !== null) {
@@ -253,7 +234,7 @@ class PeriodontogramValidationMiddleware {
           if (typeof value === 'string') {
             try {
               parsedStats = JSON.parse(value);
-            } catch (error) {
+            } catch (_error) {
               throw new Error('Las estadísticas inferiores deben ser un JSON válido');
             }
           } else if (typeof value === 'object' && value !== null) {
@@ -275,7 +256,7 @@ class PeriodontogramValidationMiddleware {
             try {
               JSON.parse(data);
               return true;
-            } catch (error) {
+            } catch (_error) {
               throw new Error('superiorData debe ser un JSON válido');
             }
           }
@@ -293,7 +274,7 @@ class PeriodontogramValidationMiddleware {
             try {
               JSON.parse(data);
               return true;
-            } catch (error) {
+            } catch (_error) {
               throw new Error('inferiorData debe ser un JSON válido');
             }
           }

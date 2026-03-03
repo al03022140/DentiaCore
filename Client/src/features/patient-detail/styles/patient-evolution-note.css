@@ -50,7 +50,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr; /* Procedimiento | Observaciones | Correcciones */
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 16px;
 }
 
@@ -58,25 +58,30 @@
 .patient-evolution-note__form .form-row {
   font-family: var(--font-family-primary);
   min-width: 0; /* allow shrinking without overflow */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .patient-evolution-note__form .form-row label {
   display: block;
-  font-weight: var(--font-weight-bold);
+  font: var(--pd-font-label-md);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-black);
   margin-bottom: 4px;
-  font-size: var(--font-size-base);
 }
 
 /* Ensure textareas and inputs use Montserrat and wrap text */
 .patient-evolution-note__form .form-row .ant-input,
 .patient-evolution-note__form .form-row .ant-input-textarea,
 .patient-evolution-note__form .form-row .ant-input-textarea textarea {
-  font-family: var(--font-family-primary);
-  white-space: pre-wrap; /* preserve newlines and wrap long lines */
+  font: var(--pd-font-body-md);
+  white-space: pre-wrap;
   word-wrap: break-word;
-  word-break: break-word; /* break long unspaced strings */
-  font-weight: var(--font-weight-semibold); /* make text bolder */
+  word-break: break-word;
+  min-height: 120px;
+  height: 100%;
+  flex: 1;
 }
 
 /* Actions aligned to the right under the grid (span full row) */
@@ -111,21 +116,21 @@
   border: 1px solid var(--color-border-light);
   padding: 8px;
   text-align: left;
-  white-space: pre-wrap; /* allow wrapping within cells */
+  white-space: pre-wrap;
   word-break: break-word;
-  overflow-wrap: anywhere; /* break long strings when necessary */
-  font-family: var(--font-family-primary);
+  overflow-wrap: anywhere;
+  font: var(--pd-font-body-md);
 }
 
 .patient-evolution-note__table thead th {
   background: var(--color-neutral-50);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-black);
 }
 
 /* Hacer más bolder la información del historial (manteniendo color) */
 .patient-evolution-note__table tbody td {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
   color: var(--color-neutral-680); /* color para datos guardados */
 }
 
@@ -207,7 +212,7 @@
 
   .printing-portal th {
     background-color: var(--color-neutral-180) !important;
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-medium);
     -webkit-print-color-adjust: exact; /* Para que salga el gris */
     print-color-adjust: exact;
   }
@@ -239,7 +244,7 @@
   }
 
   .printing-portal .signature-label {
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-medium);
     margin-bottom: 4px;
     font-size: var(--font-size-print-signature-label);
   }

@@ -1,8 +1,8 @@
 const Patient = require('../models/patient');
 const Periodontogram = require('../models/periodontogram');
 const PeriodontogramHistory = require('../models/periodontogramHistory');
-const { body, param, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
+const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { validatePeriodontogramData } = require('../schemas/unified-periodontogram-schema');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
@@ -62,34 +62,10 @@ function statisticsToPlain(statistics) {
   return { ...statistics };
 }
 
-// ✅ ESQUEMA UNIFICADO - Validación sin transformaciones
-function extractCanonicalStructureErrors(data) {
-  try {
-    // Usar esquema unificado para validación
-    validatePeriodontogramData(data || {});
-    // Si no lanza, no hay errores canónicos
-    return [];
-  } catch (e) {
-    const msg = String(e && e.message || '');
-    const patterns = [
-      /Estructura canónica no detectada/i,
-      /Falta bloque de medición/i,
-      /Falta cara/i,
-      /debe ser array de longitud 3/i,
-      /Validación fallida/i,
-      /Error en validación de datos/i,
-      /Campo\s+"teeth"\s+requerido/i
-    ];
-    return patterns.some(p => p.test(msg)) ? [msg] : ['Error al validar estructura canónica'];
-  }
-}
-
 // Usar middlewares centralizados
 const validatePatientId = PeriodontogramValidationMiddleware.validatePatientId();
 const validatePatientIdAsId = PeriodontogramValidationMiddleware.validatePatientIdAsId();
 const checkValidationErrors = PeriodontogramValidationMiddleware.checkValidationErrors();
-const validatePeriodontogramCreation = PeriodontogramValidationMiddleware.validatePeriodontogramCreation();
-const validateHistoryEntry = PeriodontogramValidationMiddleware.validateHistoryEntry();
 // REMOVIDO: validateToothUpdate y validateFullPeriodontogramUpdate - no se procesan datos de dientes individuales
 
 
@@ -217,7 +193,6 @@ exports.createInitialPeriodontogram = async (req, res) => {
     
     try {
       const { id } = req.params;
-      const { initialData } = req.body;
       const userId = req.user?.id;
       
 
@@ -277,7 +252,7 @@ exports.createInitialPeriodontogram = async (req, res) => {
         }
       });
       
-    } catch (error) {
+    } catch (_error) {
       
       res.status(500).json({
         success: false,
@@ -302,7 +277,7 @@ exports.updateFullPeriodontogram = [
     
     try {
       const { id } = req.params;
-      const { patientId, date, teeth, modifiedBy } = req.body;
+      const { date, teeth, modifiedBy } = req.body;
       const userId = modifiedBy || req.user?.id || null;
 
       // Rechazar claves legacy si vienen en este endpoint (aunque no se procesen dientes aquí)
@@ -314,15 +289,12 @@ exports.updateFullPeriodontogram = [
         });
       }
 
-      // Pre-validación específica: si llegan dientes, exigir 4 caras y tripletas
-      if (teeth && typeof teeth === 'object') {
-        const canonErrors = extractCanonicalStructureErrors({ teeth });
-        if (canonErrors.length > 0) {
-          return res.status(400).json({
-            success: false,
-            message: `Estructura canónica 4-caras/tripletas inválida: ${canonErrors.slice(0, 8).join('; ')}`
-          });
-        }
+      // Si llegan datos de dientes, informar que se debe usar el endpoint específico
+      if (teeth && typeof teeth === 'object' && Object.keys(teeth).length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Para actualizar datos de dientes, use PUT /api/patients/:id/periodontogram/data'
+        });
       }
       
       console.log('  - patientId from params:', id);
@@ -429,7 +401,7 @@ exports.getPeriodontogramHistory = [
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(sanitizedLimit)
-          .populate('createdBy', 'name email')
+          .populate('createdBy', 'nombre email')
           .lean(),
         PeriodontogramHistory.countDocuments({ patient: id })
       ]);
@@ -448,7 +420,7 @@ exports.getPeriodontogramHistory = [
         }
       });
       
-    } catch (error) {
+    } catch (_error) {
 
       
       res.status(500).json({
@@ -533,7 +505,7 @@ exports.deletePeriodontogram = [
         message: 'Periodontograma archivado exitosamente'
       });
       
-    } catch (error) {
+    } catch (_error) {
 
       
       res.status(500).json({
@@ -557,7 +529,7 @@ exports.deletePeriodontogram = [
 exports.getPeriodontogramSchemas = [
   validatePatientIdAsId,
   checkValidationErrors,
-  async (req, res) => {
+  (req, res) => {
     try {
       // Rechazar cualquier intento de enviar datos legacy por query
       const legacyInQuery = collectForbiddenKeys(req.query || {});
@@ -617,6 +589,20 @@ exports.savePeriodontogramData = [
 
       const periodontogram = await ensurePeriodontogramExists(patientId, userId);
 
+      // Determinar estadoRegistro según permisos (asistente → BORRADOR)
+      const userPerms = getEffectivePermissions(req.user);
+      let estadoRegistro = 'OFICIAL';
+      if (!hasPermission(userPerms, ['periodontogram.create']) && hasPermission(userPerms, ['periodontogram.write.draft'])) {
+        estadoRegistro = 'BORRADOR';
+      }
+      periodontogram.estadoRegistro = estadoRegistro;
+      periodontogram.creadoPor = periodontogram.creadoPor || (userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null);
+      periodontogram.modificadoPor = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
+      periodontogram.modificadoEn = new Date();
+      if (req.body._capturaExtemporanea) {
+        periodontogram.capturaExtemporanea = req.body._capturaExtemporanea;
+      }
+
       const normalizedTeeth = normalizeFurcaInTeeth(validatedData.teeth || {});
       const versionNameFromPayload = typeof payload.versionName === 'string' ? payload.versionName.trim() : payload.versionName;
       const versionName = versionNameFromPayload || validatedData.version || new Date().toISOString().replace(/[:.-]/g, '');
@@ -636,30 +622,48 @@ exports.savePeriodontogramData = [
         periodontogram.markModified('initial.metadata');
       }
 
+      // Intentar crear historial primero para detectar duplicados ANTES de guardar el documento principal
+      const plainTeethPreSave = mapTeethToPlain(periodontogram.current.teeth);
+      const plainStatisticsPreSave = statisticsToPlain(periodontogram.current.statistics);
+
+      try {
+        await PeriodontogramHistory.create({
+          patient: periodontogram.patient,
+          periodontogram: periodontogram._id,
+          versionName,
+          teeth: plainTeethPreSave,
+          statistics: plainStatisticsPreSave,
+          createdBy: validUserId
+        });
+      } catch (historyError) {
+        // E11000 = versionName duplicado en historial
+        if (historyError.code === 11000) {
+          return res.status(409).json({
+            success: false,
+            message: `Ya existe una versión con el nombre '${versionName}'. Use un nombre diferente.`
+          });
+        }
+        throw historyError;
+      }
+
+      // Solo guardar el documento principal si el historial se creó exitosamente
       await periodontogram.save();
 
       const plainTeeth = mapTeethToPlain(periodontogram.current.teeth);
       const plainStatistics = statisticsToPlain(periodontogram.current.statistics);
 
-      await PeriodontogramHistory.create({
-        patient: periodontogram.patient,
-        periodontogram: periodontogram._id,
-        versionName,
-        teeth: plainTeeth,
-        statistics: plainStatistics,
-        createdBy: validUserId
-      });
-
       res.status(201).json({
         success: true,
         message: 'Periodontograma guardado con esquema unificado',
         version: versionName,
+        versionName: versionName,
         statistics: plainStatistics,
         arcadas: buildArcadasFromTeeth(normalizedTeeth)
       });
     } catch (error) {
       console.error('❌ savePeriodontogramData:', error.message);
-      res.status(400).json({ success: false, message: error.message });
+      const statusCode = error.name === 'ValidationError' ? 400 : 500;
+      res.status(statusCode).json({ success: false, message: statusCode === 500 ? 'Error interno del servidor' : error.message });
     }
   }
 ];
@@ -746,7 +750,8 @@ exports.getPeriodontogramData = [
       });
     } catch (error) {
       console.error('❌ getPeriodontogramData:', error.message);
-      return res.status(400).json({ success: false, message: error.message });
+      const statusCode = error.name === 'ValidationError' ? 400 : 500;
+      return res.status(statusCode).json({ success: false, message: statusCode === 500 ? 'Error interno del servidor' : error.message });
     }
   }
 ];
@@ -802,7 +807,8 @@ exports.getPeriodontogramStatistics = [
       });
     } catch (error) {
       console.error('❌ getPeriodontogramStatistics:', error.message);
-      return res.status(400).json({ success: false, message: error.message });
+      const statusCode = error.name === 'ValidationError' ? 400 : 500;
+      return res.status(statusCode).json({ success: false, message: statusCode === 500 ? 'Error interno del servidor' : error.message });
     }
   }
 ];

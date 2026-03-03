@@ -4,18 +4,13 @@
 }
 
 .patient-list-wrapper {
-  /* Variables de la lista de pacientes */
+  /* Variables locales consumidas en este archivo */
   --pl-primary-color: var(--color-blue-750);
   --pl-secondary-color: var(--color-neutral-680);
-  --pl-text-color: var(--color-bg-white);
   --pl-light-text-color: var(--color-text-dark);
   --pl-background-color: var(--color-bg-white);
   --pl-light-background: var(--color-neutral-150);
   --pl-border-color: var(--color-border-light);
-  --pl-shadow-color: var(--color-black-08);
-  --pl-shadow-hover: var(--color-black-12);
-  --pl-border-radius: 1rem;
-  --pl-gap: 1.5rem;
   font-family: var(--pl-font-family);
 }
 /* Contenedor principal */
@@ -25,7 +20,6 @@
   padding: 1rem;
   padding-top: 0.5rem;
   padding-left: 0rem;
-  font-family: var(--pl-font-family);
   text-align: center;
   box-sizing: border-box;
   display: flex;
@@ -67,7 +61,6 @@
   justify-content: space-between;
   background-color: var(--pl-background-color);
   border-radius: var(--card-border-radius);
-  font-family: var(--pl-font-family);
   padding-top: 0rem !important;
   padding-bottom: 0rem !important;
   padding-left: 1rem !important;
@@ -131,19 +124,6 @@
   color: var(--pl-secondary-color);
   white-space: nowrap;
   text-align: left;
-}
-
-.patient-list-wrapper .patient-name {
-  font: var(--text-fluid-pl-name);
-  color: inherit;
-  color: var(--color-text-black) !important;
-  text-align: left;
-  white-space: npwrap;
-  word-wrap: break-word;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  display: block;
 }
 
 .patient-list-wrapper .patient-top {
@@ -224,16 +204,6 @@
   color: var(--color-bg-white);
   border-color: var(--pl-primary-color);
 }
-.patient-list-wrapper .page-number.arrow {
-  padding: 0.625rem 1rem;
-  font: var(--text-fluid-pl-pagination);
-}
-.patient-list-wrapper .ellipsis {
-  padding: 0.625rem 1rem;
-  cursor: default;
-  color: var(--color-text-light);
-  font: var(--text-fluid-pl-pagination);
-}
 
 .patient-list-wrapper .filter-button {
   margin-left: auto;
@@ -268,15 +238,6 @@
 }
 .patient-list-wrapper .sort-menu li:hover {
   background-color: var(--pl-light-background);
-}
-
-.patient-list-wrapper .arrow-icon {
-  width: 1.2rem;
-  height: 1.2rem;
-  transition: transform 0.3s ease;
-}
-.patient-list-wrapper .rotated {
-  transform: rotate(180deg);
 }
 
 /* Contenedor de la barra de búsqueda */
@@ -315,13 +276,6 @@
 }
 .patient-list-wrapper .arrow-icon.desc {
   transform: rotate(180deg);
-}
-
-/* Deshabilitar flechas si no hay más páginas */
-.patient-list-wrapper .disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 
 /* Contenedor para el nombre del paciente */
@@ -432,9 +386,6 @@
   .patient-list-wrapper .patient-photo img {
     width: 3.5rem;
     height: 3.5rem;
-  }
-  .patient-list-wrapper .patient-name {
-    font: var(--text-fluid-pl-name);
   }
 }
 

@@ -15,24 +15,24 @@
 /* Estilos estándar para strong y span en article */
 .patient-detail__section article strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .patient-detail__section article span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 .patient-detail__section article p strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .patient-detail__section article p span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 .patient-detail__section p {
@@ -56,7 +56,7 @@
 /* Título de cada grupo (Última Cita / Próxima Cita) */
 .patient-detail__section article h3 {
   font-size: var(--font-size-large);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-top: 0;
   margin-bottom: var(--spacing-md);
   color: var(--color-text-primary);

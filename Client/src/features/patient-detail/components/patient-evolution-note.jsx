@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, message } from 'antd';
 import API from '../../../shared/services/axios-instance.js';
 import '../styles/patient-evolution-note.css';

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './styles/statistics-page.css';
 import ChartRenderer from './components/ChartRenderer';
-import { fetchMetricData } from './data/mockMetricService';
+import { fetchMetricData } from './data/statsService';
 
 const TAB_CONFIG = [
   { id: 'overview', label: 'General' },
@@ -44,12 +44,44 @@ const METRICS = [
     visualizations: ['linea', 'barra']
   },
   {
-    id: 'productivity',
-    title: 'Productividad por Hora',
-    description: 'Consultas e ingresos promedio por hora.',
-    category: 'Operaciones',
-    temporalities: ['diaria', 'semanal'],
+    id: 'net-earnings',
+    title: 'Ganancias Netas',
+    description: 'Ingresos menos gastos por periodo. Muestra el margen real de la clínica.',
+    category: 'Finanzas',
+    temporalities: ['diaria', 'semanal', 'mensual', 'anual'],
     visualizations: ['linea', 'barra']
+  },
+  {
+    id: 'treatment-status',
+    title: 'Tratamientos por Estado',
+    description: 'Pendientes, en proceso y finalizados por periodo.',
+    category: 'Operaciones',
+    temporalities: ['semanal', 'mensual', 'anual'],
+    visualizations: ['barra', 'linea']
+  },
+  {
+    id: 'inactive-patients',
+    title: 'Pacientes Inactivos',
+    description: 'Pacientes sin visita reciente clasificados por tiempo sin asistir.',
+    category: 'Pacientes',
+    temporalities: ['mensual'],
+    visualizations: ['barra', 'pastel']
+  },
+  {
+    id: 'common-treatments',
+    title: 'Tratamientos Más Comunes',
+    description: 'Top 10 de procedimientos realizados con mayor frecuencia.',
+    category: 'Operaciones',
+    temporalities: ['mensual', 'anual'],
+    visualizations: ['barra', 'pastel']
+  },
+  {
+    id: 'treatment-duration',
+    title: 'Duración Promedio de Tratamiento',
+    description: 'Días promedio de inicio a cierre por tipo de tratamiento.',
+    category: 'Operaciones',
+    temporalities: ['mensual', 'anual'],
+    visualizations: ['barra']
   }
 ];
 
@@ -173,9 +205,6 @@ const StatisticsPage = () => {
     bootStateRef.current = readStoredState();
   }
   const bootState = bootStateRef.current;
-
-  // Estadísticas ya no modifica clases globales; dejamos el layout comportarse como el resto de vistas.
-  useEffect(() => {}, []);
 
   const metricMap = useMemo(() => {
     const map = new Map();
@@ -563,7 +592,21 @@ const StatisticsPage = () => {
         {announcement || ' '}
       </div>
       <div className="statistics-page__left">
-        <div className="statistics-chart-grid">
+        <nav className="statistics-tabs" role="tablist" aria-label="Categorias de estadisticas">
+          {TAB_CONFIG.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`statistics-tab ${activeTab === tab.id ? 'statistics-tab--active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <div className="statistics-chart-grid" role="tabpanel">
           {Array.from({ length: SLOT_COUNT }, (_, index) => renderSlot(activeTab, index))}
         </div>
       </div>
@@ -573,9 +616,6 @@ const StatisticsPage = () => {
           <h3>Metricas disponibles</h3>
           <p>Arrastra para componer la pestaña activa.</p>
         </header>
-        <p id={KEYBOARD_INSTRUCTIONS_ID} className="metrics-panel__instructions">
-          Enter/Espacio: seleccionar tarjeta; mover foco a slot; Enter/Espacio: colocar.
-        </p>
         <div className="metrics-panel__list" role="list">
           {availableMetricIds.map(metricId => {
             const metric = getMetric(metricId);
@@ -588,7 +628,6 @@ const StatisticsPage = () => {
                 onDragEnd={handleDragEnd}
                 tabIndex={0}
                 role="listitem"
-                aria-describedby={KEYBOARD_INSTRUCTIONS_ID}
                 aria-grabbed={draggedMetricId === metricId}
               >
                 <header className="metrics-card__header">

@@ -73,13 +73,13 @@
 /* Estilos estándar para strong y span en medication-details */
 .medication-details p strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .medication-details p span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Estilos para elementos de cirugías previas */
@@ -108,24 +108,24 @@
 /* Estilos estándar para strong y span en subsecciones */
 .patient-detail__subsection ul li strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .patient-detail__subsection ul li span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 .patient-detail__subsection ul li p strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .patient-detail__subsection ul li p span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Estilos para la lista de enfermedades graves adicionales */
@@ -149,13 +149,13 @@
 /* Estilos estándar para strong y span en diseases-list */
 .diseases-list p strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .diseases-list p span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Estilo para cuando no hay enfermedades */

@@ -1,5 +1,3 @@
-import React from 'react';
-
 const DentalEvaluation = ({ formData, handleNestedChange, handleDoubleNestedChange, handleTripleNestedChange }) => {
   return (
     <section className="form-section">

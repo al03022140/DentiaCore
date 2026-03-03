@@ -23,10 +23,22 @@ const boxSessionSchema = new mongoose.Schema({
     default: 'OPEN',
     required: true
   },
-  // Usuario que abrió la caja (opcional por ahora)
+  // Usuario que abrió la caja
+  openedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    default: null
+  },
+  // Usuario que cerró la caja
+  closedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    default: null
+  },
+  // Campo legacy mantenido por compatibilidad
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Usuario'
   }
 }, {
   timestamps: true

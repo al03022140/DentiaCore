@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Spin, message } from 'antd';
 import CashDashboard from './CashDashboard';
 import ActionsPanel from './ActionsPanel';

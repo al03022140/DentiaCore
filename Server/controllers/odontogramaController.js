@@ -1,8 +1,5 @@
-const Patient   = require('../models/patient');
 const fs        = require('fs');
-const path      = require('path');
 const util      = require('util');
-const multer    = require('multer');
 const {
   processAndSaveOdontograma,
   ValidationError,
@@ -12,8 +9,9 @@ const {
 } = require('../helpers/odontograma');
 const OdontogramaModel = require('../models/odontograma');
 const fsExtra = require('fs-extra');
+const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
 
-const unlinkAsync = util.promisify(fs.unlink);
+const _unlinkAsync = util.promisify(fs.unlink);
 
 // ——— Constantes de tipo de odontograma ————————————————————————————————————————————————
 const TYPE_INITIAL = 'initial';
@@ -46,12 +44,12 @@ const verificarOdontogramaInicial = async (req, res, next) => {
       historyLength: doc?.history?.length
     });
 
-    const history = doc?.history?.map(v => ({
+    const history = (doc?.history || []).filter(v => !v.deletedAt).map(v => ({
       id: v._id,
       imageUrl: v.imageUrl,
       fecha: v.savedAt.toISOString(),
       datos: (v.datos || []).map(normalizeEntry)
-    })) || [];
+    }));
 
     if (!doc || !doc.current) {
       console.log('📭 [verificarOdontogramaInicial] Sin datos actuales, devolviendo vacío');
@@ -109,7 +107,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
   }
 
   // Validar y procesar entries
-  let raw = req.body.entries;
+  const raw = req.body.entries;
   let entries;
 
   console.log('[DEBUG] Procesando entries:', {
@@ -121,7 +119,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
   try {
     entries = typeof raw === 'string' ? JSON.parse(raw) : raw;
     // console.log('[DEBUG] Entries parseadas:', { entries, isArray: Array.isArray(entries), length: entries?.length });
-  } catch (parseError) {
+  } catch (_parseError) {
     // console.log('[ERROR] Error parseando entries:', parseError.message);
     return res.status(400).json({
       success: false,
@@ -138,7 +136,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
   }
 
   // Mapear usando la función normalizada del helper
-  const mappedEntries = entries.map((e, index) => {
+  const mappedEntries = entries.map((e) => {
     // console.log(`[DEBUG] Procesando entry #${index}:`, e);
     const normalized = normalizeEntry(e);
     // Mantener compatibilidad con campos adicionales del controlador
@@ -222,9 +220,27 @@ const guardarOdontogramaInicial = async (req, res, next) => {
     // console.log('[DEBUG] processAndSaveOdontograma exitoso:', { imageUrl, datosCount: datos?.length });
 
     const snapshot = { imageUrl, datos, savedAt: new Date() };
+
+    // Determinar estadoRegistro según permisos (asistente → BORRADOR)
+    const userPerms = getEffectivePermissions(req.user);
+    let estadoRegistro = 'OFICIAL';
+    if (!hasPermission(userPerms, ['odontogram.create']) && hasPermission(userPerms, ['odontogram.write.draft'])) {
+      estadoRegistro = 'BORRADOR';
+    }
+
+    const auditFields = {
+      estado: estadoRegistro,
+      creadoPor: req.user?.id || null,
+      modificadoPor: req.user?.id || null,
+      modificadoEn: new Date()
+    };
+    if (req.body._capturaExtemporanea) {
+      auditFields.capturaExtemporanea = req.body._capturaExtemporanea;
+    }
+
     const odontograma = await OdontogramaModel.findOneAndUpdate(
       { patientId: patientId, type: TYPE_INITIAL },
-      { $set: { current: snapshot }, $push: { history: snapshot } },
+      { $set: { current: snapshot, ...auditFields }, $push: { history: snapshot } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
@@ -275,12 +291,13 @@ const obtenerHistorialInicial = async (req, res, next) => {
       historyLength: doc?.history?.length
     });
 
-    if (!doc || !doc.history || doc.history.length === 0) {
+    const activeHistory = (doc?.history || []).filter(v => !v.deletedAt);
+    if (!doc || activeHistory.length === 0) {
       console.log('📭 [obtenerHistorialInicial] Sin historial, devolviendo vacío');
       return res.json({ exists: false, history: [] });
     }
 
-    const history = doc.history.map(v => ({
+    const history = activeHistory.map(v => ({
       id: v._id,
       imageUrl: v.imageUrl,
       fecha: v.savedAt.toISOString(),
@@ -364,7 +381,10 @@ const agregarHistorialInicial = async (req, res, next) => {
 
     const updated = await OdontogramaModel.findOneAndUpdate(
       { patientId: patientId, type: TYPE_INITIAL },
-      { $push: { history: snapshot } },
+      {
+        $push: { history: snapshot },
+        $set: { modificadoPor: req.user?.id || null, modificadoEn: new Date() }
+      },
       { new: true }
     );
 
@@ -394,18 +414,24 @@ const deleteInitialOdontogram = async (req, res, next) => {
       });
     }
     
-    const result = await OdontogramaModel.deleteOne({ patientId: patientId, type: TYPE_INITIAL });
-
-    if (result.deletedCount === 0) {
+    // Soft-delete (NOM-004 Art. 5.4): marcar como ARCHIVADO en vez de eliminar
+    const doc = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_INITIAL });
+    if (!doc) {
       return res.status(404).json({
         success: false,
         message: 'Odontograma inicial no encontrado para eliminar.'
       });
     }
 
+    doc.estado = 'ARCHIVADO';
+    doc.deletedAt = new Date();
+    doc.deletedBy = req.user?.id || null;
+    doc.deleteReason = req.body?.motivo || 'Eliminado por usuario';
+    await doc.save();
+
     res.json({ 
       success: true,
-      message: 'Odontograma inicial eliminado correctamente' 
+      message: 'Odontograma inicial archivado correctamente' 
     });
   } catch (e) { 
     next(e); 
@@ -440,14 +466,14 @@ const verificarOdontogramaClinico = async (req, res, next) => {
     });
 
     const datos = doc?.current?.datos?.map(normalizeEntry) || [];
-    const history = doc?.history?.map(h => ({
+    const history = (doc?.history || []).filter(h => !h.deletedAt).map(h => ({
       id: h._id,
       fecha: h.savedAt.toISOString(),
       datos: (h.datos || []).map(normalizeEntry)
-    })) || [];
+    }));
     
     const responseData = {
-      exists: doc !== null && doc.current !== null,
+      exists: !!doc && !!doc.current,
       datos,
       history,
     };
@@ -490,12 +516,13 @@ const obtenerHistorialClinico = async (req, res, next) => {
       historyLength: doc?.history?.length
     });
 
-    if (!doc || !doc.history || doc.history.length === 0) {
+    const activeHistory = (doc?.history || []).filter(h => !h.deletedAt);
+    if (!doc || activeHistory.length === 0) {
       console.log('📭 [obtenerHistorialClinico] Sin historial, devolviendo vacío');
       return res.json({ exists: false, history: [] });
     }
 
-    const history = doc.history.map(h => ({
+    const history = activeHistory.map(h => ({
       id: h._id,
       fecha: h.savedAt.toISOString(),
       datos: (h.datos || []).map(normalizeEntry)
@@ -537,11 +564,28 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             });
         }
         
+    // Determinar estadoRegistro según permisos (asistente → BORRADOR)
+    const userPerms = getEffectivePermissions(req.user);
+    let estadoRegistro = 'OFICIAL';
+    if (!hasPermission(userPerms, ['odontogram.create']) && hasPermission(userPerms, ['odontogram.write.draft'])) {
+      estadoRegistro = 'BORRADOR';
+    }
+
+    const auditUpdate = {
+      estado: estadoRegistro,
+      modificadoPor: req.user?.id || null,
+      modificadoEn: new Date()
+    };
+    if (req.body._capturaExtemporanea) {
+      auditUpdate.capturaExtemporanea = req.body._capturaExtemporanea;
+    }
+
     const doc = await OdontogramaModel.findOneAndUpdate(
       { patientId: patientId, type: TYPE_CLINIC },
       { 
-        $set: { current: snapshot },
-        $push: { history: snapshot }
+        $set: { current: snapshot, ...auditUpdate },
+        $push: { history: snapshot },
+        $setOnInsert: { creadoPor: req.user?.id || null }
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -555,7 +599,7 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
     const responseData = {
       exists: true,
       datos: (doc.current.datos || []).map(normalizeEntry),
-      history: doc.history.map(h => ({
+      history: (doc.history || []).filter(h => !h.deletedAt).map(h => ({
         id: h._id,
         fecha: h.savedAt.toISOString(),
         datos: (h.datos || []).map(normalizeEntry)
@@ -590,8 +634,14 @@ const deleteClinicalHistoryEntry = async (req, res, next) => {
       { 
         patientId: patientId, 
         type: TYPE_CLINIC,
+        'history._id': entryId,
+        'history.deletedAt': null
       },
-      { $pull: { history: { _id: entryId } } }
+      { $set: { 
+        'history.$.deletedAt': new Date(),
+        'history.$.deletedBy': req.user?.id || null,
+        'history.$.deleteReason': req.body?.motivo || 'Eliminado por usuario'
+      } }
     );
 
     if (result.matchedCount === 0) {
@@ -627,21 +677,28 @@ const deleteClinicalOdontogramState = async (req, res, next) => {
       });
     }
     
-    const result = await OdontogramaModel.deleteOne({
+    // Soft-delete (NOM-004 Art. 5.4)
+    const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_CLINIC
     });
 
-    if (result.deletedCount === 0) {
+    if (!doc) {
       return res.status(404).json({
         success: false,
         error: { code: 'DOCUMENT_NOT_FOUND', message: 'Estado del odontograma clínico no encontrado' }
       });
     }
 
+    doc.estado = 'ARCHIVADO';
+    doc.deletedAt = new Date();
+    doc.deletedBy = req.user?.id || null;
+    doc.deleteReason = req.body?.motivo || 'Eliminado por usuario';
+    await doc.save();
+
     res.json({
       success: true,
-      message: 'Estado del odontograma clínico eliminado correctamente'
+      message: 'Estado del odontograma clínico archivado correctamente'
     });
   } catch (error) {
     next(error);
@@ -666,7 +723,7 @@ const validarEntradasOdontograma = (req, res, next) => {
       error: { code: 'NO_ENTRIES_KEY', message: "El body debe tener la clave 'entries'" }
     });
   }
-  let raw = req.body.entries;
+  const raw = req.body.entries;
   let entries;
 
   // console.log('[DEBUG] Raw entries:', { type: typeof raw, value: raw });
@@ -674,7 +731,7 @@ const validarEntradasOdontograma = (req, res, next) => {
   try {
     entries = typeof raw === 'string' ? JSON.parse(raw) : raw;
     // console.log('[DEBUG] Parsed entries:', { type: typeof entries, isArray: Array.isArray(entries), length: entries?.length, value: entries });
-  } catch (parseError) {
+  } catch (_parseError) {
     // console.log('[ERROR] Error parseando entries:', parseError.message);
     return res.status(400).json({
       success: false,
@@ -691,7 +748,7 @@ const validarEntradasOdontograma = (req, res, next) => {
   }
 
   // Mapear usando la función normalizada del helper
-  const mappedEntries = entries.map((e, index) => {
+  const mappedEntries = entries.map((e) => {
     // console.log(`[DEBUG] Procesando entry #${index}:`, e);
     const normalized = normalizeEntry(e);
     // Mantener compatibilidad con campos adicionales del controlador
@@ -753,6 +810,7 @@ const validarEntradasOdontograma = (req, res, next) => {
   next();
 };
 
+// eslint-disable-next-line no-unused-vars
 const manejarError = (err, req, res, next) => {
   console.error('[ODONTOGRAMA_ERROR]', {
     name: err.name,

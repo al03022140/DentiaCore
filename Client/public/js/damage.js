@@ -399,7 +399,7 @@ Damage.prototype.drawRemanenteRadicular = function (context, settings) {
 
     context.fillStyle = settings.COLOR_RED;
     context.textAlign = 'center';
-    context.font = "20px Arial Bold";
+    context.font = "600 20px Montserrat, Arial, sans-serif";
 
     if (this.type === 0) {
         context.fillText("RR", this.rect.x + this.rect.width / 2,
@@ -841,7 +841,7 @@ Damage.prototype.drawSuperNumerario = function (context, settings) {
 
         context.textAlign = 'center';
         context.fillStyle = settings.COLOR_BLUE;
-        context.font = "16px Arial Bold";
+        context.font = "600 16px Montserrat, Arial, sans-serif";
         context.fillText("S", this.rect.x + this.rect.width / 2, this.rect.y + 25);
 
         context.restore();
@@ -865,7 +865,7 @@ Damage.prototype.drawSuperNumerario = function (context, settings) {
 
         context.textAlign = 'center';
         context.fillStyle = settings.COLOR_BLUE;
-        context.font = "16px Arial Bold";
+        context.font = "600 16px Montserrat, Arial, sans-serif";
 
         context.fillText("S", this.rect.x + this.rect.width / 2,
                 this.rect.y + this.rect.height - 15);

@@ -33,45 +33,56 @@
 
 .home {
   display: grid;
-  /* Distribución 2 partes izq. / 1 parte der. */
-  grid-template-columns: 1fr 1fr; 
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
   width: 100%;
-  /* Para que ocupe alto completo menos la cabecera, si lo deseas */
-  min-height: 100%;
   height: 100%;
+  min-height: 0;
   box-sizing: border-box;
-  min-height: 100%;
+  overflow: hidden;
 }
 
 .left-section,
 .right-section {
-  display: flex;              /* para alinear internamente */
-  flex-direction: column;     /* contenido apilado verticalmente */
-  /* Elimina width: 500px; max-width: 600px; etc. */
-  box-sizing: border-box; 
-  overflow-y: auto;    
-  height: 100%;   
-  min-height: 100%;      
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
 }
 
 .left-section {
-  /* Quita max-width: 500px o cualquier width fijo */
-  display: flex;
-  flex-direction: column;
-  overflow: auto; /* Si quieres scroll interno cuando crezca demasiado */
-  box-sizing: border-box;
-  padding-right: 10px;
+  padding-right: 0;
 }
 
 .right-section {
-  /* Quita width: 500px para que la grid le asigne el ancho 1fr */
-    padding-left: 10px;
-    /* sin width fijo */
-  
+  padding-left: 0;
 }
 
-/* Específico para la tabla de calendario */
+/* Wrapper divs for home components */
+.left-section .calendar {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.left-section .next-patient {
+  flex: 0 0 auto;
+}
+
+.right-section .clock {
+  flex: 0 0 auto;
+}
+
+.right-section .patient-stats {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Estilos base para tablas */
 table {
   width: 100%;
   border-collapse: collapse;

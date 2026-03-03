@@ -63,7 +63,7 @@ const ALL_VALID_TEETH = [...PERMANENT_TEETH, ...TEMPORARY_TEETH];
 const MEASUREMENT_LIMITS = {
   PROBING_DEPTH: { min: -9, max: 9, default: 0 },
   GINGIVAL_MARGIN: { min: -9, max: 9, default: 0 },
-  GUM_WIDTH: { min: -99, max: 99, default: 0 },
+  GUM_WIDTH: { min: 0, max: 10, default: 0 },
   MOBILITY: { min: 0, max: 3, default: 0 },
   FURCA: { min: 0, max: 3, default: 0 },
   BLEEDING: { min: 0, max: 3, default: 0 }, // 0-3 valores multistate
@@ -138,9 +138,9 @@ const TRANSFORMATION_CONFIG = {
 const DEFAULT_TOOTH_DATA = {
   numeroDiente: null, // Se asigna dinámicamente
   arcada: null, // Se determina por el número de diente
-  ausente: 0, // 0=presente, 1=ausente
+  ausente: false, // Boolean (modelo usa Boolean, no Number)
   implante: false, // Boolean
-  pronostico: 'bueno', // 'bueno', 'dudoso', 'malo', 'imposible'
+  pronostico: 'Bueno', // 'Bueno', 'Regular', 'Malo', 'Dudoso'
   movilidad: 0,
   anchuraEncia: MEASUREMENT_LIMITS.GUM_WIDTH.default,
   furca: {
@@ -152,21 +152,33 @@ const DEFAULT_TOOTH_DATA = {
       furca2: 0
     }
   },
-  vestibular: {
-    profundidad: [0, 0, 0], // 3 mediciones por cara
-    margen: [0, 0, 0], // 3 mediciones por cara
+  vestibularSuperior: {
     sangrado: [0, 0, 0], // 3 valores multistate
     supuracion: [0, 0, 0], // 3 checkboxes (0/1)
     placa: [0, 0, 0], // 3 checkboxes (0/1)
-    // anchuraEncia eliminado: valor único a nivel de diente
+    margenGingival: [0, 0, 0], // 3 mediciones por cara
+    profundidadSondaje: [0, 0, 0], // 3 mediciones por cara
   },
-  lingualPalatino: {
-    profundidad: [0, 0, 0], // 3 mediciones por cara
-    margen: [0, 0, 0], // 3 mediciones por cara
-    sangrado: [0, 0, 0], // 3 valores multistate
-    supuracion: [0, 0, 0], // 3 checkboxes (0/1)
-    placa: [0, 0, 0], // 3 checkboxes (0/1)
-    // anchuraEncia eliminado: valor único a nivel de diente
+  palatinoSuperior: {
+    sangrado: [0, 0, 0],
+    supuracion: [0, 0, 0],
+    placa: [0, 0, 0],
+    margenGingival: [0, 0, 0],
+    profundidadSondaje: [0, 0, 0],
+  },
+  vestibularInferior: {
+    sangrado: [0, 0, 0],
+    supuracion: [0, 0, 0],
+    placa: [0, 0, 0],
+    margenGingival: [0, 0, 0],
+    profundidadSondaje: [0, 0, 0],
+  },
+  lingualInferior: {
+    sangrado: [0, 0, 0],
+    supuracion: [0, 0, 0],
+    placa: [0, 0, 0],
+    margenGingival: [0, 0, 0],
+    profundidadSondaje: [0, 0, 0],
   }
 };
 
@@ -243,7 +255,7 @@ const PERIODONTOGRAM_CONFIG = {
   
   getDefaultToothData: (toothNumber) => {
     const data = { ...DEFAULT_TOOTH_DATA };
-    data.numero = parseInt(toothNumber);
+    data.numeroDiente = parseInt(toothNumber);
     data.arcada = PERIODONTOGRAM_CONFIG.getToothArcada(toothNumber);
     return data;
   },

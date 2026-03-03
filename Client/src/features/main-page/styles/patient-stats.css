@@ -1,18 +1,18 @@
 /* Contenedor de estadísticas de pacientes */
 .patient-stats-container {
   background-color: var(--home-stats-background);
-  border-radius: var(--home-stats-border-radius); /* Usamos rem para que el radio de borde sea relativo */
-  padding: var(--home-stats-padding); /* Usamos rem para que el padding sea relativo */
+  border-radius: var(--home-stats-border-radius);
+  padding: var(--home-stats-padding);
   box-shadow: var(--home-stats-shadow);
   border: var(--home-stats-border);
-  flex-grow: 2; /* Asegura que crezca más en relación al reloj */
-  box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
-  width: 100%; /* Asegura que ocupe todo el ancho disponible */
-  height: var(--home-stats-height); /* Asegura que ocupe todo el alto disponible */
-  min-height: var(--home-stats-min-height);
+  flex-grow: 1;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   font: var(--home-stats-font);
-  display: flex; /* Usa flexbox para asegurar que el canvas ocupe todo el espacio */
-  flex-direction: column; /* Asegura que el canvas ocupe todo el alto disponible */
+  display: flex;
+  flex-direction: column;
 }
 
 .patient-stats-container canvas {
@@ -22,198 +22,30 @@
   height: 100%; /* Asegura que el canvas ocupe todo el alto disponible */
 }
 
-/* Ajustes responsivos */
+/* Ajustes responsivos - solo padding cambia, font se hereda del base */
 @media (max-width: 1200px) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 80px);
-  }
-  .content {
-    gap: 1.5vw;
-    padding: 1.5vw;
-  }
-  .home {
-    height: calc(100vh - 80px);
-  }
-  .left-section,
-  .right-section {
-    padding: 1vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-1200);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-1200); }
 }
-
 @media (max-width: 992px) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 70px);
-  }
-  .content {
-    gap: 1vw;
-    padding: 1vw;
-  }
-  .home {
-    height: calc(100vh - 70px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.9vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-992);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-992); }
 }
-
 @media (max-width: 768px) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 60px);
-  }
-  .content {
-    gap: 0.75vw;
-    padding: 0.75vw;
-  }
-  .home {
-    height: calc(100vh - 60px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.75vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-768);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-768); }
 }
-
 @media (max-width: 576px) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 50px);
-  }
-  .content {
-    gap: 0.6vw;
-    padding: 0.6vw;
-  }
-  .home {
-    height: calc(100vh - 50px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.6vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-576);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-576); }
 }
-
 @media (max-width: 480px) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 40px);
-  }
-  .content {
-    gap: 0.5vw;
-    padding: 0.5vw;
-  }
-  .home {
-    height: calc(100vh - 40px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.5vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-480);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-480); }
 }
 
-/* Ajustes para escala de 125% */
+/* Ajustes para escala de pantalla */
 @media (resolution: 125dpi) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 80px);
-  }
-  .content {
-    gap: 1vw;
-    padding: 1vw;
-  }
-  .home {
-    height: calc(100vh - 80px);
-  }
-  .left-section,
-  .right-section {
-    padding: 1vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-125dpi);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-125dpi); }
 }
-
-/* Ajustes para escala de 150% */
 @media (resolution: 150dpi) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 70px);
-  }
-  .content {
-    gap: 0.9vw;
-    padding: 0.9vw;
-  }
-  .home {
-    height: calc(100vh - 70px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.9vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-150dpi);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-150dpi); }
 }
-
-/* Ajustes para escala de 200% */
 @media (resolution: 200dpi) {
-  .dashboard {
-    height: 100vh;
-  }
-  .main {
-    height: calc(100vh - 60px);
-  }
-  .content {
-    gap: 0.75vw;
-    padding: 0.75vw;
-  }
-  .home {
-    height: calc(100vh - 60px);
-  }
-  .left-section,
-  .right-section {
-    padding: 0.75vw;
-  }
-  .patient-stats-container {
-    padding: var(--home-stats-padding-200dpi);
-    font: var(--home-stats-font);
-  }
+  .patient-stats-container { padding: var(--home-stats-padding-200dpi); }
 }

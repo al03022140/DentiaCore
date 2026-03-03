@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal, InputNumber, Typography, Button, message } from 'antd';
 import { openBox } from '../../shared/services/cashService';
 

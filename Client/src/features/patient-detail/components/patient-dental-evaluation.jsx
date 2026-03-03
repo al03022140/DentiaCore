@@ -1,5 +1,3 @@
-import React from 'react';
-import PropTypes from 'prop-types';
 import SectionHeader from './section-header';
 import '../styles/patient-dental-evaluation.css';
 

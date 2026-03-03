@@ -78,7 +78,7 @@ export const VALIDATION_RANGES = {
   PROBING_DEPTH: { min: -9, max: 9 },
   GINGIVAL_MARGIN: { min: -9, max: 9 },
   ATTACHMENT_LEVEL: { min: -10, max: 25 },
-  GUM_WIDTH: { min: 0, max: 3 },
+  GUM_WIDTH: { min: 0, max: 10 },
   MOBILITY: { min: 0, max: 3 },
   FURCA: { min: 0, max: 3 },
   BLEEDING: { min: 0, max: 3 },

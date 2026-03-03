@@ -147,7 +147,7 @@ MenuItem.prototype.renderLabel = function (context) {
     context.globalAlpha = 1;
     context.textAlign = "center";
     context.fillStyle = "#000000"; // Matching the CSS color
-    context.font = "bold 15px Montserrat"; // Matching CSS font-size and font-family
+    context.font = "500 15px Montserrat"; // Matching CSS font-size and font-family
 
     // Calculate vertical centering
     const textMetrics = context.measureText(this.textBox.text);

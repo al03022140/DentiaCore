@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/users');
 const { getEffectivePermissions } = require('../utils/permissions');
+const auditLogger = require('../middlewares/auditLogger');
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MINUTES = 15;
@@ -42,6 +43,7 @@ const signAccessToken = (user, permissions) => {
     {
       sub: user._id.toString(),
       role: user.rol,
+      nombre: user.nombre || null,
       permissions
     },
     getJwtSecret(),
@@ -89,7 +91,8 @@ const respondWithTokens = async (res, user) => {
   });
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
+  try {
   const { email, contraseña } = req.body || {};
 
   if (!email || !contraseña) {
@@ -124,10 +127,20 @@ const login = async (req, res) => {
   user.lockUntil = null;
   user.lastLoginAt = new Date();
 
+  // Registrar login exitoso en auditoría
+  auditLogger.registrarManual({ user: { id: user._id, role: user.rol }, ip: req.ip }, 'login_exitoso', {
+    resourceType: 'usuario',
+    resourceId: user._id,
+  }).catch(() => {});
+
   return respondWithTokens(res, user);
+  } catch (error) {
+    next(error);
+  }
 };
 
-const refresh = async (req, res) => {
+const refresh = async (req, res, next) => {
+  try {
   const token = req.cookies?.refreshToken || req.body?.refreshToken;
   if (!token) {
     return res.status(401).json({ message: 'Refresh token requerido' });
@@ -136,7 +149,7 @@ const refresh = async (req, res) => {
   let payload;
   try {
     payload = jwt.verify(token, getJwtSecret());
-  } catch (error) {
+  } catch (_error) {
     return res.status(401).json({ message: 'Refresh token inválido o expirado' });
   }
 
@@ -154,9 +167,13 @@ const refresh = async (req, res) => {
   }
 
   return respondWithTokens(res, user);
+  } catch (error) {
+    next(error);
+  }
 };
 
-const logout = async (req, res) => {
+const logout = async (req, res, next) => {
+  try {
   const token = req.cookies?.refreshToken;
   if (token) {
     try {
@@ -167,16 +184,20 @@ const logout = async (req, res) => {
         user.refreshTokenExpiresAt = null;
         await user.save();
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignorar errores de token al cerrar sesión
     }
   }
 
   res.clearCookie('refreshToken', buildCookieOptions());
   return res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
 };
 
-const me = async (req, res) => {
+const me = async (req, res, next) => {
+  try {
   const user = await Usuario.findById(req.user.id);
   if (!user) {
     return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -190,11 +211,139 @@ const me = async (req, res) => {
     rol: user.rol,
     permissions
   });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── PIN: Establecer o cambiar PIN (roles.MD §9.3) ──────────────
+const setPin = async (req, res, next) => {
+  try {
+  const { pin, contraseña } = req.body || {};
+
+  if (!pin || !/^\d{4}$/.test(pin)) {
+    return res.status(400).json({ message: 'El PIN debe ser exactamente 4 dígitos numéricos' });
+  }
+
+  const user = await Usuario.findById(req.user.id);
+  if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+  // Requiere contraseña para cambiar PIN
+  if (contraseña) {
+    const valid = await user.compararContraseña(contraseña);
+    if (!valid) return res.status(401).json({ message: 'Contraseña incorrecta' });
+  } else if (user.pinHash) {
+    // Si ya tiene PIN, requiere contraseña para cambiarlo
+    return res.status(400).json({ message: 'Se requiere contraseña para cambiar el PIN' });
+  }
+
+  await user.setPin(pin);
+  await user.save();
+
+  auditLogger.registrarManual(req, 'cambio_pin', {
+    resourceType: 'usuario',
+    resourceId: user._id,
+  }).catch(() => {});
+
+  return res.json({ message: 'PIN establecido correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── PIN: Verificar PIN (Modo Cortina desbloqueo) ────────────────
+const MAX_PIN_ATTEMPTS = 5;
+
+const verifyPin = async (req, res, next) => {
+  try {
+  const { pin } = req.body || {};
+
+  if (!pin || !/^\d{4}$/.test(pin)) {
+    return res.status(400).json({ message: 'PIN inválido', valid: false });
+  }
+
+  const user = await Usuario.findById(req.user.id);
+  if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+  if (!user.pinHash) {
+    return res.status(400).json({ message: 'El usuario no tiene PIN configurado', valid: false });
+  }
+
+  if (user.pinFailedAttempts >= MAX_PIN_ATTEMPTS) {
+    auditLogger.registrarManual(req, 'pin_fallo', {
+      resourceType: 'session',
+      detalles: { razon: 'PIN bloqueado por máximo de intentos' },
+    }).catch(() => {});
+
+    return res.status(423).json({
+      message: 'PIN bloqueado por demasiados intentos fallidos. Inicie sesión nuevamente.',
+      valid: false,
+      locked: true,
+    });
+  }
+
+  const valid = await user.verificarPin(pin);
+  if (!valid) {
+    user.pinFailedAttempts = (user.pinFailedAttempts || 0) + 1;
+    await user.save();
+
+    auditLogger.registrarManual(req, 'pin_fallo', {
+      resourceType: 'session',
+      detalles: { intentos: user.pinFailedAttempts },
+    }).catch(() => {});
+
+    return res.status(401).json({
+      message: 'PIN incorrecto',
+      valid: false,
+      intentosRestantes: MAX_PIN_ATTEMPTS - user.pinFailedAttempts,
+    });
+  }
+
+  // PIN correcto → resetear intentos
+  user.pinFailedAttempts = 0;
+  await user.save();
+
+  return res.json({ valid: true, message: 'PIN verificado correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Modo Cortina: Bloquear / Desbloquear pantalla ───────────────
+const lockScreen = async (req, res, next) => {
+  try {
+    await auditLogger.registrarManual(req, 'pantalla_bloqueada', {
+      resourceType: 'session',
+      trigger: req.body?.trigger || 'manual',
+    });
+
+    return res.json({ locked: true, message: 'Pantalla bloqueada' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const unlockScreen = async (req, res, next) => {
+  try {
+    // El PIN se verifica antes con verifyPin; este endpoint solo registra el evento
+    await auditLogger.registrarManual(req, 'pantalla_desbloqueada', {
+      resourceType: 'session',
+      trigger: 'manual',
+    });
+
+    return res.json({ locked: false, message: 'Pantalla desbloqueada' });
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = {
   login,
   refresh,
   logout,
-  me
+  me,
+  setPin,
+  verifyPin,
+  lockScreen,
+  unlockScreen,
 };

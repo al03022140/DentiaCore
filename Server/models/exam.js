@@ -8,7 +8,7 @@ const examSchema = new mongoose.Schema({
     },
     doctor_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Doctor', // 🔹 Relacionado con el doctor que lo solicitó
+        ref: 'Usuario', // 🔹 Relacionado con el doctor que lo solicitó
         required: true
     },
     tipo_examen: {
@@ -41,6 +41,27 @@ const examSchema = new mongoose.Schema({
         type: String, 
         required: false,
         trim: true // Elimina espacios innecesarios
+    },
+    // ── Campos de auditoría y estado (roles.MD §5) ──────────────
+    estadoRegistro: {
+        type: String,
+        enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
+        default: 'OFICIAL'
+    },
+    creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoEn: { type: Date, default: null },
+    firmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    firmadoEn: { type: Date, default: null },
+    autorizadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    deleteReason: { type: String, default: null },
+    capturaExtemporanea: {
+        esExtemporanea: { type: Boolean, default: false },
+        motivo: { type: String, default: null },
+        fechaNota: { type: Date, default: null },
+        fechaCaptura: { type: Date, default: null }
     }
 }, {
     timestamps: true // 🔹 Agrega `createdAt` y `updatedAt` automáticamente

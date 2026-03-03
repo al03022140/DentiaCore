@@ -66,17 +66,17 @@ const odontogramValidators = {
 const appointmentValidators = {
   create: [
     body('paciente_id').isMongoId().withMessage('ID de paciente inválido'),
-    body('fecha').isISO8601().withMessage('Fecha inválida'),
-    body('tipo').isIn(['CONSULTA', 'TRATAMIENTO', 'URGENCIA']).withMessage('Tipo de cita inválido'),
-    body('estado').isIn(['PENDIENTE', 'CONFIRMADA', 'CANCELADA']).withMessage('Estado inválido'),
+    body('fecha_hora').isISO8601().withMessage('Fecha inválida'),
+    body('motivo').trim().notEmpty().withMessage('Motivo es requerido'),
+    body('estado').optional().isIn(['Pendiente', 'Confirmada', 'Cancelada', 'Pasada']).withMessage('Estado inválido'),
     validate
   ],
   
   update: [
     param('id').isMongoId().withMessage('ID de cita inválido'),
-    body('fecha').optional().isISO8601(),
-    body('tipo').optional().isIn(['CONSULTA', 'TRATAMIENTO', 'URGENCIA']),
-    body('estado').optional().isIn(['PENDIENTE', 'CONFIRMADA', 'CANCELADA']),
+    body('fecha_hora').optional().isISO8601(),
+    body('motivo').optional().trim().notEmpty(),
+    body('estado').optional().isIn(['Pendiente', 'Confirmada', 'Cancelada', 'Pasada']),
     validate
   ]
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, List, Avatar, Typography, Tag } from 'antd';
 import { UserOutlined, DollarCircleOutlined } from '@ant-design/icons';
 import { getLastMovements } from '../../shared/services/cashService';
@@ -28,9 +28,6 @@ const MovementsList = ({ refreshTrigger }) => {
     <Card 
       title="Últimos Movimientos" 
       bordered={false}
-      style={{ height: '100%', background: 'transparent' }}
-      headStyle={{ borderBottom: '1px solid #f0f0f0', padding: 0 }}
-      bodyStyle={{ padding: 0, height: 'calc(100% - 57px)' }}
     >
       <div className="movements-list-container">
         <List
@@ -43,7 +40,7 @@ const MovementsList = ({ refreshTrigger }) => {
                 avatar={
                   <Avatar 
                     icon={item.type === 'INCOME' ? <UserOutlined /> : <DollarCircleOutlined />} 
-                    style={{ backgroundColor: item.type === 'INCOME' ? '#87d068' : '#f56a00' }}
+                    className={item.type === 'INCOME' ? 'movement-avatar--income' : 'movement-avatar--expense'}
                   />
                 }
                 title={
@@ -57,7 +54,7 @@ const MovementsList = ({ refreshTrigger }) => {
                 }
                 description={
                   <div className="movement-meta">
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                    <Text type="secondary" className="movement-patient-name">
                       {item.patientId ? `${item.patientId.primer_nombre} ${item.patientId.apellido_paterno}` : 'General'}
                     </Text>
                     <Tag color={item.paymentMethod === 'CASH' ? 'gold' : 'blue'}>

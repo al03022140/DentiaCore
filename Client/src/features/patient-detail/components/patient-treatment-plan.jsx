@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Input, message } from 'antd';
 import SectionHeader from './section-header';
+import API from '../../../shared/services/axios-instance.js';
 import '../styles/patient-treatment-plan.css';
 
 // Componente para mostrar y editar la sección de Tratamiento a realizar
@@ -60,19 +61,11 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
       };
 
       // Llamada a la API para guardar el plan de tratamiento
-      const response = await fetch(`/api/patients/${patientId}/treatment-plan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ treatmentPlan: newTreatmentPlan }),
+      const response = await API.post(`/patients/${patientId}/treatment-plan`, {
+        treatmentPlan: newTreatmentPlan
       });
 
-      if (!response.ok) {
-        throw new Error('Error al guardar el plan de tratamiento');
-      }
-
-      const body = await response.json().catch(() => null);
+      const body = response.data;
       const savedPlan = body?.data ? {
         ...body.data,
         fecha: body.data.fecha || newTreatmentPlan.fecha,

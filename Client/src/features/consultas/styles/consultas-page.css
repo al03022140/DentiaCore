@@ -13,7 +13,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  font: var(--text-body-default);
+  font: var(--pd-font-base);
   background-color: transparent;
   overflow: hidden;
   overflow-x: hidden;
@@ -106,7 +106,7 @@
 }
 
 .next-patient-time {
-  font: var(--text-body-lg);
+  font: var(--pd-font-body-md);
   color: var(--color-text-secondary);
   display: block;
 }
@@ -134,6 +134,7 @@
   background: var(--color-bg-section);
   padding: 1rem;
   border-radius: var(--border-radius-md);
+  font: var(--pd-font-section-body);
   color: var(--color-text-secondary);
 }
 
@@ -150,7 +151,7 @@
   padding: 1rem;
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font: var(--text-label-strong);
+  font: var(--pd-font-label-md);
   transition: var(--transition-medium);
   width: 100%;
   text-align: center;
@@ -222,7 +223,7 @@
 }
 
 .timeline-content {
-  font: var(--text-body-default);
+  font: var(--pd-font-section-body);
   color: var(--color-text-secondary);
 }
 
@@ -238,7 +239,7 @@
   margin-bottom: 0.5rem;
   border-radius: var(--border-radius-sm);
   border-left: 4px solid var(--color-warning);
-  font: var(--text-body-default);
+  font: var(--pd-font-section-body);
 }
 
 .detail-actions {
@@ -254,7 +255,7 @@
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font: var(--text-label);
+  font: var(--pd-font-label-md);
   transition: all 0.2s;
 }
 
@@ -316,12 +317,13 @@
   align-items: center;
   min-width: 70px;
   color: var(--color-primary);
-  font: var(--text-label-strong);
+  font: var(--pd-font-label-md);
+  font-weight: var(--font-weight-medium);
   margin-right: 1rem;
 }
 
 .time-hour {
-  font: var(--text-body-lg);
+  font: var(--pd-font-body-md);
 }
 
 .time-ampm {
@@ -334,13 +336,14 @@
 }
 
 .consultation-patient-name {
-  font: var(--text-body-strong);
+  font: var(--pd-font-section-body);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   margin-bottom: 0.25rem;
   display: block;
 }
 
 .consultation-reason {
-  font: var(--text-body-sm);
+  font: var(--pd-font-body-sm);
   color: var(--color-text-secondary);
 }

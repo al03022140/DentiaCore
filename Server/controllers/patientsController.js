@@ -5,19 +5,33 @@ const Periodontogram = require('../models/periodontogram.js');
 const fs = require('fs-extra');
 const path = require('path');
 const mongoose = require('mongoose');
-const { getUploadsBase, resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
-const uploadsBase = getUploadsBase();
+const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
+const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
+const { sanitizePatientForBasicRead } = require('../middlewares/authorize');
+
+// Utilidad compartida: calcular edad a partir de fecha de nacimiento
+const calcularEdad = (fechaNacimiento) => {
+    const nacimiento = fechaNacimiento instanceof Date ? fechaNacimiento : new Date(fechaNacimiento);
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    if (hoy.getMonth() < nacimiento.getMonth() || 
+        (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
+        edad--;
+    }
+    return edad;
+};
+
 // 🔥 Función temporal para desarrollo - Borrar todos los pacientes
 exports.deleteAllPatients = async (req, res) => {
+    // 🚫 BLOQUEADO fuera de modo desarrollo
+    if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ message: 'Función deshabilitada en producción' });
+    }
+
     try {
         // Verificar que no se esté intentando convertir un ID (evitar el error de Cast to ObjectId)
         if (req.params.id) {
             return res.status(400).json({ message: 'Esta ruta no acepta parámetros de ID' });
-        }
-        
-        // Solo permitir en modo desarrollo
-        if (process.env.NODE_ENV !== 'development') {
-            return res.status(403).json({ message: 'Esta función solo está disponible en modo desarrollo' });
         }
         
         // Requerir confirmación explícita
@@ -60,8 +74,8 @@ exports.getAllPatients = async (req, res) => {
         const limit = parseInt(req.query.limit) || 0; // 0 significa sin límite
         const skip = (page - 1) * limit;
 
-        // Construir la consulta base
-        let query = Patient.find({}, { __v: 0 }); // Excluye __v para limpiar la respuesta
+        // Construir la consulta base (excluir pacientes dados de baja)
+        let query = Patient.find({ deletedAt: null }, { __v: 0 });
 
         // Aplicar paginación si se especifica un límite
         if (limit > 0) {
@@ -71,18 +85,23 @@ exports.getAllPatients = async (req, res) => {
         // Ejecutar la consulta
         const patients = await query.exec();
 
-        // Contar el total de pacientes para la paginación
-        const total = await Patient.countDocuments();
+        // Contar el total de pacientes para la paginación (excluyendo dados de baja)
+        const total = await Patient.countDocuments({ deletedAt: null });
 
         if (!patients.length) {
             console.log("⚠️ No se encontraron pacientes.");
         }
 
         // Verificar que todos los pacientes tengan un `paciente_id` generado correctamente
-        const patientsWithId = patients.map(patient => ({
+        let patientsWithId = patients.map(patient => ({
             ...patient.toObject(),
             paciente_id: patient.paciente_id || "No asignado" // Si no tiene un ID, muestra "No asignado"
         }));
+
+        // Filtrar datos clínicos si el usuario solo tiene patients.read.basic
+        if (req.filterClinicalData) {
+            patientsWithId = patientsWithId.map(p => sanitizePatientForBasicRead(p));
+        }
 
         // Incluir información de paginación en la respuesta
         res.status(200).json({
@@ -115,23 +134,8 @@ exports.getPatientById = async (req, res) => {
         return res.status(400).json({ message: "El formato del ID del paciente no es válido" });
       }
   
-      // Buscar usando el _id de MongoDB con manejo de errores mejorado
-      console.log('🔍 DEBUG: Ejecutando Patient.findById con ID:', id);
-      console.log('🔍 DEBUG: Tipo de ID:', typeof id);
-      console.log('🔍 DEBUG: Conexión MongoDB estado:', mongoose.connection.readyState);
-      console.log('🔍 DEBUG: Base de datos actual:', mongoose.connection.name);
-      
-      const patient = await Patient.findById(id).exec();
-      
-      console.log('🔍 DEBUG: Resultado de findById:', patient ? 'ENCONTRADO' : 'NULL');
-      if (patient) {
-        console.log('🔍 DEBUG: Datos del paciente encontrado:', {
-          _id: patient._id,
-          name: patient.name,
-          primer_nombre: patient.primer_nombre,
-          email: patient.email
-        });
-      }
+      // Buscar usando el _id de MongoDB (excluyendo dados de baja)
+      const patient = await Patient.findOne({ _id: id, deletedAt: null }).exec();
   
       if (!patient) {
         console.log("⚠️ Paciente no encontrado en la base de datos.");
@@ -160,8 +164,13 @@ exports.getPatientById = async (req, res) => {
       }).sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora)); // Ordenar ascendente
       
       // Respuesta enriquecida con información adicional
+      // Filtrar datos clínicos si el usuario solo tiene patients.read.basic
+      const patientObj = req.filterClinicalData
+        ? sanitizePatientForBasicRead(patient)
+        : patient.toObject();
+
       res.status(200).json({ 
-        patient: patient.toObject(),
+        patient: patientObj,
         citas: {
           pasadas: citasPasadas,
           futuras: citasFuturas,
@@ -249,6 +258,9 @@ exports.createPatient = async (req, res) => {
                 fechaNacimiento = new Date(year, month, day);
                 // Actualizar el valor en patientData para usarlo más adelante
                 patientData.fecha_nacimiento = fechaNacimiento;
+            } else {
+                // Formato DD/MM/YYYY inválido, intentar parsear como cadena genérica
+                fechaNacimiento = new Date(patientData.fecha_nacimiento);
             }
         } else {
             // Si no está en formato DD/MM/YYYY, intentar parsear normalmente
@@ -267,19 +279,6 @@ exports.createPatient = async (req, res) => {
             console.log("✅ ID generado:", patientData.paciente_id);
         }
 
-        // 📌 Calcular la edad correctamente
-        const calcularEdad = (fechaNacimiento) => {
-            // Si ya es un objeto Date, usarlo directamente
-            const nacimiento = fechaNacimiento instanceof Date ? fechaNacimiento : new Date(fechaNacimiento);
-            const hoy = new Date();
-            let edad = hoy.getFullYear() - nacimiento.getFullYear();
-            if (hoy.getMonth() < nacimiento.getMonth() || 
-                (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
-                edad--;
-            }
-            return edad;
-        };
-
         // Validar _id si viene en el payload
         if (patientData._id && !mongoose.Types.ObjectId.isValid(patientData._id)) {
             console.error("❌ ID de paciente inválido en el payload");
@@ -293,14 +292,15 @@ exports.createPatient = async (req, res) => {
 
         const newPatient = new Patient({
             ...patientData,
-            edad: calcularEdad(patientData.fecha_nacimiento)
+            edad: calcularEdad(patientData.fecha_nacimiento),
+            creadoPor: req.user?.id || null
         });
         
         // 📂 Crear carpeta del paciente usando el _id de mongoose
         const patientIdStr = newPatient._id.toString();
         const patientFolderPath = resolveUploadsPath('pacientes', patientIdStr);
         const initialOdontogramPath = resolveUploadsPath('pacientes', patientIdStr, 'odontograma-inicial');
-        const profilePicFolderPath = resolveUploadsPath('pacientes', patientIdStr, 'profile-pic');
+        // profile-pic folder created below via ensureUploadsPath
 
         try {
             await ensureUploadsPath('pacientes');
@@ -391,18 +391,6 @@ exports.createPatients = async (req, res) => {
             return res.status(400).json({ message: "Debe enviar un array de pacientes" });
         }
 
-        // 📌 Función para calcular la edad
-        const calcularEdad = (fechaNacimiento) => {
-            const nacimiento = fechaNacimiento instanceof Date ? fechaNacimiento : new Date(fechaNacimiento);
-            const hoy = new Date();
-            let edad = hoy.getFullYear() - nacimiento.getFullYear();
-            if (hoy.getMonth() < nacimiento.getMonth() || 
-                (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
-                edad--;
-            }
-            return edad;
-        };
-
         const patientsWithId = await Promise.all(req.body.map(async (patientData) => {
             if (!patientData.paciente_id) {
                 patientData.paciente_id = await Patient.generateUniquePatientId();
@@ -410,6 +398,7 @@ exports.createPatients = async (req, res) => {
 
             const newPatient = new Patient(patientData);
             newPatient.edad = calcularEdad(patientData.fecha_nacimiento);
+            newPatient.creadoPor = req.user?.id || null;
             return newPatient;
         }));
 
@@ -433,7 +422,7 @@ exports.updatePatient = async (req, res) => {
         if (req.body && typeof req.body.patientData === 'string') {
             try {
                 updateData = JSON.parse(req.body.patientData);
-            } catch (parseError) {
+            } catch (_parseError) {
                 return res.status(400).json({ message: 'Error al parsear los datos del paciente (patientData)' });
             }
         }
@@ -462,19 +451,7 @@ exports.updatePatient = async (req, res) => {
             });
         }
 
-        // 📌 Función para calcular la edad
-        const calcularEdad = (fechaNacimiento) => {
-            const nacimiento = fechaNacimiento instanceof Date ? fechaNacimiento : new Date(fechaNacimiento);
-            const hoy = new Date();
-            let edad = hoy.getFullYear() - nacimiento.getFullYear();
-            if (hoy.getMonth() < nacimiento.getMonth() || 
-                (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
-                edad--;
-            }
-            return edad;
-        };
-
-        // 📅 Normalizar formato de fecha_nacimiento (aceptar DD/MM/YYYY) y recalcular edad
+        //  Normalizar formato de fecha_nacimiento (aceptar DD/MM/YYYY) y recalcular edad
         if (updateData.fecha_nacimiento) {
             let fechaNacimiento = updateData.fecha_nacimiento;
             if (typeof fechaNacimiento === 'string' && fechaNacimiento.includes('/')) {
@@ -517,8 +494,18 @@ exports.updatePatient = async (req, res) => {
         };
         const setPayload = flattenToDot(updateData);
 
-        const updatedPatient = await Patient.findByIdAndUpdate(
-            req.params.id,
+        // Inyectar campos de auditoría
+        setPayload.modificadoPor = req.user?.id || null;
+        setPayload.modificadoEn = new Date();
+
+        // Eliminar campos protegidos del payload para evitar manipulación de auditoría/soft-delete
+        const protectedKeys = ['deletedAt', 'deletedBy', 'deleteReason', 'creadoPor', '_id'];
+        for (const key of protectedKeys) {
+            delete setPayload[key];
+        }
+
+        const updatedPatient = await Patient.findOneAndUpdate(
+            { _id: req.params.id, deletedAt: null },
             { $set: setPayload },
             { new: true, runValidators: true, context: 'query' }
         );
@@ -557,120 +544,49 @@ exports.updatePatient = async (req, res) => {
     }
 };
 
-/** 🔹 Eliminar un paciente y su carpeta */
+/** 🔹 Soft-delete de un paciente (NOM-004: expedientes clínicos no pueden destruirse) */
 exports.deletePatient = async (req, res) => {
     try {
-        const deletedPatient = await Patient.findByIdAndDelete(req.params.id);
-        if (!deletedPatient) return res.status(404).json({ message: 'Paciente no encontrado' });
-
-        // 📂 Eliminar carpeta del paciente si existe (usando ID sin #)
-    const patientFolderPath = path.join(uploadsBase, 'pacientes', deletedPatient._id.toString());
-        try {
-            await fs.remove(patientFolderPath);
-            console.log(`🗑️ Carpeta del paciente eliminada: ${patientFolderPath}`);
-        } catch (error) {
-            console.error(`⚠️ No se pudo eliminar la carpeta del paciente: ${patientFolderPath}`);
+        const { deleteReason } = req.body || {};
+        if (!deleteReason || typeof deleteReason !== 'string' || deleteReason.trim().length < 10) {
+            return res.status(400).json({
+                message: 'Se requiere un motivo de eliminación (mínimo 10 caracteres)',
+                field: 'deleteReason'
+            });
         }
 
-        // 🔹 Eliminar citas asociadas
-        await Appointment.deleteMany({ paciente_id: deletedPatient._id });
+        const patient = await Patient.findById(req.params.id);
+        if (!patient) return res.status(404).json({ message: 'Paciente no encontrado' });
 
-        res.status(200).json({ message: 'Paciente eliminado correctamente' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al eliminar el paciente', error: error.message });
+        if (patient.deletedAt) {
+            return res.status(409).json({ message: 'El paciente ya fue dado de baja previamente' });
+        }
+
+        // Soft-delete del paciente
+        patient.deletedAt = new Date();
+        patient.deletedBy = req.user?.id || null;
+        patient.deleteReason = deleteReason.trim();
+        await patient.save({ validateModifiedOnly: true });
+
+        // Soft-delete de citas asociadas (deletedAt: null coincide con null y campo ausente)
+        await Appointment.updateMany(
+            { paciente_id: patient._id, deletedAt: null },
+            { $set: { deletedAt: new Date(), deletedBy: req.user?.id || null, deleteReason: 'Paciente dado de baja' } }
+        );
+
+        res.status(200).json({ message: 'Paciente dado de baja correctamente' });
+    } catch (_error) {
+        res.status(500).json({ message: 'Error al dar de baja al paciente', error: _error.message });
     }
 };
 
 
-/** 🔹 Guardar captura del odontograma inicial */
-// Add these methods to your existing controller
-
-/**
- * Save odontograma screenshot
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-// Update the saveOdontogramaScreenshot method
-exports.saveOdontogramaScreenshot = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { imageData, tipo, odontogramaData } = req.body;
-    
-    // Validar datos de entrada
-    if (!imageData) {
-      return res.status(400).json({ error: 'No se proporcionó la imagen del odontograma' });
-    }
-    
-    if (!imageData.startsWith('data:image')) {
-      return res.status(400).json({ error: 'Formato de imagen inválido' });
-    }
-    
-
-    if (imageData.length < 1000) {
-      return res.status(400).json({ error: 'La imagen proporcionada es demasiado pequeña o está corrupta' });
-    }
-    
-    // Create directory if it doesn't exist
-    const dir = path.join(uploadsBase, 'pacientes', id);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-
-    const timestamp = Date.now();
-    const filename = `odontograma_inicial_${timestamp}.png`;
-    const filepath = path.join(dir, filename);
-    
-    try {
-
-      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-      
-      // Verificar que los datos base64 sean válidos
-      if (!base64Data || base64Data.trim() === '') {
-        throw new Error('Datos base64 inválidos después de procesar');
-      }
-      
-      // Escribir archivo con manejo de errores
-      fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
-      
-      // Verificar que el archivo se creó correctamente
-      if (!fs.existsSync(filepath) || fs.statSync(filepath).size === 0) {
-        throw new Error('El archivo de imagen se creó pero está vacío');
-      }
-      
-      console.log(`Imagen guardada correctamente en: ${filepath}, tamaño: ${fs.statSync(filepath).size} bytes`);
-    } catch (fileError) {
-      console.error('Error al escribir el archivo de imagen:', fileError);
-      return res.status(500).json({ error: `Error al guardar la imagen: ${fileError.message}` });
-    }
-    
-    // Store both the relative URL path and the full base64 data
-    const imageUrl = `/uploads/pacientes/${id}/${filename}`;
-    
-    // Update patient record
-    const patient = await Patient.findById(id);
-    if (!patient) {
-      return res.status(404).json({ error: 'Paciente no encontrado' });
-    }
-    
-    // ❌ CAMPO ELIMINADO: odontogramaInicial migrado a modelo Odontograma independiente
-    // patient.odontogramaInicial = {
-
-    //   datos: odontogramaData,
-    //   fecha: new Date(),
-    //   odontogramaInicialGuardado: true
-    // };
-    
-    await patient.save();
-    
-
-    res.status(500).json({
-      error: 'Función obsoleta: usar modelo Odontograma independiente'
-    });
-  } catch (error) {
-    console.error('Error al guardar el odontograma inicial:', error);
-    res.status(500).json({ error: `Error al guardar el odontograma inicial: ${error.message}` });
-  }
+/** 🔹 [OBSOLETO] Guardar captura del odontograma inicial — Usar modelo Odontograma independiente */
+exports.saveOdontogramaScreenshot = (_req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Función obsoleta: usar modelo Odontograma independiente (rutas /odontogramas)'
+  });
 };
 
 
@@ -694,8 +610,8 @@ exports.addEvolutionNote = async (req, res) => {
       });
     }
 
-    // Buscar el paciente
-    const patient = await Patient.findById(id);
+    // Buscar el paciente (excluir soft-deleted)
+    const patient = await Patient.findOne({ _id: id, deletedAt: null });
     if (!patient) {
       return res.status(404).json({
         success: false,
@@ -705,6 +621,13 @@ exports.addEvolutionNote = async (req, res) => {
 
     // Calcular numero_procedimiento como longitud_actual + 1
     const numero_procedimiento = (patient.notas_evolucion?.length || 0) + 1;
+
+    // Determinar estadoRegistro según permisos (asistente → BORRADOR)
+    const userPerms = getEffectivePermissions(req.user);
+    let estadoRegistro = 'OFICIAL';
+    if (!hasPermission(userPerms, ['consultas.create']) && hasPermission(userPerms, ['consultas.create.draft'])) {
+      estadoRegistro = 'BORRADOR';
+    }
 
     // Preparar la nueva nota de evolución
     const now = new Date();
@@ -720,7 +643,10 @@ exports.addEvolutionNote = async (req, res) => {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }),
+      creadoPor: req.user?.id || null,
+      estadoRegistro,
+      capturaExtemporanea: req.body._capturaExtemporanea || undefined
     };
 
     // Agregar al inicio del array
@@ -732,10 +658,12 @@ exports.addEvolutionNote = async (req, res) => {
     // Guardar el paciente
     await patient.save();
 
+    // Devolver el subdocumento guardado (con _id generado por Mongoose)
+    const savedNote = patient.notas_evolucion[0];
     return res.status(201).json({
       success: true,
       message: 'Nota de evolución agregada correctamente',
-      data: newEvolutionNote
+      data: savedNote
     });
   } catch (error) {
     console.error('Error al agregar nota de evolución:', error);
@@ -770,8 +698,8 @@ exports.addTreatmentPlan = async (req, res) => {
             });
         }
 
-        // Buscar el paciente
-        const patient = await Patient.findById(id);
+        // Buscar el paciente (excluir soft-deleted)
+        const patient = await Patient.findOne({ _id: id, deletedAt: null });
         if (!patient) {
             return res.status(404).json({ 
                 success: false, 
@@ -779,17 +707,27 @@ exports.addTreatmentPlan = async (req, res) => {
             });
         }
 
+        // Determinar estadoRegistro según permisos (asistente → BORRADOR)
+        const userPerms = getEffectivePermissions(req.user);
+        let estadoRegistro = 'OFICIAL';
+        if (!hasPermission(userPerms, ['consultas.create']) && hasPermission(userPerms, ['consultas.create.draft'])) {
+            estadoRegistro = 'BORRADOR';
+        }
+
         // Preparar el nuevo plan de tratamiento
         const newTreatmentPlan = {
             texto: treatmentPlan.texto.trim(),
-            fecha: treatmentPlan.fecha || new Date(),
+            fecha: treatmentPlan.fecha ? new Date(treatmentPlan.fecha) : new Date(),
             fechaFormateada: treatmentPlan.fechaFormateada || new Date().toLocaleDateString('es-ES', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
-            })
+            }),
+            creadoPor: req.user?.id || null,
+            estadoRegistro,
+            capturaExtemporanea: req.body._capturaExtemporanea || undefined
         };
 
         // Agregar el plan de tratamiento al array
@@ -798,10 +736,12 @@ exports.addTreatmentPlan = async (req, res) => {
         // Guardar el paciente
         await patient.save();
 
+        // Devolver el subdocumento guardado (con _id generado por Mongoose)
+        const savedPlan = patient.planes_tratamiento[0];
         res.status(201).json({
             success: true,
             message: 'Plan de tratamiento agregado correctamente',
-            data: newTreatmentPlan
+            data: savedPlan
         });
 
     } catch (error) {

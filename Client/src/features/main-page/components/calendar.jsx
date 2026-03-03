@@ -14,165 +14,111 @@ const setAuthFetchInProgress = (value) => {
   else localStorage.removeItem(AUTH_FETCH_PROGRESS_KEY);
 };
 
+// ====== FUNCIONES PURAS DE ALMACENAMIENTO (fuera del componente) ======
+const storeTokenWithExpiration = (token, expiresIn = 3600, refreshToken = null) => {
+  const expirationTime = Date.now() + (expiresIn * 1000);
+  localStorage.setItem('accessToken', JSON.stringify({
+    token,
+    expiration: expirationTime,
+    refreshToken
+  }));
+};
+
+const getStoredToken = () => {
+  try {
+    const tokenData = localStorage.getItem('accessToken');
+    if (!tokenData) return null;
+
+    // Formato antiguo: string simple
+    if (!tokenData.startsWith('{')) return tokenData;
+
+    const parsed = JSON.parse(tokenData);
+    if (!parsed.token || !parsed.expiration) return parsed.token || parsed;
+
+    const timeUntilExpiry = parsed.expiration - Date.now();
+
+    if (timeUntilExpiry > 0) {
+      return { token: parsed.token, refreshToken: parsed.refreshToken, needsRefresh: timeUntilExpiry < 5 * 60 * 1000 };
+    }
+    // Expirado
+    if (!parsed.refreshToken) localStorage.removeItem('accessToken');
+    return parsed.refreshToken ? { token: null, refreshToken: parsed.refreshToken, needsRefresh: true } : null;
+  } catch (error) {
+    console.error('Error al obtener token almacenado:', error);
+    localStorage.removeItem('accessToken');
+    return null;
+  }
+};
+
+const storeEventsLocally = (fetchedEvents) => {
+  const expiration = new Date();
+  expiration.setMonth(expiration.getMonth() + 1);
+  localStorage.setItem('calendarEvents', JSON.stringify({
+    events: fetchedEvents,
+    expiration: expiration.toISOString(),
+  }));
+};
+
+const loadLocalEvents = () => {
+  try {
+    const localData = JSON.parse(localStorage.getItem('calendarEvents'));
+    if (localData?.events && localData.expiration) {
+      if (new Date(localData.expiration) > new Date()) return localData.events;
+      localStorage.removeItem('calendarEvents');
+    }
+  } catch (error) {
+    console.error('Error al cargar datos locales:', error);
+    localStorage.removeItem('calendarEvents');
+  }
+  return null;
+};
+
 const Calendar = () => {
   // ====== ESTADOS ======
   const [events, setEvents] = useState([]);
   const [connectionMessage, setConnectionMessage] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [systemDate, setSystemDate] = useState(new Date());
-  // Estado para la hora inicial visible en la agenda (se mostrarán 4 horas consecutivas)
-  const [topHour, setTopHour] = useState(() => {
-    const nowHour = new Date().getHours();
-    return Math.max(0, nowHour - 1);
-  });
+  // Estado para la hora inicial visible en la agenda (se muestran 7 horas consecutivas)
+  const [topHour, setTopHour] = useState(() => Math.max(0, new Date().getHours() - 1));
   const currentHour = systemDate.getHours();
 
-  // ====== FUNCIONES DE ALMACENAMIENTO DE TOKEN ======
-  const storeTokenWithExpiration = (token, expiresIn = 3600, refreshToken = null) => {
-    const expirationTime = new Date().getTime() + (expiresIn * 1000);
-    const tokenData = {
-      token: token,
-      expiration: expirationTime,
-      refreshToken: refreshToken // Guardar refresh token para renovación automática
-    };
-    localStorage.setItem('accessToken', JSON.stringify(tokenData));
-    console.log(`🔍 Token almacenado. Expira en ${expiresIn} segundos (${Math.floor(expiresIn / 60)} minutos)`);
-  };
-
-  const getStoredToken = () => {
-    try {
-      const tokenData = localStorage.getItem('accessToken');
-      if (!tokenData) return null;
-      
-      // Si es un string simple (formato antiguo), devolverlo
-      if (typeof tokenData === 'string' && !tokenData.startsWith('{')) {
-        return tokenData;
-      }
-      
-      const parsed = JSON.parse(tokenData);
-      if (parsed.token && parsed.expiration) {
-        const now = new Date().getTime();
-        const timeUntilExpiry = parsed.expiration - now;
-        
-        // Si el token expira en menos de 5 minutos, intentar renovarlo
-        if (timeUntilExpiry < 5 * 60 * 1000 && parsed.refreshToken) {
-          console.log("🔍 Token próximo a expirar, intentando renovar automáticamente...");
-          renewAccessToken(parsed.refreshToken);
-          return parsed.token; // Devolver el token actual mientras se renueva
-        }
-        
-        // Verificar si el token ha expirado
-        if (now < parsed.expiration) {
-          const minutesLeft = Math.floor(timeUntilExpiry / 1000 / 60);
-          console.log(`🔍 Token válido. Expira en ${minutesLeft} minutos`);
-          return parsed.token;
-        } else {
-          // Si hay refresh token, intentar renovar
-          if (parsed.refreshToken) {
-            console.log("🔍 Token expirado, intentando renovar con refresh_token...");
-            renewAccessToken(parsed.refreshToken);
-          } else {
-            console.log("🔍 Token expirado y sin refresh_token, eliminando...");
-            localStorage.removeItem('accessToken');
-          }
-          return null;
-        }
-      }
-      return parsed.token || parsed; // Fallback para formatos antiguos
-    } catch (error) {
-      console.error("Error al obtener token almacenado:", error);
-      localStorage.removeItem('accessToken');
-      return null;
-    }
-  };
-
-  const [accessToken, setAccessToken] = useState(getStoredToken() || null);
   const isInitializedRef = useRef(false);
   const authAttemptedRef = useRef(false);
-  const [syncStatus, setSyncStatus] = useState('loading'); // 'loading', 'error', 'connection-error', 'success'
-
-  // ====== ALMACENAMIENTO LOCAL ======
-
-  const storeEventsLocally = (fetchedEvents) => {
-    const expiration = new Date();
-    expiration.setMonth(expiration.getMonth() + 1); // Expira en 1 mes
-    localStorage.setItem('calendarEvents', JSON.stringify({
-      events: fetchedEvents,
-      expiration: expiration.toISOString(),
-    }));
-  };
-
-  const loadLocalEvents = () => {
-    try {
-      const localData = JSON.parse(localStorage.getItem('calendarEvents'));
-      if (localData && localData.events && localData.expiration) {
-        const expirationDate = new Date(localData.expiration);
-        if (expirationDate > new Date()) {
-          return localData.events;
-        } else {
-          localStorage.removeItem('calendarEvents');
-          console.log('Datos locales expirados y eliminados.');
-        }
-      }
-    } catch (error) {
-      console.error('Error al cargar los datos locales:', error);
-      localStorage.removeItem('calendarEvents');
-    }
-    return null;
-  };
+  const [syncStatus, setSyncStatus] = useState('loading');
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    summary: '', description: '', date: '', startTime: '09:00', endTime: '10:00', location: '',
+  });
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const fetchedRangeRef = useRef({ min: null, max: null });
 
   // ====== AUTENTICACIÓN CON GOOGLE ======
   const renewAccessToken = async (refreshToken) => {
     try {
-      console.log("🔄 Renovando access token con refresh_token...");
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/google/refresh-token`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken })
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log("✅ Access token renovado exitosamente");
         storeTokenWithExpiration(data.accessToken, data.expiresIn, data.refreshToken);
-        setAccessToken(data.accessToken);
         return data.accessToken;
       } else {
-        console.error("❌ Error renovando token:", response.statusText);
+        console.error('Error renovando token:', response.statusText);
         localStorage.removeItem('accessToken');
-        setAccessToken(null);
         return null;
       }
     } catch (error) {
-      console.error("❌ Error en renovación de token:", error);
+      console.error('Error en renovación de token:', error);
       return null;
     }
   };
 
-  const validateToken = async (token) => {
-    try {
-      const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + token);
-      if (response.ok) {
-        const tokenInfo = await response.json();
-        console.log("🔍 Token válido:", tokenInfo);
-        return true;
-      } else {
-        console.log("❌ Token inválido o expirado");
-        return false;
-      }
-    } catch (error) {
-      console.error("❌ Error validando token:", error);
-      return false;
-    }
-  };
-
   const getAuthUrl = async () => {
-    if (isAuthFetchInProgress() || isAuthInProgress()) {
-      console.log("🔍 Autenticación en curso, evitando nueva solicitud de URL...");
-      return;
-    }
+    if (isAuthFetchInProgress() || isAuthInProgress()) return;
     try {
       setAuthFetchInProgress(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/google/auth/url`);
@@ -181,65 +127,51 @@ const Calendar = () => {
         setAuthInProgress();
         window.location.href = data.url;
       } else {
-        console.error("❌ URL de autenticación no válida:", data);
+        console.error("URL de autenticación no válida:", data);
         setConnectionMessage("❌ Error: No se pudo obtener la URL de autenticación de Google.");
         setAuthFetchInProgress(false);
       }
     } catch (error) {
-      console.error("❌ Error obteniendo la URL de autenticación:", error);
+      console.error("Error obteniendo la URL de autenticación:", error);
       setConnectionMessage("❌ Error de conexión al obtener la autenticación de Google.");
       setAuthFetchInProgress(false);
     }
   };
 
+  // checkAccessToken: usa el token directamente con fetchCalendarEvents.
+  // Si el token es inválido, fetchCalendarEvents maneja el 401/403 y redirige.
   const checkAccessToken = async () => {
-    const storedAccessToken = getStoredToken();
-    if (storedAccessToken) {
-      console.log("🔍 Validando accessToken almacenado...");
-      const isValid = await validateToken(storedAccessToken);
-      if (isValid) {
-        console.log("🔍 Usando accessToken válido.");
-        setAccessToken(storedAccessToken);
-        fetchCalendarEvents(storedAccessToken);
-      } else {
-        console.log("🔍 Token almacenado inválido, eliminando y solicitando nueva autenticación...");
-        localStorage.removeItem("accessToken");
-         setAccessToken(null);
-        if (!authAttemptedRef.current) {
-          authAttemptedRef.current = true;
-          setSyncStatus('loading');
-          setConnectionMessage("🔄 Redirigiendo a Google para autenticación...");
-          getAuthUrl();
-        } else {
-          setSyncStatus('error');
-          setConnectionMessage("❌ No se pudo completar la autenticación con Google.");
-        }
-      }
+    const stored = getStoredToken();
+    // getStoredToken retorna string (formato antiguo) u objeto { token, refreshToken, needsRefresh }
+    const token = typeof stored === 'string' ? stored : stored?.token;
+
+    if (stored?.needsRefresh && stored?.refreshToken) {
+      renewAccessToken(stored.refreshToken);
+    }
+
+    if (token) {
+      fetchCalendarEvents(token);
     } else if (!authAttemptedRef.current) {
-      console.log("🔍 No se encontró accessToken, solicitando autenticación...");
       authAttemptedRef.current = true;
       setSyncStatus('loading');
-      setConnectionMessage("🔄 Redirigiendo a Google para autenticación...");
+      setConnectionMessage('🔄 Redirigiendo a Google para autenticación...');
       getAuthUrl();
     } else {
-      console.log("🔍 Autenticación ya intentada, no redirigiendo nuevamente.");
       setSyncStatus('error');
-      setConnectionMessage("❌ No se pudo completar la autenticación con Google.");
+      setConnectionMessage('❌ No se pudo completar la autenticación con Google.');
     }
   };
 
   const fetchCalendarEvents = async (token) => {
     if (!token) {
-      console.error("❌ No se encontró un accessToken válido.");
       setSyncStatus('error');
-      setConnectionMessage("❌ No se encontró un accessToken válido.");
+      setConnectionMessage('❌ No se encontró un accessToken válido.');
       return;
     }
 
     try {
       setSyncStatus('loading');
       setConnectionMessage("🔄 Sincronizando con Google Calendar...");
-      console.log("🔍 Obteniendo eventos de Google Calendar con token:", token);
 
       const now = new Date();
       const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
@@ -256,10 +188,7 @@ const Calendar = () => {
       });
 
       if (response.status === 401 || response.status === 403) {
-        console.warn("⚠️ Token inválido/expirado al consultar eventos (",
-          response.status, ") -> limpiando y solicitando nueva autenticación");
         localStorage.removeItem('accessToken');
-        setAccessToken(null);
         clearAuthInProgress();
         if (!authAttemptedRef.current && !isAuthInProgress()) {
           authAttemptedRef.current = true;
@@ -282,14 +211,17 @@ const Calendar = () => {
       }
 
       const data = await response.json();
-      console.log("✅ Eventos obtenidos:", data.items);
 
       setEvents(data.items);
       storeEventsLocally(data.items);
+      fetchedRangeRef.current = {
+        min: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        max: new Date(now.getFullYear(), now.getMonth() + 2, 0),
+      };
       setSyncStatus('success');
       setConnectionMessage("✅ Eventos sincronizados con Google Calendar.");
     } catch (error) {
-      console.error("❌ Error al obtener eventos:", error);
+      console.error("Error al obtener eventos:", error);
       setSyncStatus('connection-error');
       setConnectionMessage("❌ No se pudieron obtener eventos. Verifique su conexión.");
     }
@@ -302,53 +234,34 @@ const Calendar = () => {
     const tokenFromUrl = urlParams.get('accessToken');
     const refreshTokenFromUrl = urlParams.get('refreshToken');
     const errorFromUrl = urlParams.get('error');
-    const errorMessage = urlParams.get('message');
     const expiresInParam = urlParams.get('expiresIn');
     
     if (errorFromUrl) {
-      console.error("❌ Error de OAuth recibido:", errorFromUrl, errorMessage);
       authAttemptedRef.current = true;
       clearAuthInProgress();
-      
-      // Manejar diferentes tipos de errores
-      if (errorFromUrl === 'invalid_grant') {
-        setSyncStatus('error');
-        setConnectionMessage("❌ Código de autorización expirado. Haga clic para intentar nuevamente.");
-      } else if (errorFromUrl === 'oauth_error') {
-        setSyncStatus('error');
-        setConnectionMessage("❌ Error de autorización. Haga clic para intentar nuevamente.");
-      } else if (errorFromUrl === 'no_code') {
-        setSyncStatus('error');
-        setConnectionMessage("❌ No se recibió código de autorización. Haga clic para intentar nuevamente.");
-      } else {
-        setSyncStatus('error');
-        setConnectionMessage("❌ Error en la autenticación. Haga clic para intentar nuevamente.");
-      }
-      
-      // Limpiar la URL
+      setSyncStatus('error');
+
+      const errorMessages = {
+        invalid_grant: '❌ Código de autorización expirado. Haga clic para intentar nuevamente.',
+        oauth_error: '❌ Error de autorización. Haga clic para intentar nuevamente.',
+        no_code: '❌ No se recibió código de autorización. Haga clic para intentar nuevamente.',
+      };
+      setConnectionMessage(errorMessages[errorFromUrl] || '❌ Error en la autenticación. Haga clic para intentar nuevamente.');
+
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
     
     if (tokenFromUrl) {
-      console.log("🔍 AccessToken recibido desde URL:", tokenFromUrl);
-      if (refreshTokenFromUrl) {
-        console.log("✅ RefreshToken recibido - ¡Las credenciales durarán mucho más tiempo!");
-      }
       const expiresIn = expiresInParam ? parseInt(expiresInParam, 10) : 3600;
       storeTokenWithExpiration(
-        tokenFromUrl, 
+        tokenFromUrl,
         Number.isFinite(expiresIn) ? expiresIn : 3600,
-        refreshTokenFromUrl // Guardar refresh token para renovación automática
+        refreshTokenFromUrl
       );
-      setAccessToken(tokenFromUrl);
       authAttemptedRef.current = true;
       clearAuthInProgress();
-      
-      // Limpiar la URL
       window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Obtener eventos inmediatamente
       fetchCalendarEvents(tokenFromUrl);
     }
   }, []);
@@ -363,7 +276,6 @@ const Calendar = () => {
 
       if (!tokenFromUrl && !errorFromUrl) {
         if (isAuthInProgress()) {
-          console.log('🔍 Autenticación marcada en progreso, esperando resultado sin relanzar');
           setSyncStatus('loading');
           setConnectionMessage('🔄 Esperando autenticación con Google...');
           return;
@@ -378,7 +290,6 @@ const Calendar = () => {
     const localEvents = loadLocalEvents();
     if (localEvents) {
       setEvents(localEvents);
-      console.log("Eventos cargados desde almacenamiento local.");
     }
   }, []);
 
@@ -405,7 +316,6 @@ const Calendar = () => {
           
           // Si el token expira en menos de 10 minutos, renovarlo proactivamente
           if (timeUntilExpiry < 10 * 60 * 1000 && timeUntilExpiry > 0) {
-            console.log("⏰ Token próximo a expirar, renovando proactivamente...");
             renewAccessToken(parsed.refreshToken);
           }
         }
@@ -423,11 +333,117 @@ const Calendar = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Se generan las horas visibles a partir de topHour (se muestran 4 horas consecutivas)
-  const visibleHours = Array.from({ length: 7 }, (_, i) => {
-    const hour = topHour + i;
-    return hour;
-  });
+  // ====== HELPERS DE NAVEGACIÓN Y EVENTOS ======
+  const getAccessToken = () => {
+    const stored = getStoredToken();
+    if (typeof stored === 'string') return stored;
+    return stored?.token || null;
+  };
+
+  const navigateDay = (offset) => {
+    setCurrentDate(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + offset);
+      return d;
+    });
+  };
+
+  const navigateMonth = (offset) => {
+    setCurrentDate(prev => {
+      const d = new Date(prev);
+      d.setMonth(d.getMonth() + offset);
+      return d;
+    });
+  };
+
+  const openEventModal = () => {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    setEventForm({
+      summary: '', description: '', date: dateStr,
+      startTime: '09:00', endTime: '10:00', location: '',
+    });
+    setShowEventModal(true);
+  };
+
+  const handleCreateEvent = async (e) => {
+    e.preventDefault();
+    const token = getAccessToken();
+    if (!token) {
+      setSyncStatus('error');
+      setConnectionMessage('❌ No hay token. Autentíquese primero.');
+      setShowEventModal(false);
+      return;
+    }
+    setCreatingEvent(true);
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const eventBody = {
+        summary: eventForm.summary,
+        description: eventForm.description || undefined,
+        location: eventForm.location || undefined,
+        start: { dateTime: `${eventForm.date}T${eventForm.startTime}:00`, timeZone },
+        end: { dateTime: `${eventForm.date}T${eventForm.endTime}:00`, timeZone },
+      };
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventBody),
+        }
+      );
+      if (response.ok) {
+        const newEvent = await response.json();
+        setEvents(prev => [...prev, newEvent]);
+        setShowEventModal(false);
+        setSyncStatus('success');
+        setConnectionMessage('✅ Evento creado exitosamente.');
+      } else {
+        setSyncStatus('error');
+        setConnectionMessage('❌ Error al crear el evento.');
+      }
+    } catch (err) {
+      console.error('Error creating event:', err);
+      setConnectionMessage('❌ Error de conexión al crear el evento.');
+    } finally {
+      setCreatingEvent(false);
+    }
+  };
+
+  // Re-fetch events when navigating to a month outside the fetched range
+  useEffect(() => {
+    const month = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+    const range = fetchedRangeRef.current;
+    if (range.min && range.max) {
+      const curYM = year * 12 + month;
+      const minYM = range.min.getFullYear() * 12 + range.min.getMonth();
+      const maxYM = range.max.getFullYear() * 12 + range.max.getMonth();
+      if (curYM >= minYM && curYM <= maxYM) return;
+    }
+    const token = getAccessToken();
+    if (token) {
+      const timeMin = new Date(year, month - 1, 1).toISOString();
+      const timeMax = new Date(year, month + 2, 0, 23, 59, 59, 999).toISOString();
+      fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}`,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      )
+        .then(res => { if (res.ok) return res.json(); throw new Error('fetch error'); })
+        .then(data => {
+          setEvents(data.items || []);
+          storeEventsLocally(data.items || []);
+          fetchedRangeRef.current = {
+            min: new Date(year, month - 1, 1),
+            max: new Date(year, month + 1, 28),
+          };
+        })
+        .catch(err => console.error('Error re-fetching events:', err));
+    }
+  }, [currentDate]);
+
+  // Se generan las horas visibles a partir de topHour (se muestran 7 horas consecutivas)
+  const visibleHours = Array.from({ length: 7 }, (_, i) => topHour + i);
 
   // ====== FILTRADO Y ORDENACIÓN DE EVENTOS ======
   // Filtra los eventos para el día seleccionado (optimizado con useMemo)
@@ -540,6 +556,7 @@ const Calendar = () => {
     const firstDayOfWeek = new Date(year, month, 1).getDay();
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
     const daysInPreviousMonth = new Date(year, month, 0).getDate();
+    const dayLabels = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 
     const days = [];
     for (let i = firstDayOfWeek; i > 0; i--) {
@@ -562,8 +579,15 @@ const Calendar = () => {
 
     return (
       <div className="month-calendar">
-        <h3>{currentDate.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())} {year}</h3>
+        <div className="month-nav">
+          <button className="nav-arrow" onClick={() => navigateMonth(-1)} title="Mes anterior">&#8249;</button>
+          <h3>{currentDate.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())} {year}</h3>
+          <button className="nav-arrow" onClick={() => navigateMonth(1)} title="Mes siguiente">&#8250;</button>
+        </div>
         <div className="days-grid">
+          {dayLabels.map((label, i) => (
+            <div key={`label-${i}`} className="day-label">{label}</div>
+          ))}
           {days}
         </div>
       </div>
@@ -582,14 +606,10 @@ const Calendar = () => {
         title={connectionMessage}
         onClick={() => {
           if (syncStatus === 'error' || syncStatus === 'connection-error') {
-            // Reiniciar el proceso de autenticación
             authAttemptedRef.current = false;
             localStorage.removeItem('accessToken');
-            setAccessToken(null);
-            checkAccessToken();
-          } else {
-            checkAccessToken();
           }
+          checkAccessToken();
         }}
       >
         {syncStatus === 'loading' ? '🔄' :
@@ -598,13 +618,24 @@ const Calendar = () => {
          '✅'}
       </div>
 
+      {/* Botón para agregar evento */}
+      <button
+        className="add-event-btn"
+        onClick={openEventModal}
+        title="Agregar evento"
+      >+</button>
+
       {/* Bloque superior-izquierdo: muestra el mes y día actual */}
       <div className="day-display">
         <div className="month-name">
           {currentDate.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())}
         </div>
-        <div className="day-number">
-          {systemDate.getDate()}
+        <div className="day-nav">
+          <button className="nav-arrow" onClick={() => navigateDay(-1)} title="Día anterior">&#8249;</button>
+          <div className="day-number">
+            {currentDate.getDate()}
+          </div>
+          <button className="nav-arrow" onClick={() => navigateDay(1)} title="Día siguiente">&#8250;</button>
         </div>
       </div>
 
@@ -623,6 +654,95 @@ const Calendar = () => {
       {/* Bloque inferior: Mini-calendario del mes */}
       {renderMonth()}
     </div>
+
+    {/* Modal para crear evento */}
+    {showEventModal && (
+      <div className="event-modal-overlay" onClick={() => setShowEventModal(false)}>
+        <div className="event-modal" onClick={e => e.stopPropagation()}>
+          <div className="event-modal__header">
+            <h3>Agregar Evento</h3>
+            <button className="event-modal__close" onClick={() => setShowEventModal(false)}>&times;</button>
+          </div>
+          <form className="event-modal__form" onSubmit={handleCreateEvent}>
+            <div className="event-modal__field">
+              <label className="event-modal__label">Nombre del evento</label>
+              <input
+                className="event-modal__input"
+                type="text"
+                required
+                value={eventForm.summary}
+                onChange={e => setEventForm(f => ({ ...f, summary: e.target.value }))}
+                placeholder="Ej: Consulta dental"
+              />
+            </div>
+            <div className="event-modal__field">
+              <label className="event-modal__label">Fecha</label>
+              <input
+                className="event-modal__input"
+                type="date"
+                required
+                value={eventForm.date}
+                onChange={e => setEventForm(f => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+            <div className="event-modal__row">
+              <div className="event-modal__field">
+                <label className="event-modal__label">Hora inicio</label>
+                <input
+                  className="event-modal__input"
+                  type="time"
+                  required
+                  value={eventForm.startTime}
+                  onChange={e => setEventForm(f => ({ ...f, startTime: e.target.value }))}
+                />
+              </div>
+              <div className="event-modal__field">
+                <label className="event-modal__label">Hora fin</label>
+                <input
+                  className="event-modal__input"
+                  type="time"
+                  required
+                  value={eventForm.endTime}
+                  onChange={e => setEventForm(f => ({ ...f, endTime: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="event-modal__field">
+              <label className="event-modal__label">Ubicación</label>
+              <input
+                className="event-modal__input"
+                type="text"
+                value={eventForm.location}
+                onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))}
+                placeholder="Ej: Consultorio 3"
+              />
+            </div>
+            <div className="event-modal__field">
+              <label className="event-modal__label">Descripción</label>
+              <textarea
+                className="event-modal__textarea"
+                value={eventForm.description}
+                onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Detalles del evento..."
+                rows={3}
+              />
+            </div>
+            <div className="event-modal__actions">
+              <button
+                className="event-modal__btn event-modal__btn--cancel"
+                type="button"
+                onClick={() => setShowEventModal(false)}
+              >Cancelar</button>
+              <button
+                className="event-modal__btn event-modal__btn--submit"
+                type="submit"
+                disabled={creatingEvent}
+              >{creatingEvent ? 'Creando...' : 'Crear Evento'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </div>
   );
 };

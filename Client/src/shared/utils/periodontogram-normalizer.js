@@ -112,8 +112,8 @@ export const normalizeBackendPeriodontogram = (backendData = {}, { patientId = n
         mobility: canonicalTooth.movilidad ?? 0,
         anchuraEncia: canonicalTooth.anchuraEncia ?? 0,
         gumWidth: canonicalTooth.anchuraEncia ?? 0,
-        pronostico: canonicalTooth.pronostico || 'Bueno',
-        prognosis: canonicalTooth.pronostico || 'Bueno',
+        pronostico: (canonicalTooth.pronostico || 'bueno').toLowerCase(),
+        prognosis: (canonicalTooth.pronostico || 'bueno').toLowerCase(),
         fechaUltimaModificacion: canonicalTooth.fechaUltimaModificacion || sanitized.fechaModificacion || new Date().toISOString()
       };
 

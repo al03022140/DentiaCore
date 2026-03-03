@@ -437,19 +437,6 @@ export class PeriodontogramStateManager {
 // FUNCIONES DE COMPATIBILIDAD LEGACY
 // ==========================================
 
-// Instancia global para compatibilidad
-let globalStateManager = null;
-
-/**
- * Obtiene el gestor de estado global
- */
-export const getGlobalStateManager = () => {
-  if (!globalStateManager) {
-    globalStateManager = new PeriodontogramStateManager();
-  }
-  return globalStateManager;
-};
-
 /**
  * Helper central para obtener disponibilidad de diente
  * Convierte el estado 'absent' a la semántica 'disponible/presente'
@@ -459,29 +446,6 @@ export const getGlobalStateManager = () => {
  */
 export const getToothAvailability = (absent) => {
   return !absent;
-};
-
-/**
- * Funciones legacy para compatibilidad hacia atrás
- */
-export const toggleToothAbsent = (toothNumber) => {
-  const manager = getGlobalStateManager();
-  return manager.toggleToothAbsent(toothNumber);
-};
-
-export const resetToothClinicalData = (toothNumber) => {
-  const manager = getGlobalStateManager();
-  return manager.resetToothClinicalData(toothNumber);
-};
-
-export const getAvailableTeeth = () => {
-  const manager = getGlobalStateManager();
-  return manager.getAvailableTeeth();
-};
-
-export const getAbsentTeeth = () => {
-  const manager = getGlobalStateManager();
-  return manager.getAbsentTeeth();
 };
 
 // Exportación por defecto

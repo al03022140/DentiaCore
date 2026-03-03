@@ -43,7 +43,7 @@
 
 /* Estilos para los términos (dt) */
 .emergency-contact-details dt {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-black);
   margin-bottom: 0.25rem;
 }
@@ -51,7 +51,7 @@
 /* Estilos para las descripciones (dd) */
 .emergency-contact-details dd {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
   margin-left: 0; /* Eliminar margen izquierdo predeterminado */
 }
 

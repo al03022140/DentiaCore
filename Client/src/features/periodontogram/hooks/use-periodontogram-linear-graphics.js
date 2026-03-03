@@ -450,19 +450,21 @@ export const usePeriodontogramLinearGraphics = ({
   
   // Efecto para actualización de datos
   useEffect(() => {
-    latestDataRef.current = periodontogramData;
+    // Extraer solo .teeth para que las gráficas reciban { toothNumber: toothData } y no el wrapper completo
+    const teethOnly = periodontogramData?.teeth || null;
+    latestDataRef.current = teethOnly;
 
-    if (!periodontogramData) {
+    if (!teethOnly) {
       pendingDataRef.current = null;
       return;
     }
 
     if (!isInitializedRef.current) {
-      pendingDataRef.current = periodontogramData;
+      pendingDataRef.current = teethOnly;
       return;
     }
 
-    updateLinearGraphics(periodontogramData);
+    updateLinearGraphics(teethOnly);
     pendingDataRef.current = null;
   }, [periodontogramData, updateLinearGraphics]);
   

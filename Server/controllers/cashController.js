@@ -46,7 +46,7 @@ exports.getSessionStatus = async (req, res) => {
       isOpen: !!activeSession,
       session: activeSession
     });
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ message: 'Error checking session status' });
   }
 };
@@ -63,12 +63,13 @@ exports.openBox = async (req, res) => {
     const newSession = new BoxSession({
       initialAmount: Number(initialAmount) || 0,
       status: 'OPEN',
-      startTime: new Date()
+      startTime: new Date(),
+      openedBy: req.user?.id || null
     });
 
     await newSession.save();
     res.status(201).json(newSession);
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ message: 'Error opening box' });
   }
 };
@@ -93,10 +94,11 @@ exports.closeBox = async (req, res) => {
     activeSession.status = 'CLOSED';
     activeSession.endTime = new Date();
     activeSession.finalAmount = cashBalance;
+    activeSession.closedBy = req.user?.id || null;
     
     await activeSession.save();
     res.json(activeSession);
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ message: 'Error closing box' });
   }
 };
@@ -104,6 +106,17 @@ exports.closeBox = async (req, res) => {
 exports.addMovement = async (req, res) => {
   try {
     const { amount, type, paymentMethod, concept, patientId } = req.body;
+
+    // Validar campos requeridos
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'El monto debe ser un número positivo' });
+    }
+    if (!['INCOME', 'EXPENSE'].includes(type)) {
+      return res.status(400).json({ message: 'El tipo debe ser INCOME o EXPENSE' });
+    }
+    if (!paymentMethod) {
+      return res.status(400).json({ message: 'El método de pago es requerido' });
+    }
     
     // Find active session
     const activeSession = await BoxSession.findOne({ status: 'OPEN' });
@@ -135,7 +148,8 @@ exports.addMovement = async (req, res) => {
       concept,
       patientId,
       boxSessionId: activeSession._id,
-      date: new Date()
+      date: new Date(),
+      creadoPor: req.user?.id || null
     });
 
     await movement.save();
@@ -153,7 +167,7 @@ exports.getLastMovements = async (req, res) => {
       .limit(20)
       .populate('patientId', 'primer_nombre apellido_paterno');
     res.json(movements);
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ message: 'Error fetching movements' });
   }
 };

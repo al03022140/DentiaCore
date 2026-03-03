@@ -1,4 +1,5 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const path = require('path');
 
 const options = {
   definition: {
@@ -29,7 +30,7 @@ const options = {
             documento: {
               type: 'object',
               properties: {
-                tipo: { type: 'string', enum: ['DNI', 'CE', 'PAS'] },
+                tipo: { type: 'string', enum: ['Licencia', 'Pasaporte', 'INE', 'Otro'] },
                 numero: { type: 'string' }
               }
             },
@@ -97,8 +98,8 @@ const options = {
     }]
   },
   apis: [
-    './routes/*.js',
-    './models/*.js'
+    path.join(__dirname, '..', 'routes', '*.js'),
+    path.join(__dirname, '..', 'models', '*.js')
   ]
 };
 

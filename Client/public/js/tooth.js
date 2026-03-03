@@ -464,7 +464,7 @@ Tooth.prototype.drawId = function (context) {
     context.beginPath();
     context.textAlign = 'center';
     context.fillStyle = "#000000";
-    context.font = "15px Arial Bold";
+    context.font = "500 15px Montserrat, Arial, sans-serif";
 
     var space = 40;
 

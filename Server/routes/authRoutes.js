@@ -45,4 +45,16 @@ router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 router.get('/me', authenticate, authController.me);
 
+// ── PIN y Modo Cortina (roles.MD §9.3) ────────────────────────
+router.post('/set-pin', authenticate, withValidation([
+  body('pin').isString().isLength({ min: 4, max: 4 }).matches(/^\d{4}$/).withMessage('PIN debe ser 4 dígitos')
+]), authController.setPin);
+
+router.post('/verify-pin', authenticate, withValidation([
+  body('pin').isString().isLength({ min: 4, max: 4 }).matches(/^\d{4}$/).withMessage('PIN debe ser 4 dígitos')
+]), authController.verifyPin);
+
+router.post('/lock-screen', authenticate, authController.lockScreen);
+router.post('/unlock-screen', authenticate, authController.unlockScreen);
+
 module.exports = router;

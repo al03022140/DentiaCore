@@ -1,10 +1,8 @@
 .patient-info-wrapper {
-  /* Variables locales para personalización */
+  /* Variables locales consumidas en este archivo */
   --patient-bg-color: var(--home-nextpatient-bg);
-  --patient-border-color: var(--home-nextpatient-border-color);
   --patient-text-color: var(--home-nextpatient-text-color);
   --patient-heading-color: var(--home-nextpatient-heading-color);
-  --patient-font-family: var(--home-nextpatient-font-family);
   --patient-border-radius: var(--home-nextpatient-border-radius);
   --patient-box-shadow: var(--home-nextpatient-box-shadow);
 }
@@ -21,7 +19,7 @@
   width: 100%;
   height: var(--home-nextpatient-height);
   box-sizing: border-box;
-  margin-top: var(--home-nextpatient-margin-top);
+  margin-top: 0;
   min-height: var(--home-nextpatient-min-height);
 }
 
@@ -75,25 +73,6 @@
 }
 
 @media (max-width: 992px) {
-  .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-992);
-    margin-top: var(--home-nextpatient-margin-top-1200);
-  }
-  .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-992);
-    height: var(--home-nextpatient-image-size-992);
-    margin-right: var(--home-nextpatient-image-margin-1200);
-  }
-  .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-1200);
-  }
-  .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-1200);
-    margin: 0.25rem 0;
-  }
-}
-
-@media (max-width: 768px) {
   .patient-info-wrapper .patient-info {
     padding: var(--home-nextpatient-padding-992);
     margin-top: var(--home-nextpatient-margin-top-1200);

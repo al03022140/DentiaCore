@@ -62,7 +62,10 @@ const entrySchema = new Schema({
 const historyEntrySchema = new Schema({
   datos:    { type: [entrySchema], required: true },
   imageUrl: { type: String, required: true }, // Cada snapshot de historial debe tener su imagen
-  savedAt:  { type: Date, default: () => new Date() }
+  savedAt:  { type: Date, default: () => new Date() },
+  deletedAt: { type: Date, default: null },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  deleteReason: { type: String, default: null }
 }); // _id: true es el comportamiento por defecto y es necesario para :snapshotId
 
 /**
@@ -128,7 +131,31 @@ const odontogramaSchema = new Schema({
     datos:    { type: [entrySchema], default: [] }, // Unificado a 'datos'
     savedAt:  { type: Date, default: () => new Date() }
   },
-  history: { type: [historyEntrySchema], default: [] }
+  history: { type: [historyEntrySchema], default: [] },
+
+  // ── Campos de auditoría y estado (roles.MD §4.7, §5) ────────────
+  estado: {
+    type: String,
+    enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
+    default: 'OFICIAL'
+  },
+  creadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  modificadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  modificadoEn: { type: Date, default: null },
+  firmadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  firmadoEn: { type: Date, default: null },
+  autorizadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  // Soft-delete (NOM-004 Art. 5.4)
+  deletedAt: { type: Date, default: null },
+  deletedBy: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  deleteReason: { type: String, default: null },
+  // Captura extemporánea (roles.MD §9.5)
+  capturaExtemporanea: {
+    esExtemporanea: { type: Boolean, default: false },
+    motivo: { type: String, default: null },
+    fechaNota: { type: Date, default: null },
+    fechaCaptura: { type: Date, default: null }
+  }
 }, {
   timestamps: true // Añade createdAt y updatedAt automáticamente
 });

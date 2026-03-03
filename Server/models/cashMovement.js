@@ -23,7 +23,7 @@ const cashMovementSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  // Campos opcionales para futuras implementaciones
+  // Campos opcionales
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient'
@@ -32,9 +32,16 @@ const cashMovementSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BoxSession'
   },
+  // Usuario que registró el movimiento
+  creadoPor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    default: null
+  },
+  // Campo legacy mantenido por compatibilidad
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Usuario'
   }
 }, {
   timestamps: true

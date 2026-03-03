@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Typography, Radio, Skeleton, Button } from 'antd';
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import { getMonthlyBalance } from '../../shared/services/cashService';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const CashDashboard = () => {
   const [balance, setBalance] = useState({ cash: 0, digital: 0, total: 0 });
@@ -59,9 +59,6 @@ const CashDashboard = () => {
           onClick={() => setIsVisible(!isVisible)}
         />
       }
-      style={{ height: '100%', background: 'transparent' }}
-      headStyle={{ borderBottom: '1px solid #f0f0f0', padding: 0 }}
-      bodyStyle={{ padding: '20px 0 0 0' }}
     >
       <div className="balance-display">
         {loading ? (

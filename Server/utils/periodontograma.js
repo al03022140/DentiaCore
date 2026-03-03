@@ -51,7 +51,7 @@ const activeSessionTimestamps = new Map();
  * Limpia archivos temporales o corruptos
  * @param {string} filePath - Ruta del archivo a limpiar
  */
-async function cleanupFile(filePath) {
+async function _cleanupFile(filePath) {
   try {
     await fs.unlink(filePath);
     console.log(`Archivo limpiado: ${filePath}`);
@@ -65,7 +65,7 @@ async function cleanupFile(filePath) {
  * @param {string} message - Mensaje de error
  * @param {Array} filesToClean - Archivos a limpiar
  */
-async function cleanupAndThrow(message, filesToClean = []) {
+async function _cleanupAndThrow(message, filesToClean = []) {
   console.error(`❌ [PeriodontogramUtils] ${message}`);
   
   // Limpiar archivos creados
@@ -178,7 +178,7 @@ async function getNextVersionNumber(patientId) {
       if (versionNumbers.length > 0) {
         nextVersion = Math.max(...versionNumbers) + 1;
       }
-    } catch (error) {
+    } catch (_error) {
       // El directorio no existe, empezar con versión 1
       console.log('📁 Directorio de versiones no existe, empezando con v001');
     }
@@ -201,7 +201,7 @@ async function getNextVersionNumber(patientId) {
  * @param {string} patientId - ID del paciente
  * @returns {Promise<Array>} Lista de versiones
  */
-async function getPeriodontogramVersions(patientId) {
+async function _getPeriodontogramVersions(patientId) {
   try {
     const versionsDir = path.join(__dirname, '..', getUnifiedPeriodontogramPath(patientId));
     
@@ -268,7 +268,7 @@ async function deletePeriodontogramVersion(patientId, versionNumber) {
     // Verificar que existe
     try {
       await fs.access(versionPath);
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`La versión ${versionNumber} no existe`);
     }
     
@@ -335,9 +335,11 @@ function cleanupInactiveSessions(maxAge = 60 * 60 * 1000) {
 }
 
 // Limpiar sesiones inactivas cada 30 minutos
-setInterval(() => {
+// .unref() permite que el proceso termine limpiamente sin esperar al intervalo
+const _cleanupInterval = setInterval(() => {
   cleanupInactiveSessions();
 }, 30 * 60 * 1000);
+_cleanupInterval.unref();
 
 
 // Eliminar exportación de getPeriodontogramVersions y addImageVersion del objeto module.exports

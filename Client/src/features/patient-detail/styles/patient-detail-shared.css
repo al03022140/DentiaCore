@@ -92,6 +92,7 @@
 .patient-detail__section li strong,
 .patient-detail__details p strong {
   color: var(--color-text-black);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
@@ -99,14 +100,14 @@
 .patient-detail__section li span,
 .patient-detail__details p span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Estilos para definition lists - etiquetas y valores */
 .patient-detail__section dd {
   margin: 0 0 var(--spacing-sm) 0;
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Los estilos para hábitos de higiene están cubiertos por los estilos generales de .patient-detail__section */

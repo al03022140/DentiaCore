@@ -58,25 +58,6 @@ export const getBleedingInterpretation = (percentage) => {
 // ============================================================================
 
 /**
- * NOTA: Las funciones calculateBleedingPercentage y calculatePlaquePercentage han sido
- * eliminadas para evitar duplicación. Usar UniversalToothValidator.calculateStatistics
- * que proporciona bleedingPercentage y plaquePercentage de forma centralizada.
- */
-
-// Función legacy mantenida solo para compatibilidad
-const calculatePlaquePercentageLegacy = (periodontogramData) => {
-  try {
-    // Lógica legacy removida - usar UniversalToothValidator.calculateStatistics
-    return 0;
-  } catch (error) {
-    console.error('Error al calcular porcentaje de placa (legacy):', error);
-    return 0;
-  }
-};
-
-// calculateOLearyIndex eliminada - usar UniversalToothValidator.calculateStatistics().plaquePercentage
-
-/**
  * Obtiene la interpretación clínica de la placa
  * @param {number} percentage - Porcentaje de placa
  * @returns {Object} Interpretación clínica

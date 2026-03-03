@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const router = express.Router();
 const cashController = require('../controllers/cashController');
+const { authorize } = require('../middlewares/authorize');
 
 // Helper de validación para responder 400 con detalles claros
 const withValidation = (rules) => [
@@ -18,10 +19,11 @@ const withValidation = (rules) => [
 	}
 ];
 
-router.get('/balance/monthly', cashController.getMonthlyBalance);
-router.get('/session/status', cashController.getSessionStatus);
+router.get('/balance/monthly', authorize(['cash.read']), cashController.getMonthlyBalance);
+router.get('/session/status', authorize(['cash.read']), cashController.getSessionStatus);
 router.post(
 	'/session/open',
+	authorize(['cash.manage']),
 	withValidation([
 		body('initialAmount')
 			.optional()
@@ -31,9 +33,10 @@ router.post(
 	]),
 	cashController.openBox
 );
-router.post('/session/close', cashController.closeBox);
+router.post('/session/close', authorize(['cash.manage']), cashController.closeBox);
 router.post(
 	'/movements',
+	authorize(['cash.manage']),
 	withValidation([
 		body('amount')
 			.exists().withMessage('El monto es obligatorio')
@@ -53,6 +56,6 @@ router.post(
 	]),
 	cashController.addMovement
 );
-router.get('/movements', cashController.getLastMovements);
+router.get('/movements', authorize(['cash.read']), cashController.getLastMovements);
 
 module.exports = router;

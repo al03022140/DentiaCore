@@ -1,15 +1,14 @@
 .statistics-page {
   display: grid;
   grid-template-columns: 74% 25%;
-  gap: 1rem;
-  /* Permitir que crezca y deje que el body haga scroll como otras vistas */
+  gap: 1.5rem;
   height: 100%;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
-  font: var(--text-body-default);
-  overflow: visible;
-  padding: 1.25rem;
+  font: var(--pd-font-base);
+  overflow: hidden;
+  padding: 0;
 }
 
 /* Asegurar que los contenedores internos puedan encoger correctamente */
@@ -32,30 +31,55 @@
   overflow: visible;
 }
 
+.statistics-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.statistics-tab {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 999px;
+  background: var(--color-neutral-250);
+  color: var(--color-text-secondary);
+  font: var(--pd-font-label-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.statistics-tab:hover {
+  background: var(--color-blue-500-08);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.statistics-tab--active {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  border-color: var(--color-primary);
+  box-shadow: 0 0.25rem 0.75rem var(--color-blue-500-25);
+}
+
 .statistics-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  /* Asegura que cada fila del grid distribuya el espacio disponible */
-  grid-auto-rows: 1fr;
-  gap: 1rem;
-  column-gap: 1rem;
-  flex: 0 0 auto;
+  gap: 1.5rem;
+  flex: 1 1 0;
   min-height: 0;
   align-content: stretch;
-  height: auto;
 }
 
 .chart-slot {
   background: var(--color-bg-white);
-  border-radius: 1rem;
-  border: 2px solid var(--color-border-light);
-  box-shadow: 0 0.125rem 0.25rem var(--color-black-10);
+  border-radius: var(--card-border-radius);
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
   display: flex;
   flex-direction: column;
   position: relative;
-  min-height: 33.7vh;
-  /* Usar flex para que el slot ocupe el espacio disponible sin forzar el alto del ancestro */
+  min-height: 0;
   flex: 1 1 0;
   transition: border 0.15s ease, box-shadow 0.15s ease;
   overflow: hidden;
@@ -86,7 +110,7 @@
 }
 
 .slot-placeholder__headline {
-  font: var(--text-label-strong);
+  font: var(--pd-font-section-body);
   color: var(--color-text-secondary);
 }
 
@@ -94,7 +118,8 @@
   display: flex;
   justify-content: space-between;
   gap: 0.35rem;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .chart-slot__header:focus-within {
@@ -105,15 +130,18 @@
 
 .chart-slot__title-block {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   position: relative;
   gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .chart-slot__title {
   margin: 0;
   color: var(--color-primary);
-  font: var(--text-caption);
+  font: var(--pd-font-label-md);
+  flex-basis: 100%;
 }
 
 .chart-slot__granularity {
@@ -125,7 +153,7 @@
   gap: 0.35rem;
   padding: 0.28rem 0.6rem;
   cursor: pointer;
-  font: var(--text-label-sm);
+  font: var(--pd-font-label-sm);
   color: var(--color-text-secondary);
 }
 
@@ -135,7 +163,7 @@
 }
 
 .chart-slot__caret {
-  font: var(--text-overline);
+  font: var(--pd-font-body-sm);
 }
 
 .chart-slot__granularity-menu {
@@ -166,7 +194,7 @@
   border-radius: 0.55rem;
   cursor: pointer;
   color: var(--color-text-secondary);
-  font: var(--text-label);
+  font: var(--pd-font-label-md);
 }
 
 .chart-slot__granularity-menu button[aria-selected="true"],
@@ -193,7 +221,7 @@
   background: var(--color-neutral-250);
   border-radius: 999px;
   padding: 0.3rem 0.8rem;
-  font: var(--text-caption-xs);
+  font: var(--pd-font-label-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -213,7 +241,7 @@
   height: 2rem;
   border-radius: 999px;
   cursor: pointer;
-  font: var(--text-label-lg);
+  font: var(--pd-font-section-body);
 }
 
 .chart-slot__remove:hover {
@@ -228,26 +256,12 @@
   min-height: 0;
 }
 
-.chart-slot__placeholder-chart {
-  width: 100%;
-  height: 100%;
-  border: 1px dashed var(--color-border-light);
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  font: var(--text-label-sm);
-  text-align: center;
-  padding: 1rem;
-}
-
 .chart-slot__loader {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
   color: var(--color-primary);
-  font: var(--text-label-strong);
+  font: var(--pd-font-section-body);
 }
 
 .chart-slot__state {
@@ -270,7 +284,7 @@
   color: var(--color-text-muted);
   text-align: center;
   margin-top: 0.75rem;
-  font: var(--text-caption-sm);
+  font: var(--pd-font-body-sm);
 }
 
 .chart-slot__status-text--error {
@@ -285,7 +299,7 @@
   background: var(--color-bg-white);
   color: var(--color-primary);
   cursor: pointer;
-  font: var(--text-label-strong);
+  font: var(--pd-font-section-body);
 }
 
 .chart-slot__retry:hover {
@@ -306,14 +320,14 @@
   display: flex;
   flex-direction: column;
   background: var(--color-bg-white);
-  border-radius: 1rem;
-  border: 2px solid var(--color-border-light);
-  box-shadow: 0 0.125rem 0.25rem var(--color-black-10);
+  border-radius: var(--card-border-radius);
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
   padding: 1.25rem;
   min-width: 0;
   min-height: 0;
   height: auto;
-  overflow: visible;
+  overflow-y: auto;
 }
 
 .metrics-panel__header h3 {
@@ -324,11 +338,11 @@
 .metrics-panel__header p {
   margin: 0.25rem 0 1rem;
   color: var(--color-text-muted);
-  font: var(--text-label-sm);
+  font: var(--pd-font-body-sm);
 }
 
 .metrics-panel__instructions {
-  font: var(--text-caption-xs);
+  font: var(--pd-font-body-sm);
   color: var(--color-text-muted);
   margin-bottom: 0.75rem;
 }
@@ -355,11 +369,6 @@
   gap: 0.75rem;
 }
 
-.metrics-card--selected {
-  border-color: var(--card-border-color);
-  box-shadow: var(--card-shadow);
-}
-
 .metrics-card:active {
   cursor: grabbing;
 }
@@ -373,7 +382,7 @@
 
 .metrics-card__header h4 {
   margin: 0;
-  font: var(--text-label-lg);
+  font: var(--pd-font-label-md);
   color: var(--color-text-primary);
 }
 
@@ -382,7 +391,7 @@
   color: var(--color-primary);
   border-radius: 999px;
   padding: 0.25rem 0.75rem;
-  font: var(--text-overline);
+  font: var(--pd-font-label-sm);
 }
 
 .metrics-card__temporalities,
@@ -396,7 +405,7 @@
   background: var(--color-bg-white);
   border-radius: 999px;
   padding: 0.3rem 0.75rem;
-  font: var(--text-caption-xs);
+  font: var(--pd-font-label-sm);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-blue-500-25);
 }
@@ -408,7 +417,7 @@
 
 .metrics-card__description {
   margin: 0;
-  font: var(--text-label-sm);
+  font: var(--pd-font-label-sm);
   color: var(--color-text-secondary);
 }
 

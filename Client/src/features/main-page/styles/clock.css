@@ -14,37 +14,13 @@
   box-sizing: border-box;
 }
 
-/* Ajustes responsivos */
-@media (max-width: 1200px) {
-  .clock { font: var(--home-clock-font); }
-}
-
-@media (max-width: 992px) {
-  .clock { font: var(--home-clock-font); }
-}
-
-@media (max-width: 768px) {
-  .clock { font: var(--home-clock-font); }
-}
-
+/* Ajustes responsivos - solo padding cambia, font se hereda del base */
 @media (max-width: 576px) {
-  .clock {
-    font: var(--home-clock-font);
-    padding: var(--home-clock-padding-576);
-  }
+  .clock { padding: var(--home-clock-padding-576); }
 }
-
 @media (max-width: 480px) {
-  .clock {
-    font: var(--home-clock-font);
-    padding: var(--home-clock-padding-480);
-  }
+  .clock { padding: var(--home-clock-padding-480); }
 }
-
-/* Ajustes para escala de 125% */
 @media (resolution: 125dpi) {
-  .clock {
-    font: var(--home-clock-font);
-    padding: var(--home-clock-padding-125dpi);
-  }
+  .clock { padding: var(--home-clock-padding-125dpi); }
 }

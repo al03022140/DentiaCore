@@ -1,9 +1,3 @@
-
-
-
-
-import React from 'react';
-
 const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange }) => {
   return (
     <section className="form-section">

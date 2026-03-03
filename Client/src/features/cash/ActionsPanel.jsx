@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Button, Modal, Form, Input, InputNumber, Radio, message } from 'antd';
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
@@ -63,9 +63,6 @@ const ActionsPanel = ({ onMovementAdded }) => {
     <Card 
       title="Acciones Operativas" 
       bordered={false}
-      style={{ height: '100%', background: 'transparent' }}
-      headStyle={{ borderBottom: '1px solid #f0f0f0', padding: 0 }}
-      bodyStyle={{ padding: '20px 0', height: 'calc(100% - 57px)' }}
       extra={<Button type="link" danger onClick={handleCloseBox}>Cerrar Caja</Button>}
     >
       <div className="actions-container">
@@ -73,8 +70,7 @@ const ActionsPanel = ({ onMovementAdded }) => {
           type="primary" 
           size="large" 
           icon={<PlusCircleOutlined />} 
-          className="action-button"
-          style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+          className="action-button action-button--income"
           onClick={() => showModal('INCOME')}
         >
           Ingresar
@@ -99,7 +95,7 @@ const ActionsPanel = ({ onMovementAdded }) => {
         confirmLoading={loading}
         okText="Registrar"
         cancelText="Cancelar"
-        okButtonProps={{ danger: actionType === 'EXPENSE', style: { backgroundColor: actionType === 'INCOME' ? '#52c41a' : undefined } }}
+        okButtonProps={{ danger: actionType === 'EXPENSE', className: actionType === 'INCOME' ? 'action-button--income' : '' }}
       >
         <Form form={form} layout="vertical">
           <Form.Item 

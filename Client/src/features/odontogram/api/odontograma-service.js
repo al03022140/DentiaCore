@@ -1,6 +1,4 @@
-import axios from 'axios';
-// import { toast } from 'react-toastify'; // Comentado si no se usa toast directamente aquí
-import API from '../../../shared/services/axios-instance.js'; // Asegurar la extensión .js
+import API from '../../../shared/services/axios-instance.js';
 
 // Configuración de timeouts
 const UPLOAD_TIMEOUT = 15000; // 15 segundos para subidas
@@ -58,14 +56,6 @@ const handleApiError = (error) => {
   
   throw new Error('Error al configurar la petición');
 };
-
-
-
-// Ya no necesitamos API_URL_BASE ni API_INSTANCE localmente
-// const API_URL_BASE = import.meta.env.VITE_API_URL || '/api';
-// const API_INSTANCE = axios.create({
-//   baseURL: API_URL_BASE,
-// });
 
 // Utilidad para desnormalizar payloads al backend
 function mapToBackend(entry) {
@@ -229,7 +219,7 @@ const odontogramaService = {
         { timeout: DEFAULT_TIMEOUT }
       );
       return {
-        exists: data.exists || true,
+        exists: data.exists ?? true,
         datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
         history: Array.isArray(data.history) ? data.history : []
       };

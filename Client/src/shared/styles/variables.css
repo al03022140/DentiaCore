@@ -340,14 +340,14 @@
   --text-fluid-pl-tooltip: var(--font-weight-normal) clamp(0.75rem, 0.9vw, 0.9rem) / 1.3 var(--font-family-primary);
 
   /* Tipografía: Patient detail */
-  --pd-font-body-lg: var(--font-weight-light) 1.2rem / 1.6 var(--font-family-primary);
-  --pd-font-body-md: var(--font-weight-light) 1.1rem / 1.6 var(--font-family-primary);
-  --pd-font-body-sm: var(--font-weight-light) 1rem / 1.5 var(--font-family-primary);
-  --pd-font-label-md: var(--font-weight-light) 1rem / 1.4 var(--font-family-primary);
-  --pd-font-label-sm: var(--font-weight-light) 0.95rem / 1.4 var(--font-family-primary);
-  --pd-font-title: var(--font-weight-normal) 3rem / 1.1 var(--font-family-primary);
+  --pd-font-body-lg: var(--font-weight-light) 1.3rem / 1.6 var(--font-family-primary);
+  --pd-font-body-md: var(--font-weight-light) 1.3rem / 1.6 var(--font-family-primary);
+  --pd-font-body-sm: var(--font-weight-light) 1.3rem / 1.5 var(--font-family-primary);
+  --pd-font-label-md: var(--font-weight-light) 1.1rem / 1.4 var(--font-family-primary);
+  --pd-font-label-sm: var(--font-weight-light) 1rem / 1.4 var(--font-family-primary);
+  --pd-font-title: var(--font-weight-normal) 4rem / 1.1 var(--font-family-primary);
   --pd-font-section-title: var(--font-weight-normal) 3.5rem / 1.2 var(--font-family-primary);
-  --pd-font-card-list: var(--font-weight-light) 1.1rem / 1.5 var(--font-family-primary);
+  --pd-font-card-list: var(--font-weight-light) 1.3rem / 1.5 var(--font-family-primary);
 
   --pd-font-base: var(--pd-font-body-lg);
   --pd-font-card-title: var(--pd-font-body-lg);
@@ -373,23 +373,23 @@
   --pd-font-definition-value: var(--pd-font-body-md);
 
   --pd-font-acceptance-body: var(--pd-font-body-sm);
-  --pd-font-acceptance-title: var(--font-weight-light) 24px / 1.2 var(--font-family-primary);
+  --pd-font-acceptance-title: var(--font-weight-light) 1.6rem / 1.2 var(--font-family-primary);
   --pd-font-odontograma-table-cell: var(--font-weight-light) 12px / 1.1 var(--font-family-primary);
 
-  --pd-font-section-title-main: var(--font-weight-normal) 2rem / 1.3 var(--font-family-primary);
+  --pd-font-section-title-main: var(--font-weight-normal) 2.2rem / 1.3 var(--font-family-primary);
   --pd-font-section-title: var(--pd-font-section-title-main);
   --pd-font-section-h2: var(--pd-font-section-title-main);
-  --pd-font-section-h3: var(--pd-font-section-title-main);
+  --pd-font-section-h3: var(--font-weight-normal) 1.8rem / 1.3 var(--font-family-primary);
   --pd-definition-term-weight: var(--font-weight-medium);
   --pd-definition-term-color: var(--color-text-black);
   --pd-definition-term-margin-bottom: var(--spacing-xs);
 
-  --pd-font-bilateral-title: var(--font-weight-normal) var(--font-size-md) / 1.3 var(--font-family-primary);
-  --pd-font-measurement: var(--font-weight-medium) var(--font-size-sm) / 1.2 var(--font-family-mono);
-  --pd-font-measurement-unit: var(--font-weight-normal) var(--font-size-xs) / 1.2 var(--font-family-mono);
-  --pd-font-classification: var(--font-weight-medium) var(--font-size-xs) / 1.2 var(--font-family-primary);
-  --pd-font-section-h2-size-sm: var(--font-size-lg);
-  --pd-font-section-h3-size-sm: var(--font-size-md);
+  --pd-font-bilateral-title: var(--font-weight-normal) 1.5rem / 1.3 var(--font-family-primary);
+  --pd-font-measurement: var(--font-weight-medium) 1.3rem / 1.2 var(--font-family-mono);
+  --pd-font-measurement-unit: var(--font-weight-normal) 1.1rem / 1.2 var(--font-family-mono);
+  --pd-font-classification: var(--font-weight-medium) 1rem / 1.2 var(--font-family-primary);
+  --pd-font-section-h2-size-sm: 1.8rem;
+  --pd-font-section-h3-size-sm: 1.5rem;
 
   /* Tipografía impresión */
   --text-print-hero: 800 38px / 1.1 var(--font-family-primary);

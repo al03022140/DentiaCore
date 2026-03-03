@@ -57,30 +57,16 @@ const PatientStats = () => {
         if (chartInstanceRef.current) {
             chartInstanceRef.current.destroy();
         }
-        // Crear un nuevo gráfico
+        // Crear un nuevo gráfico (responsive: true ya maneja el resize automáticamente)
         chartInstanceRef.current = new Chart(ctx, chartConfig);
 
-        // Función para redibujar el gráfico cuando el tamaño del contenedor cambia
-        const handleResize = () => {
-            if (chartInstanceRef.current) {
-                chartInstanceRef.current.resize();
-            }
-        };
-
-        // Forzar redimensionamiento al montar el componente
-        handleResize();
-
-        // Añadir un listener para el evento de redimensionamiento
-        window.addEventListener('resize', handleResize);
-
-        // Limpieza: destruir el gráfico al desmontar el componente y remover el listener
+        // Limpieza: destruir el gráfico al desmontar el componente
         return () => {
             if (chartInstanceRef.current) {
                 chartInstanceRef.current.destroy();
             }
-            window.removeEventListener('resize', handleResize);
         };
-    }, [chartConfig]); // Dependencia en `chartConfig`
+    }, [chartConfig]);
 
     return (
         <div className="patient-stats-container">

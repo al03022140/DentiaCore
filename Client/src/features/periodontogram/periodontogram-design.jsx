@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, memo, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, memo, useRef } from 'react';
 import { perfMonitor, withRenderCount } from './utils/perf-monitor';
 import PeriodontogramUtils from "./utils/periodontogram-utils";
 import { getToothNumberButtonProps } from './periodontograma-functions/index.js';
@@ -449,7 +449,7 @@ const PeriodontogramDesign = ({
       implant: (raw.implante ?? raw.implant ?? false),
       mobility: (raw.movilidad ?? raw.mobility ?? 0),
       gumWidth: (raw.anchuraEncia ?? raw.gumWidth ?? 0),
-      prognosis: (raw.pronostico ?? raw.prognosis ?? 'bueno')
+      prognosis: String(raw.pronostico ?? raw.prognosis ?? 'bueno').toLowerCase()
     };
     return normalized;
   }, [periodontogramData]);
@@ -1053,7 +1053,7 @@ const PeriodontogramDesign = ({
                     return;
                   }
                   const numValue = parseInt(inputValue);
-                  if (!isNaN(numValue) && numValue >= 0 && numValue <= 3) {
+                  if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
                     updateToothData(toothNumber, row.key, numValue);
                   }
                 }}
@@ -1065,7 +1065,7 @@ const PeriodontogramDesign = ({
                     updateToothData(toothNumber, row.key, 0);
                   } else {
                     const numValue = parseInt(inputValue);
-                    if (!isNaN(numValue) && numValue >= 0 && numValue <= 3) {
+                    if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
                       updateToothData(toothNumber, row.key, numValue);
                     }
                   }
@@ -1082,13 +1082,13 @@ const PeriodontogramDesign = ({
                   });
                 }}
                 onKeyDown={(e) => {
-                  const digitKeys = ['0','1','2','3'];
+                  const digitKeys = ['0','1','2','3','4','5','6','7','8','9'];
                   const utilityKeys = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight'];
                   const hasSelection = e.target.selectionStart !== e.target.selectionEnd;
 
                   if (digitKeys.includes(e.key)) {
                     // Permitir sobrescribir cuando todo el texto está seleccionado
-                    if (e.target.value.length >= 1 && !hasSelection) {
+                    if (e.target.value.length >= 2 && !hasSelection) {
                       e.preventDefault();
                     }
                     return;
@@ -1100,8 +1100,8 @@ const PeriodontogramDesign = ({
                 }}
                 disabled={isDisabled}
                 className={`mini-input ${isRedValue ? 'gum-width-red' : ''}`}
-                title="La anchura de la encía debe ser un número del 0-3. Si no pone nada, por defecto se pone en 0"
-                maxLength="1"
+                title="La anchura de la encía debe ser un número del 0-10mm. Si no pone nada, por defecto se pone en 0"
+                maxLength="2"
               />
             </div>
           );
@@ -1481,9 +1481,9 @@ const PeriodontogramDesign = ({
           </div>
         </div>
 
-        {/* 12 Filas Vestibular */}
+        {/* 12 Filas Vestibular (orden invertido para arco inferior) */}
         <div className="data-section vestibular-rows">
-              {vestibularRows.map((row, rowIndex) => (
+              {vestibularLowerRows.map((row, rowIndex) => (
             <div key={`lower-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (

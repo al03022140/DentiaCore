@@ -50,7 +50,7 @@
   line-height: 1.5;
   color: var(--color-text-black) !important;
   font: var(--pd-font-section-body);
-  font-weight: var(--font-weight-bold) !important;
+  font-weight: var(--font-weight-normal) !important;
 }
 
 .treatment-plan-date {
@@ -61,7 +61,7 @@
   color: var(--color-text-secondary);
   font: var(--pd-font-label-sm);
   font-style: italic;
-  font-weight: var(--font-weight-bold) !important;
+  font-weight: var(--font-weight-normal) !important;
 }
 
 /* Formulario para nuevo plan de tratamiento */
@@ -106,7 +106,7 @@
   background-color: var(--color-background-white);
   resize: vertical;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
 
 .treatment-plan-textarea:focus {
@@ -122,38 +122,9 @@
 }
 
 .treatment-plan-textarea::placeholder {
-  color: var(--color-text-placeholder);
   font-style: italic;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
   color: var(--color-text-light);
-}
-
-.treatment-plan-confirm-input {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-border-medium);
-  border-radius: 6px;
-  font: var(--pd-font-section-body);
-  color: var(--color-text-primary);
-  background-color: var(--color-background-white);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.treatment-plan-confirm-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-blue-500-10);
-}
-
-.treatment-plan-confirm-input:disabled {
-  background-color: var(--color-background-disabled);
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
-}
-
-.treatment-plan-confirm-input::placeholder {
-  color: var(--color-text-placeholder);
-  font-style: italic;
 }
 
 .save-button {

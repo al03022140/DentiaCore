@@ -1,8 +1,4 @@
-
-
-
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const Medic = ({ 
   formData, 
@@ -1154,15 +1150,15 @@ const Medic = ({
                           </label>
                         </div>
 
-                        {/* Arteroesclerosis */}
+                        {/* Arteriosclerosis */}
                         <div className="form-group">
                           <label>
                             <input
                               type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.arteroesclerosis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('arteroesclerosis', e.target.checked)}
+                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.arteriosclerosis || false}
+                              onChange={(e) => handleEnfermedadGraveChange('arteriosclerosis', e.target.checked)}
                             />
-                            Arteroesclerosis
+                            Arteriosclerosis
                           </label>
                         </div>
 

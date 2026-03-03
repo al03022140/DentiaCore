@@ -1,8 +1,3 @@
-
-
-
-import React from 'react';
-
 const Identification = ({ formData, handleNestedChange }) => {
   return (
     <section className="form-section">

@@ -23,8 +23,10 @@ const REGEX_PATTERNS = {
     // Solo letras y espacios (para nombres)
     SOLO_LETRAS: /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/,
     
-    // Números de diente válidos (1-32 para adultos, 51-85 para niños)
-    NUMERO_DIENTE: /^(([1-9]|[12][0-9]|3[0-2])|([5-8][1-9]|[5-8][0-5]))$/
+    // Números de diente válidos - Notación FDI:
+    // Permanentes: 11-18, 21-28, 31-38, 41-48
+    // Temporales: 51-55, 61-65, 71-75, 81-85
+    NUMERO_DIENTE: /^([1-4][1-8]|[5-8][1-5])$/
 };
 
 // Listas de valores válidos
@@ -125,7 +127,7 @@ const VALIDATORS = {
      */
     mexicanPhone: (phone) => {
         if (!phone) return true;
-        const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+        const cleanPhone = phone.replace(/[\s\-()]/g, '');
         return REGEX_PATTERNS.TELEFONO_MEXICANO.test(cleanPhone);
     },
     
@@ -179,7 +181,8 @@ const SANITIZERS = {
                 const entities = {
                     '<': '&lt;',
                     '>': '&gt;',
-                    '"': '&quot;',
+                    // eslint-disable-next-line quotes
+                    '"': "&quot;",
                     "'": '&#x27;',
                     '&': '&amp;'
                 };
@@ -219,13 +222,14 @@ const SANITIZERS = {
 };
 
 // Configuración de índices para optimización
+// NOTA: Estos índices deben coincidir con los paths reales del schema Patient
 const INDEXES = {
     // Índices simples
     SIMPLE: [
         { field: 'paciente_id', options: { unique: true } },
-        { field: 'informacion_personal.documento.numero', options: { sparse: true } },
-        { field: 'informacion_personal.email', options: { sparse: true } },
-        { field: 'informacion_personal.telefono', options: { sparse: true } },
+        { field: 'documento.numero', options: { sparse: true } },
+        { field: 'email', options: { sparse: true } },
+        { field: 'contacto.telefono', options: { sparse: true } },
         { field: 'createdAt', options: {} },
         { field: 'updatedAt', options: {} }
     ],
@@ -234,15 +238,15 @@ const INDEXES = {
     COMPOUND: [
         {
             fields: {
-                'informacion_personal.primer_nombre': 1,
-                'informacion_personal.apellido_paterno': 1
+                'primer_nombre': 1,
+                'apellido_paterno': 1
             },
             options: { name: 'nombre_completo_idx' }
         },
         {
             fields: {
-                'informacion_personal.fecha_nacimiento': 1,
-                'informacion_personal.genero': 1
+                'fecha_nacimiento': 1,
+                'sexo': 1
             },
             options: { name: 'demografia_idx' }
         }
@@ -252,9 +256,9 @@ const INDEXES = {
     TEXT: [
         {
             fields: {
-                'informacion_personal.primer_nombre': 'text',
-                'informacion_personal.apellido_paterno': 'text',
-                'informacion_personal.apellido_materno': 'text'
+                'primer_nombre': 'text',
+                'apellido_paterno': 'text',
+                'apellido_materno': 'text'
             },
             options: { name: 'busqueda_nombres_idx' }
         }

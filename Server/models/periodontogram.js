@@ -273,7 +273,7 @@ const PeriodontogramSchema = new mongoose.Schema({
       },
       createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Usuario'
       },
       lastModified: {
         type: Date,
@@ -281,7 +281,7 @@ const PeriodontogramSchema = new mongoose.Schema({
       },
       modifiedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Usuario'
       }
     },
     
@@ -431,6 +431,28 @@ const PeriodontogramSchema = new mongoose.Schema({
       min: 0.5,
       max: 2.0
     }
+  },
+
+  // ── Campos de auditoría y estado documental (roles.MD §5) ──────────
+  estadoRegistro: {
+    type: String,
+    enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
+    default: 'OFICIAL'
+  },
+  creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  modificadoEn: { type: Date, default: null },
+  firmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  firmadoEn: { type: Date, default: null },
+  autorizadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  deletedAt: { type: Date, default: null },
+  deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  deleteReason: { type: String, default: null },
+  capturaExtemporanea: {
+    esExtemporanea: { type: Boolean, default: false },
+    motivo: { type: String, default: null },
+    fechaNota: { type: Date, default: null },
+    fechaCaptura: { type: Date, default: null }
   }
 }, {
   timestamps: true,
@@ -481,7 +503,7 @@ PeriodontogramSchema.pre('save', function(next) {
 
 // Fábrica simplificada para crear periodontograma inicial
 PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
-  const emptyData = UniversalToothValidator ? UniversalToothValidator.getDefaultToothData() : {};
+  const _emptyData = UniversalToothValidator ? UniversalToothValidator.getDefaultToothData() : {};
   const emptyStatistics = computeCurrentStatistics(new Map());
   return this.create({
     patient: patientId,

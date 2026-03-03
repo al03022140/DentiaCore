@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Table, Modal, message, Tabs } from 'antd';
 import { prepareDataSource } from '../utils/odontogram-utils.js';
-import { formatDateToDDMMYYYY, getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
+import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
 import PropTypes from 'prop-types';
@@ -49,17 +49,6 @@ const getDamageNameFromIdInternal = (damageId, engineInstance) => {
     return result;
 };
 
-// Definición inicial de Props (se refinará después)
-// interface OdontogramClinicalSectionProps {
-//   patientId: string;
-//   clinicalData: any[]; // Estado actual del CANVAS
-//   onDelete: () => Promise<void>; // Callback para borrar canvas state
-//   onDataSave: (savedData: any[]) => void; // Callback para guardar canvas state
-
-//   areScriptsReady: boolean;
-//   API_URL: string;
-// }
-
 const OdontogramClinicalSection = ({ 
     patientId, 
     clinicalData = [], // Estado actual del CANVAS (snapshot)
@@ -73,9 +62,6 @@ const OdontogramClinicalSection = ({
     // ---> LOG PROP RECIBIDA <-----
     // console.log(`[OdontoClinical] Renderizando. Prop clinicalData (Canvas State) RECIBIDA (${Array.isArray(clinicalData) ? clinicalData.length : 'No Array'} items):`, clinicalData);
     // -----------------------------
-
-    // --- Refs ---
-    const isMounted = useRef(true); // Para evitar set state en unmounted component
 
     // --- Estados ---
     // Eliminados: canvasData, detectedDamages, observations, specifications, showAllTeeth, showSpinner
@@ -101,14 +87,6 @@ const OdontogramClinicalSection = ({
     }, []); // Dependencia de engineManagerRef.current.instance es implícita, pero useCallback lo memoizará sin ella.
            // Si se quiere re-memoizar cuando el engine cambia, se añadiría engineManagerRef.current.instance a las deps,
            // pero eso es más complejo con refs. Por ahora, se asume que el engine no cambia tan seguido como para necesitarlo.
-
-    // Efecto para manejar isMounted
-    useEffect(() => {
-        isMounted.current = true;
-        return () => {
-            isMounted.current = false;
-        };
-    }, []);
 
     // NUEVO: Función para cargar el historial clínico
     const loadClinicalHistory = useCallback(async () => {
@@ -136,36 +114,6 @@ const OdontogramClinicalSection = ({
     }, [loadClinicalHistory]);
 
     // --- Funciones ---
-
-    // Nueva función para manejar el borrado del estado clínico con confirmación
-    const handleDeleteRequest = useCallback(() => {
-        Modal.confirm({
-            title: 'Borrar estado actual del odontograma clínico',
-            content: 'Esta acción borrará el estado guardado del odontograma clínico actual. El historial de entradas no se verá afectado. Esta acción no se puede deshacer.',
-            okText: 'Sí, borrar estado',
-            cancelText: 'Cancelar',
-            onOk: async () => {
-                if (onDelete && typeof onDelete === 'function') {
-                    try {
-                        await onDelete(); // Llama a la prop pasada por el padre
-                        message.info("Estado clínico borrado del servidor.");
-                        // Limpiar datos locales del canvas y resetear el motor si está inicializado
-                        if (engineManagerRef.current.instance) {
-                            engineManagerRef.current.instance.reset(); // Resetea el canvas del motor
-                            engineManagerRef.current.instance.update(); // Refresca el canvas
-                            console.log("Engine (Clínico) reseteado después de borrar estado.");
-                        }
-                    } catch (error) {
-                        console.error("Error al ejecutar onDelete desde OdontogramClinicalSection:", error);
-                        message.error("Hubo un error al intentar borrar el estado clínico.");
-                    }
-                } else {
-                    console.error("La prop onDelete no es una función o no está definida.");
-                    message.error("Error interno: no se puede procesar la solicitud de borrado.");
-                }
-            }
-        });
-    }, [onDelete, patientId]); // Dependencia de onDelete y patientId
 
     // Función para guardar el estado actual del canvas clínico
     const triggerSave = useCallback(async () => {
@@ -253,12 +201,13 @@ const OdontogramClinicalSection = ({
         { title: 'Fecha', dataIndex: 'fecha', key: 'fecha', width: 60 },
     ];
 
-    // Función para obtener el nombre de la superficie (5 superficies básicas)
+    // Función para obtener el nombre de la superficie usando códigos de letra del engine
     const getSurfaceName = (surfaceValue) => {
         const surfaces = {
-            '1': 'Vestibular', '2': 'Lingual', '3': 'Mesial', '4': 'Distal', '5': 'Oclusal'
+            'V': 'Vestibular', 'M': 'Mesial', 'D': 'Distal', 'L': 'Lingual',
+            '0': 'Oclusal', 'O': 'Oclusal', 'P': 'Palatino'
         };
-        return surfaces[surfaceValue] || surfaceValue;
+        return surfaces[String(surfaceValue).toUpperCase()] || surfaceValue;
     };
 
     // Función para combinar daño con superficie

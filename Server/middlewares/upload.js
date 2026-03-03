@@ -1,5 +1,4 @@
 const multer = require('multer');
-const fs = require('fs-extra');
 const path = require('path');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 
@@ -10,6 +9,11 @@ const storage = multer.diskStorage({
 
         if (!patientId) {
             return cb(new Error("No se proporcionó `paciente_id` en la solicitud"));
+        }
+
+        // Validar que patientId sea un ObjectId válido para prevenir path traversal
+        if (!/^[a-f\d]{24}$/i.test(patientId)) {
+            return cb(new Error("ID de paciente inválido"));
         }
 
         // 📂 Crear carpeta dinámica para el paciente

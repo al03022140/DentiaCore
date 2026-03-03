@@ -1,5 +1,3 @@
-import React from 'react';
-
 const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
   return (
     <section className="form-section">

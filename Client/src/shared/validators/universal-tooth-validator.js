@@ -866,7 +866,7 @@ export class UniversalToothValidator {
         margenGingival: [0, 0, 0],
         profundidadSondaje: [0, 0, 0]
       },
-      palatino: {
+      palatinoSuperior: {
         placa: [0, 0, 0],
         sangrado: [0, 0, 0],
         supuracion: [0, 0, 0],
@@ -880,7 +880,7 @@ export class UniversalToothValidator {
         margenGingival: [0, 0, 0],
         profundidadSondaje: [0, 0, 0]
       },
-      lingual: {
+      lingualInferior: {
         placa: [0, 0, 0],
         sangrado: [0, 0, 0],
         supuracion: [0, 0, 0],
@@ -1318,7 +1318,7 @@ export const UNIFIED_TOOTH_SCHEMA = {
       profundidadSondaje: [0, 0, 0]
     }
   },
-  palatino: {
+  palatinoSuperior: {
     type: 'object',
     properties: {
       placa: { 
@@ -1412,7 +1412,7 @@ export const UNIFIED_TOOTH_SCHEMA = {
       profundidadSondaje: [0, 0, 0]
     }
   },
-  lingual: {
+  lingualInferior: {
     type: 'object',
     properties: {
       placa: { 

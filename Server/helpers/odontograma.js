@@ -41,7 +41,7 @@ class UnsupportedMediaTypeError extends Error {
 async function cleanupAndThrow(filePath, error) {
   try {
     await fs.remove(filePath);
-  } catch (cleanupErr) {
+  } catch (_cleanupErr) {
     // Error limpiando archivo temporal
   }
   throw error;

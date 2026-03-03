@@ -78,7 +78,7 @@ function parseVersionFolderDate(name) {
     // Formato compacto: YYYYMMDDHHmmss (14 dígitos)
     const m2 = name.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
     if (m2) {
-      const [_, yyyy, mm, dd, HH, MM, SS] = m2;
+      const [, yyyy, mm, dd, HH, MM, SS] = m2;
       const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(HH), Number(MM), Number(SS));
       return d.getTime();
     }

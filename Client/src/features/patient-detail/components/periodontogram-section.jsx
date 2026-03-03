@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ADVANCED_LOGGING_CONFIG } from '../../periodontogram/utils/config.js';
 import PeriodontogramDesign from '../../periodontogram/periodontogram-design';
 import StatisticsPanel from '../../periodontogram/statistics-panel';
@@ -257,13 +257,27 @@ const PeriodontogramSection = ({ patientId }) => {
       // Verificar si existe periodontograma guardado
       const exists = orderedVersions.length > 0;
       
-      // SIEMPRE empezar con periodontograma limpio en modo edición
-      // No cargar datos guardados automáticamente
-      setPeriodontogramData(createEmptyPeriodontogram());
       setPeriodontogramExists(exists);
       setVersionList(orderedVersions);
-      setSelectedVersion(null); // No seleccionar ninguna versión por defecto
       setPreviousData(null);
+
+      // Si hay versiones guardadas, cargar automáticamente la más reciente
+      if (exists && orderedVersions.length > 0) {
+        try {
+          const latestVersion = orderedVersions[0];
+          const backendData = await PeriodontogramService.getData(patientId, latestVersion);
+          const normalizedData = convertBackendDataToFrontend(backendData);
+          setPeriodontogramData(normalizedData);
+          setSelectedVersion(latestVersion);
+        } catch (loadErr) {
+          console.warn('No se pudo cargar la última versión, iniciando vacío:', loadErr);
+          setPeriodontogramData(createEmptyPeriodontogram());
+          setSelectedVersion(null);
+        }
+      } else {
+        setPeriodontogramData(createEmptyPeriodontogram());
+        setSelectedVersion(null);
+      }
 
       if (typeof UniversalToothValidator.invalidateCache === 'function') {
         UniversalToothValidator.invalidateCache();
@@ -277,7 +291,7 @@ const PeriodontogramSection = ({ patientId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [patientId, sortVersionsDesc, createEmptyPeriodontogram, handleError]);
+  }, [patientId, sortVersionsDesc, createEmptyPeriodontogram, handleError, convertBackendDataToFrontend]);
 
   useEffect(() => {
     loadPeriodontogram();
@@ -616,9 +630,9 @@ const PeriodontogramSection = ({ patientId }) => {
           gumWidthLimits.default ?? 0
         );
 
-        // pronóstico: aceptar UI "prognosis" o "pronostico" y capitalizar primera letra
+        // pronóstico: aceptar UI "prognosis" o "pronostico", normalizar a minúsculas
         const rawPron = toothData?.pronostico ?? toothData?.prognosis;
-        const pronostico = rawPron ? (String(rawPron).charAt(0).toUpperCase() + String(rawPron).slice(1)) : 'Bueno';
+        const pronostico = rawPron ? String(rawPron).toLowerCase() : 'bueno';
 
         // ausente/implante
         const ausente = Boolean(toothData?.ausente ?? toothData?.absent ?? false);
@@ -696,7 +710,7 @@ const PeriodontogramSection = ({ patientId }) => {
       };
       
       const saveResponse = await PeriodontogramService.saveData(patientId, payload);
-      const nextVersionName = saveResponse?.versionName ?? payload.versionName;
+      const nextVersionName = saveResponse?.versionName ?? saveResponse?.version ?? payload.versionName;
       setPeriodontogramExists(true);
       setPeriodontogramData((prev) => {
         if (!prev) return prev;

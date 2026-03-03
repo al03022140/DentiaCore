@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import "../styles/next-patient.css";
-import userNot from '../../../assets/images/avatars/UserNot.png'; // Imagen por defecto
-
-const API_URL = import.meta.env.VITE_API_URL;
+import userNot from '../../../assets/images/avatars/UserNot.png';
+import API from '../../../shared/services/axios-instance';
 
 const NextPatient = () => {
   const [nextPatient, setNextPatient] = useState(null);
@@ -10,14 +9,12 @@ const NextPatient = () => {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/patients`);
-        const data = await response.json();
+        const { data } = await API.get('/patients');
         const now = new Date();
 
         // Verificar que data tenga la estructura esperada
         const patients = data.patients || data;
         if (!Array.isArray(patients)) {
-          console.warn('Los datos recibidos no contienen un array de pacientes:', data);
           setNextPatient(null);
           return;
         }
@@ -29,7 +26,7 @@ const NextPatient = () => {
 
         setNextPatient(upcomingPatient || null);
       } catch (error) {
-        console.error('❌ Error al obtener los pacientes:', error);
+        console.error('Error al obtener los pacientes:', error);
       }
     };
 

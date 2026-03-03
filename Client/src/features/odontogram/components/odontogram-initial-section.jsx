@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Button, Table, Modal, message, Input } from 'antd';
 // Use dynamic import for odontograma service to enable better code-splitting
 import { prepareDataSource, arrayContainsElement } from '../utils/odontogram-utils.js';
-import { formatDateToDDMMYYYY, getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
+import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
 // Asumiremos que los estilos relevantes están en PatientDetail.css por ahora
 // import '../../Styles/PatientDetail.css'; 
 
@@ -283,7 +283,6 @@ const OdontogramInitialSection = ({
 }) => {
 
     // --- Refs ---
-    const imageLoadAttemptsRef = useRef(0); 
     // Consolidar refs del motor
     const engineManagerRef = useRef({
         instance: null,
@@ -304,13 +303,8 @@ const OdontogramInitialSection = ({
     const [isInitializing, setIsInitializing] = useState(false); 
     const [showAllTeeth, setShowAllTeeth] = useState(false);
     const [detectedDamages, setDetectedDamages] = useState([]);
-    const [advertencias, setAdvertencias] = useState([]);
-    const [verificacionDetalle, setVerificacionDetalle] = useState(null);
-    const [mostrarDetalleVerificacion, setMostrarDetalleVerificacion] = useState(false);
     // Estado único para el flujo inicial
     const [estadoInicial, setEstadoInicial] = useState(ESTADOS.CARGANDO);
-    const [tries, setTries] = useState(0);
-    const MAX_TRIES = 5;
     
     // Estados para el modal de confirmación
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -1083,10 +1077,8 @@ const OdontogramInitialSection = ({
     useEffect(() => {
         setCurrentImageUrl(initialImageUrl ? formatImageUrl(initialImageUrl) : '');
         setInitialImageLoadFailed(false);
-        imageLoadAttemptsRef.current = 0;
         // Resetear flag de inicialización cuando cambia la URL de imagen
         didInitRef.current = false;
-        console.log("🔄 Reseteando estado por cambio en initialImageUrl");
     }, [initialImageUrl, formatImageUrl]);
     
     // Efecto adicional para manejar recargas de página
@@ -1324,12 +1316,13 @@ const OdontogramInitialSection = ({
         };
     }, [areScriptsReady, patientId, initialTableData, formatImageUrl, initialImageLoadFailed, showInitialOdontogramImage]);
 
-    // Función para obtener el nombre de la superficie (5 superficies básicas)
+    // Función para obtener el nombre de la superficie usando códigos de letra del engine
       const getSurfaceName = (surfaceValue) => {
           const surfaces = {
-              '1': 'Vestibular', '2': 'Lingual', '3': 'Mesial', '4': 'Distal', '5': 'Oclusal'
+              'V': 'Vestibular', 'M': 'Mesial', 'D': 'Distal', 'L': 'Lingual',
+              '0': 'Oclusal', 'O': 'Oclusal', 'P': 'Palatino'
           };
-          return surfaces[surfaceValue] || surfaceValue;
+          return surfaces[String(surfaceValue).toUpperCase()] || surfaceValue;
       };
 
     // Función para combinar daño con superficie
@@ -1373,12 +1366,10 @@ const OdontogramInitialSection = ({
       console.log('🔄 [OdontogramInitialSection] Reseteando estado por cambio de patientId:', patientId);
       setInitialImageLoadFailed(false);
       if (setShowInitialOdontogramImage) {
-          console.log('🔄 [OdontogramInitialSection] Reseteando showInitialOdontogramImage a false');
           setShowInitialOdontogramImage(false);
       }
       setCurrentImageUrl('');
       setInitialOdontogramData([]);
-      setTries(0);
     }, [patientId, setShowInitialOdontogramImage]);
 
     // Removemos los useEffect de monitoreo para evitar renders innecesarios

@@ -1,18 +1,17 @@
 const Exam = require('../models/exam.js');
 const Patient = require('../models/patient.js');
 const Doctor = require('../models/users.js'); // Suponiendo que los doctores están en el modelo 'users'
+const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
 
 // 📌 Obtener todos los exámenes
 exports.getAllExams = async (req, res) => {
     try {
-        console.log("📡 Solicitando todos los exámenes...");
-        const exams = await Exam.find().populate('paciente_id', 'nombre apellido_paterno apellido_materno')
+        const exams = await Exam.find({ deletedAt: null }).populate('paciente_id', 'primer_nombre apellido_paterno apellido_materno')
                                        .populate('doctor_id', 'nombre email');
-        if (!exams.length) console.log("⚠️ No hay exámenes en la base de datos.");
+        if (!exams.length) return res.status(200).json([]);
         res.status(200).json(exams);
-    } catch (error) {
-        console.error("❌ Error al obtener los exámenes:", error);
-        res.status(500).json({ message: 'Error al obtener los exámenes', error });
+    } catch (_error) {
+        res.status(500).json({ message: 'Error al obtener los exámenes' });
     }
 };
 
@@ -20,15 +19,14 @@ exports.getAllExams = async (req, res) => {
 exports.getExamById = async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id)
-            .populate('paciente_id', 'nombre apellido_paterno apellido_materno')
+            .populate('paciente_id', 'primer_nombre apellido_paterno apellido_materno')
             .populate('doctor_id', 'nombre email');
         
-        if (!exam) return res.status(404).json({ message: 'Examen no encontrado' });
+        if (!exam || exam.deletedAt) return res.status(404).json({ message: 'Examen no encontrado' });
 
         res.status(200).json(exam);
-    } catch (error) {
-        console.error("❌ Error al obtener el examen:", error);
-        res.status(500).json({ message: 'Error al obtener el examen', error });
+    } catch (_error) {
+        res.status(500).json({ message: 'Error al obtener el examen' });
     }
 };
 
@@ -37,10 +35,8 @@ exports.getExamsByPatient = async (req, res) => {
     try {
         const { paciente_id } = req.params;
 
-        console.log(`📡 Buscando exámenes del paciente con ID: ${paciente_id}`);
-
         // Buscar exámenes con el paciente_id y poblar información del doctor
-        const exams = await Exam.find({ paciente_id })
+        const exams = await Exam.find({ paciente_id, deletedAt: null })
             .populate('doctor_id', 'nombre email');
 
         if (!exams.length) {
@@ -48,9 +44,8 @@ exports.getExamsByPatient = async (req, res) => {
         }
 
         res.status(200).json(exams);
-    } catch (error) {
-        console.error("❌ Error al obtener los exámenes del paciente:", error);
-        res.status(500).json({ message: 'Error al obtener los exámenes', error });
+    } catch (_error) {
+        res.status(500).json({ message: 'Error al obtener los exámenes' });
     }
 };
 
@@ -58,7 +53,6 @@ exports.getExamsByPatient = async (req, res) => {
 // 📌 Crear un nuevo examen
 exports.createExam = async (req, res) => {
     try {
-        console.log("📥 Recibiendo datos para crear un examen:", req.body);
 
         // Verificar si el paciente y el doctor existen antes de crear el examen
         const paciente = await Patient.findById(req.body.paciente_id);
@@ -67,8 +61,31 @@ exports.createExam = async (req, res) => {
         const doctor = await Doctor.findById(req.body.doctor_id);
         if (!doctor) return res.status(404).json({ message: "Doctor no encontrado" });
 
-        // Crear y guardar el examen
-        const newExam = new Exam(req.body);
+        // Determinar estadoRegistro según permisos del usuario (asistente → BORRADOR)
+        const userPerms = getEffectivePermissions(req.user);
+        let estadoRegistro = 'OFICIAL';
+        if (!hasPermission(userPerms, ['exams.create']) && hasPermission(userPerms, ['exams.write.draft'])) {
+            estadoRegistro = 'BORRADOR';
+        }
+
+        // Crear y guardar el examen (whitelist para prevenir inyección de deletedAt, modificadoPor, etc.)
+        const { paciente_id, doctor_id, tipo_examen, observaciones, archivo, tipo_archivo } = req.body;
+        const newExam = new Exam({
+            paciente_id,
+            doctor_id,
+            tipo_examen,
+            observaciones,
+            archivo,
+            tipo_archivo,
+            creadoPor: req.user?.id || null,
+            estadoRegistro
+        });
+
+        // Inyectar captura extemporánea si fue detectada por el middleware
+        if (req.body._capturaExtemporanea) {
+            newExam.capturaExtemporanea = req.body._capturaExtemporanea;
+        }
+
         await newExam.save();
 
         res.status(201).json({
@@ -77,19 +94,20 @@ exports.createExam = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Error al crear el examen:", error);
-        res.status(400).json({ message: "Error al crear el examen", error });
+        if (error.name === 'ValidationError' || error.name === 'CastError') {
+            return res.status(400).json({ message: 'Error al crear el examen', error: error.message });
+        }
+        res.status(500).json({ message: 'Error interno al crear el examen' });
     }
 };
 
 // 📌 Actualizar un examen por ID
 exports.updateExam = async (req, res) => {
     try {
-        console.log("🔄 Actualizando examen:", req.body);
 
-        // Verificar si el examen existe
+        // Verificar si el examen existe y no está eliminado
         let exam = await Exam.findById(req.params.id);
-        if (!exam) return res.status(404).json({ message: "Examen no encontrado" });
+        if (!exam || exam.deletedAt) return res.status(404).json({ message: "Examen no encontrado" });
 
         // Verificar si el paciente o doctor han sido modificados y existen
         if (req.body.paciente_id) {
@@ -102,10 +120,22 @@ exports.updateExam = async (req, res) => {
             if (!doctor) return res.status(404).json({ message: "Doctor no encontrado" });
         }
 
+        // Whitelist de campos permitidos para evitar inyección de campos internos
+        const { paciente_id, doctor_id, tipo_examen, estado, observaciones, fecha_resultado, archivo, tipo_archivo } = req.body;
+        const allowedFields = {};
+        if (paciente_id !== undefined) allowedFields.paciente_id = paciente_id;
+        if (doctor_id !== undefined) allowedFields.doctor_id = doctor_id;
+        if (tipo_examen !== undefined) allowedFields.tipo_examen = tipo_examen;
+        if (estado !== undefined) allowedFields.estado = estado;
+        if (observaciones !== undefined) allowedFields.observaciones = observaciones;
+        if (fecha_resultado !== undefined) allowedFields.fecha_resultado = fecha_resultado;
+        if (archivo !== undefined) allowedFields.archivo = archivo;
+        if (tipo_archivo !== undefined) allowedFields.tipo_archivo = tipo_archivo;
+
         // Actualizar el examen
         exam = await Exam.findByIdAndUpdate(
             req.params.id,
-            { $set: req.body },
+            { $set: { ...allowedFields, modificadoPor: req.user?.id || null, modificadoEn: new Date() } },
             { new: true, runValidators: true }
         );
 
@@ -115,20 +145,26 @@ exports.updateExam = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Error al actualizar el examen:", error);
-        res.status(400).json({ message: "Error al actualizar el examen", error });
+        if (error.name === 'ValidationError' || error.name === 'CastError') {
+            return res.status(400).json({ message: 'Error al actualizar el examen', error: error.message });
+        }
+        res.status(500).json({ message: 'Error interno al actualizar el examen' });
     }
 };
 
-// 📌 Eliminar un examen
+// 📌 Eliminar un examen (soft delete)
 exports.deleteExam = async (req, res) => {
     try {
-        const deletedExam = await Exam.findByIdAndDelete(req.params.id);
-        if (!deletedExam) return res.status(404).json({ message: 'Examen no encontrado' });
+        const exam = await Exam.findById(req.params.id);
+        if (!exam) return res.status(404).json({ message: 'Examen no encontrado' });
+
+        exam.deletedAt = new Date();
+        exam.deletedBy = req.user?.id || null;
+        exam.deleteReason = req.body?.motivo || 'Eliminado por usuario';
+        await exam.save();
 
         res.status(200).json({ message: 'Examen eliminado correctamente' });
-    } catch (error) {
-        console.error("❌ Error al eliminar el examen:", error);
-        res.status(500).json({ message: 'Error al eliminar el examen', error });
+    } catch (_error) {
+        res.status(500).json({ message: 'Error al eliminar el examen' });
     }
 };

@@ -59,11 +59,11 @@
 }
 
 .patient-detail__photo img {
-  width: 130px;
-  height: 130px;
+  width: 8rem;
+  height: 8rem;
   border-radius: var(--border-radius-circle);
   object-fit: cover;
-  border: 2px solid var(--color-border-medium);
+  border: var(--card-border-width) solid var(--color-border-medium);
   margin-right: var(--spacing-xxl);
 }
 
@@ -148,7 +148,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-sm);
 }
 
 
@@ -156,7 +156,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
   width: 100%;
 }
 
@@ -167,20 +167,20 @@
 .periodontogram-header-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   align-items: center;
   justify-content: flex-start;
 }
 
 .periodontogram-select {
-  padding: 0.5rem 1rem;
-  border: 2px solid var(--color-primary);
-  border-radius: 5px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: var(--card-border-width) solid var(--color-primary);
+  border-radius: var(--border-radius-md);
   font: var(--pd-font-select);
   color: var(--color-primary);
   background-color: var(--color-bg-white);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  min-width: 220px;
+  transition: border-color var(--transition-medium), box-shadow var(--transition-medium);
+  min-width: 13.75rem;
 }
 
 .periodontogram-select:focus {
@@ -194,20 +194,20 @@
 }
 
 .odontogram-save-button {
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-md);
 }
 
 .odontograma-status {
   display: flex;
   align-items: center;
-  margin-left: 20px;
+  margin-left: var(--spacing-xl);
 }
 
 /* Estilos para el contenedor de odontograma y tabla */
 .odontograma-container {
   display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
 }
 
 .odontograma-image-container,
@@ -217,11 +217,11 @@
 
 .odontograma-table {
   flex: 1;
-  min-width: 300px;
+  min-width: 18.75rem;
 }
 
 .odontograma-table h3 {
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-sm);
   color: var(--color-neutral-1100);
   font: var(--pd-font-odontograma-table-title);
 }
@@ -229,7 +229,7 @@
 /* Odontograma layout styles */
 .odontograma-flex-container {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-sm);
   align-items: flex-start;
 }
 
@@ -240,7 +240,7 @@
 
 .odontograma-image {
   max-width: 100%;
-  border: 1px solid var(--color-border-medium);
+  border: var(--border-radius-sm) solid var(--color-border-medium);
 }
 
 .odontograma-canvas-container {
@@ -249,18 +249,18 @@
 }
 
 .odontograma-canvas {
-  border: 1px solid var(--color-border-medium);
+  border: var(--border-radius-sm) solid var(--color-border-medium);
   max-width: 100%;
 }
 
 .odontograma-table-container {
-  width: 290px !important;
+  width: 18rem !important;
   flex-shrink: 0;
-  height: 690px;
+  height: 43rem;
   overflow-y: hidden;
   overflow-x: hidden;
-  border: 1px solid var(--color-neutral-175);
-  padding: 5px;
+  border: var(--border-radius-sm) solid var(--color-neutral-175);
+  padding: var(--spacing-xs);
   background-color: var(--color-bg-light);
   padding-left: 0%;
   padding-right: 0%;
@@ -282,7 +282,7 @@
 /* Make table cells more compact */
 .odontograma-table th,
 .odontograma-table td {
-  padding: 4px !important;
+  padding: var(--spacing-xs) !important;
   font: var(--pd-font-odontograma-table-cell) !important;
   white-space: nowrap;
   overflow: hidden;
@@ -368,7 +368,7 @@
 /* Estilos para el botón de imprimir */
 .patient-detail__actions {
   display: flex;
-  gap: 15px;
+  gap: var(--spacing-lg);
   align-items: center;
   position: relative;
 }
@@ -383,15 +383,15 @@
   background-color: var(--color-green-700);
   color: var(--color-bg-white);
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
-  transition: background-color 0.3s;
+  transition: background-color var(--transition-medium);
   order: -1;
   white-space: nowrap;
   min-width: max-content;
-  min-height: 39px;
+  min-height: 2.4rem;
 }
 
 .Boton_Imprimir:hover {
@@ -402,11 +402,11 @@
   background-color: var(--color-blue-400);
   color: var(--color-bg-white);
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
-  transition: background-color 0.3s;
+  transition: background-color var(--transition-medium);
   order: -1;
 }
 
@@ -419,8 +419,8 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
-  padding: 16px 0;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) 0;
 }
 
 /* Botón de eliminar paciente con estilo equivalente al de imprimir (rojo), no fijo */
@@ -428,14 +428,14 @@
   background-color: var(--color-red-550);
   color: var(--color-bg-white);
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
-  transition: background-color 0.3s;
+  transition: background-color var(--transition-medium);
   white-space: nowrap;
   min-width: max-content;
-  min-height: 39px;
+  min-height: 2.4rem;
 }
 
 .Boton_Eliminar:hover {
@@ -446,28 +446,28 @@
 .patient-acceptance-section {
   display: none;
   page-break-before: always;
-  margin-top: 50px;
-  padding: 30px;
-  border-top: 2px solid var(--color-neutral-1100);
+  margin-top: 3rem;
+  padding: var(--spacing-xxl);
+  border-top: var(--card-border-width) solid var(--color-neutral-1100);
 }
 
 .acceptance-content h2 {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: var(--spacing-xxl);
   font: var(--pd-font-acceptance-title);
   color: var(--color-neutral-1100);
 }
 
 .acceptance-content p {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-xl);
   font: var(--pd-font-acceptance-body);
 }
 
 .signatures-container {
   display: flex;
   justify-content: space-between;
-  margin-top: 80px;
-  gap: 50px;
+  margin-top: 5rem;
+  gap: 3rem;
 }
 
 .signature-block {
@@ -476,14 +476,14 @@
 }
 
 .signature-line {
-  border-bottom: 2px solid var(--color-neutral-1100);
-  margin-bottom: 10px;
-  height: 50px;
+  border-bottom: var(--card-border-width) solid var(--color-neutral-1100);
+  margin-bottom: var(--spacing-sm);
+  height: 3rem;
 }
 
 .signature-label {
   font: var(--pd-font-signature-label);
-  margin-bottom: 5px;
+  margin-bottom: var(--spacing-xs);
 }
 
 .signature-title {
@@ -539,7 +539,7 @@
    }
 
    .patient-detail__content {
-     padding: 15px !important;
+     padding: var(--spacing-lg) !important;
      margin: 0 !important;
      width: 100% !important;
      max-width: none !important;
@@ -558,19 +558,19 @@
   /* Ajustar secciones para impresión */
    .patient-detail__section {
      page-break-inside: avoid;
-     margin-bottom: 15px !important;
-     padding: 15px !important;
+     margin-bottom: var(--spacing-lg) !important;
+     padding: var(--spacing-lg) !important;
      box-shadow: none !important;
-    border: 1px solid var(--color-border-dark) !important;
+    border: var(--border-radius-sm) solid var(--color-border-dark) !important;
      width: 100% !important;
      box-sizing: border-box !important;
    }
 
    /* Ajustar información del paciente */
    .patient-detail__info {
-     border-bottom: 2px solid var(--color-neutral-1100) !important;
-     margin-bottom: 20px !important;
-     padding-bottom: 15px !important;
+     border-bottom: var(--card-border-width) solid var(--color-neutral-1100) !important;
+     margin-bottom: var(--spacing-xl) !important;
+     padding-bottom: var(--spacing-lg) !important;
      width: 100% !important;
      display: flex !important;
      flex-wrap: wrap !important;
@@ -578,7 +578,7 @@
 
    .patient-detail__photo {
      flex-shrink: 0 !important;
-     margin-right: 20px !important;
+     margin-right: var(--spacing-xl) !important;
    }
 
    .patient-detail__details {
@@ -592,22 +592,22 @@
 
   /* Ajustar foto del paciente */
   .patient-detail__photo img {
-    width: 100px !important;
-    height: 100px !important;
+    width: 6.25rem !important;
+    height: 6.25rem !important;
   }
 
   /* Ajustar títulos */
    .patient-detail__section h2 {
      color: var(--color-text-black) !important;
      font: var(--text-print-title) !important;
-     margin-bottom: 12px !important;
-     margin-top: 8px !important;
+     margin-bottom: var(--spacing-md) !important;
+     margin-top: var(--spacing-sm) !important;
    }
 
    .patient-detail__section h3 {
      color: var(--color-neutral-1100) !important;
      font: var(--text-print-subtitle) !important;
-     margin-bottom: 8px !important;
+     margin-bottom: var(--spacing-sm) !important;
    }
 
    /* Ajustar texto */
@@ -617,19 +617,19 @@
      color: var(--color-text-black) !important;
      font: var(--text-print-body) !important;
      line-height: 1.3 !important;
-     margin-bottom: 4px !important;
+     margin-bottom: var(--spacing-xs) !important;
    }
 
    /* Ajustar información del header del paciente */
    .patient-detail__details h1 {
      font: var(--text-print-hero) !important;
-     margin-bottom: 16px !important;
+     margin-bottom: var(--spacing-lg) !important;
     color: var(--color-text-black) !important;
      letter-spacing: 1px !important;
    }
 
    .patient-detail__details p {
-     margin: 6px 0 !important;
+     margin: var(--spacing-xs) 0 !important;
      font: var(--text-data-sm) !important;
      letter-spacing: 0.5px !important;
    }
@@ -644,7 +644,7 @@
    .patient-detail__content {
      display: flex !important;
      flex-direction: row !important;
-     gap: 1px !important;
+     gap: var(--border-radius-sm) !important;
      align-items: flex-start !important;
      justify-content: flex-start !important;
      width: 100vw !important;
@@ -693,8 +693,8 @@
 
    .patient-detail__section dl > div {
      width: 100% !important;
-     margin-bottom: 8px !important;
-     padding: 8px !important;
+     margin-bottom: var(--spacing-sm) !important;
+     padding: var(--spacing-sm) !important;
    }
 
    /* Ajustar tablas */
@@ -702,13 +702,13 @@
      width: 100% !important;
      border-collapse: collapse !important;
      font: var(--text-data-8xs) !important;
-     margin: 8px 0 !important;
+     margin: var(--spacing-sm) 0 !important;
    }
 
    .patient-detail__section th,
    .patient-detail__section td {
-     border: 1px solid var(--color-text-black) !important;
-     padding: 4px !important;
+     border: var(--border-radius-sm) solid var(--color-text-black) !important;
+     padding: var(--spacing-xs) !important;
      text-align: left !important;
      vertical-align: top !important;
    }
@@ -721,7 +721,7 @@
    /* Ajustar odontogramas */
    .odontogram-container {
      width: 100% !important;
-     margin: 10px 0 !important;
+     margin: var(--spacing-sm) 0 !important;
    }
 
    .odontogram-grid {
@@ -786,20 +786,20 @@
     height: auto !important;
     transform: scale(4.0) !important;
     transform-origin: center !important;
-    margin: 50px 0 !important;
+    margin: 3rem 0 !important;
   }
 
   /* Tablas del odontograma - tamaño normal como solicitado */
   .odontograma-table {
     font: var(--text-data-5xs) !important;
-    margin: 20px 0 !important;
+    margin: var(--spacing-xl) 0 !important;
     transform: scale(1.0) !important;
     transform-origin: center !important;
   }
 
   .odontograma-table th,
   .odontograma-table td {
-    padding: 8px !important;
+    padding: var(--spacing-sm) !important;
     font: var(--text-data-6xs) !important;
   }
 
@@ -812,8 +812,8 @@
       right: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
-      padding: 20px 40px !important;
-      margin: 0 20px !important;
+      padding: var(--spacing-xl) 2.5rem !important;
+      margin: 0 var(--spacing-xl) !important;
       box-sizing: border-box !important;
       z-index: 1000 !important;
     }
@@ -822,7 +822,7 @@
   .saved-images-container .saved-image-section {
     width: 100% !important;
     max-width: none !important;
-    margin: 20px 0 !important;
+    margin: var(--spacing-xl) 0 !important;
     transform: scale(1.0) !important;
     transform-origin: top left !important;
   }
@@ -834,7 +834,7 @@
     height: auto !important;
     transform: scale(1.25) !important;
     transform-origin: center !important;
-    margin: 30px 0 !important;
+    margin: var(--spacing-xxl) 0 !important;
   }
 
   /* MODO RENDER: Escalas más pequeñas para vista editable - PERO NO EN IMPRESIÓN */
@@ -942,16 +942,16 @@
    Danger zone: delete patient
    ========================= */
 .danger-zone {
-  margin-top: 24px;
-  padding: 16px;
-  border: 1px solid var(--color-red-250);
+  margin-top: var(--spacing-xxl);
+  padding: var(--spacing-lg);
+  border: var(--border-radius-sm) solid var(--color-red-250);
   background-color: var(--color-red-100);
-  border-radius: 8px;
+  border-radius: var(--border-radius-lg);
 }
 
 .danger-zone h3 {
   color: var(--color-red-600);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--spacing-md) 0;
   font: var(--text-heading-xxs);
 }
 
@@ -961,13 +961,13 @@
 .delete-confirm {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--spacing-sm);
 }
 
 .delete-confirm-input {
-  padding: 0.6rem 1rem;
-  border: 2px solid var(--color-red-550);
-  border-radius: 6px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: var(--card-border-width) solid var(--color-red-550);
+  border-radius: var(--border-radius-md);
   font: var(--text-body-strong);
 }
 
@@ -978,7 +978,7 @@
 
 .delete-confirm-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-sm);
   align-items: center;
 }
 

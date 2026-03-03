@@ -44,12 +44,12 @@
 /* Estilos estándar para strong en elementos de medicamentos */
 .patient-detail__info-card li strong {
   color: var(--color-text-black);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 /* Estilos estándar para span en elementos de medicamentos */
 .patient-detail__info-card li span {
   color: var(--color-neutral-680);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
 }
