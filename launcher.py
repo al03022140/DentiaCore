@@ -7,7 +7,7 @@ Usa la paleta de colores del programa para mantener consistencia visual
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import subprocess
 import threading
 import os
@@ -62,6 +62,7 @@ class DentLauncher:
         self.server_dir = self.project_dir / 'Server'
         self.client_dir = self.project_dir / 'Client'
         self.db_dir = self.project_dir / 'DB'
+        self._mongod_exe_cache = None  # Cache para evitar búsquedas repetidas
 
         self.create_widgets()
         
@@ -170,6 +171,7 @@ class DentLauncher:
             command=self.update_mode
         )
         local_radio.grid(row=0, column=0, padx=(0, 15))
+        self._local_radio = local_radio
 
         lan_radio = tk.Radiobutton(
             radio_frame,
@@ -182,6 +184,7 @@ class DentLauncher:
             command=self.update_mode
         )
         lan_radio.grid(row=0, column=1)
+        self._lan_radio = lan_radio
 
         lan_entry_frame = tk.Frame(mode_frame, bg=self.colors['bg_light'])
         lan_entry_frame.pack(fill='x', pady=(10, 0))
@@ -371,9 +374,11 @@ class DentLauncher:
         
     def start_all(self):
         """Iniciar servidor y frontend"""
-        if not self.is_server_running and not self.is_client_running:
-            self.start_all_btn.config(state='disabled', text="⏳ Iniciando...")
-            threading.Thread(target=self._start_all_thread, daemon=True).start()
+        # Permitir iniciar si al menos un servicio no está corriendo
+        if self.is_server_running and (self.is_client_running or self.mode_var.get() == 'lan'):
+            return  # Ya está todo ejecutándose
+        self.start_all_btn.config(state='disabled', text="⏳ Iniciando...")
+        threading.Thread(target=self._start_all_thread, daemon=True).start()
         
     def _start_all_thread(self):
         """Hilo para iniciar todos los servicios"""
@@ -390,16 +395,11 @@ class DentLauncher:
                 ))
                 return
             
-            # Cambiar al directorio del proyecto
-            os.chdir(self.project_dir)
-            
-            # Matar puertos antes de iniciar (ya verificados en _verify_system_requirements)
-            self._kill_port(5002)  # Puerto del servidor
-            self._kill_port(5173)  # Puerto del cliente Vite
-            self._kill_port(5174)  # Puerto alternativo del cliente
-            time.sleep(1)  # Esperar a que los puertos se liberen
-            
             env = self._apply_mode_environment()
+
+            # Diagnóstico de configuración
+            self._print_effective_configuration(env)
+            self._validate_envs(env)
 
             mode = env.get('DENT_MODE', 'local')
             if mode == 'lan':
@@ -412,7 +412,12 @@ class DentLauncher:
                     ))
                     return
                 # Asegurar build del cliente para servir estáticos
-                self._ensure_client_build()
+                if not self._ensure_client_build():
+                    self.root.after(0, lambda: messagebox.showwarning(
+                        'Build Frontend',
+                        'El build del frontend falló. El servidor LAN no podrá servir la app.'
+                    ))
+                    return
                 started = self._start_server_with_pm2(env)
                 if not started:
                     self.server_process = subprocess.Popen(
@@ -424,7 +429,10 @@ class DentLauncher:
                     )
                     self.using_pm2 = False
                 target_url = env.get('PUBLIC_URL', 'http://localhost:5002')
-                self.is_server_running = self._wait_for_server_ready(target_url, timeout=30)
+                self.is_server_running = self._wait_for_server_ready(
+                    target_url, timeout=30,
+                    process=self.server_process if not self.using_pm2 else None
+                )
                 self.is_client_running = False
                 if not self.is_server_running:
                     self.root.after(0, lambda: messagebox.showerror(
@@ -487,9 +495,6 @@ class DentLauncher:
                         "3. Las dependencias estén instaladas (npm install)"
                     ))
             
-            # Actualizar UI en el hilo principal
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar: {str(e)}\n\nAsegurate de:\n1. Tener MongoDB ejecutandose\n2. Haber instalado dependencias (npm install)\n3. No tener otros servicios en los puertos 5002, 5173, 5174"
             print(f"❌ Error en _start_all_thread: {error_msg}")
@@ -497,15 +502,15 @@ class DentLauncher:
             # Limpiar procesos si hay error
             if hasattr(self, 'server_process') and self.server_process:
                 try:
-                    self.server_process.terminate()
-                except:
+                    self._terminate_process_tree(self.server_process)
+                except Exception:
                     pass
                 self.server_process = None
                 
             if hasattr(self, 'client_process') and self.client_process:
                 try:
-                    self.client_process.terminate()
-                except:
+                    self._terminate_process_tree(self.client_process)
+                except Exception:
                     pass
                 self.client_process = None
                 
@@ -513,6 +518,8 @@ class DentLauncher:
             self.is_client_running = False
             
             self.root.after(0, lambda: messagebox.showerror("Error al Iniciar", error_msg))
+        finally:
+            # SIEMPRE actualizar UI para evitar que el botón quede atascado en '⏳ Iniciando...'
             self.root.after(0, self.update_ui_state)
             
     def stop_all(self):
@@ -531,44 +538,36 @@ class DentLauncher:
             # Terminar procesos si existen (cliente primero, luego servidor)
             if self.client_process:
                 try:
-                    self.client_process.terminate()
-                    time.sleep(1)  # Dar tiempo para terminar graciosamente
-                    if self.client_process.poll() is None:
-                        self.client_process.kill()
+                    self._terminate_process_tree(self.client_process)
                 except Exception:
                     pass
                 self.client_process = None
                 
             if self.server_process:
                 try:
-                    self.server_process.terminate()
-                    time.sleep(2)  # Dar más tiempo al servidor para cerrar conexiones
-                    if self.server_process.poll() is None:
-                        self.server_process.kill()
+                    self._terminate_process_tree(self.server_process)
                 except Exception:
                     pass
                 self.server_process = None
                 
             if self.mongo_process:
                 try:
-                    self.mongo_process.terminate()
+                    self._terminate_process_tree(self.mongo_process)
                 except Exception:
                     pass
                 self.mongo_process = None
                 
-            # Matar puertos específicos como respaldo
-            subprocess.run(['npx', 'kill-port', '5173'], shell=True, capture_output=True)
-            subprocess.run(['npx', 'kill-port', '5174'], shell=True, capture_output=True)
-            subprocess.run(['npx', 'kill-port', '5002'], shell=True, capture_output=True)
+            # Matar puertos específicos como respaldo (nativo, rápido)
+            self._kill_port(5173)
+            self._kill_port(5174)
+            self._kill_port(5002)
             
             self.is_server_running = False
             self.is_client_running = False
             
-            # Actualizar UI en el hilo principal
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Error al detener: {str(e)}"))
+        finally:
             self.root.after(0, self.update_ui_state)
             
     def toggle_server(self):
@@ -632,7 +631,6 @@ class DentLauncher:
     def _check_port_availability(self, port):
         """Verificar si un puerto está disponible"""
         try:
-            import socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
                 result = s.connect_ex(('localhost', port))
@@ -641,29 +639,89 @@ class DentLauncher:
             return False
             
     def _kill_port(self, port):
-        """Matar proceso en un puerto específico antes de iniciar un servicio"""
+        """Matar proceso en un puerto específico usando comandos nativos (más rápido que npx)"""
         try:
-            subprocess.run(
-                ['npx', 'kill-port', str(port)],
-                shell=True,
-                capture_output=True,
-                timeout=5
-            )
+            if sys.platform == 'win32':
+                # Buscar PIDs escuchando en el puerto con netstat (instantáneo vs npx ~3s)
+                result = subprocess.run(
+                    f'netstat -ano | findstr ":{port}" | findstr "LISTENING"',
+                    shell=True, capture_output=True, text=True, timeout=5
+                )
+                if result.stdout:
+                    pids = set()
+                    for line in result.stdout.strip().split('\n'):
+                        parts = line.split()
+                        if parts:
+                            pid = parts[-1].strip()
+                            if pid.isdigit() and pid != '0':
+                                pids.add(pid)
+                    for pid in pids:
+                        subprocess.run(
+                            f'taskkill /F /T /PID {pid}',
+                            shell=True, capture_output=True, timeout=5
+                        )
+            else:
+                subprocess.run(
+                    ['npx', 'kill-port', str(port)],
+                    shell=True, capture_output=True, timeout=5
+                )
         except Exception:
             pass  # Ignorar errores si el puerto ya está libre
+
+    def _terminate_process_tree(self, process):
+        """Terminar un proceso y todo su árbol de hijos (Windows-safe).
+        
+        En Windows con shell=True, subprocess.terminate() solo mata cmd.exe,
+        dejando nodos hijos (node, npm) huérfanos. taskkill /T mata el árbol completo.
+        """
+        if process is None:
+            return
+        try:
+            pid = process.pid
+            if sys.platform == 'win32' and pid:
+                subprocess.run(
+                    f'taskkill /F /T /PID {pid}',
+                    shell=True, capture_output=True, timeout=10
+                )
+            else:
+                process.terminate()
+                time.sleep(1)
+                if process.poll() is None:
+                    process.kill()
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
 
     def _verify_system_requirements(self):
         """Verificar todos los requisitos del sistema antes de iniciar"""
         try:
             print("🔍 Verificando requisitos del sistema...")
             
+            # 0. Verificar que Node.js/npm estén disponibles
+            try:
+                node_result = subprocess.run(
+                    ['node', '--version'], shell=True,
+                    capture_output=True, text=True, timeout=10
+                )
+                if node_result.returncode != 0:
+                    return False, "Node.js no encontrado.\n\nInstala Node.js LTS desde https://nodejs.org"
+                print(f"✅ Node.js {node_result.stdout.strip()}")
+            except Exception:
+                return False, "Node.js no encontrado.\n\nInstala Node.js LTS desde https://nodejs.org"
+            
             # 1. Verificar dependencias npm
             deps_ok, deps_error = self._check_npm_dependencies()
             if not deps_ok:
                 return False, f"Dependencias npm: {deps_error}\n\nEjecuta: npm install"
             
-            # 2. Verificar puertos disponibles
-            ports_to_check = [5002, 5173, 5174]
+            # 2. Verificar puertos disponibles (solo los necesarios según el modo)
+            with self.mode_lock:
+                current_mode = self.mode_var.get()
+            ports_to_check = [5002]
+            if current_mode != 'lan':
+                ports_to_check.extend([5173, 5174])
             busy_ports = []
             
             for port in ports_to_check:
@@ -740,9 +798,10 @@ class DentLauncher:
         env_vars.setdefault('PORT', '5002')
         # Asegurar NODE_ENV
         env_vars.setdefault('NODE_ENV', 'development' if mode == 'local' else 'production')
-        # No forzar MONGODB_URI aquí: dejar que scripts/dent.js cargue .env
-        # Si el entorno ya define MONGODB_URI lo respetamos; de lo contrario
-        # dotenv en el servidor usará el valor de .env del proyecto.
+        # Asegurar MONGODB_URI tiene un valor por defecto para evitar crash silencioso
+        # dotenv en dent.js complementará con Server/.env, pero este default previene
+        # la situación donde ni env ni .env definen MONGODB_URI.
+        env_vars.setdefault('MONGODB_URI', 'mongodb://127.0.0.1:27017/Dent')
 
         self.current_env = env_vars
         return env_vars
@@ -810,8 +869,8 @@ class DentLauncher:
         if not mongo_uri:
             warnings.append("Server/.env no define MONGODB_URI; se requiere para conectar a MongoDB.")
         else:
-            if 'mongodb://' not in mongo_uri:
-                warnings.append("MONGODB_URI parece inválida (no comienza con mongodb://).")
+            if not ('mongodb://' in mongo_uri or 'mongodb+srv://' in mongo_uri):
+                warnings.append("MONGODB_URI parece inválida (no comienza con mongodb:// o mongodb+srv://).")
 
         # Puerto del servidor
         port = env.get('PORT') or server_env.get('PORT')
@@ -888,6 +947,7 @@ class DentLauncher:
             
     def start_server(self):
         """Iniciar solo el servidor"""
+        self.server_btn.config(state='disabled')
         threading.Thread(target=self._start_server_thread, daemon=True).start()
         
     def _start_server_thread(self):
@@ -897,7 +957,6 @@ class DentLauncher:
             self._kill_port(5002)
             time.sleep(1)
             
-            server_dir = self.server_dir
             env = self._apply_mode_environment()
             mode = env.get('DENT_MODE', 'local')
 
@@ -914,13 +973,14 @@ class DentLauncher:
                         'Por favor, inicia el servicio de MongoDB y vuelve a intentar.'
                     ))
                     return
-                self._ensure_client_build()
+                if not self._ensure_client_build():
+                    return
                 started = self._start_server_with_pm2(env)
                 if not started:
                     self.server_process = subprocess.Popen(
                         ['npm', 'run', 'start'],
                         shell=True,
-                        cwd=server_dir,
+                        cwd=self.server_dir,
                         env=env,
                         creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
                     )
@@ -935,9 +995,9 @@ class DentLauncher:
                     ))
                     return
                 self.server_process = subprocess.Popen(
-                    ['npm', 'run', 'dev'],
+                    ['npm', 'run', 'server'],
                     shell=True,
-                    cwd=server_dir,
+                    cwd=self.project_dir,
                     env=env,
                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
                 )
@@ -974,37 +1034,45 @@ class DentLauncher:
                 )
                 self.root.after(0, lambda: messagebox.showerror("Servidor no disponible", msg))
 
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar servidor: {str(e)}\n\nVerifica:\n1. MongoDB esta corriendo\n2. El puerto 5002 esta libre\n3. Dependencias instaladas"
             self.root.after(0, lambda: messagebox.showerror("Error Servidor", error_msg))
+        finally:
+            self.root.after(0, self.update_ui_state)
             
     def stop_server(self):
         """Detener solo el servidor"""
-        if self.using_pm2:
-            subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-            subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-            self.using_pm2 = False
-        if self.server_process:
-            self.server_process.terminate()
-            self.server_process = None
-        subprocess.run(['npx', 'kill-port', '5002'], shell=True, capture_output=True)
-        # Si iniciamos Mongo, detenerlo
-        if self.mongo_process:
-            try:
-                self.mongo_process.terminate()
-            except Exception:
-                pass
-            self.mongo_process = None
-        self.is_server_running = False
-        self.update_ui_state()
+        self.server_btn.config(state='disabled')
+        threading.Thread(target=self._stop_server_thread, daemon=True).start()
+
+    def _stop_server_thread(self):
+        """Hilo para detener el servidor sin bloquear la UI"""
+        try:
+            if self.using_pm2:
+                subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                self.using_pm2 = False
+            if self.server_process:
+                self._terminate_process_tree(self.server_process)
+                self.server_process = None
+            self._kill_port(5002)
+            # Si iniciamos Mongo, detenerlo
+            if self.mongo_process:
+                try:
+                    self._terminate_process_tree(self.mongo_process)
+                except Exception:
+                    pass
+                self.mongo_process = None
+            self.is_server_running = False
+        finally:
+            self.root.after(0, self.update_ui_state)
         
     def start_client(self):
         """Iniciar solo el frontend"""
         if self.mode_var.get() == 'lan':
             messagebox.showinfo("Modo LAN", "En modo LAN el frontend ya se sirve desde el servidor.")
             return
+        self.client_btn.config(state='disabled')
         threading.Thread(target=self._start_client_thread, daemon=True).start()
         
     def _start_client_thread(self):
@@ -1028,20 +1096,28 @@ class DentLauncher:
             
             time.sleep(3)  # Aumentar tiempo de espera
             self.is_client_running = True
-            self.root.after(0, self.update_ui_state)
             
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Error al iniciar frontend: {str(e)}"))
+        finally:
+            self.root.after(0, self.update_ui_state)
             
     def stop_client(self):
         """Detener solo el frontend"""
-        if self.client_process:
-            self.client_process.terminate()
-            self.client_process = None
-        subprocess.run(['npx', 'kill-port', '5173'], shell=True, capture_output=True)
-        subprocess.run(['npx', 'kill-port', '5174'], shell=True, capture_output=True)
-        self.is_client_running = False
-        self.update_ui_state()
+        self.client_btn.config(state='disabled')
+        threading.Thread(target=self._stop_client_thread, daemon=True).start()
+
+    def _stop_client_thread(self):
+        """Hilo para detener el frontend sin bloquear la UI"""
+        try:
+            if self.client_process:
+                self._terminate_process_tree(self.client_process)
+                self.client_process = None
+            self._kill_port(5173)
+            self._kill_port(5174)
+            self.is_client_running = False
+        finally:
+            self.root.after(0, self.update_ui_state)
         
     def open_app(self):
         """Abrir la aplicación en el navegador"""
@@ -1101,13 +1177,16 @@ class DentLauncher:
             subprocess.run(['xdg-open', self.project_dir])
 
     def _ensure_client_build(self):
-        """Construir el frontend para producción si corresponde."""
+        """Construir el frontend para producción si corresponde.
+
+        Devuelve True si el build existe/se completó, False si falló.
+        """
         dist_index = self.client_dir / 'dist' / 'index.html'
         env = self.current_env or {}
         # En modo LAN, siempre reconstruimos para recoger cambios en VITE_API_URL/PUBLIC_URL
         force_build = env.get('DENT_MODE') == 'lan'
         if dist_index.exists() and not force_build:
-            return
+            return True
         try:
             self.root.after(0, lambda: self.start_all_btn.config(text='⏳ Construyendo Frontend...', state='disabled'))
             subprocess.run(
@@ -1117,8 +1196,10 @@ class DentLauncher:
                 env=env,
                 check=True
             )
+            return True
         except subprocess.CalledProcessError as e:
             self.root.after(0, lambda: messagebox.showerror('Build Frontend', f'Fallo al construir el frontend: {e}'))
+            return False
 
     def _ensure_mongo_running(self):
         """Verifica que MongoDB esté ejecutándose como servicio de Windows."""
@@ -1142,7 +1223,6 @@ class DentLauncher:
                         print(f"🔎 mongod detectado: {exe_path or 'PATH'} (versión {version or 'desconocida'})")
                         cfg = self.project_dir / 'mongod.cfg'
                         db_dir = self.project_dir / 'DB'
-                        import os
                         use_shell = os.environ.get('MONGO_TERMINAL', 'powershell')
                         started = self._launch_mongod_in_terminal(exe_path, use_shell, cfg, db_dir)
                         if started:
@@ -1160,6 +1240,7 @@ class DentLauncher:
                         db_dir = self.project_dir / 'DB'
                         try:
                             db_dir.mkdir(exist_ok=True)
+                            (db_dir / 'logs').mkdir(exist_ok=True)
                         except Exception:
                             pass
                         if exe_path:
@@ -1176,8 +1257,10 @@ class DentLauncher:
                             cmd += ['--config', str(cfg)]
                         # Añadir siempre dbpath para forzar uso de la carpeta local DB
                         cmd += ['--dbpath', str(db_dir)]
-                        # --- CORRECCIÓN: forzar bind_ip para permitir conexiones LAN si arrancamos mongod manualmente
-                        cmd += ['--bind_ip', '0.0.0.0']
+                        # --- bind_ip según modo: 127.0.0.1 (local) o 0.0.0.0 (LAN)
+                        with self.mode_lock:
+                            bind_ip = '0.0.0.0' if self.mode_var.get() == 'lan' else '127.0.0.1'
+                        cmd += ['--bind_ip', bind_ip]
                         self.mongo_process = subprocess.Popen(
                             cmd,
                             cwd=str(self.project_dir),
@@ -1223,14 +1306,8 @@ class DentLauncher:
                     except Exception:
                         pass
 
-                    # Si no se pudo iniciar, mostrar advertencia
-                    self.root.after(0, lambda: messagebox.showwarning(
-                        'MongoDB', 
-                        'MongoDB no está ejecutándose.\n\n'
-                        'Alternativas:\n'
-                        '• Ejecuta "mongod --dbpath ./DB" en el directorio del proyecto, o\n'
-                        '• Inicia el servicio global desde services.msc o con "net start MongoDB"'
-                    ))
+                    # No mostrar diálogo aquí; el caller muestra su propio error
+                    print("❌ No se pudo iniciar MongoDB por ningún método")
                     return False
             except Exception as e:
                 print(f"⚠️ Error verificando MongoDB: {e}")
@@ -1260,43 +1337,39 @@ class DentLauncher:
             time.sleep(min(2 ** attempt, 5))
             attempt += 1
         print(f"❌ Timeout: MongoDB no aceptó conexiones en {host}:{port} tras {timeout}s")
-        self.root.after(0, lambda: messagebox.showerror(
-            'MongoDB no disponible',
-            f'No se pudo establecer conexión con MongoDB en {host}:{port}.\n\n'
-            'Verifica que el servicio esté ejecutándose y sin errores.'
-        ))
         return False
 
     def _find_mongod_exe(self):
-        """Busca mongod.exe priorizando la versión embebida del proyecto y luego otras fuentes."""
-        import shutil
+        """Busca mongod.exe priorizando la versión embebida del proyecto y luego otras fuentes.
+        
+        Cachea el resultado para evitar búsquedas repetidas en disco.
+        """
+        if self._mongod_exe_cache is not None:
+            return self._mongod_exe_cache if self._mongod_exe_cache else None
+        
+        result = None
         
         # 1. Preferir la ruta del proyecto (tools/mongo/bin, etc.)
-        project_path = self._find_mongod_in_project()
-        if project_path:
-            return project_path
+        result = self._find_mongod_in_project()
         
         # 2. Intentar encontrar mongod en PATH
-        mongod_in_path = shutil.which('mongod')
-        if mongod_in_path:
-            return mongod_in_path
+        if not result:
+            result = shutil.which('mongod')
         
         # 3. Buscar usando variables de entorno
-        env_path = self._find_mongod_from_env()
-        if env_path:
-            return env_path
+        if not result:
+            result = self._find_mongod_from_env()
         
         # 4. Buscar en el registro de Windows
-        registry_path = self._find_mongod_from_registry()
-        if registry_path:
-            return registry_path
+        if not result:
+            result = self._find_mongod_from_registry()
         
         # 5. Búsqueda dinámica en unidades del sistema
-        dynamic_path = self._find_mongod_dynamic_search()
-        if dynamic_path:
-            return dynamic_path
+        if not result:
+            result = self._find_mongod_dynamic_search()
         
-        return None
+        self._mongod_exe_cache = result or ''  # '' = buscado pero no encontrado
+        return result
 
     def _get_mongod_version(self, exe_path=None):
         """Obtiene la versión de mongod ejecutando '--version'. Devuelve 'major.minor.patch' o None."""
@@ -1441,17 +1514,20 @@ class DentLauncher:
         """Abre una ventana de PowerShell o CMD y ejecuta mongod con la configuración dada."""
         try:
             db_dir.mkdir(exist_ok=True)
+            (db_dir / 'logs').mkdir(exist_ok=True)
         except Exception:
             pass
         exe = exe_path if exe_path else 'mongod'
         use_shell = (use_shell or 'powershell').lower()
+        # bind_ip según modo: restringir a localhost en local, abrir en LAN
+        with self.mode_lock:
+            bind_ip = '0.0.0.0' if self.mode_var.get() == 'lan' else '127.0.0.1'
         if use_shell == 'cmd':
             # Forzar siempre --dbpath para apuntar a la carpeta DB del proyecto.
             if cfg.exists():
-                # Añadimos --bind_ip para permitir conexiones desde la LAN cuando abrimos mongod en terminal
-                inner = f'"{exe}" --config "{cfg}" --dbpath "{db_dir}" --bind_ip 0.0.0.0'
+                inner = f'"{exe}" --config "{cfg}" --dbpath "{db_dir}" --bind_ip {bind_ip}'
             else:
-                inner = f'"{exe}" --dbpath "{db_dir}" --bind_ip 0.0.0.0'
+                inner = f'"{exe}" --dbpath "{db_dir}" --bind_ip {bind_ip}'
             command = ['cmd.exe', '/c', f'cd /d "{self.project_dir}" && {inner}']
             subprocess.Popen(
                 command,
@@ -1462,9 +1538,9 @@ class DentLauncher:
             ps_cmds = [f"Set-Location '{self.project_dir}'"]
             # Forzar siempre --dbpath para apuntar a la carpeta DB del proyecto.
             if cfg.exists():
-                ps_cmds.append(f"& '{exe}' --config '{cfg}' --dbpath '{db_dir}'")
+                ps_cmds.append(f"& '{exe}' --config '{cfg}' --dbpath '{db_dir}' --bind_ip {bind_ip}")
             else:
-                ps_cmds.append(f"& '{exe}' --dbpath '{db_dir}'")
+                ps_cmds.append(f"& '{exe}' --dbpath '{db_dir}' --bind_ip {bind_ip}")
             command = ['powershell.exe', '-NoProfile', '-Command', '; '.join(ps_cmds)]
             subprocess.Popen(
                 command,
@@ -1611,10 +1687,10 @@ class DentLauncher:
         # Actualizar indicadores de estado
         if self.is_server_running:
             self.server_status.config(text="🟢 Servidor: Ejecutándose", fg=self.colors['success'])
-            self.server_btn.config(text="⏹️ Detener Servidor")
+            self.server_btn.config(text="⏹️ Detener Servidor", state='normal')
         else:
             self.server_status.config(text="🔴 Servidor: Detenido", fg=self.colors['danger'])
-            self.server_btn.config(text="▶️ Iniciar Servidor")
+            self.server_btn.config(text="▶️ Iniciar Servidor", state='normal')
             
         if current_mode == 'lan':
             status_text = "🟢 Frontend servido por backend" if self.is_server_running else "🔴 Frontend: Dependiente del servidor"
@@ -1643,20 +1719,37 @@ class DentLauncher:
                 bg=self.colors['primary']
             )
             self.stop_all_btn.config(state='normal', text="⏹️ Detener Todo")
+
+        # Deshabilitar cambio de modo mientras hay servicios activos
+        # para evitar UI inconsistente (ej. mostrar "Frontend servido por backend"
+        # cuando Vite sigue corriendo en modo local)
+        any_running = self.is_server_running or self.is_client_running
+        radio_state = 'disabled' if any_running else 'normal'
+        if hasattr(self, '_local_radio'):
+            self._local_radio.config(state=radio_state)
+        if hasattr(self, '_lan_radio'):
+            self._lan_radio.config(state=radio_state)
+        if hasattr(self, 'lan_entry') and any_running:
+            self.lan_entry.config(state='disabled')
             
     def on_closing(self):
         """Manejar el cierre de la aplicación"""
         if self.is_server_running or self.is_client_running:
-            result = messagebox.askyesno(
+            result = messagebox.askyesnocancel(
                 "Confirmar cierre",
-                "Hay servicios ejecutándose. ¿Quieres detenerlos antes de cerrar?"
+                "Hay servicios ejecutándose.\n\n"
+                "• Sí → Detener servicios y cerrar\n"
+                "• No → Cerrar sin detener (los procesos seguirán activos)\n"
+                "• Cancelar → Volver al launcher"
             )
-            if result:
+            if result is True:
+                # Sí: detener todo y cerrar
                 self.stop_all()
-                # Esperar un poco para que se detengan
                 self.root.after(2000, self.root.destroy)
-            else:
+            elif result is False:
+                # No: cerrar sin detener
                 self.root.destroy()
+            # Cancelar (None): no hacer nada, volver al launcher
         else:
             self.root.destroy()
             

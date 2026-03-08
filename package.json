@@ -4,10 +4,10 @@
   "main": "index.js",
   "scripts": {
     "kill-port": "npx kill-port 5002 || echo Port 5002 cleared",
-    "kill-client-port": "npx kill-port 5173 || echo Port 5173 cleared && npx kill-port 5174 || echo Port 5174 cleared",
+    "kill-client-port": "npx kill-port 5173 & npx kill-port 5174",
     "mongod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\start-mongo.ps1",
     "client": "npm run dev --prefix Client",
-    "server": "nodemon Server/scripts/dent.js",
+    "server": "nodemon --config Server/nodemon.json Server/scripts/dent.js",
     "dev": "npm run kill-port && cross-env NODE_ENV=development concurrently \"npm run mongod\" \"npm run client\" \"npm run server\"",
     "start": "npm run kill-port && npm run kill-client-port && concurrently \"npm run mongod\" \"npm run client\" \"npm run server\""
   },

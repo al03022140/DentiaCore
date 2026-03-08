@@ -1,9 +1,11 @@
-// Cargar variables de entorno priorizando Server/.env y usando root .env como respaldo
+// Cargar variables de entorno: Server/.env tiene prioridad, root .env rellena lo que falte (Google creds, etc.)
 const path = require('path');
 const dotenv = require('dotenv');
-// Cargar primero Server/.env y luego sobreescribir con el .env raíz para asegurar credenciales de Google
+// 1) Server/.env: configuración de red gestionada por el instalador (PORT, HOST, CLIENT_URL, etc.)
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+// 2) Root .env: credenciales de Google y otros secrets que no están en Server/.env
+//    SIN override para que Server/.env y las env vars del launcher tengan prioridad
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Importaciones principales
 const express = require('express');

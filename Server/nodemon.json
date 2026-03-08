@@ -1,5 +1,5 @@
 {
-  "watch": ["."],
+  "watch": ["scripts", "config", "controllers", "routes", "middlewares", "models", "schemas", "helpers", "utils"],
   "ignore": [
     "uploads/**",
     "logs/**",
