@@ -33,6 +33,20 @@
   gap: 0.5rem;
 }
 
+.lock-button {
+  background: none;
+  border: 1px solid var(--color-border-medium);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  transition: background 0.2s;
+}
+.lock-button:hover {
+  background: var(--color-bg-tertiary, #f0f0f0);
+}
+
 
 /* Ajustes responsivos */
 @media (max-width: 1200px) {

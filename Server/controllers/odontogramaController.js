@@ -221,6 +221,15 @@ const guardarOdontogramaInicial = async (req, res, next) => {
 
     const snapshot = { imageUrl, datos, savedAt: new Date() };
 
+    // NOM-024: Los registros firmados son inmutables — solo se permiten addenda
+    const existingDoc = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_INITIAL });
+    if (existingDoc && existingDoc.estado === 'OFICIAL') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma en estado OFICIAL. Use addendum para correcciones.' }
+      });
+    }
+
     // Determinar estadoRegistro según permisos (asistente → BORRADOR)
     const userPerms = getEffectivePermissions(req.user);
     let estadoRegistro = 'OFICIAL';
@@ -564,6 +573,15 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             });
         }
         
+    // NOM-024: Los registros firmados son inmutables — solo se permiten addenda
+    const existingClinic = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_CLINIC });
+    if (existingClinic && existingClinic.estado === 'OFICIAL') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico en estado OFICIAL. Use addendum para correcciones.' }
+      });
+    }
+
     // Determinar estadoRegistro según permisos (asistente → BORRADOR)
     const userPerms = getEffectivePermissions(req.user);
     let estadoRegistro = 'OFICIAL';

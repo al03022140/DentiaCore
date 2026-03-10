@@ -23,6 +23,13 @@
   min-height: var(--home-nextpatient-min-height);
 }
 
+/* Estado vacío: igualar altura al reloj */
+.patient-info-wrapper.no-patient .patient-info {
+  height: calc(clamp(8.5vw, 5vw, 8vw) + 2 * var(--home-clock-padding));
+  min-height: unset;
+  justify-content: center;
+}
+
 /* Imagen del paciente */
 .patient-info-wrapper .patient-image img {
   width: var(--home-nextpatient-image-size);

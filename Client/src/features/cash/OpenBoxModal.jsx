@@ -4,7 +4,7 @@ import { openBox } from '../../shared/services/cashService';
 
 const { Title, Text } = Typography;
 
-const OpenBoxModal = ({ visible, onOpenSuccess }) => {
+const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -30,8 +30,9 @@ const OpenBoxModal = ({ visible, onOpenSuccess }) => {
           Abrir Caja
         </Button>
       ]}
-      closable={false}
-      maskClosable={false}
+      closable={true}
+      onCancel={onCancel}
+      maskClosable={true}
       centered
     >
       <div style={{ textAlign: 'center', padding: '20px 0' }}>

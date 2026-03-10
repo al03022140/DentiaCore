@@ -36,7 +36,7 @@ const NextPatient = () => {
   // Si no hay un próximo paciente, muestra un mensaje predeterminado
   if (!nextPatient) {
     return (
-      <div className="patient-info-wrapper">
+      <div className="patient-info-wrapper no-patient">
         <div className="patient-info">
           <p>No hay pacientes programados.</p>
         </div>

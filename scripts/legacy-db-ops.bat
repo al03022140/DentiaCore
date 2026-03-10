@@ -20,7 +20,7 @@ if /i "%MODE%"=="backup" (
   )
 )
 
-if not defined MONGODB_URI set "MONGODB_URI=mongodb://localhost:27017/dental_clinic"
+if not defined MONGODB_URI set "MONGODB_URI=mongodb://localhost:27017/DentiaCore"
 
 where mongodump >nul 2>&1
 if errorlevel 1 (
@@ -99,7 +99,7 @@ echo   scripts\legacy-db-ops.bat backup [MONGODB_URI]
 echo   scripts\legacy-db-ops.bat restore ^<BACKUP_DIR^> [MONGODB_URI]
 echo.
 echo Ejemplos:
-echo   scripts\legacy-db-ops.bat backup mongodb://localhost:27017/dental_clinic
-echo   scripts\legacy-db-ops.bat restore C:\ruta\backup\legacy-20250120-101500 mongodb://localhost:27017/dental_clinic
+echo   scripts\legacy-db-ops.bat backup mongodb://localhost:27017/DentiaCore
+echo   scripts\legacy-db-ops.bat restore C:\ruta\backup\legacy-20250120-101500 mongodb://localhost:27017/DentiaCore
 echo.
 exit /b 1

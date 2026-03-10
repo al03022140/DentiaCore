@@ -20,7 +20,7 @@ const Treatment = require('../models/treatment');
 // Conectar a la base de datos
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic');
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore');
         console.log('✅ Conectado a MongoDB');
     } catch (error) {
         console.error('❌ Error conectando a MongoDB:', error.message);

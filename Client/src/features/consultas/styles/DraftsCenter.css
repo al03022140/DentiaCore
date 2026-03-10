@@ -1,0 +1,298 @@
+/* Centro de Firmas Pendientes — Notificación flotante — roles.MD §9.4 */
+
+/* ── Notificación flotante ── */
+.drafts-notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9000;
+  width: 380px;
+  max-width: calc(100vw - 2rem);
+  background: var(--color-bg-white, #fff);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border-light, #e8e8e8);
+  overflow: hidden;
+  animation: drafts-slide-in 0.3s ease-out;
+}
+
+@keyframes drafts-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.drafts-notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  gap: 0.75rem;
+  user-select: none;
+}
+
+.drafts-notification-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-primary, #2c3e50);
+}
+
+.drafts-notif-icon {
+  font-size: 1.2rem;
+  color: var(--color-warning, #f39c12);
+}
+
+.drafts-notif-icon--ok {
+  color: var(--color-success, #27ae60);
+}
+
+.drafts-notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.drafts-btn-batch-mini {
+  background: var(--color-primary, #084888);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.drafts-btn-batch-mini:hover:not(:disabled) {
+  background: var(--color-primary-hover, #025db8);
+}
+
+.drafts-notification-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--color-text-muted, #7f8c8d);
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+
+.drafts-notification-close:hover {
+  color: var(--color-danger, #e74c3c);
+}
+
+/* ── Cuerpo expandible ── */
+.drafts-notification-body {
+  border-top: 1px solid var(--color-border-light, #e8e8e8);
+  padding: 0.75rem 1rem 1rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+/* ── Mensajes ── */
+.drafts-success {
+  background: #e8f5e9;
+  color: var(--color-success, #27ae60);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+}
+
+.drafts-error {
+  background: #fdecea;
+  color: var(--color-danger, #e74c3c);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* ── Botón firmar todas (dentro del body) ── */
+.drafts-btn-batch {
+  background: var(--color-primary, #084888);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  transition: background 0.2s;
+}
+
+.drafts-btn-batch:hover:not(:disabled) {
+  background: var(--color-primary-hover, #025db8);
+}
+
+/* ── Lista de borradores ── */
+.drafts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.draft-card {
+  background: var(--color-bg-light, #f9fafb);
+  border: 1px solid var(--color-border-light, #e8e8e8);
+  border-left: 3px solid var(--color-warning, #f39c12);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.draft-card-type {
+  background: #e3f2fd;
+  color: var(--color-primary, #084888);
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.draft-card-info {
+  font-size: 0.82rem;
+  color: var(--color-text-primary, #2c3e50);
+}
+
+.draft-card-label {
+  color: var(--color-text-muted, #7f8c8d);
+  font-size: 0.75rem;
+}
+
+.draft-card-date {
+  color: var(--color-text-muted, #7f8c8d);
+  font-size: 0.75rem;
+}
+
+.draft-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.drafts-btn-sign {
+  background: var(--color-success, #27ae60);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.drafts-btn-sign:hover:not(:disabled) {
+  background: #219a52;
+}
+
+.drafts-btn-reject {
+  background: transparent;
+  color: var(--color-danger, #e74c3c);
+  border: 1px solid var(--color-danger, #e74c3c);
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drafts-btn-reject:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+/* ── PIN Modal ── */
+.drafts-pin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.drafts-pin-modal {
+  background: var(--color-bg-white, #fff);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 340px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.drafts-pin-modal h3 {
+  margin: 0 0 0.25rem;
+  color: var(--color-text-primary, #2c3e50);
+}
+
+.drafts-pin-modal p {
+  color: var(--color-text-muted, #7f8c8d);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.drafts-pin-input {
+  text-align: center;
+  font-size: 1.75rem;
+  letter-spacing: 0.75rem;
+  padding: 0.5rem;
+  border: 2px solid var(--color-border-light, #e8e8e8);
+  border-radius: 8px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.drafts-pin-input:focus {
+  border-color: var(--color-primary, #084888);
+}
+
+.drafts-pin-error {
+  color: var(--color-danger, #e74c3c);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.drafts-pin-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.drafts-btn-cancel {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--color-border-medium, #ccc);
+  border-radius: 8px;
+  padding: 0.6rem;
+  cursor: pointer;
+  color: var(--color-text-secondary, #555);
+  font-size: 0.95rem;
+}
+
+.drafts-btn-confirm {
+  flex: 1;
+  background: var(--color-primary, #084888);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.drafts-btn-confirm:hover:not(:disabled) {
+  background: var(--color-primary-hover, #025db8);
+}
+
+.drafts-btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

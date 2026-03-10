@@ -531,7 +531,13 @@ const PatientSchema = new mongoose.Schema({
     deletedAt: { type: Date, default: null },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     deleteReason: { type: String, default: null },
-    creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null }
+    creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoEn: { type: Date, default: null },
+
+    // 📌 Derechos ARCO — Cancelación (LFPDPPP Arts. 22-36, roles.MD §6)
+    // true = el paciente solicita que sus datos NO se compartan con fines secundarios
+    datosNoCompartir: { type: Boolean, default: false }
 }, {
     timestamps: true,
     toJSON: { virtuals: true },

@@ -12,7 +12,7 @@ const Periodontogram = require('../models/periodontogram');
 const { ensurePeriodontogramExists } = require('../controllers/periodontogramController');
 
 // Configuración de la base de datos
-const DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic';
+const DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore';
 
 /**
  * Función para conectar a la base de datos

@@ -279,6 +279,17 @@
   font: var(--pd-font-body-sm) !important;
 }
 
+/* Pie de auditoría */
+.movement-audit {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  opacity: 0.75;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1366px) {
   .cash-page {

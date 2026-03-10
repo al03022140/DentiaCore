@@ -18,6 +18,7 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
 import UsersPage from '../features/users/UsersPage';
 import PermissionGate from './auth/PermissionGate';
+import DraftsCenter from '../features/consultas/DraftsCenter';
 
 const AppLayout = () => (
   <div className="dashboard">
@@ -46,26 +47,31 @@ const App = () => {
             <Route
               path="/"
               element={
-                <div className="home">
-                  <div className="left-section">
-                    <div className="calendar">
-                      <Calendar />
+                <>
+                  <DraftsCenter />
+                  <div className="home">
+                    <div className="left-section">
+
+                      <div className="calendar">
+                        <Calendar />
+                      </div>
+                      <div className="next-patient">
+                        <NextPatient />
+                      </div>
                     </div>
-                    <div className="next-patient">
-                      <NextPatient />
+                    <div className="right-section">
+                      <div className="clock">
+                        <Clock />
+                      </div>
+                      <div className="patient-stats">
+                        <PatientStats />
+                      </div>
                     </div>
                   </div>
-                  <div className="right-section">
-                    <div className="clock">
-                      <Clock />
-                    </div>
-                    <div className="patient-stats">
-                      <PatientStats />
-                    </div>
-                  </div>
-                </div>
+                </>
               }
             />
+
 
             <Route path="/pacientes" element={<PatientList />} />
             <Route path="/add-patient" element={<AddPatient />} />

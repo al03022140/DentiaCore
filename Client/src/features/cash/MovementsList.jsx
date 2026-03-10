@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, List, Avatar, Typography, Tag } from 'antd';
-import { UserOutlined, DollarCircleOutlined } from '@ant-design/icons';
+import { UserOutlined, DollarCircleOutlined, AuditOutlined } from '@ant-design/icons';
 import { getLastMovements } from '../../shared/services/cashService';
 
 const { Text } = Typography;
@@ -53,14 +53,21 @@ const MovementsList = ({ refreshTrigger }) => {
                   </div>
                 }
                 description={
-                  <div className="movement-meta">
-                    <Text type="secondary" className="movement-patient-name">
-                      {item.patientId ? `${item.patientId.primer_nombre} ${item.patientId.apellido_paterno}` : 'General'}
-                    </Text>
-                    <Tag color={item.paymentMethod === 'CASH' ? 'gold' : 'blue'}>
-                      {item.paymentMethod === 'CASH' ? 'Efectivo' : 'Digital'}
-                    </Tag>
-                  </div>
+                  <>
+                    <div className="movement-meta">
+                      <Text type="secondary" className="movement-patient-name">
+                        {item.patientId ? `${item.patientId.primer_nombre} ${item.patientId.apellido_paterno}` : 'General'}
+                      </Text>
+                      <Tag color={item.paymentMethod === 'CASH' ? 'gold' : 'blue'}>
+                        {item.paymentMethod === 'CASH' ? 'Efectivo' : 'Digital'}
+                      </Tag>
+                    </div>
+                    {item.creadoPor && (
+                      <div className="movement-audit">
+                        <AuditOutlined /> Registrado por: {item.creadoPor.nombre}
+                      </div>
+                    )}
+                  </>
                 }
               />
             </List.Item>

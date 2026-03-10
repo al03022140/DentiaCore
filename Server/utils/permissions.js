@@ -30,7 +30,7 @@ const ROLE_PERMISSIONS = {
     'patients.read',
     'patients.create',
     'patients.update',
-    'patients.delete',
+    // NO patients.delete — NOM-004 Art. 5.4: solo admin puede archivar
     'odontogram.read',
     'odontogram.create',
     'odontogram.update',
@@ -46,9 +46,9 @@ const ROLE_PERMISSIONS = {
     'appointments.read',
     'appointments.create',
     'appointments.update',
-    'appointments.delete',
+    // NO appointments.delete — solo admin/recepcionista
     'stats.read.own',
-    'cash.read',
+    // NO cash.read — LFPDPPP Art. 6: proporcionalidad, no necesario para función clínica
     'draft.approve',            // transicionar DRAFT → OFICIAL con firma
     'drafts.batch_sign',        // firmar borradores en lote (Centro de Firmas Pendientes)
     'notes.create.backdated',   // captura extemporánea — requiere motivo
@@ -58,7 +58,6 @@ const ROLE_PERMISSIONS = {
     'read_periodontogram',
     'create_periodontogram',
     'update_periodontogram',
-    'delete_periodontogram',
   ],
 
   // ─── Asistente Dental (NOM-013: bajo supervisión directa) ────

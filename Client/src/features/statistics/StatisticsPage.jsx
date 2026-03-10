@@ -592,20 +592,6 @@ const StatisticsPage = () => {
         {announcement || ' '}
       </div>
       <div className="statistics-page__left">
-        <nav className="statistics-tabs" role="tablist" aria-label="Categorias de estadisticas">
-          {TAB_CONFIG.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              className={`statistics-tab ${activeTab === tab.id ? 'statistics-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
         <div className="statistics-chart-grid" role="tabpanel">
           {Array.from({ length: SLOT_COUNT }, (_, index) => renderSlot(activeTab, index))}
         </div>

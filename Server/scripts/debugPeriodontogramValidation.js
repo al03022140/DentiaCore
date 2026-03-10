@@ -9,7 +9,7 @@ const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
 require('dotenv').config();
 
 // Conectar a la base de datos
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore')
   .then(() => console.log('✅ Conectado a MongoDB'))
   .catch(err => console.error('❌ Error conectando a MongoDB:', err));
 

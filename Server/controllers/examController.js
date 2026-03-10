@@ -109,6 +109,11 @@ exports.updateExam = async (req, res) => {
         let exam = await Exam.findById(req.params.id);
         if (!exam || exam.deletedAt) return res.status(404).json({ message: "Examen no encontrado" });
 
+        // NOM-024: Los registros firmados son inmutables — solo se permiten addenda
+        if (exam.estadoRegistro === 'OFICIAL') {
+            return res.status(403).json({ message: 'No se puede modificar un registro en estado OFICIAL. Use addendum para correcciones.' });
+        }
+
         // Verificar si el paciente o doctor han sido modificados y existen
         if (req.body.paciente_id) {
             const paciente = await Patient.findById(req.body.paciente_id);

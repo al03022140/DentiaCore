@@ -81,13 +81,28 @@ exports.closeBox = async (req, res) => {
       return res.status(400).json({ message: 'No hay caja abierta para cerrar' });
     }
 
-    // Calculate final amount
+    // Calculate final amount and summary
     const movements = await CashMovement.find({ boxSessionId: activeSession._id });
     let cashBalance = activeSession.initialAmount;
-    
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let cashIncome = 0;
+    let digitalIncome = 0;
+    let cashExpense = 0;
+    let digitalExpense = 0;
+
     movements.forEach(m => {
       if (m.paymentMethod === 'CASH') {
         cashBalance += (m.type === 'INCOME' ? m.amount : -m.amount);
+      }
+      if (m.type === 'INCOME') {
+        totalIncome += m.amount;
+        if (m.paymentMethod === 'CASH') cashIncome += m.amount;
+        else digitalIncome += m.amount;
+      } else {
+        totalExpense += m.amount;
+        if (m.paymentMethod === 'CASH') cashExpense += m.amount;
+        else digitalExpense += m.amount;
       }
     });
 
@@ -97,7 +112,21 @@ exports.closeBox = async (req, res) => {
     activeSession.closedBy = req.user?.id || null;
     
     await activeSession.save();
-    res.json(activeSession);
+    res.json({
+      session: activeSession,
+      summary: {
+        initialAmount: activeSession.initialAmount,
+        finalCashAmount: cashBalance,
+        totalIncome,
+        totalExpense,
+        cashIncome,
+        digitalIncome,
+        cashExpense,
+        digitalExpense,
+        movementCount: movements.length,
+        net: totalIncome - totalExpense
+      }
+    });
   } catch (_error) {
     res.status(500).json({ message: 'Error closing box' });
   }
@@ -165,7 +194,8 @@ exports.getLastMovements = async (req, res) => {
     const movements = await CashMovement.find()
       .sort({ date: -1 })
       .limit(20)
-      .populate('patientId', 'primer_nombre apellido_paterno');
+      .populate('patientId', 'primer_nombre apellido_paterno')
+      .populate('creadoPor', 'nombre');
     res.json(movements);
   } catch (_error) {
     res.status(500).json({ message: 'Error fetching movements' });

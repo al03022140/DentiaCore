@@ -304,6 +304,14 @@ exports.updateFullPeriodontogram = [
       console.log('  - Buscando periodontograma...');
       let periodontogram = await Periodontogram.findOne({ patient: id });
       console.log('  - Periodontograma encontrado:', !!periodontogram);
+
+      // NOM-024: Los registros firmados son inmutables
+      if (periodontogram && periodontogram.estadoRegistro === 'OFICIAL') {
+        return res.status(403).json({
+          success: false,
+          message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
+        });
+      }
       
       if (!periodontogram) {
         console.log('  - Creando nuevo periodontograma...');
@@ -588,6 +596,14 @@ exports.savePeriodontogramData = [
       console.log('✅ Datos validados correctamente:', validatedData);
 
       const periodontogram = await ensurePeriodontogramExists(patientId, userId);
+
+      // NOM-024: Los registros firmados son inmutables
+      if (periodontogram.estadoRegistro === 'OFICIAL') {
+        return res.status(403).json({
+          success: false,
+          message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
+        });
+      }
 
       // Determinar estadoRegistro según permisos (asistente → BORRADOR)
       const userPerms = getEffectivePermissions(req.user);

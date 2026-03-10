@@ -120,6 +120,14 @@ const login = async (req, res, next) => {
       user.failedLoginAttempts = 0;
     }
     await user.save();
+
+    // Registrar login fallido en auditoría (NOM-024)
+    auditLogger.registrarManual(
+      { user: { id: user._id, role: user.rol }, ip: req.ip },
+      'login_fallido',
+      { resourceType: 'usuario', resourceId: user._id, detalles: { intentos: user.failedLoginAttempts } }
+    ).catch(() => {});
+
     return res.status(401).json({ message: 'Credenciales inválidas' });
   }
 
@@ -187,6 +195,15 @@ const logout = async (req, res, next) => {
     } catch (_error) {
       // Ignorar errores de token al cerrar sesión
     }
+  }
+
+  // Registrar logout en auditoría (NOM-024)
+  if (req.user) {
+    auditLogger.registrarManual(
+      { user: { id: req.user.id, role: req.user.role }, ip: req.ip },
+      'logout',
+      { resourceType: 'usuario', resourceId: req.user.id }
+    ).catch(() => {});
   }
 
   res.clearCookie('refreshToken', buildCookieOptions());

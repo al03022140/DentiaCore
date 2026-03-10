@@ -36,6 +36,19 @@ const CashPage = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleDismissModal = () => {
+    setShowOpenModal(false);
+  };
+
+  const handleBoxClosed = () => {
+    setIsBoxOpen(false);
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleRequestOpenBox = () => {
+    setShowOpenModal(true);
+  };
+
   const handleMovementAdded = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -46,7 +59,7 @@ const CashPage = () => {
 
   return (
     <div className="cash-page">
-      <OpenBoxModal visible={showOpenModal} onOpenSuccess={handleOpenSuccess} />
+      <OpenBoxModal visible={showOpenModal} onOpenSuccess={handleOpenSuccess} onCancel={handleDismissModal} />
 
       {/* Columna Izquierda */}
       <div className="cash-left-section">
@@ -57,7 +70,12 @@ const CashPage = () => {
         
         {/* Panel Inferior: Acciones Operativas */}
         <div className="cash-card cash-actions-card">
-          <ActionsPanel onMovementAdded={handleMovementAdded} />
+          <ActionsPanel
+            isBoxOpen={isBoxOpen}
+            onMovementAdded={handleMovementAdded}
+            onBoxClosed={handleBoxClosed}
+            onRequestOpenBox={handleRequestOpenBox}
+          />
         </div>
       </div>
 

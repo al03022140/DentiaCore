@@ -11,7 +11,7 @@ const Patient = require('../models/patient');
 const { migratePatient } = require('../scripts/migratePatientData');
 
 // Configuración de pruebas
-const TEST_DB_URI = process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/dental_clinic_test';
+const TEST_DB_URI = process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/DentiaCore_test';
 
 // Helper: datos mínimos válidos para crear un paciente (campos requeridos)
 let docCounter = 0;
@@ -352,7 +352,7 @@ describe('Integración Completa', () => {
     beforeAll(async () => {
         if (mongoose.connection.readyState !== 1) {
             await mongoose.connect(
-                process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/dental_clinic_test'
+                process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/DentiaCore_test'
             );
         }
     });

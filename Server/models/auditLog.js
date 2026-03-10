@@ -166,9 +166,8 @@ auditLogSchema.index({ evento: 1, timestamp: -1 });
 auditLogSchema.index({ patientId: 1, timestamp: -1 });
 auditLogSchema.index({ resourceType: 1, resourceId: 1, timestamp: -1 });
 
-// TTL index: retención mínima 5 años (1825 días).
-// En producción, esto se configura en MongoDB directamente para mayor control.
-// auditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 157680000 }); // 5 años
+// TTL index: retención mínima 5 años (NOM-004 Art. 5.4 — conservación de expediente)
+auditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 157680000 }); // 5 años ≈ 1825 días
 
 /**
  * Registrar un evento de auditoría.

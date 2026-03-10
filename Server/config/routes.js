@@ -12,6 +12,7 @@ const draftRoutes = require('../routes/draftRoutes');
 const googleRoutes = require('../routes/googleRoutes');
 const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
+const validarCapturaExtemporanea = require('../middlewares/capturaExtemporanea');
 
 // Configuración de rutas
 const configureRoutes = () => {
@@ -58,6 +59,9 @@ const configureRoutes = () => {
 
   // Middleware de auditoría automática para escrituras (NOM-024)
   router.use(auditLogger());
+
+  // Validación de captura extemporánea en escrituras clínicas (roles.MD §9.5)
+  router.use(validarCapturaExtemporanea);
 
   // Montar rutas protegidas - las subrutas se manejan dentro
   router.use('/patients', patientRoutes);
