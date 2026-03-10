@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const checkPatient = require('../middlewares/checkPatient');
+const { authorize, requireClinicalRole } = require('../middlewares/authorize');
 
 const {
   verificarOdontogramaInicial,
@@ -19,7 +20,7 @@ const {
 } = require('../controllers/odontogramaController');
 
 const {
-  uploadMulter,
+  _uploadMulter,
   uploadPng,
   handleMulterError,
   cleanupOnError
@@ -56,46 +57,54 @@ const setUploadDir = (dir) => (req, res, next) => {
 // --- Odontograma Inicial ---
 router
   .route('/odontograma-inicial')
-  .get(verificarOdontogramaInicial)
+  .get(authorize(['odontogram.read']), verificarOdontogramaInicial)
   .post(
+    requireClinicalRole,
+    authorize(['odontogram.create', 'odontogram.write.draft']),
     setUploadDir('odontograma-inicial'),
     uploadPng.single('odontograma'),
     handleMulterError,
     validarEntradasOdontograma,
-    cleanupOnError,
     guardarOdontogramaInicial
   )
-  .delete(deleteInitialOdontogram);
+  .delete(authorize(['odontogram.delete']), deleteInitialOdontogram);
+
+// Error handler para limpiar archivos subidos si falla el guardado
+router.use('/odontograma-inicial', cleanupOnError);
 
 // Historial del odontograma inicial
 router
   .route('/odontograma-inicial/history')
-  .get(obtenerHistorialInicial)
+  .get(authorize(['odontogram.read']), obtenerHistorialInicial)
   .post(
+    requireClinicalRole,
+    authorize(['odontogram.create', 'odontogram.write.draft']),
     validarEntradasOdontograma,
     agregarHistorialInicial
   );
 
 // Obtener un snapshot específico del historial inicial
-router.get('/odontograma-inicial/history/:snapshotId', obtenerSnapshotPorId);
+router.get('/odontograma-inicial/history/:snapshotId', authorize(['odontogram.read']), obtenerSnapshotPorId);
 
 // --- Odontograma Clínico ---
 router
   .route('/odontograma-clinico')
-  .get(verificarOdontogramaClinico)
+  .get(authorize(['odontogram.read']), verificarOdontogramaClinico)
   .post(
+    requireClinicalRole,
+    authorize(['odontogram.create', 'odontogram.write.draft']),
     validarEntradasOdontograma,
     saveClinicalHistoryEntries
   )
-  .delete(deleteClinicalOdontogramState);
+  .delete(authorize(['odontogram.delete']), deleteClinicalOdontogramState);
 
 // Historial del odontograma clínico
 router
   .route('/odontograma-clinico/history')
-  .get(obtenerHistorialClinico);
+  .get(authorize(['odontogram.read']), obtenerHistorialClinico);
 
 // Eliminar entrada específica del historial clínico
-router.delete('/odontograma-clinico/history/:entryId', deleteClinicalHistoryEntry);
+router.delete('/odontograma-clinico/history/:entryId', authorize(['odontogram.delete']), deleteClinicalHistoryEntry);
 
 // Error handler específico para odontograma
 router.use(manejarError);

@@ -1,9 +1,4 @@
 
-
-
-
-import React from 'react';
-
 const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
   return (
     <section className="form-section">

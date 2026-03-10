@@ -2,19 +2,25 @@ const express = require('express');
 const mongoose = require('mongoose');
 const patientRoutes = require('../routes/patientRoutes');
 const periodontogramRoutes = require('../routes/periodontogramRoutes');
+const cashRoutes = require('../routes/cashRoutes');
+const authRoutes = require('../routes/authRoutes');
+const userRoutes = require('../routes/userRoutes');
+const statsRoutes = require('../routes/statsRoutes');
+const appointmentRoutes = require('../routes/appointmentRoutes');
+const examRoutes = require('../routes/examRoutes');
+const draftRoutes = require('../routes/draftRoutes');
+const googleRoutes = require('../routes/googleRoutes');
+const authenticate = require('../middlewares/authenticate');
+const auditLogger = require('../middlewares/auditLogger');
+const validarCapturaExtemporanea = require('../middlewares/capturaExtemporanea');
 
 // Configuración de rutas
 const configureRoutes = () => {
   const router = express.Router();
 
-  // Debug: Log de configuración de rutas
-  console.log('🔍 DEBUG: Configurando rutas principales');
-  console.log('  - Montando /patients');
-  console.log('  - Montando /periodontograms');
-
-  // Montar rutas - las subrutas se manejan dentro
-  router.use('/patients', patientRoutes);
-  router.use('/periodontograms', periodontogramRoutes);
+  // Montar rutas públicas
+  router.use('/auth', authRoutes);
+  router.use('/google', googleRoutes);
 
   // Ruta de estado de salud (incluye estado de conexión a DB)
   router.get('/health', (req, res) => {
@@ -48,6 +54,25 @@ const configureRoutes = () => {
     });
   }
 
+  // Autenticación para el resto de rutas
+  router.use(authenticate);
+
+  // Middleware de auditoría automática para escrituras (NOM-024)
+  router.use(auditLogger());
+
+  // Validación de captura extemporánea en escrituras clínicas (roles.MD §9.5)
+  router.use(validarCapturaExtemporanea);
+
+  // Montar rutas protegidas - las subrutas se manejan dentro
+  router.use('/patients', patientRoutes);
+  router.use('/periodontograms', periodontogramRoutes);
+  router.use('/cash', cashRoutes);
+  router.use('/users', userRoutes);
+  router.use('/stats', statsRoutes);
+  router.use('/appointments', appointmentRoutes);
+  router.use('/exams', examRoutes);
+  router.use('/drafts', draftRoutes);
+
   // Capturar rutas no encontradas
   router.use('*', (req, res) => {
     res.status(404).json({ 
@@ -55,6 +80,17 @@ const configureRoutes = () => {
       path: req.originalUrl,
       method: req.method
     });
+  });
+
+  // Manejador global de errores — captura rechazos de promesas y excepciones no controladas
+  // eslint-disable-next-line no-unused-vars
+  router.use((err, req, res, _next) => {
+    const statusCode = err.statusCode || err.status || 500;
+    const message = statusCode === 500 ? 'Error interno del servidor' : err.message;
+    console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err);
+    if (!res.headersSent) {
+      res.status(statusCode).json({ error: message });
+    }
   });
 
   return router;

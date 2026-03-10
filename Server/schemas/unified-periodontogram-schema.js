@@ -532,8 +532,9 @@ function getDefaultToothData(toothNumber = null) {
   };
   
   if (toothNumber) {
-    // Determinar arcada según número de diente
-    defaultData.arcada = (parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28) ? 'superior' : 'inferior';
+    // Determinar arcada según cuadrante (primer dígito del número de diente)
+    const firstDigit = Math.floor(parseInt(toothNumber) / 10);
+    defaultData.arcada = [1, 2, 5, 6].includes(firstDigit) ? 'superior' : 'inferior';
   }
   
   return defaultData;

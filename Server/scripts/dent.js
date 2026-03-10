@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
 const { getUploadsBase } = require('../utils/uploads');
@@ -77,10 +78,11 @@ app.use(cors({
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false // Cambiar a true si usas cookies/sesiones
+    credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
 
 // Middleware urlencoded condicional aplicado después de morgan
@@ -275,7 +277,13 @@ if (process.env.NODE_ENV !== 'test') {
     (async () => {
         try {
             // Esperar a que la DB esté conectada ANTES de arrancar el servidor
-            await connectDB();
+            const dbConnection = await connectDB();
+            
+            // Health check simple de la conexión
+            if (dbConnection.readyState !== 1) {
+                throw new Error('La base de datos no está en estado "Connected"');
+            }
+            logger.info('✅ Auditoría de DB: Conexión establecida y lista para escritura.');
         } catch (err) {
             logger.error('🛑 Falló la conexión a MongoDB al inicio', { err });
             process.exit(1);
@@ -289,6 +297,7 @@ if (process.env.NODE_ENV !== 'test') {
 
         server = app.listen(PORT, host, () => {
             logger.info('🔥 Servidor corriendo en http://%s:%d', displayHost, PORT);
+            logger.info(`🔗 API accesible en ${process.env.API_URL || `http://localhost:${PORT}`}`);
         });
 
         // 11) Graceful shutdown

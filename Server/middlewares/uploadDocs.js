@@ -1,6 +1,5 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs-extra');
 const { v4: uuid } = require('uuid');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 
@@ -84,7 +83,7 @@ const handleMulterError = (err, req, res, next) => {
     }
   }
   
-  if (err.message.includes('Solo se permiten archivos')) {
+  if (err?.message?.includes('Solo se permiten archivos')) {
     return res.status(400).json({
       success: false,
       error: {

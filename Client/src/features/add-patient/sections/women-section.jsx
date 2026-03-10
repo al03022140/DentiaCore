@@ -1,9 +1,3 @@
-
-
-
-
-import React from 'react';
-
 const WomenSection = ({ 
   formData, 
   setFormData, 

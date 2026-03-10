@@ -3,10 +3,7 @@ const path = require('path');
 const fsExtra = require('fs-extra');
 // Logger removido
 
-const { getUploadsBase, resolveUploadsPath } = require('../utils/uploads');
-
-// Añadir base de uploads configurable por entorno
-const uploadsBase = getUploadsBase();
+const { resolveUploadsPath } = require('../utils/uploads');
 
 // Errores personalizados
 class FileTooLargeError extends Error {
@@ -39,9 +36,15 @@ const storage = multer.diskStorage({
       console.error('[uploadImage] destination - ERROR: patientId is not set!');
       return cb(new Error('Patient ID not found'));
     }
-    
+
+    // Validar que patientId sea un ObjectId válido para prevenir path traversal
+    if (!/^[a-f\d]{24}$/i.test(patientId)) {
+      console.error('[uploadImage] destination - ERROR: patientId is not a valid ObjectId!');
+      return cb(new Error('Patient ID inválido'));
+    }
+
     // 2) Monta la carpeta correcta usando UPLOADS_DIR si está definido
-  const uploadPath = resolveUploadsPath(patientId, req.uploadDir);
+  const uploadPath = resolveUploadsPath('pacientes', patientId, req.uploadDir);
     
     // Ruta de upload configurada
     
@@ -180,45 +183,19 @@ const handleMulterError = (err, req, res, next) => {
   next(err);
 };
 
-// Middleware para limpiar archivos temporales en caso de error
-const cleanupOnError = async (req, res, next) => {
-  // Guardamos una referencia al archivo subido
-  const uploadedFile = req.file;
-  
-  // Envolvemos el siguiente middleware en un try-catch
-  try {
-    // Llamamos al siguiente middleware
-    await new Promise((resolve, reject) => {
-      const nextHandler = next();
-      if (nextHandler instanceof Promise) {
-        nextHandler.then(resolve).catch(reject);
-      } else {
-        resolve();
-      }
+// Middleware de error para limpiar archivos temporales cuando falla un paso posterior.
+// Usa la firma de 4 argumentos de Express para interceptar errores.
+const cleanupOnError = (err, req, res, next) => {
+  if (err && req.file && req.file.path) {
+    fsExtra.remove(req.file.path).catch((cleanupError) => {
+      console.error('❌ Error al limpiar archivo temporal:', {
+        originalError: err,
+        cleanupError,
+        file: req.file.path
+      });
     });
-  } catch (error) {
-    // Si hay error y existe un archivo subido, lo eliminamos
-    if (uploadedFile && uploadedFile.path) {
-      try {
-        await fsExtra.remove(uploadedFile.path);
-        // Archivo temporal eliminado
-      } catch (cleanupError) {
-        console.error('❌ Error al limpiar archivo temporal:', {
-          originalError: error,
-          cleanupError,
-          file: uploadedFile.path
-        });
-      }
-    }
-    // Propagamos el error original
-    next(error);
   }
-};
-
-// Utilidad para obtener la extensión del archivo
-const getExtension = (filename) => {
-  const ext = filename.split('.').pop();
-  return ext ? `.${ext}` : '';
+  next(err);
 };
 
 module.exports = {

@@ -12,148 +12,37 @@ const generateRandomMeasurement = (min, max) => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-// Generar datos completos para un diente
+// Generar datos completos para un diente en estructura canónica:
+// measurement > face > array (e.g. placa.vestibularSuperior = [1,0,1])
 const generateCompletToothData = (toothNumber) => {
-  const isUpper = toothNumber >= 11 && toothNumber <= 28;
+  const faces = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
+  
+  const buildFaceArrays = (min, max) => {
+    const obj = {};
+    faces.forEach(f => {
+      obj[f] = [
+        generateRandomMeasurement(min, max),
+        generateRandomMeasurement(min, max),
+        generateRandomMeasurement(min, max)
+      ];
+    });
+    return obj;
+  };
   
   return {
+    // numeroDiente is required by validateToothData but excluded by
+    // validatePeriodontogramStructure whitelist — kept for individual checks.
     numeroDiente: toothNumber,
-    arcada: isUpper ? 'superior' : 'inferior',
     ausente: false,
     implante: false,
     movilidad: generateRandomMeasurement(0, 3),
     anchuraEncia: generateRandomMeasurement(0, 8),
     pronostico: ['Excelente', 'Bueno', 'Regular', 'Malo'][generateRandomMeasurement(0, 3)],
-    
-    // Vestibular Superior o Inferior
-    vestibularSuperior: {
-      profundidadSondaje: [
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6)
-      ],
-      margenGingival: [
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3)
-      ],
-      sangrado: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      supuracion: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      placa: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ]
-    },
-    
-    // Palatino Superior o Lingual Inferior
-    palatinoSuperior: {
-      profundidadSondaje: [
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6)
-      ],
-      margenGingival: [
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3)
-      ],
-      sangrado: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      supuracion: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      placa: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ]
-    },
-    
-    vestibularInferior: {
-      profundidadSondaje: [
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6)
-      ],
-      margenGingival: [
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3)
-      ],
-      sangrado: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      supuracion: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      placa: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ]
-    },
-    
-    lingualInferior: {
-      profundidadSondaje: [
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6),
-        generateRandomMeasurement(1, 6)
-      ],
-      margenGingival: [
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3),
-        generateRandomMeasurement(-2, 3)
-      ],
-      sangrado: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      supuracion: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ],
-      placa: [
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1),
-        generateRandomMeasurement(0, 1)
-      ]
-    },
-    
-    // Furca (solo para molares)
-    furca: {
-      vestibular: [16, 17, 18, 26, 27, 28, 36, 37, 38, 46, 47, 48].includes(toothNumber) 
-        ? generateRandomMeasurement(0, 3) 
-        : 0,
-      lingualPalatino: [16, 17, 18, 26, 27, 28, 36, 37, 38, 46, 47, 48].includes(toothNumber)
-        ? generateRandomMeasurement(0, 3)
-        : 0,
-      doble: {
-        furca1: 0,
-        furca2: 0
-      }
-    },
-    
-    fechaUltimaModificacion: new Date().toISOString()
+    profundidadSondaje: buildFaceArrays(1, 6),
+    margenGingival: buildFaceArrays(-2, 3),
+    sangrado: buildFaceArrays(0, 1),
+    supuracion: buildFaceArrays(0, 1),
+    placa: buildFaceArrays(0, 1)
   };
 };
 

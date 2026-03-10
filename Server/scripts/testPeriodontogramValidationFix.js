@@ -25,7 +25,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
  */
 const connectDB = async () => {
     try {
-        const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic';
+        const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore';
         await mongoose.connect(mongoURI);
         console.log('✅ Conectado a MongoDB exitosamente');
     } catch (error) {

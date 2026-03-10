@@ -1,30 +1,14 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
 const periodontogramController = require('../controllers/periodontogramController');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
+const { authorize, requireClinicalRole } = require('../middlewares/authorize');
 
 // mergeParams: true permite acceder a req.params.id del padre (el id del paciente)
 const router = express.Router({ mergeParams: true });
 
-// Middleware de seguridad
-router.use(helmet());
+// helmet() ya se aplica a nivel de app — no duplicar en sub-router
 
-// Middleware temporal para simular usuario autenticado
-router.use((req, res, next) => {
-  const mongoose = require('mongoose');
-  req.user = {
-    id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
-    role: 'dentist',
-    permissions: [
-      'read_periodontogram',
-      'create_periodontogram',
-      'update_periodontogram',
-      'delete_periodontogram'
-    ]
-  };
-  next();
-});
 
 // Rate limiting para operaciones de escritura
 const writeRateLimit = rateLimit({
@@ -52,62 +36,38 @@ const readRateLimit = rateLimit({
   skip: (req) => req.method !== 'GET'
 });
 
-// Middleware de autorización para verificar permisos
-const authorize = (permissions = []) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
-    }
-    if (permissions.length > 0) {
-      const userPermissions = req.user.permissions || [];
-      const hasPermission = permissions.some(permission => 
-        userPermissions.includes(permission) || req.user.role === 'admin'
-      );
-      if (!hasPermission) {
-        return res.status(403).json({ success: false, message: 'Permisos insuficientes para esta operación' });
-      }
-    }
-    next();
-  };
-};
 
 // RUTAS PRINCIPALES
-router.get('/', readRateLimit, periodontogramController.getPeriodontogram);
+router.get('/', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogram);
 
 router.post('/', 
-  (req, res, next) => {
-    console.log('🔍 DEBUG: POST periodontogram route reached');
-    console.log('  - req.params:', req.params);
-    console.log('  - req.body:', req.body);
-    console.log('  - req.url:', req.url);
-    console.log('  - req.originalUrl:', req.originalUrl);
-    next();
-  },
   writeRateLimit,
+  requireClinicalRole,
+  authorize(['periodontogram.create', 'periodontogram.write.draft']),
   PeriodontogramValidationMiddleware.validatePeriodontogramCreation(),
   PeriodontogramValidationMiddleware.checkValidationErrors(),
   periodontogramController.createInitialPeriodontogram
 );
 
-router.put('/', writeRateLimit, periodontogramController.updateFullPeriodontogram);
+router.put('/', writeRateLimit, requireClinicalRole, authorize(['periodontogram.update', 'periodontogram.write.draft']), periodontogramController.updateFullPeriodontogram);
 
 // Agregar endpoint para exponer los JSON Schemas del periodontograma
-router.get('/schemas', readRateLimit, authorize(['read_periodontogram']), periodontogramController.getPeriodontogramSchemas);
+router.get('/schemas', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramSchemas);
 
 // Agregar endpoints para manejo de datos JSON del periodontograma (/data)
-router.put('/data', writeRateLimit, periodontogramController.savePeriodontogramData);
-router.get('/data', readRateLimit, periodontogramController.getPeriodontogramData);
+router.put('/data', writeRateLimit, requireClinicalRole, authorize(['periodontogram.update', 'periodontogram.write.draft']), periodontogramController.savePeriodontogramData);
+router.get('/data', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramData);
 
 // Estadísticas del periodontograma (actual o por versión)
-router.get('/statistics', readRateLimit, periodontogramController.getPeriodontogramStatistics);
-router.get('/statistics/:version', readRateLimit, periodontogramController.getPeriodontogramStatistics);
+router.get('/statistics', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramStatistics);
+router.get('/statistics/:version', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramStatistics);
 
-router.get('/history', readRateLimit, periodontogramController.getPeriodontogramHistory);
+router.get('/history', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramHistory);
 
-router.delete('/', writeRateLimit, periodontogramController.deletePeriodontogram);
+router.delete('/', writeRateLimit, authorize(['periodontogram.delete']), periodontogramController.deletePeriodontogram);
 
 // Middleware de manejo de errores específico para periodontograma
-router.use((error, req, res, next) => {
+router.use((error, req, res, _next) => {
   console.error('Periodontogram route error:', error);
   if (error.name === 'ValidationError') {
     const errors = Object.values(error.errors).map(err => ({ field: err.path, message: err.message }));

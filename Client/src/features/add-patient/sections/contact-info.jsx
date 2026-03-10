@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
   return (
     <section className="form-section">

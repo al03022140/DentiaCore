@@ -400,7 +400,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
                     trastornos_coagulacion: 'Trastornos de Coagulación',
                     anemia: 'Anemia',
                     sida: 'SIDA',
-                    arteroesclerosis: 'Arteroesclerosis',
+                    arteriosclerosis: 'Arteriosclerosis',
                     hipotiroidismo: 'Hipotiroidismo',
                     cancer: 'Cáncer',
                     esclerodermia: 'Esclerodermia',

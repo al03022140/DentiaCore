@@ -4,19 +4,19 @@
 .periodontogram-title {
   text-align: center;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--color-neutral-1100);
   font-size: 1.5rem;
-  font-weight: bolder;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Secciones del arco dental */
 .arch-section {
   margin-bottom: 20px;
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-neutral-500);
   padding: 20px; /* Unificado con periodontogram-data-table.css */
   border-radius: 6px; /* Añadido para consistencia */
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05); /* Añadido para consistencia */
+  box-shadow: 0 1px 4px var(--color-black-05); /* Añadido para consistencia */
   box-sizing: border-box; /* Asegurar cálculo correcto de dimensiones */
   width: 100%; /* Asegurar ancho completo */
   text-align: center; /* Centrar el contenido, incluyendo el título */
@@ -27,9 +27,9 @@
   margin-bottom: 15px;
   margin-left: auto;
   margin-right: auto;
-  color: #030303;
+  color: var(--color-text-deep);
   font-size: 1.5rem;
-  font-weight: bolder;
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 1px;
   border-bottom: none !important; /* Sin borde inferior - título centrado sin líneas */
@@ -79,12 +79,12 @@
 }
 
 .tooth-number {
-  background: #495057;
-  color: white;
+  background: var(--color-neutral-1000);
+  color: var(--color-bg-white);
   padding: 6px 4px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   font-size: 0.85rem;
-  border: 1px solid #343a40;
+  border: 1px solid var(--color-neutral-1050);
 }
 
 
@@ -145,11 +145,11 @@
 .data-cell select:disabled,
 .triple-input input:disabled,
 .mini-input:disabled {
-  background-color: #f8f9fa !important;
-  color: #6c757d !important;
+  background-color: var(--color-neutral-100) !important;
+  color: var(--color-neutral-900) !important;
   opacity: 0.6;
   cursor: not-allowed;
-  border: 1px solid #dc3545 !important;
+  border: 1px solid var(--color-red-500) !important;
 }
 
 /* Gradiente para celdas con elementos deshabilitados - SOLO en edición */
@@ -167,15 +167,15 @@
 .periodontogram-container:not([data-read-only="true"]) .mini-input-cell:has(.mini-input:disabled) {
   background: linear-gradient(
     135deg,
-    rgba(220, 53, 69, 0.1) 0%,
-    rgba(248, 249, 250, 0.9) 25%,
-    rgba(220, 53, 69, 0.1) 50%,
-    rgba(248, 249, 250, 0.9) 75%,
-    rgba(220, 53, 69, 0.1) 100%
+    var(--color-red-500-10) 0%,
+    var(--color-neutral-100-90) 25%,
+    var(--color-red-500-10) 50%,
+    var(--color-neutral-100-90) 75%,
+    var(--color-red-500-10) 100%
   );
   opacity: 0.8;
   position: relative;
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  border: 1px solid var(--color-red-500-30);
 }
 
 /* Líneas diagonales para elementos deshabilitados - SOLO en edición */
@@ -200,8 +200,8 @@
     45deg,
     transparent,
     transparent 6px,
-    rgba(220, 53, 69, 0.15) 6px,
-    rgba(220, 53, 69, 0.15) 8px
+    var(--color-red-500-15) 6px,
+    var(--color-red-500-15) 8px
   );
   pointer-events: none;
   z-index: 1;
@@ -214,12 +214,12 @@
 }
 
 .row-label {
-  background: #f8f9fa;
+  background: var(--color-neutral-100);
   padding: 6px 8px;
-  font-weight: bold;
-  color: #000000;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-black);
   text-align: left;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-neutral-500);
   font-size: 0.85rem;
   justify-content: flex-start;
   min-height: 32px;
@@ -233,8 +233,8 @@
 }
 
 .data-cell {
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-neutral-500);
   padding: 3px;
   font-size: 0.8rem;
   min-height: 28px;
@@ -297,8 +297,8 @@
   appearance: none !important;
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
-  background: #ff8c00 !important;
-  border: 1px solid #ff8c00 !important;
+  background: var(--color-orange-650) !important;
+  border: 1px solid var(--color-orange-650) !important;
   border-radius: 2px !important;
   width: 12px !important;
   height: 12px !important;
@@ -312,8 +312,8 @@
   appearance: none !important;
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
-  background: #9b59b6 !important;
-  border: 1px solid #9b59b6 !important;
+  background: var(--color-purple-500) !important;
+  border: 1px solid var(--color-purple-500) !important;
   border-radius: 2px !important;
   width: 12px !important;
   height: 12px !important;
@@ -327,8 +327,8 @@
 .triple-checkbox input.mini-checkbox[data-type="plaque"]:disabled:not(:checked),
 .data-cell .triple-checkbox input.mini-checkbox[data-type="suppuration"]:disabled:not(:checked),
 .data-cell .triple-checkbox input.mini-checkbox[data-type="plaque"]:disabled:not(:checked) {
-  border: 1px solid #666 !important;
-  background: #fff !important;
+  border: 1px solid var(--color-border-strong) !important;
+  background: var(--color-bg-white) !important;
   width: 12px !important;
   height: 12px !important;
   border-radius: 2px !important;
@@ -341,7 +341,7 @@
 .triple-checkbox:has(input:disabled)::after {
   top: 50%;
   height: 2px;
-  background: rgba(220, 53, 69, 0.4);
+  background: var(--color-red-500-40);
   transform: translateY(-50%);
   z-index: 2;
 }
@@ -363,20 +363,20 @@
 
 /* Números de dientes - Consolidado */
 .tooth-number {
-  background: #495057;
-  color: white;
+  background: var(--color-neutral-1000);
+  color: var(--color-bg-white);
   padding: 6px 4px;
   text-align: center;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   font-size: 0.85rem;
-  border: 1px solid #343a40;
+  border: 1px solid var(--color-neutral-1050);
 }
 
 /* Celdas de imágenes - Dimensiones optimizadas para imágenes reales */
 .image-cell {
-  background: white;
+  background: var(--color-bg-white);
   padding: 4px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-neutral-500);
   min-height: 150px;
   height: 150px;
   width: 65px;
@@ -387,9 +387,9 @@
 /* Estados de hover consolidados */
 .image-cell:hover,
 .data-cell:hover {
-  background: #f8f9fa;
-  border-color: #007bff;
-  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+  background: var(--color-neutral-100);
+  border-color: var(--color-blue-500);
+  box-shadow: 0 2px 8px var(--color-blue-500-15);
 }
 
 /* Contenedor de imagen de diente - Tamaño exacto para fondos */
@@ -450,7 +450,7 @@
 }
 
 .tooth-image-wrapper.selected {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--color-blue-500);
   outline-offset: 2px;
 }
 
@@ -459,12 +459,12 @@
   top: -5px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+  background: var(--color-black-70);
+  color: var(--color-bg-white);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: var(--font-weight-semibold);
   z-index: 10;
   pointer-events: none;
 }
@@ -475,7 +475,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 123, 255, 0.2);
+  background: var(--color-blue-500-20);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -485,7 +485,7 @@
 
 .selection-indicator {
   font-size: 20px;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.5));
+  filter: drop-shadow(0 0 3px var(--color-black-50));
 }
 
 /* Superposición para dientes ausentes en sección de imágenes */
@@ -495,14 +495,14 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(220, 53, 69, 0.20);
+  background: var(--color-red-500-20);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  font-weight: bold;
-  color: #dc3545;
-  font-family: Arial, sans-serif;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-red-500);
+  font-family: var(--font-family-primary);
   z-index: 3;
   pointer-events: none;
 }
@@ -531,8 +531,8 @@
     45deg,
     transparent,
     transparent 6px,
-    rgba(220, 53, 69, 0.15) 6px,
-    rgba(220, 53, 69, 0.15) 8px
+    var(--color-red-500-15) 6px,
+    var(--color-red-500-15) 8px
   );
   pointer-events: none;
   z-index: 1;
@@ -543,12 +543,12 @@
   width: 100%;
   max-width: 25px;
   height: 17px;
-  border: 1px solid #007bff;
+  border: 1px solid var(--color-blue-500);
   font-size: 0.9rem;
   padding: 1px;
-  background: #ffffff;
-  box-shadow: 0 3px 3px rgba(126, 126, 126, 0.1);
-  outline: 1px solid #eeeeee;
+  background: var(--color-bg-white);
+  box-shadow: 0 3px 3px var(--color-gray-500-10);
+  outline: 1px solid var(--color-neutral-175);
   position: relative;
   z-index: 3;
 }
@@ -567,8 +567,8 @@
 
 .mini-input:focus {
   outline: none;
-  border-color: #0056b3;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 0 0 2px var(--color-blue-500-25);
   transform: scale(1.05);
 }
 
@@ -589,10 +589,10 @@
   width: 100%;
   max-width: 50px;
   height: 24px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-neutral-800);
   font-size: 0.7rem;
   padding: 1px;
-  background: white;
+  background: var(--color-bg-white);
   overflow: hidden;
   text-overflow: ellipsis;
   /* Ocultar flecha desplegable */
@@ -604,8 +604,8 @@
 
 .mini-select:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 2px var(--color-blue-500-25);
 }
 
 .select-cell {
@@ -615,25 +615,25 @@
 
 /* Estilos para diferentes tipos de datos */
 .profundidad {
-  background-color: #fff3cd;
+  background-color: var(--color-yellow-100);
 }
 
 .margen-gingival {
-  background-color: #d1ecf1;
+  background-color: var(--color-info-100);
 }
 
 .placa {
-  background-color: #f8d7da;
+  background-color: var(--color-danger-100);
 }
 
 
 
 .sangrado {
-  background-color: #d4edda;
+  background-color: var(--color-success-100);
 }
 
 .supuracion {
-  background-color: #e2e3e5;
+  background-color: var(--color-neutral-220);
 }
 
 /* Responsive design */
@@ -700,12 +700,12 @@
 }
 
 .tooth-image:focus {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--color-blue-500);
   outline-offset: 2px;
 }
 
 .mini-input:invalid {
-  border-color: #dc3545;
+  border-color: var(--color-red-500);
 }
 
 
@@ -731,32 +731,32 @@
 
 /* Estilos específicos para gumWidth */
 .gum-width-red {
-  color: #dc3545 !important;
-  font-weight: bold;
+  color: var(--color-red-500) !important;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Asegurar que el color rojo se aplique incluso en campos deshabilitados */
 .mini-input.gum-width-red:disabled {
-  color: #dc3545 !important;
-  font-weight: bold !important;
+  color: var(--color-red-500) !important;
+  font-weight: var(--font-weight-semibold) !important;
 }
 
 /* Especificidad adicional para contenedores con inputs deshabilitados */
 .mini-input-cell:has(.mini-input.gum-width-red:disabled) .mini-input.gum-width-red {
-  color: #dc3545 !important;
-  font-weight: bold !important;
+  color: var(--color-red-500) !important;
+  font-weight: var(--font-weight-semibold) !important;
 }
 
 /* Placeholder que se ve igual al texto normal */
 .mini-input::placeholder {
-  color: #000;
+  color: var(--color-text-black);
   opacity: 1;
-  font-weight: normal;
+  font-weight: var(--font-weight-normal);
   font-size: inherit;
 }
-.mini-checkbox[data-type="bleeding"]:checked { accent-color: #e74c3c; }
-.mini-checkbox[data-type="suppuration"]:checked { accent-color: #f39c12; }
-.mini-checkbox[data-type="plaque"]:checked { accent-color: #2ecc71; }
+.mini-checkbox[data-type="bleeding"]:checked { accent-color: var(--color-danger); }
+.mini-checkbox[data-type="suppuration"]:checked { accent-color: var(--color-warning); }
+.mini-checkbox[data-type="plaque"]:checked { accent-color: var(--color-green-450); }
 
 /* Checkbox completamente relleno de naranja para supuración */
 .triple-checkbox .mini-checkbox[data-type="suppuration"]:checked,
@@ -765,8 +765,8 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: #ff8c00 !important;
-  border: 1px solid #ff8c00 !important;
+  background: var(--color-orange-650) !important;
+  border: 1px solid var(--color-orange-650) !important;
   border-radius: 2px;
   width: 12px !important;
   height: 12px !important;
@@ -780,8 +780,8 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: #9b59b6 !important;
-  border: 1px solid #9b59b6 !important;
+  background: var(--color-purple-500) !important;
+  border: 1px solid var(--color-purple-500) !important;
   border-radius: 2px;
   width: 12px !important;
   height: 12px !important;
@@ -793,8 +793,8 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: #fff;
-  border: 1px solid #666;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-border-strong);
   border-radius: 2px;
   width: 12px !important;
   height: 12px !important;
@@ -808,10 +808,10 @@
   left: 50%;
   width: 8px;
   height: 8px;
-  background: #e74c3c;
+  background: var(--color-danger);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3);
+  box-shadow: 0 0 2px var(--color-danger-30);
 }
 
 
@@ -827,13 +827,13 @@
 
 /* Contenedor del checkbox de implante (solo para checkbox personalizado) */
 .checkbox-cell:has(.checkbox-btn) {
-  background-color: rgba(40, 167, 69, 0.05);
+  background-color: var(--color-green-500-05);
   border-radius: 4px;
 }
 
 .checkbox-cell:has(.checkbox-btn input:checked) {
-  background-color: rgba(40, 167, 69, 0.15);
-  border: 1px solid rgba(40, 167, 69, 0.3);
+  background-color: var(--color-green-500-15);
+  border: 1px solid var(--color-green-500-30);
 }
 
 /* Estilos legacy para checkboxes de implante */
@@ -844,7 +844,7 @@
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
-  border: 1px solid #606062 !important;
+  border: 1px solid var(--color-neutral-750) !important;
   border-radius: 2px !important;
   cursor: pointer;
   flex-shrink: 0 !important;
@@ -860,8 +860,8 @@
 
 .implant-row .mini-checkbox:checked,
 .checkbox-visual.implant-checkbox:checked {
-  background-image: linear-gradient(#b9e9b3, #a8e4a0) !important;
-  border-color: #a8e4a0 !important;
+  background-image: linear-gradient(var(--color-green-250), var(--color-green-300)) !important;
+  border-color: var(--color-green-300) !important;
 }
 
 /* Estilos personalizados para checkbox de implante */
@@ -952,7 +952,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   left: 0;
   height: 25px;
   width: 25px;
-  border: 2.5px solid #ffffff;
+  border: 2.5px solid var(--color-bg-white);
   transition: .2s linear;
   background-color: transparent;
 }
@@ -971,8 +971,8 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   top: 40%;
   width: 10px;
   height: 14px;
-  border: 2px solid #0ea021;
-  filter: drop-shadow(0px 0px 10px #0ea021);
+  border: 2px solid var(--color-green-750);
+  filter: drop-shadow(0px 0px 10px var(--color-green-750));
   border-width: 0 2.5px 2.5px 0;
   transition: .2s linear;
   transform: translate(-50%, -50%) rotate(-90deg) scale(0.2);
@@ -1033,10 +1033,10 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 
 .tooth-number-btn {
   background: transparent;
-  color: #333;
+  color: #084888;
   border: none;
   padding: 4px;
-  font-weight: bolder;
+  font-weight: var(--font-weight-semibold);
   font-size: 18px;
   cursor: pointer;
   transition: color 0.2s ease;
@@ -1046,29 +1046,29 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 }
 
 .tooth-number-btn:hover {
-  color: #333;
+  color: var(--color-neutral-1100);
 }
 
 .tooth-number-btn:active {
-  color: #333;
+  color: var(--color-neutral-1100);
 }
 
 .tooth-number-btn.selected {
-  color: #333;
+  color: var(--color-neutral-1100);
   text-decoration: none;
 }
 
 .tooth-number-btn.absent {
-  color: #dc3545;
+  color: var(--color-red-500);
   text-decoration: line-through;
 }
 
 .tooth-number-btn.absent:hover {
-  color: #dc3545;
+  color: var(--color-red-500);
 }
 
 .tooth-number-btn:disabled {
-  color: #6c757d;
+  color: var(--color-neutral-900);
   cursor: not-allowed;
 }
 
@@ -1080,28 +1080,28 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .small-input {
   width: 50px;
   height: 32px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-dark);
   border-radius: 4px;
   font-size: 13px;
   padding: 4px;
 }
 
 .small-input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 2px var(--color-blue-500-25);
   outline: none;
 }
 
 /* Campo específico para anchura de encía */
 .mini-input-cell .mini-input {
-  background-color: #f8f9fa;
-  border-color: #6c757d;
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-900);
 }
 
 .mini-input-cell .mini-input:focus {
-  background-color: white;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  background-color: var(--color-bg-white);
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 2px var(--color-blue-500-25);
 }
 
 /* Estilos específicos para mini-inputs deshabilitados - Consolidado con estilos generales */
@@ -1142,9 +1142,9 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .periodontogram-container[data-read-only="true"] .triple-input:has(input:disabled),
 .periodontogram-container[data-read-only="true"] .triple-checkbox:has(input:disabled),
 .periodontogram-container[data-read-only="true"] .mini-input-cell:has(.mini-input:disabled) {
-  background: white !important;
+  background: var(--color-bg-white) !important;
   opacity: 1 !important;
-  border: 1px solid #dee2e6 !important;
+  border: 1px solid var(--color-neutral-500) !important;
 }
 
 /* Ocultar pseudo-elementos que generan el rayado diagonal */
@@ -1228,15 +1228,15 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .periodontogram-container[data-read-only="true"] .data-cell-container.absent .mini-input-cell {
   background: linear-gradient(
     135deg,
-    rgba(220, 53, 69, 0.1) 0%,
-    rgba(248, 249, 250, 0.9) 25%,
-    rgba(220, 53, 69, 0.1) 50%,
-    rgba(248, 249, 250, 0.9) 75%,
-    rgba(220, 53, 69, 0.1) 100%
+    var(--color-red-500-10) 0%,
+    var(--color-neutral-100-90) 25%,
+    var(--color-red-500-10) 50%,
+    var(--color-neutral-100-90) 75%,
+    var(--color-red-500-10) 100%
   ) !important;
   opacity: 0.8 !important;
   position: relative;
-  border: 1px solid rgba(220, 53, 69, 0.3) !important;
+  border: 1px solid var(--color-red-500-30) !important;
 }
 
 /* Restablecer línea horizontal de triple-input en read-only */
@@ -1264,9 +1264,9 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator {
    width: 16px;
    height: 16px;
-   border: 1px solid #606062;
+  border: 1px solid var(--color-neutral-750);
    border-radius: 2px;
-   background: #fff;
+   background: var(--color-bg-white);
    box-shadow: none;
    cursor: default;
    position: relative;
@@ -1275,7 +1275,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator:hover,
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator:focus {
-  border-color: #606062;
+  border-color: var(--color-neutral-750);
   box-shadow: none;
 }
 
@@ -1286,8 +1286,8 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 /* Visualización/solo-lectura: asegurar contorno visible en BleedingMultiStateCheckbox deshabilitado */
 .periodontogram-consolidated.rendered .triple-checkbox input.bleeding-multi-state:disabled,
 .periodontogram-consolidated.read-only .triple-checkbox input.bleeding-multi-state:disabled {
-  border: 1px solid #606062 !important;
-  background: #fff !important;
+  border: 1px solid var(--color-neutral-750) !important;
+  background: var(--color-bg-white) !important;
   z-index: 3 !important;
 }
 
@@ -1300,9 +1300,9 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator {
    width: 16px;
    height: 16px;
-   border: 1px solid #606062;
+  border: 1px solid var(--color-neutral-750);
    border-radius: 2px;
-   background: #fff;
+   background: var(--color-bg-white);
    box-shadow: none;
    cursor: default;
    position: relative;
@@ -1311,7 +1311,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator:hover,
 .periodontogram-consolidated.rendered .multi-state-checkbox__indicator:focus {
-  border-color: #606062;
+  border-color: var(--color-neutral-750);
   box-shadow: none;
 }
 
@@ -1346,8 +1346,8 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
     page-break-inside: auto !important; /* Permitir salto entre superior e inferior si es necesario */
     break-inside: auto !important;
     margin-bottom: 8px !important;
-    background: white !important;
-    border: 1px solid #000 !important;
+    background: var(--color-bg-white) !important;
+    border: 1px solid var(--color-text-black) !important;
     padding: 5px !important;
     box-shadow: none !important;
     width: 100% !important;
@@ -1356,7 +1356,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   }
 
   .arch-title {
-    color: #000 !important;
+    color: var(--color-text-black) !important;
     font-size: 10pt !important;
     margin-bottom: 3px !important;
     page-break-after: avoid !important;
@@ -1404,7 +1404,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   .label-cell {
     font-size: 6pt !important;
     padding: 1px 2px !important;
-    border: 0.5px solid #333 !important;
+    border: 0.5px solid var(--color-neutral-1100) !important;
     min-height: 14px !important;
     line-height: 1.1 !important;
   }
@@ -1412,9 +1412,9 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   /* Ajustar inputs para que sean muy pequeños */
   .data-cell input[type="text"],
   .data-cell input[type="number"] {
-    border: 1px solid #333 !important;
-    background: white !important;
-    color: #000 !important;
+    border: 1px solid var(--color-neutral-1100) !important;
+    background: var(--color-bg-white) !important;
+    color: var(--color-text-black) !important;
     font-size: 6pt !important;
     padding: 0.2px !important;
     height: 13px !important;
@@ -1430,7 +1430,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
   input[type="checkbox"] {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    border: 1px solid #000 !important;
+    border: 1px solid var(--color-text-black) !important;
     width: 8px !important;
     height: 8px !important;
   }

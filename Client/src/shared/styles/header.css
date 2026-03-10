@@ -1,83 +1,116 @@
 .header {
+  /* Altura estimada del header usada por otras vistas (ajustable) */
+  --app-header-height: 15vh;
   grid-row: 1 / 2; /* Está en la primera fila */
   grid-column: 2 / -1; /* Ocupa desde la segunda columna hacia la derecha */
-  background-color: #d5d5d573;
-  padding: 1rem 2rem; /* Uniforme */
+  background-color: var(--color-header-bg);
+  /* Usamos padding horizontal; la altura la controla la variable */
+  padding: 0 2rem;
+  height: var(--app-header-height);
   display: flex; /* Flexbox para alinear título y reloj */
   align-items: center;
   justify-content: space-between; /* Título a la izquierda, reloj a la derecha */
-  font-size: 2rem; /* Tamaño base en rem */
-  color: #555;
-  border-bottom: 1px solid #ccc;
+  font: var(--text-heading-lg);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-medium);
   box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
 }
 
 .header h1 {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 3rem; /* Tamaño base en rem */
-  color: #555;
+  font: var(--text-display-xl);
+  color: var(--color-text-secondary);
   flex: 1;
   text-align: left;
 }
+.header__title {
+  font-family: var(--font-family-primary);
+}
+
+/* Contenedor de acciones del header (botones a la derecha) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lock-button {
+  background: none;
+  border: 1px solid var(--color-border-medium);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  transition: background 0.2s;
+}
+.lock-button:hover {
+  background: var(--color-bg-tertiary, #f0f0f0);
+}
+
 
 /* Ajustes responsivos */
 @media (max-width: 1200px) {
   .header {
-    font-size: 1.875rem; /* Reduce el tamaño de la fuente para pantallas más pequeñas */
-    padding: 0.75rem 1.5rem;
+    font: var(--text-heading-md); /* Reduce el tamaño de la fuente para pantallas más pequeñas */
+    --app-header-height: 72px;
+    padding: 0 1.5rem;
   }
   .header h1 {
-    font-size: 2rem;
+    font: var(--text-heading-xl);
   }
 }
 
 @media (max-width: 992px) {
   .header {
-    font-size: 1.75rem; /* Reduce aún más el tamaño de la fuente */
-    padding: 0.75rem 1.25rem;
+    font: var(--text-heading-sm); /* Reduce aún más el tamaño de la fuente */
+    --app-header-height: 64px;
+    padding: 0 1.25rem;
   }
   .header h1 {
-    font-size: 1.875rem;
+    font: var(--text-heading-lg);
   }
 }
 
 @media (max-width: 768px) {
   .header {
-    font-size: 1.5rem; /* Reduce el tamaño de la fuente para pantallas medianas */
-    padding: 0.5rem 1rem;
+    font: var(--text-heading-xs); /* Reduce el tamaño de la fuente para pantallas medianas */
+    --app-header-height: 56px;
+    padding: 0 1rem;
   }
   .header h1 {
-    font-size: 1.75rem;
+    font: var(--text-heading-md);
   }
 }
 
 @media (max-width: 576px) {
   .header {
-    font-size: 1.25rem; /* Reduce el tamaño de la fuente para pantallas pequeñas */
-    padding: 0.5rem 0.75rem;
+    font: var(--text-heading-xxs); /* Reduce el tamaño de la fuente para pantallas pequeñas */
+    --app-header-height: 48px;
+    padding: 0 0.75rem;
   }
   .header h1 {
-    font-size: 1.5rem;
+    font: var(--text-heading-sm);
   }
 }
 
 @media (max-width: 480px) {
   .header {
-    font-size: 1rem; /* Reduce aún más el tamaño de la fuente para pantallas muy pequeñas */
-    padding: 0.5rem 0.5rem;
+    font: var(--text-subtitle-lg); /* Reduce aún más el tamaño de la fuente para pantallas muy pequeñas */
+    --app-header-height: 44px;
+    padding: 0 0.5rem;
   }
   .header h1 {
-    font-size: 1.25rem;
+    font: var(--text-heading-xs);
   }
 }
 
 /* Ajustes para escala de 125% */
 @media (resolution: 125dpi) {
   .header {
-    font-size: 1.5rem; /* Ajusta el tamaño de la fuente para escala de 125% */
+    font: var(--text-heading-sm); /* Ajusta el tamaño de la fuente para escala de 125% */
     padding: 0.4rem 1rem;
   }
   .header h1 {
-    font-size: 1.875rem;
+    font: var(--text-heading-lg);
   }
 }

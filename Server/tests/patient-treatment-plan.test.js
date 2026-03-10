@@ -1,23 +1,50 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 
 const app = require('../scripts/dent');
 const Patient = require('../models/patient');
+const Usuario = require('../models/users');
+const { getEffectivePermissions } = require('../utils/permissions');
 
 jest.setTimeout(30000);
 
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+function makeToken(user) {
+  const permissions = getEffectivePermissions(user);
+  return jwt.sign(
+    { sub: user._id.toString(), role: user.rol, permissions },
+    JWT_SECRET,
+    { expiresIn: '1h', issuer: 'dentia-core' }
+  );
+}
+
 let mongoServer;
+let authToken;
 
 describe('POST /api/patients/:id/treatment-plan', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     const uri = mongoServer.getUri();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
     await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 5000,
       connectTimeoutMS: 5000
     });
+
+    // Create a doctor user for authentication
+    const user = await Usuario.create({
+      nombre: 'Dr. Test',
+      email: `tp-test-${Date.now()}@test.com`,
+      contraseña: 'Password123!',
+      rol: 'doctor'
+    });
+    authToken = makeToken(user);
   });
 
   afterAll(async () => {
@@ -50,6 +77,7 @@ describe('POST /api/patients/:id/treatment-plan', () => {
 
     const response = await request(app)
       .post(`/api/patients/${patient._id}/treatment-plan`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send(payload)
       .expect(201);
 
@@ -76,6 +104,7 @@ describe('POST /api/patients/:id/treatment-plan', () => {
 
     const response = await request(app)
       .post(`/api/patients/${patient._id}/treatment-plan`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({ treatmentPlan: { texto: '   ', confirmar: 'confirmar' } })
       .expect(400);
 
@@ -106,6 +135,7 @@ describe('POST /api/patients/:id/treatment-plan', () => {
 
     const response = await request(app)
       .post(`/api/patients/${patient._id}/treatment-plan`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send(payload)
       .expect(201);
 
@@ -136,11 +166,13 @@ describe('POST /api/patients/:id/treatment-plan', () => {
 
     await request(app)
       .post(`/api/patients/${patient._id}/treatment-plan`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({ treatmentPlan: { texto: 'Aplicar flúor' } })
       .expect(400);
 
     await request(app)
       .post(`/api/patients/${patient._id}/treatment-plan`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({ treatmentPlan: { texto: 'Aplicar flúor', confirmar: 'confirm' } })
       .expect(400);
   });

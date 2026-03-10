@@ -1,0 +1,152 @@
+/* Captura Extemporánea Modal — roles.MD §9.5 */
+
+.captura-ext-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99997;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.captura-ext-modal {
+  background: var(--color-bg-white, #fff);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.captura-ext-icon {
+  font-size: 2.5rem;
+  text-align: center;
+  color: var(--color-warning, #f39c12);
+}
+
+.captura-ext-modal h3 {
+  text-align: center;
+  margin: 0.25rem 0 0.5rem;
+  color: var(--color-text-primary, #2c3e50);
+  font-size: 1.2rem;
+}
+
+.captura-ext-desc {
+  text-align: center;
+  color: var(--color-text-muted, #7f8c8d);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.captura-ext-dates {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.captura-ext-date-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.captura-ext-date-label {
+  color: var(--color-text-muted, #7f8c8d);
+}
+
+.captura-ext-date-value {
+  color: var(--color-text-primary, #2c3e50);
+  font-weight: 500;
+}
+
+.captura-ext-motivo-section {
+  margin-bottom: 1.25rem;
+}
+
+.captura-ext-motivo-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary, #2c3e50);
+}
+
+.captura-ext-motivo-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.captura-ext-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-primary, #2c3e50);
+  cursor: pointer;
+}
+
+.captura-ext-radio input[type="radio"] {
+  accent-color: var(--color-primary, #084888);
+  margin: 0;
+}
+
+.captura-ext-otro-input {
+  margin-top: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border-light, #e8e8e8);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.captura-ext-otro-input:focus {
+  border-color: var(--color-primary, #084888);
+}
+
+.captura-ext-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.captura-ext-btn-cancel {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--color-border-medium, #ccc);
+  border-radius: 8px;
+  padding: 0.6rem;
+  cursor: pointer;
+  color: var(--color-text-secondary, #555);
+  font-size: 0.95rem;
+}
+
+.captura-ext-btn-confirm {
+  flex: 1;
+  background: var(--color-primary, #084888);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.captura-ext-btn-confirm:hover:not(:disabled) {
+  background: var(--color-primary-hover, #025db8);
+}
+
+.captura-ext-btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

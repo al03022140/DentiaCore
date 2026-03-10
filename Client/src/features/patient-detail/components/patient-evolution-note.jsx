@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, message } from 'antd';
 import API from '../../../shared/services/axios-instance.js';
 import '../styles/patient-evolution-note.css';
 
-const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [] }) => {
+const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientData }) => {
   const [procedimiento, setProcedimiento] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [correcciones, setCorrecciones] = useState('');
@@ -79,11 +79,34 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [] }) => {
     setIsConfirmVisible(false);
   };
 
+  const handlePrint = () => {
+    const printContent = document.querySelector('.printable-evolution-notes');
+    if (!printContent) return;
+
+    // Clonar el contenido para imprimir
+    const clone = printContent.cloneNode(true);
+    clone.classList.add('printing-portal');
+    
+    // Asegurar que sea visible
+    clone.style.display = 'block';
+    
+    // Agregar al body
+    document.body.appendChild(clone);
+    document.body.classList.add('printing-evolution-mode');
+    
+    // Imprimir
+    window.print();
+    
+    // Limpiar
+    document.body.removeChild(clone);
+    document.body.classList.remove('printing-evolution-mode');
+  };
+
   return (
     <section className="patient-detail__section patient-evolution-note">
       <div className="patient-evolution-note__header">
         <h2>Notas de evolución</h2>
-        <button className="Boton_Imprimir" onClick={() => window.print()}>
+        <button className="Boton_Imprimir" onClick={handlePrint}>
           Imprimir
         </button>
       </div>
@@ -214,12 +237,16 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [] }) => {
           </tbody>
         </table>
 
-        <div className="printable-signatures">
+        <div className="signatures-container">
           <div className="signature-block">
-            <p>Firma del Paciente</p>
+            <div className="signature-line"></div>
+            <p className="signature-label">{patientData?.primer_nombre} {patientData?.apellido_paterno} {patientData?.apellido_materno}</p>
+            <p className="signature-title">Firma del Paciente</p>
           </div>
           <div className="signature-block">
-            <p>Firma del Doctor</p>
+            <div className="signature-line"></div>
+            <p className="signature-label">Dr. Jeferson Arley Ramirez Mejia</p>
+            <p className="signature-title">Firma del Doctor</p>
           </div>
         </div>
 

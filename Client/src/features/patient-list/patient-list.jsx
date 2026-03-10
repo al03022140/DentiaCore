@@ -1,21 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
 import './styles/patient-list.css';
 import userNot from '../../assets/images/avatars/UserNot.png';
 
 // Imágenes
-import filtroIcon from '../../assets/images/icons/filtro.png'; 
+import filtroIcon from '../../assets/images/icons/filtro.png';
 import arrowIcon from '../../assets/images/icons/arrow.png';
 import arrowLeft from '../../assets/images/icons/arrow-left.png';
 import arrowRight from '../../assets/images/icons/arrow-right.png';
-import plusIcon from '../../assets/images/icons/plus.png';
+import plusIcon from '../../assets/images/icons/plus.svg';
 
 // Utilidades y API
-import { formatName, removeAccents, formatDate, formatAge, formatAgeYearsOnly } from '../../shared/utils/formatters';
-import { getAllPatients } from '../../shared/services/patient-service';
+import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
+import { getAllPatients } from '../../shared/services/api';
 
 const PatientList = () => {
   const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const patientsPerPage = 15;
   const navigate = useNavigate();
@@ -31,18 +33,16 @@ const PatientList = () => {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
+        setLoading(true);
         const response = await getAllPatients();
-        // Asegurar que siempre sea un array
-        const patientsArray = Array.isArray(response) ? response : 
-                            Array.isArray(response?.patients) ? response.patients : 
-                            Array.isArray(response?.data) ? response.data : [];
-        setPatients(patientsArray);
+        const patientsArray = response?.patients ?? response ?? [];
+        setPatients(Array.isArray(patientsArray) ? patientsArray : []);
       } catch (error) {
         console.error("Error al obtener pacientes:", error);
-        // Mostrar mensaje de error al usuario
-        alert(`Error al cargar pacientes: ${error.message || 'Error desconocido'}`);
-        // En caso de error, asegurar que el estado sea un array vacío
+        message.error(`Error al cargar pacientes: ${error.message || 'Error desconocido'}`);
         setPatients([]);
+      } finally {
+        setLoading(false);
       }
     };
     fetchPatients();
@@ -64,109 +64,84 @@ const PatientList = () => {
     };
   }, [isMenuOpen]);
 
-  // Manejador de búsqueda
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
   };
 
-  // Usar la función removeAccents de utils/formatters.js
-  const searchTermNormalized = removeAccents(searchTerm).toLowerCase().trim();
+  // Filtrado memoizado para evitar recálculos innecesarios
+  const filteredPatients = useMemo(() => {
+    const normalized = removeAccents(searchTerm).toLowerCase().trim();
+    if (!normalized) return patients;
 
-  // Asegurar que filteredPatients siempre sea un array
-  const filteredPatients = Array.isArray(patients) ? patients.filter((patient) => {
-    // Si no se ha ingresado término, se muestran todos
-    if (!searchTermNormalized) return true;
+    return patients.filter((patient) => {
+      // Buscar por paciente_id (empieza con "#")
+      if (normalized.startsWith('#')) {
+        const searchDigits = normalized.slice(1).trim();
+        return patient.paciente_id?.trim().toLowerCase().includes(`#${searchDigits}`);
+      }
 
-    // Caso 1: Si el término empieza con "#", buscar en el paciente_id personalizado
-    if (searchTermNormalized.startsWith('#')) {
-      // Remover el símbolo '#' y espacios extra del término ingresado
-      const searchDigits = searchTermNormalized.slice(1).trim();
-      // Comparar agregando '#' al valor almacenado y eliminando espacios extra del mismo
-      return patient.paciente_id && patient.paciente_id.trim().toLowerCase().includes(`#${searchDigits}`);
-    }
+      // Buscar por _id de MongoDB
+      if (patient._id?.toString().toLowerCase().includes(normalized)) return true;
 
-    // Caso 2: Revisar si el _id de MongoDB (convertido a string) contiene el término
-    if (patient._id && patient._id.toString().toLowerCase().includes(searchTermNormalized)) {
-      return true;
-    }
+      // Buscar por edad (solo dígitos)
+      if (/^\d+$/.test(normalized) && patient.edad === parseInt(normalized, 10)) return true;
 
-    // Caso 3: Si el término es numérico (solo dígitos), comparar con la edad
-    if (/^\d+$/.test(searchTermNormalized)) {
-      const searchNumber = parseInt(searchTermNormalized, 10);
-      if (patient.edad === searchNumber) return true;
-    }
+      // Buscar por nombre completo
+      const nombreCompleto = removeAccents(
+        `${patient.apellido_paterno || ''} ${patient.apellido_materno || ''} ${patient.primer_nombre || ''} ${patient.segundo_nombre || ''}`
+      ).toLowerCase();
 
-    // Caso 4: Por defecto, buscar por nombre completo (sin acentos y en minúsculas)
-    const nombreCompleto = removeAccents(
-      `${patient.apellido_paterno || ''} ${patient.apellido_materno || ''} ${patient.primer_nombre || ''} ${patient.segundo_nombre || ''}`
-    ).toLowerCase();
-
-    return nombreCompleto.includes(searchTermNormalized);
-  }) : [];
+      return nombreCompleto.includes(normalized);
+    });
+  }, [patients, searchTerm]);
 
   // Ordenar pacientes
   const handleSortBy = (type) => {
     if (!patients.length) return;
-    
-    const sortedPatients = [...patients];
-  
+
+    // Si cambia el tipo de orden, resetear a ascendente; si es el mismo, alternar
+    const nextAscending = type === sortType ? !isAscending : true;
+
     const compareValues = (a, b, key, isDate = false) => {
-      // Manejo seguro de valores nulos o indefinidos
-      let valueA = a[key];
-      let valueB = b[key];
-      
-      // Si ambos valores son nulos o indefinidos, se consideran iguales
+      const valueA = a[key];
+      const valueB = b[key];
+
       if (valueA == null && valueB == null) return 0;
-      
-      // Si solo uno es nulo o indefinido, se coloca al final en orden ascendente
-      if (valueA == null) return isAscending ? 1 : -1;
-      if (valueB == null) return isAscending ? -1 : 1;
-      
+      if (valueA == null) return nextAscending ? 1 : -1;
+      if (valueB == null) return nextAscending ? -1 : 1;
+
       if (isDate) {
-        // Manejo seguro de fechas inválidas
         const dateA = new Date(valueA);
         const dateB = new Date(valueB);
-        
-        // Verificar si las fechas son válidas
-        const isValidDateA = !isNaN(dateA.getTime());
-        const isValidDateB = !isNaN(dateB.getTime());
-        
-        // Si ambas fechas son inválidas, se consideran iguales
-        if (!isValidDateA && !isValidDateB) return 0;
-        
-        // Si solo una fecha es inválida, se coloca al final
-        if (!isValidDateA) return isAscending ? 1 : -1;
-        if (!isValidDateB) return isAscending ? -1 : 1;
-        
-        return isAscending ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
-      } else if (typeof valueA === 'string' && typeof valueB === 'string') {
-        return isAscending ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        const isValidA = !isNaN(dateA.getTime());
+        const isValidB = !isNaN(dateB.getTime());
+
+        if (!isValidA && !isValidB) return 0;
+        if (!isValidA) return nextAscending ? 1 : -1;
+        if (!isValidB) return nextAscending ? -1 : 1;
+
+        return nextAscending ? dateA - dateB : dateB - dateA;
       }
-  
-      return isAscending ? valueA - valueB : valueB - valueA;
+
+      if (typeof valueA === 'string' && typeof valueB === 'string') {
+        return nextAscending ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+      }
+
+      return nextAscending ? valueA - valueB : valueB - valueA;
     };
-  
-    switch (type) {
-      case 'apellido':
-        sortedPatients.sort((a, b) => compareValues(a, b, 'apellido_paterno'));
-        break;
-      case 'edad':
-        sortedPatients.sort((a, b) => compareValues(a, b, 'edad'));
-        break;
-      case 'ultimaVisita':
-        sortedPatients.sort((a, b) => compareValues(a, b, 'ultimaVisita', true));
-        break;
-      case 'fechaCreacion': // Nueva opción: ordenar por fecha de creación
-        sortedPatients.sort((a, b) => compareValues(a, b, 'fechaCreacion', true));
-        break;
-      default:
-        return;
-    }
-  
+
+    const sortedPatients = [...patients];
+    const sortKeys = { apellido: 'apellido_paterno', edad: 'edad', ultimaVisita: 'ultimaVisita' };
+    const key = sortKeys[type];
+    if (!key) return;
+
+    const isDate = type === 'ultimaVisita';
+    sortedPatients.sort((a, b) => compareValues(a, b, key, isDate));
+
     setPatients(sortedPatients);
     setSortType(type);
-    setIsAscending(!isAscending);
+    setIsAscending(nextAscending);
   };
 
   // Calcular paginación
@@ -185,9 +160,18 @@ const PatientList = () => {
     navigate(`/patient/${patientId}`);
   };
 
+  if (loading) {
+    return (
+      <div className="patient-list-wrapper">
+        <div className="patient-list-container">
+          <p className="no-patients-msg">Cargando pacientes...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="patient-list-wrapper">
-      {/* BARRA DE BÚSQUEDA */}
       <div className="patient-list-container">
         <div className="search-container">
           <input 
@@ -251,6 +235,11 @@ const PatientList = () => {
 
         {/* LISTA DE PACIENTES */}
         <div className="patient-list">
+          {currentPatients.length === 0 && (
+            <p className="no-patients-msg">
+              {searchTerm ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados.'}
+            </p>
+          )}
           {currentPatients.map((patient) => {
             if (!patient) return null;
 
@@ -261,9 +250,10 @@ const PatientList = () => {
               patient.segundo_nombre
             );
 
-            const fullName = `${patient.apellido_paterno || ''} ${patient.apellido_materno || ''} ${patient.primer_nombre || ''} ${patient.segundo_nombre || ''}`.trim();
+            const fullName = [patient.apellido_paterno, patient.apellido_materno, patient.primer_nombre, patient.segundo_nombre]
+              .filter(Boolean).join(' ');
 
-            const patientId = patient.paciente_id ? patient.paciente_id : patient._id;
+            const patientId = patient.paciente_id || patient._id;
             const lastVisit = patient.ultimaVisita || "No hay datos";
             const age = formatAgeYearsOnly(patient.fecha_nacimiento) || "No hay datos";
             const photoURL = patient.photoURL || userNot;

@@ -143,7 +143,7 @@ export class PeriodontogramUtils {
    */
   static getToothBackgroundImagePath(toothNumber) {
     const section = this.getToothSection(toothNumber);
-    return `/images/Periodontogram/background/${section}.png`;
+    return `/images/Periodontogram/background/background-${section}.png`;
   }
 
   /**
@@ -549,6 +549,4 @@ export const createInitialToothData = (toothNumber) => UniversalToothValidator.g
 // Exportar constantes para compatibilidad
 export { UPPER_TEETH, LOWER_TEETH };
 
-// Log de inicialización
-console.log('[PeriodontogramUtils] Utilidades consolidadas del periodontograma cargadas correctamente');
 export default PeriodontogramUtils;

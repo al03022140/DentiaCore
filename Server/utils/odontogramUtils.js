@@ -15,6 +15,7 @@
  */
 
 const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
+const { formatDateToDDMMYYYY, getCurrentDateFormatted } = require('./dateUtils');
 
 /**
  * Verifica si un array contiene un elemento (por diente, tipo y superficie)
@@ -70,8 +71,6 @@ const normalizeOdontogramaData = (data) => {
   }
   
   return data.map((item) => {
-    const { formatDateToDDMMYYYY, getCurrentDateFormatted } = require('./dateUtils');
-    
     const rawDiente = item.diente || item.tooth || 'N/A';
     const diente = formatToothNumber(rawDiente);
     const tipo = item.tipo || item.damage || '';

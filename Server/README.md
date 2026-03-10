@@ -120,7 +120,7 @@ El `launcher.py` permite iniciar y detener servicios con configuración guiada.
 
 - Backend no conecta a MongoDB (`ECONNREFUSED 127.0.0.1:27017`):
   - Ejecuta `npm run mongod`. Verifica el puerto: `Test-NetConnection -ComputerName 127.0.0.1 -Port 27017`.
-  - Confirma `Server/.env` contiene `MONGODB_URI=mongodb://127.0.0.1:27017/Dent`.
+  - Confirma `Server/.env` contiene `MONGODB_URI=mongodb://127.0.0.1:27017/DentiaCore`.
 
 - Healthcheck falla en `http://localhost:5002/api/health`:
   - Comprueba el estado del backend: `Test-NetConnection -ComputerName 127.0.0.1 -Port 5002`.

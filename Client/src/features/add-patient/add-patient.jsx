@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Cropper from "react-easy-crop";
-import "react-easy-crop/react-easy-crop.css"; // Asegúrate de tener el CSS
+import "react-easy-crop/react-easy-crop.css";
 import defaultAvatar from "../../assets/images/avatars/UserNot.png";
 import "./styles/add-patient.css";
-import { useLocation } from "react-router-dom";
 import { message, Modal } from 'antd';
+import API from '../../shared/services/axios-instance';
 
 // Importar componentes de las secciones
 import Identification from './sections/identification';
@@ -19,11 +19,7 @@ import DentalEvaluation from './sections/dental-evaluation';
 import WomenSection from './sections/women-section';
 
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 const REQUIRED_FIELDS = [
-  { path: ["documento", "tipo"], label: "Tipo de documento" },
-  { path: ["documento", "numero"], label: "Número de documento" },
   { path: ["primer_nombre"], label: "Primer nombre" },
   { path: ["apellido_paterno"], label: "Apellido paterno" },
   { path: ["fecha_nacimiento"], label: "Fecha de nacimiento" },
@@ -39,7 +35,6 @@ class PatientValidationError extends Error {
     super(message);
     this.name = "PatientValidationError";
     this.details = details;
-    this.code = "PATIENT_VALIDATION_ERROR";
   }
 }
 
@@ -71,31 +66,6 @@ const showMissingFieldsModal = (missingFields) => {
       </div>
     )
   });
-};
-
-const parseErrorResponse = async (response) => {
-  try {
-    const raw = await response.text();
-    if (!raw) {
-      return `El servidor respondió ${response.status}`;
-    }
-
-    try {
-      const data = JSON.parse(raw);
-      if (Array.isArray(data?.errors)) {
-        return data.errors
-          .map((err) => (typeof err === "string" ? err : err?.message || err?.detail))
-          .filter(Boolean)
-          .join("\n");
-      }
-      return data?.message || data?.error || raw;
-    } catch {
-      return raw;
-    }
-  } catch (error) {
-    console.error("No se pudo interpretar la respuesta de error:", error);
-    return "Ocurrió un error inesperado";
-  }
 };
 
 /**
@@ -138,10 +108,9 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
   return canvas.toDataURL("image/jpeg");
 };
 
-const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCancel }) => {
+const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(propIsEditing || true);
   const [hoverUpload, setHoverUpload] = useState(false);
   const fileInputRef = useRef(null);
   const patientToEdit = initialPatientData || location.state?.patientToEdit || null;
@@ -227,7 +196,15 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
         mordida_cruzada: false,
         traslape_horizontal_mm: "",
         traslape_vertical_mm: "",
-        mordida_abierta: false
+        mordida_abierta: {
+          presente: false,
+          medidas: {
+            anterior_mm: "",
+            posterior_mm: "",
+            derecha_mm: "",
+            izquierda_mm: ""
+          }
+        }
       }
     },
    
@@ -258,12 +235,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
         enfermedad_grave_adicional: {
           opcion_principal: "no", // "no" o "otras_enfermedades"
           enfermedades_seleccionadas: {
-            trastornos_neurologicos: false,
-            enfermedades_autoinmunes: false,
-            enfermedades_respiratorias: false,
-            problemas_renales: false,
-            problemas_hepaticos: false,
-            tratamiento_oncologico: false,
             sinusitis: false,
             convulsiones_epilepsia: false,
             tuberculosis: false,
@@ -307,12 +278,13 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
             enfermedades_familiares: false,
             anemia: false,
             sida: false,
-            arteroesclerosis: false,
             hipotiroidismo: false,
             cancer: false,
             esclerodermia: false,
             enfermedades_sangre: false,
-            presion_arterial_alta: false
+            presion_arterial_alta: false,
+            trastornos_coagulacion: false,
+            hipertension: false
           }
         }
       },
@@ -338,6 +310,7 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
       experiencia_negativa_previa: false
     },
     embarazo: {
+      estado: false,
       semanas_gestacion: ""
     },
   },
@@ -346,6 +319,7 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
   informacion_femenina: {
     ha_estado_embarazada: false,
     como_fue_parto: "",
+    tipo_parto_detallado: "",
     complicaciones_parto: "",
     fecha_ultimo_parto: "",
     menopausia: false,
@@ -397,25 +371,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
     photoURL: "",
   });
 
-  useEffect(() => {
-    if (patientToEdit) {
-      // Transformar situacion_laboral si viene como string del backend
-      const transformedPatient = { ...patientToEdit };
-      
-      if (typeof patientToEdit.situacion_laboral === 'string') {
-        transformedPatient.situacion_laboral = {
-          empleado: patientToEdit.situacion_laboral === "empleado",
-          pensionado: patientToEdit.situacion_laboral === "pensionado",
-          desempleado: patientToEdit.situacion_laboral === "desempleado",
-          jubilado: patientToEdit.situacion_laboral === "jubilado"
-        };
-      }
-      
-      setFormData(transformedPatient);
-    }
-  }, [patientToEdit]);
-  
-
   // Estado para la imagen a recortar y parámetros del crop
   const [imageSrc, setImageSrc] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -423,10 +378,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
   
-  // Estados para preservar la posición del crop y zoom
-  const [savedCrop, setSavedCrop] = useState({ x: 0, y: 0 });
-  const [savedZoom, setSavedZoom] = useState(1);
-
   // useEffect para inicializar el formulario con datos del paciente cuando se está editando
   useEffect(() => {
     if (patientToEdit) {
@@ -447,12 +398,19 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
         escolaridad: patientToEdit.escolaridad || "",
         edad: patientToEdit.edad || null,
         ocupacion: patientToEdit.ocupacion || "",
-        situacion_laboral: {
-          empleado: patientToEdit.situacion_laboral?.empleado || false,
-          pensionado: patientToEdit.situacion_laboral?.pensionado || false,
-          desempleado: patientToEdit.situacion_laboral?.desempleado || false,
-          jubilado: patientToEdit.situacion_laboral?.jubilado || false
-        },
+        situacion_laboral: typeof patientToEdit.situacion_laboral === 'string'
+          ? {
+              empleado: patientToEdit.situacion_laboral === "empleado",
+              pensionado: patientToEdit.situacion_laboral === "pensionado",
+              desempleado: patientToEdit.situacion_laboral === "desempleado",
+              jubilado: patientToEdit.situacion_laboral === "jubilado"
+            }
+          : {
+              empleado: patientToEdit.situacion_laboral?.empleado || false,
+              pensionado: patientToEdit.situacion_laboral?.pensionado || false,
+              desempleado: patientToEdit.situacion_laboral?.desempleado || false,
+              jubilado: patientToEdit.situacion_laboral?.jubilado || false
+            },
         email: patientToEdit.email || "",
         contacto: {
           telefono: patientToEdit.contacto?.telefono || "",
@@ -581,12 +539,13 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
                 enfermedades_familiares: false,
                 anemia: false,
                 sida: false,
-                arteroesclerosis: false,
                 hipotiroidismo: false,
                 cancer: false,
                 esclerodermia: false,
                 enfermedades_sangre: false,
-                presion_arterial_alta: false
+                presion_arterial_alta: false,
+                trastornos_coagulacion: false,
+                hipertension: false
               }
             }
           },
@@ -608,6 +567,7 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
             experiencia_negativa_previa: false
           },
           embarazo: {
+            estado: false,
             semanas_gestacion: ""
           }
         },
@@ -653,6 +613,7 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
         informacion_femenina: patientToEdit.informacion_femenina || {
           ha_estado_embarazada: false,
           como_fue_parto: "",
+          tipo_parto_detallado: "",
           complicaciones_parto: "",
           fecha_ultimo_parto: "",
           menopausia: false,
@@ -679,43 +640,21 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
     }
   };
 
-  const handleEditPhoto = () => {
-    if (formData.photoURL) {
-      setImageSrc(formData.photoURL);
-      
-      // Restaurar la posición guardada del crop y zoom desde formData
-      setCrop(formData.photoCrop || savedCrop || { x: 0, y: 0 });
-      setZoom(formData.photoZoom || savedZoom || 1);
-      
-      // Mantener el hover desactivado solo temporalmente
-      setHoverUpload(false);
-      
-      setIsCropping(true);
-    }
-  };
-
-
   /** Borra la imagen cargada */
   const handleDeletePhoto = (e) => {
-    e.stopPropagation(); // Evita que se dispare el evento del input de archivo
+    e.stopPropagation();
     setFormData((prev) => ({ 
       ...prev, 
       photoURL: "",
-      // Limpiar también las coordenadas guardadas
       photoCrop: { x: 0, y: 0 },
       photoZoom: 1
     }));
     setImageSrc(null);
-    setIsCropping(false); // Asegurar que el modo de recorte se cierre
-    setCrop({ x: 0, y: 0 }); // Resetear crop
-    setZoom(1); // Resetear zoom
-    setCroppedAreaPixels(null); // Limpiar área recortada
+    setIsCropping(false);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
     
-    // Resetear también los valores guardados
-    setSavedCrop({ x: 0, y: 0 });
-    setSavedZoom(1);
-    
-    // Limpiar el input de archivo
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -734,17 +673,12 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
       setFormData((prev) => ({ 
         ...prev, 
         photoURL: croppedImage,
-        // Guardar las coordenadas junto con la imagen
         photoCrop: crop,
         photoZoom: zoom
       }));
       
-      // Guardar la posición actual del crop y zoom
-      setSavedCrop(crop);
-      setSavedZoom(zoom);
-      
-      setImageSrc(null); // Asegura que el recorte finalice
-      setIsCropping(false); // Desactiva el modo de recorte
+      setImageSrc(null);
+      setIsCropping(false);
     } catch (error) {
       console.error("Error al recortar la imagen:", error);
     }
@@ -755,12 +689,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  /** Maneja cambios en checkboxes */
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
   /** Maneja cambios en campos anidados */
@@ -870,35 +798,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
     }
   };
   
-  /** Maneja cambios en situación laboral */
-  const handleSituacionLaboralChange = (value) => {
-    setFormData((prev) => ({
-      ...prev,
-      situacion_laboral: {
-        empleado: value === "empleado",
-        pensionado: value === "pensionado",
-        desempleado: value === "desempleado",
-        jubilado: value === "jubilado"
-      },
-    }));
-  };
-  
-  const handleToggleAzucar = (item) => {
-    setFormData((prev) => {
-      const { tipo } = prev.habitos_higiene.consumo_azucar;
-      const newArray = tipo.includes(item)
-        ? tipo.filter((i) => i !== item)
-        : [...tipo, item];
-      return {
-        ...prev,
-        habitos_higiene: {
-          ...prev.habitos_higiene,
-          consumo_azucar: { ...prev.habitos_higiene.consumo_azucar, tipo: newArray },
-        },
-      };
-    });
-  };
-
   /** Confirmar edición (envío de datos y navegación) */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -931,12 +830,6 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
       showMissingFieldsModal(missingFields);
       throw new PatientValidationError("Faltan campos obligatorios", missingFields);
     }
-    
-    // Asegurarse de que la fecha de nacimiento esté en formato ISO para el servidor
-    if (patientData.fecha_nacimiento && typeof patientData.fecha_nacimiento === 'string') {
-      // Si la fecha viene del input type="date", ya estará en formato YYYY-MM-DD
-      // No necesitamos hacer nada adicional
-    }
 
     // Si hay una foto en base64, convertirla a archivo
     if (patientData.photoURL && patientData.photoURL.startsWith('data:image/')) {
@@ -965,28 +858,13 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
       let res;
       if (patientToEdit) {
         // Actualizar paciente existente
-        res = await fetch(`${API_URL}/api/patients/${patientToEdit._id}`, {
-          method: "PUT",
-          body: formDataToSend,
-        });
+        res = await API.put(`/patients/${patientToEdit._id}`, formDataToSend);
       } else {
         // Crear nuevo paciente
-        res = await fetch(`${API_URL}/api/patients`, {
-          method: "POST",
-          body: formDataToSend,
-        });
+        res = await API.post('/patients', formDataToSend);
       }
 
-      if (!res.ok) {
-        const serverDetails = await parseErrorResponse(res);
-        const error = new Error(serverDetails || `El servidor respondió ${res.status}`);
-        error.name = 'PatientSaveError';
-        error.status = res.status;
-        error.userMessage = serverDetails || `El servidor respondió ${res.status}`;
-        throw error;
-      }
-
-      const data = await res.json();
+      const data = res.data;
       message.success(patientToEdit ? "Paciente actualizado correctamente" : "Paciente guardado correctamente");
 
       // Solo navegar si no se está usando como modal
@@ -1006,16 +884,17 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
 
       console.error("Error procesando paciente:", err);
       const title = patientToEdit ? 'No se pudo actualizar el paciente' : 'No se pudo guardar el paciente';
-      const description = err?.userMessage || err?.message || 'Ocurrió un error inesperado.';
+      const status = err?.response?.status || err?.status;
+      const description = err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado.';
 
       Modal.error({
         title,
         content: (
           <div>
             <p>{description}</p>
-            {err?.status && (
+            {status && (
               <p>
-                <strong>Código:</strong> {err.status}
+                <strong>Código:</strong> {status}
               </p>
             )}
           </div>
@@ -1165,13 +1044,10 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
                     onClick={(e) => {
                       e.stopPropagation();
                       if (formData.photoURL && !imageSrc) {
-                        // Activar directamente el modo de edición/recorte para ajustar zoom y posición
                         setImageSrc(formData.photoURL);
-                        // Restaurar la posición guardada del crop y zoom desde formData o usar valores por defecto
-                        setCrop(formData.photoCrop || savedCrop.x !== 0 || savedCrop.y !== 0 ? (formData.photoCrop || savedCrop) : { x: 0, y: 0 });
-                        setZoom(formData.photoZoom || savedZoom !== 1 ? (formData.photoZoom || savedZoom) : 1);
+                        setCrop(formData.photoCrop || { x: 0, y: 0 });
+                        setZoom(formData.photoZoom || 1);
                         setIsCropping(true);
-                        // No desactivar el hover aquí para permitir interacción inmediata
                       } else if (!formData.photoURL && !imageSrc) {
                         fileInputRef.current && fileInputRef.current.click();
                       }
@@ -1186,18 +1062,15 @@ const AddPatient = ({ isEditing: propIsEditing, initialPatientData, onSave, onCa
               {/* Botones para recortar y eliminar, solo cuando hay imagen cargada */}
               {imageSrc && (
                 <div className="image-controls-outside">
-                  {/* Botón de eliminar - solo visible cuando hay foto real (no vacía, no defaultAvatar, y es una URL válida) */}
-                  {((formData.photoURL && formData.photoURL.trim() !== "" && formData.photoURL !== defaultAvatar && (formData.photoURL.startsWith('data:image/') || formData.photoURL.startsWith('http') || formData.photoURL.startsWith('/uploads'))) || imageSrc) && (
-                    <button 
-                      className="trash-button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePhoto(e);
-                      }}
-                    >
-                      🗑️ Eliminar
-                    </button>
-                  )}
+                  <button 
+                    className="trash-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePhoto(e);
+                    }}
+                  >
+                    🗑️ Eliminar
+                  </button>
                   <button className="crop-button" onClick={handleCropImage}>
                     Guardar
                   </button>

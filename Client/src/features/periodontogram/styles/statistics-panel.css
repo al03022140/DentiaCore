@@ -1,11 +1,11 @@
 /* Estilos para el Panel de Estadísticas del Periodontograma */
 
 .statistics-panel {
-  background: white;
-  border-radius: 8px;
+  background: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #dee2e6;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
 }
 
 .statistics-panel.compact {
@@ -17,10 +17,10 @@
 
 .panel-title {
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   margin-bottom: 20px;
-  color: #2c3e50;
-  border-bottom: 2px solid #3498db;
+  color: var(--color-text-primary);
+  border-bottom: 2px solid var(--color-primary-light);
   padding-bottom: 10px;
 }
 
@@ -32,16 +32,17 @@
 }
 
 .stat-card {
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: var(--color-neutral-100);
+  border-radius: var(--card-border-radius);
   padding: 20px;
-  border: 1px solid #e9ecef;
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
   transition: all 0.3s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--card-shadow);
 }
 
 .stat-header {
@@ -51,12 +52,12 @@
 .stat-header h4 {
   margin: 0;
   font-size: 1.1rem;
-  color: #495057;
-  font-weight: 500;
+  color: var(--color-neutral-1000);
+  font-weight: var(--font-weight-medium);
 }
 
 .stat-content {
-  font-weight: bold;
+  font-weight: var(--font-weight-normal);
 }
 
 .stat-main {
@@ -68,25 +69,25 @@
 
 .stat-number {
   font-size: 2rem;
-  font-weight: 700;
-  color: #2c3e50;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .stat-unit {
   font-size: 1rem;
-  color: #6c757d;
-  font-weight: 500;
+  color: var(--color-neutral-900);
+  font-weight: var(--font-weight-medium);
 }
 
 .stat-total {
   font-size: 1.2rem;
-  color: #6c757d;
-  font-weight: 500;
+  color: var(--color-neutral-900);
+  font-weight: var(--font-weight-medium);
 }
 
 .stat-description {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: var(--color-neutral-900);
   font-style: italic;
 }
 
@@ -101,15 +102,15 @@
 
 .statistics-panel.compact .stat-value {
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #2c3e50;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
   margin-bottom: 5px;
 }
 
 .statistics-panel.compact .stat-label {
   font-size: 0.8rem;
-  color: #6c757d;
-  font-weight: 500;
+  color: var(--color-neutral-900);
+  font-weight: var(--font-weight-medium);
 }
 
 /* Responsive design */

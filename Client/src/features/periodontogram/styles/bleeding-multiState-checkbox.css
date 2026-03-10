@@ -12,8 +12,8 @@ input.bleeding-multi-state.mini-checkbox {
   height: 12px !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: #fff !important;
-  border: 1px solid #666 !important;
+  background: var(--color-bg-white) !important;
+  border: 1px solid var(--color-border-strong) !important;
   border-radius: 2px !important;
   cursor: pointer !important;
   flex-shrink: 0 !important;
@@ -38,10 +38,10 @@ input.bleeding-multi-state.mini-checkbox {
   left: 50% !important;
   width: 8px !important;
   height: 8px !important;
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 50% !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
 }
 
 /* Estado 2: Rectángulo horizontal rojo (sangrado persistente) */
@@ -53,10 +53,10 @@ input.bleeding-multi-state.mini-checkbox {
   left: 50% !important;
   width: 10px !important; /* Ancho que llega casi hasta los bordes */
   height: 4px !important;  /* Altura pequeña para hacer rectángulo horizontal */
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 1px !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
 }
 
 /* Estado 3: Cuadrado rojo completo (exudado purulento) */
@@ -68,15 +68,15 @@ input.bleeding-multi-state.mini-checkbox {
   left: 50% !important;
   width: 10px !important;  /* Llena casi todo el checkbox */
   height: 10px !important; /* Llena casi todo el checkbox */
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 1px !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
 }
 
 /* Estados hover - mantener consistencia */
 .bleeding-multi-state:hover:not(:disabled) {
-  border-color: #555;
+  border-color: var(--color-text-secondary);
 }
 
 /* Estado disabled */
@@ -147,7 +147,7 @@ input.bleeding-multi-state.mini-checkbox[data-bleeding-type="multi-state"]:check
 
 /* Focus states para accesibilidad */
 .bleeding-multi-state:focus {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--color-blue-500);
   outline-offset: 1px;
 }
 
@@ -166,10 +166,10 @@ body .bleeding-multi-state.bleeding-state-1::after {
   left: 50% !important;
   width: 8px !important;
   height: 8px !important;
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 50% !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
   z-index: 999 !important;
 }
 
@@ -182,10 +182,10 @@ body .bleeding-multi-state.bleeding-state-2::after {
   left: 50% !important;
   width: 10px !important;
   height: 4px !important;
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 1px !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
   z-index: 999 !important;
 }
 
@@ -198,10 +198,10 @@ body .bleeding-multi-state.bleeding-state-3::after {
   left: 50% !important;
   width: 10px !important;
   height: 10px !important;
-  background: #e74c3c !important;
+  background: var(--color-danger) !important;
   border-radius: 1px !important;
   transform: translate(-50%, -50%) !important;
-  box-shadow: 0 0 2px rgba(231, 76, 60, 0.3) !important;
+  box-shadow: 0 0 2px var(--color-danger-30) !important;
   z-index: 999 !important;
 }
 
@@ -223,8 +223,8 @@ body .bleeding-multi-state[data-type="bleeding"]:checked::after {
 .triple-checkbox input.bleeding-multi-state:disabled,
 .data-cell .triple-checkbox input.bleeding-multi-state:disabled,
 body .arch-section .data-section .data-row .data-cell .triple-checkbox input.bleeding-multi-state:disabled {
-  border: 1px solid #666 !important;
-  background: #fff !important;
+  border: 1px solid var(--color-border-strong) !important;
+  background: var(--color-bg-white) !important;
   width: 12px !important;
   height: 12px !important;
   border-radius: 2px !important;

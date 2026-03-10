@@ -1,16 +1,11 @@
-
-
-
-import React from 'react';
-
 const Identification = ({ formData, handleNestedChange }) => {
   return (
     <section className="form-section">
       <h2>Identificación</h2>
       <div className="form-group-grid">
-        {/* Tipo de Documento */}
+        {/* Tipo de Documento (opcional) */}
         <div className="form-group">
-          <label>Tipo de Documento *</label>
+          <label>Tipo de Documento</label>
           <select
             name="documento_tipo"
             value={formData.documento?.tipo || ""}
@@ -24,9 +19,9 @@ const Identification = ({ formData, handleNestedChange }) => {
           </select>
         </div>
 
-        {/* Número de Documento */}
+        {/* Número de Documento (opcional) */}
         <div className="form-group">
-          <label>Número de Documento *</label>
+          <label>Número de Documento</label>
           <input
             type="text"
             name="documento_numero"

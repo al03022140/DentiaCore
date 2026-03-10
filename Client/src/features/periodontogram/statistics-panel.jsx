@@ -3,16 +3,16 @@
  * Versión temporal sin dependencias complejas
  */
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { getToothData } from "./utils/periodontogram-utils";
 import { UniversalToothValidator } from "../../shared/validators/universal-tooth-validator";
+import { ADVANCED_LOGGING_CONFIG } from './utils/config.js';
 import './styles/statistics-panel.css';
 
 const StatisticsPanel = ({
   data = null,
   teeth = [],
-  showDetailed = true,
   compact = false
 }) => {
   const [sampleDataVersion, setSampleDataVersion] = useState(0);
@@ -181,45 +181,32 @@ const StatisticsPanel = ({
     });
     
     if (data) {
-      // Verificar si tenemos estadísticas pre-calculadas y si no son todas 0
+      // SIEMPRE recalcular estadísticas desde los datos de dientes para reflejar ediciones en tiempo real
+      if (data.teeth && Object.keys(data.teeth).length > 0) {
+        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Recalculando estadísticas desde dientes...');
+        const result = UniversalToothValidator.calculateStatistics(data);
+        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Estadísticas calculadas:', result);
+        
+        // Si el cálculo produjo todo ceros, intentar usar pre-calculadas como fallback
+        if (areStatisticsAllZero(result) && data.statistics && !areStatisticsAllZero(data.statistics)) {
+          if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Cálculo dio ceros, usando estadísticas pre-calculadas como fallback');
+          const normalized = normalizeStatistics(data.statistics);
+          return normalized;
+        }
+        
+        return result;
+      }
+      
+      // Si no hay dientes pero sí estadísticas pre-calculadas, usarlas
       if (data.statistics && !areStatisticsAllZero(data.statistics)) {
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Usando estadísticas pre-calculadas válidas:', data.statistics);
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🔍 StatisticsPanel: Datos completos recibidos:', {
-          hasTeeth: !!data.teeth,
-          teethCount: data.teeth ? Object.keys(data.teeth).length : 0,
-          firstTooth: data.teeth ? Object.keys(data.teeth)[0] : null,
-          sampleToothData: data.teeth ? data.teeth[Object.keys(data.teeth)[0]] : null,
-          statistics: data.statistics
-        });
+        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Sin dientes, usando estadísticas pre-calculadas:', data.statistics);
         const normalized = normalizeStatistics(data.statistics);
         return normalized;
       }
       
-      // Si las estadísticas pre-calculadas son todas 0 o no existen, calcular usando UniversalToothValidator
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('⚠️ StatisticsPanel: Estadísticas pre-calculadas son 0 o inexistentes, recalculando...');
-      
-      // Debug: Verificar datos de algunos dientes para entender por qué las estadísticas son 0
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🔍 StatisticsPanel: Verificando datos de dientes para debug:', {
-        totalTeeth: data?.teeth ? Object.keys(data.teeth).length : 0,
-        firstFewTeeth: data?.teeth ? Object.keys(data.teeth).slice(0, 3).map(toothNum => ({
-          toothNumber: toothNum,
-          absent: data.teeth[toothNum]?.absent,
-          hasBleedingData: !!(data.teeth[toothNum]?.bleeding),
-          hasPlaqueData: !!(data.teeth[toothNum]?.plaque),
-          hasProbingDepthData: !!(data.teeth[toothNum]?.probingDepth),
-          bleedingStructure: data.teeth[toothNum]?.bleeding,
-          plaqueStructure: data.teeth[toothNum]?.plaque,
-          probingDepthStructure: data.teeth[toothNum]?.probingDepth,
-          fullData: data.teeth[toothNum]
-        })) : [],
-        sampleToothData: data?.teeth && Object.keys(data.teeth)[0] ? {
-          toothNumber: Object.keys(data.teeth)[0],
-          fullData: data.teeth[Object.keys(data.teeth)[0]]
-        } : null
-      });
-      
+      // Fallback: calcular (resultará en ceros)
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('⚠️ StatisticsPanel: Sin dientes ni estadísticas, calculando vacío...');
       const result = UniversalToothValidator.calculateStatistics(data);
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Estadísticas recalculadas:', result);
       return result;
     } else {
       // Crear datos de muestra para demostración
@@ -399,11 +386,9 @@ const StatisticsPanel = ({
 StatisticsPanel.propTypes = {
   data: PropTypes.object,
   teeth: PropTypes.arrayOf(PropTypes.number),
-  showDetailed: PropTypes.bool,
   compact: PropTypes.bool
 };
 
 
 
 export default StatisticsPanel;
-import { ADVANCED_LOGGING_CONFIG } from './utils/config.js';

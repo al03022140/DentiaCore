@@ -34,11 +34,11 @@ Renderer.prototype.drawSplash = function () {
     this.context.beginPath();
     this.context.textAlign = 'center';
     this.context.fillStyle = "#000000";
-    this.context.font = "32px Arial Bold";
+    this.context.font = "600 32px Montserrat, Arial, sans-serif";
     this.context.fillText("OdontoGraph", this.width / 2,
             this.height / 2 - 16);
 
-    this.context.font = "24px Arial Bold";
+    this.context.font = "600 24px Montserrat, Arial, sans-serif";
     this.context.fillStyle = "#000000";
 
     var year = new Date().getFullYear();
@@ -201,7 +201,7 @@ Renderer.prototype.renderTextCenter16 = function (text, x, y, color) {
         color = "#000000"; // default color = black
     }
 
-    this.context.font = "16px Arial Bold";
+    this.context.font = "500 16px Montserrat, Arial, sans-serif";
     this.context.textAlign = 'center';
     this.context.fillStyle = color;
     this.context.fillText(text, x, y);

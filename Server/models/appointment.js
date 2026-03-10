@@ -8,7 +8,7 @@ const appointmentSchema = new mongoose.Schema({
     },
     doctor_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Doctor', // 🔹 Relación con el doctor que atiende
+        ref: 'Usuario', // 🔹 Relación con el doctor que atiende
         required: true
     },
     fecha_hora: {
@@ -16,7 +16,9 @@ const appointmentSchema = new mongoose.Schema({
         required: true,
         validate: {
             validator: function (value) {
-                return value > new Date(); // Evita citas en el pasado
+                // Solo validar en documentos nuevos o cuando fecha_hora es modificada
+                if (!this.isNew && !this.isModified('fecha_hora')) return true;
+                return value > new Date();
             },
             message: "No se pueden programar citas en el pasado."
         }
@@ -34,15 +36,24 @@ const appointmentSchema = new mongoose.Schema({
     observaciones: {
         type: String,
         trim: true
-    }
+    },
+    // ── Campos de auditoría (roles.MD §5) ──────────────────────
+    creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoEn: { type: Date, default: null },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    deleteReason: { type: String, default: null }
 }, {
     timestamps: true // 🔹 Agrega `createdAt` y `updatedAt` automáticamente
 });
 
 // 🔹 Middleware para actualizar automáticamente el estado de la cita si ya pasó
 appointmentSchema.pre('save', function (next) {
+    // No cambiar estado si se está eliminando (soft-delete)
+    if (this.isModified('deletedAt') && this.deletedAt) return next();
     if (this.fecha_hora < new Date() && this.estado !== "Cancelada") {
-        this.estado = "Pasada"; // Cambia automáticamente a "Pasada" si la fecha es anterior a hoy
+        this.estado = "Pasada";
     }
     next();
 });

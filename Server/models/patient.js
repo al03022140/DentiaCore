@@ -1,29 +1,11 @@
 const mongoose = require('mongoose');
 const uniqueValidator = require('mongoose-unique-validator');
 const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
-
-// Importar esquemas modulares (solo los necesarios)
-const DamageSchema = require('./schemas/damageSchema');
-const InitialSnapshotSchema = require('./schemas/initialSnapshotSchema');
 
 // Función para generar un número de 4 dígitos
 function generate4Digits() {
   return Math.floor(1000 + Math.random() * 9000);
-}
-
-// Función para encriptar datos sensibles
-function encryptSensitiveData(data) {
-  if (!data) return data;
-  const algorithm = 'aes-256-cbc';
-  const key = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipher(algorithm, key);
-  let encrypted = cipher.update(data, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return encrypted;
 }
 
 // ─── Esquema principal del Paciente ───────────────────────────────────────────
@@ -485,6 +467,28 @@ const PatientSchema = new mongoose.Schema({
         fechaFormateada: {
             type: String,
             required: false
+        },
+        // ── Campos de auditoría (roles.MD §4.7, §5) ──────────────────
+        estadoRegistro: {
+            type: String,
+            enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
+            default: 'OFICIAL'
+        },
+        creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        modificadoEn: { type: Date, default: null },
+        firmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        firmadoEn: { type: Date, default: null },
+        // Soft-delete (NOM-004 Art. 5.4)
+        deletedAt: { type: Date, default: null },
+        deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        deleteReason: { type: String, default: null },
+        // Captura extemporánea (roles.MD §9.5)
+        capturaExtemporanea: {
+            esExtemporanea: { type: Boolean, default: false },
+            motivo: { type: String, default: null },
+            fechaNota: { type: Date, default: null },
+            fechaCaptura: { type: Date, default: null }
         }
     }],
 
@@ -495,11 +499,45 @@ const PatientSchema = new mongoose.Schema({
         observaciones: { type: String, default: "", trim: true },
         correcciones: { type: String, default: "", trim: true },
         fecha: { type: Date, required: true, default: Date.now },
-        fechaFormateada: { type: String, required: false }
+        fechaFormateada: { type: String, required: false },
+        // ── Campos de auditoría (roles.MD §4.7, §5) ──────────────────
+        estadoRegistro: {
+            type: String,
+            enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
+            default: 'OFICIAL'
+        },
+        creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        modificadoEn: { type: Date, default: null },
+        firmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        firmadoEn: { type: Date, default: null },
+        // Soft-delete (NOM-004 Art. 5.4)
+        deletedAt: { type: Date, default: null },
+        deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        deleteReason: { type: String, default: null },
+        // Captura extemporánea (roles.MD §9.5)
+        capturaExtemporanea: {
+            esExtemporanea: { type: Boolean, default: false },
+            motivo: { type: String, default: null },
+            fechaNota: { type: Date, default: null },
+            fechaCaptura: { type: Date, default: null }
+        }
     }],
 
     // 📌 Ruta donde se almacenan los archivos del paciente
-    ruta_archivos: { type: String, default: "" }
+    ruta_archivos: { type: String, default: "" },
+
+    // 📌 Soft-delete (NOM-004: expedientes clínicos no pueden destruirse)
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    deleteReason: { type: String, default: null },
+    creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    modificadoEn: { type: Date, default: null },
+
+    // 📌 Derechos ARCO — Cancelación (LFPDPPP Arts. 22-36, roles.MD §6)
+    // true = el paciente solicita que sus datos NO se compartan con fines secundarios
+    datosNoCompartir: { type: Boolean, default: false }
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -575,17 +613,16 @@ PatientSchema.methods.calculateAge = function() {
 // Middleware para eliminar archivos cuando se elimina un paciente
 PatientSchema.pre('remove', async function(next) {
     try {
-        const uploadsPath = path.join(__dirname, '..', 'uploads', this._id.toString());
+        const uploadsPath = resolveUploadsPath('pacientes', this._id.toString());
         
         // Eliminar carpeta de uploads del paciente
         if (fs.existsSync(uploadsPath)) {
-            await fs.promises.rmdir(uploadsPath, { recursive: true });
-            // Carpeta de uploads eliminada
+            await fs.promises.rm(uploadsPath, { recursive: true, force: true });
         }
         
         // También eliminar ruta_archivos si existe
         if (this.ruta_archivos && fs.existsSync(this.ruta_archivos)) {
-            await fs.promises.rmdir(this.ruta_archivos, { recursive: true });
+            await fs.promises.rm(this.ruta_archivos, { recursive: true, force: true });
         }
         
         next();
@@ -604,6 +641,98 @@ PatientSchema.pre('validate', async function(next) {
         next();
     } catch (error) {
         next(error);
+    }
+});
+
+// Middleware para hacer inmutables las notas de evolución: sólo se permite añadir nuevas,
+// no se permite modificar o eliminar notas ya existentes.
+PatientSchema.pre('save', async function(next) {
+    try {
+        if (this.isNew) return next();
+
+        // Sólo validar si hubo cambio en notas_evolucion
+        if (!this.isModified('notas_evolucion')) return next();
+
+        const original = await this.constructor.findById(this._id).lean();
+        if (!original) return next();
+
+        const oldNotes = Array.isArray(original.notas_evolucion) ? original.notas_evolucion : [];
+        const newNotes = Array.isArray(this.notas_evolucion) ? this.notas_evolucion : [];
+
+        // No permitir eliminación de notas
+        if (newNotes.length < oldNotes.length) {
+            return next(new Error('Las notas de evolución no pueden eliminarse una vez creadas.'));
+        }
+
+        // Verificar que las notas existentes no hayan sido modificadas
+        // Nota: campos de auditoría (estadoRegistro, firmadoPor, etc.) NO se comparan
+        // porque el flujo de firma/archivado debe poder modificarlos.
+        // Matching by _id to support both push and unshift insertion patterns.
+        const fieldsToCheck = ['numero_procedimiento','procedimiento','observaciones','correcciones','fecha','fechaFormateada'];
+        for (let i = 0; i < oldNotes.length; i++) {
+            const oldN = oldNotes[i];
+            const oldId = oldN._id?.toString();
+            const newN = oldId
+                ? newNotes.find(n => n._id?.toString() === oldId)
+                : newNotes[i];
+            if (!newN) {
+                return next(new Error('No se pueden modificar las notas de evolución existentes.'));
+            }
+            for (const f of fieldsToCheck) {
+                const oldVal = oldN && oldN[f] !== undefined && oldN[f] !== null ? (oldN[f] instanceof Date ? new Date(oldN[f]).toISOString() : String(oldN[f])) : '';
+                const newVal = newN && newN[f] !== undefined && newN[f] !== null ? (newN[f] instanceof Date ? new Date(newN[f]).toISOString() : String(newN[f])) : '';
+                if (oldVal !== newVal) {
+                    return next(new Error('Las notas de evolución no pueden editarse una vez creadas.'));
+                }
+            }
+        }
+
+        return next();
+    } catch (err) {
+        return next(err);
+    }
+});
+
+// Middleware para hacer inmutables los planes de tratamiento: sólo se permite añadir nuevos,
+// no se permite modificar o eliminar planes ya existentes (NOM-004).
+PatientSchema.pre('save', async function(next) {
+    try {
+        if (this.isNew) return next();
+        if (!this.isModified('planes_tratamiento')) return next();
+
+        const original = await this.constructor.findById(this._id).lean();
+        if (!original) return next();
+
+        const oldPlans = Array.isArray(original.planes_tratamiento) ? original.planes_tratamiento : [];
+        const newPlans = Array.isArray(this.planes_tratamiento) ? this.planes_tratamiento : [];
+
+        if (newPlans.length < oldPlans.length) {
+            return next(new Error('Los planes de tratamiento no pueden eliminarse una vez creados.'));
+        }
+
+        // Matching by _id to support both push and unshift insertion patterns.
+        const fieldsToCheck = ['texto', 'fecha', 'fechaFormateada'];
+        for (let i = 0; i < oldPlans.length; i++) {
+            const oldP = oldPlans[i];
+            const oldId = oldP._id?.toString();
+            const newP = oldId
+                ? newPlans.find(p => p._id?.toString() === oldId)
+                : newPlans[i];
+            if (!newP) {
+                return next(new Error('No se pueden modificar los planes de tratamiento existentes.'));
+            }
+            for (const f of fieldsToCheck) {
+                const oldVal = oldP && oldP[f] !== undefined && oldP[f] !== null ? (oldP[f] instanceof Date ? new Date(oldP[f]).toISOString() : String(oldP[f])) : '';
+                const newVal = newP && newP[f] !== undefined && newP[f] !== null ? (newP[f] instanceof Date ? new Date(newP[f]).toISOString() : String(newP[f])) : '';
+                if (oldVal !== newVal) {
+                    return next(new Error('Los planes de tratamiento no pueden editarse una vez creados.'));
+                }
+            }
+        }
+
+        return next();
+    } catch (err) {
+        return next(err);
     }
 });
 
@@ -632,10 +761,7 @@ PatientSchema.pre('save', async function(next) {
         
         // Crear carpeta de uploads si es nuevo paciente
         if (this.isNew) {
-            const uploadsPath = resolveUploadsPath(this._id.toString());
-            await ensureUploadsPath(this._id.toString());
-            
-            // También crear ruta_archivos para compatibilidad
+            // Crear la ruta principal en uploads/pacientes/<id>
             const rutaArchivos = resolveUploadsPath('pacientes', this._id.toString());
             await ensureUploadsPath('pacientes', this._id.toString());
             this.ruta_archivos = rutaArchivos;
@@ -650,24 +776,8 @@ PatientSchema.pre('save', async function(next) {
     }
 });
 
-// Middleware para sanitizar datos sensibles antes de guardar
-PatientSchema.pre('save', function(next) {
-    // Sanitizar campos de texto para prevenir XSS
-    const sanitizeText = (text) => {
-        if (typeof text !== 'string') return text;
-        return text.replace(/<script[^>]*>.*?<\/script>/gi, '')
-                  .replace(/<[^>]*>/g, '')
-                  .trim();
-    };
-    
-    // Sanitizar campos de texto
-    if (this.primer_nombre) this.primer_nombre = sanitizeText(this.primer_nombre);
-    if (this.apellido_paterno) this.apellido_paterno = sanitizeText(this.apellido_paterno);
-    if (this.apellido_materno) this.apellido_materno = sanitizeText(this.apellido_materno);
-    if (this.otros_nombres) this.otros_nombres = sanitizeText(this.otros_nombres);
-    
-    next();
-});
+// NOTA: La sanitización XSS de nombres se realiza en el controller via SANITIZERS.sanitizeText
+// (HTML entity encoding). No se duplica aquí para evitar doble procesamiento.
 
 // ─── Métodos estáticos mejorados ──────────────────────────────────────────────
 

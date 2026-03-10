@@ -28,7 +28,7 @@ class ErrorBoundary extends React.Component {
 }
 
 // Componente para mostrar la cabecera de información del paciente
-const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, handleEditClick, handlePrintClick, handleSimplePrintClick, userNot }) => {
+const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, handleEditClick, handlePrintClick, userNot }) => {
   // Asegurarse que patient no sea null o undefined antes de acceder a sus propiedades
   if (!patient) {
     return null; // O mostrar un placeholder/loading si se prefiere
@@ -38,7 +38,7 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, han
   const {
     photoURL, primer_nombre, otros_nombres,
     apellido_paterno, apellido_materno, _id,
-    paciente_id, edad, sexo, fecha_nacimiento,
+    paciente_id, sexo, fecha_nacimiento,
     estado_civil, nacionalidad, lugar_nacimiento,
     ocupacion, escolaridad, situacion_laboral
   } = patient;
@@ -141,7 +141,6 @@ PatientInfoHeader.propTypes = {
     apellido_materno: PropTypes.string,
     _id: PropTypes.string.isRequired,
     paciente_id: PropTypes.string,
-    edad: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     sexo: PropTypes.string,
     fecha_nacimiento: PropTypes.string,
     estado_civil: PropTypes.string,
@@ -161,7 +160,6 @@ PatientInfoHeader.propTypes = {
   }),
   handleEditClick: PropTypes.func.isRequired,
   handlePrintClick: PropTypes.func.isRequired,
-  handleSimplePrintClick: PropTypes.func,
   userNot: PropTypes.string.isRequired
 };
 

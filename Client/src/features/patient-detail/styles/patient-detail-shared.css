@@ -3,14 +3,12 @@
    Archivo base unificado para todos los componentes de patient-detail
    =================================================================== */
 
-@import '../../../shared/styles/variables.css';
-
 /* ===================================================================
-   CONTENEDORES DE SECCIÓN PRINCIPALES
-   =================================================================== */
+  LAYOUT BASE
+  =================================================================== */
 
 .patient-detail__section {
-  background-color: white;
+  background-color: var(--color-bg-white);
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
@@ -19,40 +17,34 @@
 }
 
 /* ===================================================================
-   TÍTULOS H2 - ESTILO UNIFICADO
-   =================================================================== */
+  TÍTULOS DE SECCIÓN (H2 / H3)
+  =================================================================== */
 
 .patient-detail__section h2 {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
+  font: var(--pd-font-section-h2);
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-md) 0;
   padding-bottom: var(--spacing-sm);
   border-bottom: 2px solid var(--color-primary-light);
 }
 
-/* ===================================================================
-   TÍTULOS H3 - ESTILO UNIFICADO
-   =================================================================== */
+/* H3 de sección */
 
 .patient-detail__section h3 {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-lg);
-  font-weight: bolder;
+  font: var(--pd-font-section-h3);
   color: var(--color-text-secondary);
   margin: var(--spacing-md) 0 var(--spacing-sm) 0;
 }
 
 /* ===================================================================
-   SUBSECCIONES
-   =================================================================== */
+  SUBSECCIONES Y LISTAS DE DEFINICIÓN
+  =================================================================== */
 
 .patient-detail__subsection {
   margin-bottom: var(--spacing-md);
   padding: var(--spacing-md);
   background-color: var(--color-background-subtle);
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-neutral-500);
   border-left: 4px solid var(--color-primary-light);
   border-radius: var(--border-radius-md); 
 }
@@ -63,23 +55,18 @@
 }
 
 .patient-detail__section dl > div {
-  background-color: #f9f9f9;
+  background-color: var(--color-bg-light);
   border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px var(--color-black-05);
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
 }
 
 .patient-detail__section dt {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.patient-detail__section dd {
-  margin: 0 0 var(--spacing-sm) 0;
-  color: var(--color-text-secondary);
+  font-weight: var(--pd-definition-term-weight);
+  color: var(--pd-definition-term-color);
+  margin-bottom: var(--pd-definition-term-margin-bottom);
 }
 
 .patient-detail__subsection:last-child {
@@ -87,14 +74,12 @@
 }
 
 /* ===================================================================
-   PÁRRAFOS Y TEXTO
-   =================================================================== */
+  TEXTO GENERAL (P, STRONG, SPAN)
+  =================================================================== */
 
 .patient-detail__section p {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-base);
+  font: var(--pd-font-section-body);
   color: var(--color-text-primary);
-  line-height: 1.6;
   margin-bottom: var(--spacing-sm);
 }
 
@@ -106,54 +91,45 @@
 .patient-detail__section p strong,
 .patient-detail__section li strong,
 .patient-detail__details p strong {
-  color: #000;
-  font-weight: bold;
+  color: var(--color-text-black);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 .patient-detail__section p span,
 .patient-detail__section li span,
 .patient-detail__details p span {
-  color: #868686;
-  font-weight: bolder;
+  color: var(--color-neutral-680);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Estilos para definition lists - etiquetas y valores */
-.patient-detail__section dt {
-  font-weight: bold;
-  color: #000;
-  margin-bottom: var(--spacing-xs);
-}
-
 .patient-detail__section dd {
   margin: 0 0 var(--spacing-sm) 0;
-  color: #868686;
-  font-weight: bolder;
+  color: var(--color-neutral-680);
+  font-weight: var(--font-weight-normal);
 }
 
 /* Los estilos para hábitos de higiene están cubiertos por los estilos generales de .patient-detail__section */
 
 /* ===================================================================
-   LISTAS
-   =================================================================== */
+  LISTAS (UL / OL / LI)
+  =================================================================== */
 
 .patient-detail__section ul,
 .patient-detail__section ol {
   margin: 0 0 var(--spacing-sm) 0;
   padding-left: var(--spacing-lg);
 }
-
 .patient-detail__section li {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-base);
+  font: var(--pd-font-section-body);
   color: var(--color-text-primary);
-  line-height: 1.5;
   margin-bottom: var(--spacing-xs);
 }
 
 /* ===================================================================
-   GRIDS DE INFORMACIÓN
-   =================================================================== */
+  GRIDS DE INFORMACIÓN
+  =================================================================== */
 
 .patient-detail__info-grid {
   display: grid;
@@ -169,22 +145,16 @@
 }
 
 /* ===================================================================
-   ETIQUETAS Y VALORES
-   =================================================================== */
-
+  ETIQUETAS Y VALORES (LABEL / VALUE)
+  =================================================================== */
 .patient-detail__label {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font: var(--pd-font-section-label);
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-
 .patient-detail__value {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-normal);
+  font: var(--pd-font-section-value);
   color: var(--color-text-primary);
   word-wrap: break-word;
 }
@@ -195,8 +165,8 @@
 }
 
 /* ===================================================================
-   LISTAS DE DEFINICIÓN
-   =================================================================== */
+  LISTAS DE DEFINICIÓN (DT / DD)
+  =================================================================== */
 
 .patient-detail__definition-list {
   display: grid;
@@ -204,26 +174,21 @@
   gap: var(--spacing-sm) var(--spacing-md);
   margin-bottom: var(--spacing-md);
 }
-
 .patient-detail__definition-list dt {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font: var(--pd-font-definition-label);
   color: var(--color-text-secondary);
   align-self: center;
 }
-
 .patient-detail__definition-list dd {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-base);
+  font: var(--pd-font-definition-value);
   color: var(--color-text-primary);
   margin: 0;
   word-wrap: break-word;
 }
 
 /* ===================================================================
-   MENSAJES DE ESTADO
-   =================================================================== */
+  MENSAJES DE ESTADO
+  =================================================================== */
 
 .patient-detail__no-data {
   text-align: center;
@@ -263,8 +228,8 @@
 }
 
 /* ===================================================================
-   GRUPOS BILATERALES (para evaluaciones dentales)
-   =================================================================== */
+  GRUPOS BILATERALES (evaluaciones dentales)
+  =================================================================== */
 
 .patient-detail__bilateral-group {
   display: grid;
@@ -281,17 +246,15 @@
 }
 
 .patient-detail__bilateral-side h4 {
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
+  font: var(--pd-font-bilateral-title);
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-sm) 0;
   text-align: center;
 }
 
 /* ===================================================================
-   MEDICIONES Y VALORES NUMÉRICOS
-   =================================================================== */
+  MEDICIONES Y VALORES NUMÉRICOS
+  =================================================================== */
 
 .patient-detail__measurement {
   display: inline-flex;
@@ -299,11 +262,7 @@
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: var(--color-background-card);
-  border-radius: var(--border-radius-sm);
-  border: 1px solid var(--color-border-light);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font: var(--pd-font-measurement);
 }
 
 .patient-detail__measurement-value {
@@ -312,21 +271,17 @@
 
 .patient-detail__measurement-unit {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font: var(--pd-font-measurement-unit);
 }
 
 /* ===================================================================
-   CLASIFICACIONES Y BADGES
-   =================================================================== */
+  CLASIFICACIONES Y BADGES
+  =================================================================== */
 
 .patient-detail__classification {
   display: inline-flex;
   align-items: center;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-full);
-  font-family: var(--font-family-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font: var(--pd-font-classification);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -347,8 +302,8 @@
 }
 
 /* ===================================================================
-   RESPONSIVE DESIGN
-   =================================================================== */
+  RESPONSIVE
+  =================================================================== */
 
 @media (max-width: 768px) {
   .patient-detail__section {
@@ -369,13 +324,11 @@
     grid-template-columns: 1fr;
     gap: var(--spacing-xs);
   }
-  
   .patient-detail__section h2 {
-    font-size: var(--font-size-lg);
+    font-size: var(--pd-font-section-h2-size-sm);
   }
-  
   .patient-detail__section h3 {
-    font-size: var(--font-size-md);
+    font-size: var(--pd-font-section-h3-size-sm);
   }
 }
 

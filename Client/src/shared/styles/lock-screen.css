@@ -1,0 +1,95 @@
+/* Modo Cortina — LockScreen (roles.MD §9.3) */
+
+.lock-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.lock-screen-card {
+  background: var(--color-bg-white, #fff);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 340px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.lock-screen-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.lock-screen-card h2 {
+  margin: 0 0 0.25rem;
+  color: var(--color-text-primary, #2c3e50);
+  font-size: 1.4rem;
+}
+
+.lock-screen-user {
+  color: var(--color-text-secondary, #555);
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+.lock-screen-hint {
+  color: var(--color-text-muted, #7f8c8d);
+  font-size: 0.85rem;
+  margin: 0 0 1.25rem;
+}
+
+.lock-screen-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lock-screen-input {
+  text-align: center;
+  font-size: 2rem;
+  letter-spacing: 0.75rem;
+  padding: 0.5rem;
+  border: 2px solid var(--color-border-light, #e8e8e8);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lock-screen-input:focus {
+  border-color: var(--color-primary, #084888);
+}
+
+.lock-screen-error {
+  color: var(--color-danger, #e74c3c);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.lock-screen-btn {
+  background: var(--color-primary, #084888);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.lock-screen-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover, #025db8);
+}
+
+.lock-screen-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

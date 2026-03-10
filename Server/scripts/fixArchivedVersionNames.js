@@ -22,7 +22,7 @@ function makeTimestampFromDate(date) {
 }
 
 async function run() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore';
   console.log(`Conectando a MongoDB: ${uri}`);
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
 

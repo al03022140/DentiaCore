@@ -123,7 +123,7 @@ const UNIFIED_TOOTH_SCHEMA = {
   
   pronostico: {
     type: 'string',
-    enum: ['bueno', 'dudoso', 'malo', 'imposible'],
+    enum: ['bueno', 'regular', 'malo', 'dudoso'],
     default: 'bueno'
   },
   
@@ -167,7 +167,7 @@ const UNIFIED_TOOTH_SCHEMA = {
     },
     validator: (value, toothNumber) => {
       // Validación específica para furca según tipo de diente
-      const needsDoubleFurca = [18, 17, 16, 14, 24, 26, 27, 28].includes(parseInt(toothNumber));
+      const _needsDoubleFurca = [18, 17, 16, 14, 24, 26, 27, 28].includes(parseInt(toothNumber));
       return true; // Simplificado por ahora
     }
   },
@@ -411,7 +411,7 @@ class UniversalToothValidator {
         }
       }
       
-    } catch (error) {
+    } catch (_error) {
       errors.push(`Error interno validando ${fieldName}`);
       return { isValid: false, errors, warnings, sanitizedValue: schema.default };
     }
@@ -641,7 +641,7 @@ class UniversalToothValidator {
             errors.push(`Clave legacy no permitida en diente ${toothKey}: ${k}`);
           }
         }
-        const allowedToothKeys = new Set(['ausente','anchuraEncia','implante','movilidad','pronostico','placa','supuracion','sangrado','margenGingival','profundidadSondaje']);
+        const allowedToothKeys = new Set(['ausente','anchuraEncia','implante','movilidad','pronostico','placa','supuracion','sangrado','margenGingival','profundidadSondaje','numeroDiente','arcada']);
         for (const k of Object.keys(toothData)) {
           if (FORBIDDEN_LEGACY_KEYS.has(k)) continue; // evitar duplicación de errores
           if (!allowedToothKeys.has(k)) {
@@ -1425,8 +1425,8 @@ class UniversalToothValidator {
   static transformFaceData(faceData) {
     if (!faceData) {
       return {
-        profundidad: this.ensureArray3(null, 0),
-        margen: this.ensureArray3(null, 0),
+        profundidadSondaje: this.ensureArray3(null, 0),
+        margenGingival: this.ensureArray3(null, 0),
         sangrado: this.ensureArray3(null, 0),
         supuracion: this.ensureArray3(null, 0),
         placa: this.ensureArray3(null, 0)
@@ -1434,8 +1434,8 @@ class UniversalToothValidator {
     }
     
     return {
-      profundidad: this.ensureArray3(faceData.profundidad, 0),
-      margen: this.ensureArray3(faceData.margen, 0),
+      profundidadSondaje: this.ensureArray3(faceData.profundidadSondaje || faceData.profundidad, 0),
+      margenGingival: this.ensureArray3(faceData.margenGingival || faceData.margen, 0),
       sangrado: this.ensureArray3(faceData.sangrado, 0),
       supuracion: this.ensureArray3(faceData.supuracion, 0),
       placa: this.ensureArray3(faceData.placa, 0)

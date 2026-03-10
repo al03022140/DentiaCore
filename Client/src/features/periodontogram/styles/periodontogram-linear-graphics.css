@@ -50,31 +50,31 @@
 
 /* Efectos hover para inputs de medición */
 .mini-input:focus {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--color-blue-500);
   outline-offset: 1px;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--color-blue-500-10);
   transition: all 0.2s ease;
 }
 
 .mini-input:hover {
-  border-color: #007bff;
+  border-color: var(--color-blue-500);
   transition: border-color 0.2s ease;
 }
 
 /* Estados de validación para inputs */
 .mini-input.validation-error {
-  border-color: #FF6B6B !important;
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
+  border-color: var(--color-red-950) !important;
+  box-shadow: 0 0 0 2px var(--color-red-950-20) !important;
 }
 
 .mini-input.validation-warning {
-  border-color: #FFA500 !important;
-  box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.2) !important;
+  border-color: var(--color-orange-500) !important;
+  box-shadow: 0 0 0 2px var(--color-orange-500-20) !important;
 }
 
 .mini-input.validation-success {
-  border-color: #28a745;
-  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
+  border-color: var(--color-green-500);
+  box-shadow: 0 0 0 2px var(--color-green-500-10);
 }
 
 /* Indicadores de gráficas lineales activas */
@@ -103,19 +103,19 @@
   
   .mini-input:focus {
     outline-width: 1px;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 0 2px var(--color-blue-500-10);
   }
 }
 
 /* Debug mode styles */
 .linear-graphics-debug .linear-graphics-canvas {
-  border: 2px dashed #ff6b6b;
-  background-color: rgba(255, 107, 107, 0.05);
+  border: 2px dashed var(--color-red-950);
+  background-color: var(--color-red-950-05);
 }
 
 .linear-graphics-debug .tooth-image-container {
-  border: 1px dashed #4ecdc4;
-  background-color: rgba(78, 205, 196, 0.05);
+  border: 1px dashed var(--color-teal-300);
+  background-color: var(--color-teal-300-05);
 }
 
 /* Performance optimizations */
@@ -168,32 +168,32 @@
 }
 
 .clinical-indicator.pathological-pocket {
-  background-color: #FF4444;
-  box-shadow: 0 0 6px rgba(255, 68, 68, 0.6);
+  background-color: var(--color-red-850);
+  box-shadow: 0 0 6px var(--color-red-850-60);
   animation: pulse-red 1s infinite alternate;
 }
 
 .clinical-indicator.severe-recession {
-  background-color: #FF8800;
+  background-color: var(--color-orange-600);
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
   animation: fade-orange 0.8s infinite alternate;
 }
 
 .clinical-indicator.attachment-loss {
-  background-color: #CC0000;
+  background-color: var(--color-red-800);
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   animation: bounce-red 1.2s infinite;
 }
 
 .clinical-indicator.bleeding {
-  background-color: #FF6666;
+  background-color: var(--color-red-900);
   opacity: 0.7;
   width: 4px;
   height: 4px;
 }
 
 .clinical-indicator.suppuration {
-  background-color: #FFFF00;
+  background-color: var(--color-yellow-500-bright);
   opacity: 0.9;
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
@@ -218,8 +218,8 @@
 /* Tooltips avanzados */
 .hover-tooltip {
   position: absolute;
-  background: rgba(0, 0, 0, 0.8);
-  color: #FFFFFF;
+  background: var(--color-black-80);
+  color: var(--color-bg-white);
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 12px;
@@ -229,7 +229,7 @@
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.2s ease, transform 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px var(--color-black-30);
 }
 
 .hover-tooltip.visible {
@@ -245,7 +245,7 @@
   margin-left: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
+  border-color: var(--color-black-80) transparent transparent transparent;
 }
 
 /* Efectos de highlight mejorados */
@@ -253,7 +253,7 @@
   position: absolute;
   pointer-events: none;
   z-index: 12;
-  border: 3px solid #4A90E2;
+  border: 3px solid var(--color-blue-750);
   border-radius: 4px;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -265,9 +265,9 @@
 }
 
 @keyframes glow-blue {
-  0% { box-shadow: 0 0 0 rgba(74, 144, 226, 0); }
-  50% { box-shadow: 0 0 20px rgba(74, 144, 226, 0.5); }
-  100% { box-shadow: 0 0 0 rgba(74, 144, 226, 0); }
+  0% { box-shadow: 0 0 0 transparent; }
+  50% { box-shadow: 0 0 20px var(--color-blue-750-50); }
+  100% { box-shadow: 0 0 0 transparent; }
 }
 
 /* Indicadores de feedback en tiempo real */
@@ -283,25 +283,25 @@
 }
 
 .feedback-indicator.valid {
-  background-color: #4CAF50;
-  box-shadow: 0 0 4px rgba(76, 175, 80, 0.5);
+  background-color: var(--color-green-700);
+  box-shadow: 0 0 4px var(--color-green-700-50);
 }
 
 .feedback-indicator.warning {
-  background-color: #FF9800;
-  box-shadow: 0 0 4px rgba(255, 152, 0, 0.5);
+  background-color: var(--color-orange-550);
+  box-shadow: 0 0 4px var(--color-orange-550-50);
   animation: pulse-warning 1s infinite;
 }
 
 .feedback-indicator.error {
-  background-color: #F44336;
-  box-shadow: 0 0 4px rgba(244, 67, 54, 0.5);
+  background-color: var(--color-red-750);
+  box-shadow: 0 0 4px var(--color-red-750-50);
   animation: shake-error 0.5s ease-in-out;
 }
 
 .feedback-indicator.info {
-  background-color: #2196F3;
-  box-shadow: 0 0 4px rgba(33, 150, 243, 0.5);
+  background-color: var(--color-blue-400);
+  box-shadow: 0 0 4px var(--color-blue-400-50);
 }
 
 @keyframes pulse-warning {
@@ -321,7 +321,7 @@
   bottom: -4px;
   left: 0;
   height: 2px;
-  background-color: #E0E0E0;
+  background-color: var(--color-neutral-600);
   border-radius: 1px;
   overflow: hidden;
   z-index: 14;
@@ -329,7 +329,7 @@
 
 .progress-indicator .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  background: linear-gradient(90deg, var(--color-green-700), var(--color-green-400));
   border-radius: 1px;
   transition: width 0.5s ease;
   transform-origin: left;
@@ -344,23 +344,23 @@
   height: 12px;
   border-radius: 50%;
   z-index: 17;
-  border: 2px solid #FFFFFF;
+  border: 2px solid var(--color-bg-white);
 }
 
 .quality-score.excellent {
-  background-color: #4CAF50;
+  background-color: var(--color-green-700);
 }
 
 .quality-score.good {
-  background-color: #8BC34A;
+  background-color: var(--color-green-400);
 }
 
 .quality-score.fair {
-  background-color: #FF9800;
+  background-color: var(--color-orange-550);
 }
 
 .quality-score.poor {
-  background-color: #F44336;
+  background-color: var(--color-red-750);
 }
 
 /* Efectos de auto-save */
@@ -371,7 +371,7 @@
   padding: 8px 16px;
   border-radius: 4px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   z-index: 1000;
   opacity: 0;
   transform: translateY(-20px);
@@ -384,13 +384,13 @@
 }
 
 .auto-save-indicator.success {
-  background-color: #4CAF50;
-  color: white;
+  background-color: var(--color-green-700);
+  color: var(--color-bg-white);
 }
 
 .auto-save-indicator.error {
-  background-color: #F44336;
-  color: white;
+  background-color: var(--color-red-750);
+  color: var(--color-bg-white);
 }
 
 /* Mejoras para inputs con validación avanzada */
@@ -399,19 +399,19 @@
 }
 
 .mini-input.pathological {
-  border-color: #FF4444 !important;
-  box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3) !important;
+  border-color: var(--color-red-850) !important;
+  box-shadow: 0 0 0 2px var(--color-red-850-30) !important;
 }
 
 .mini-input.severe-condition {
-  border-color: #CC0000 !important;
-  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3) !important;
+  border-color: var(--color-red-800) !important;
+  box-shadow: 0 0 0 2px var(--color-red-800-30) !important;
   animation: urgent-attention 2s infinite;
 }
 
 @keyframes urgent-attention {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3); }
-  50% { box-shadow: 0 0 0 4px rgba(204, 0, 0, 0.5); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--color-red-800-30); }
+  50% { box-shadow: 0 0 0 4px var(--color-red-800-50); }
 }
 
 /* Optimizaciones de rendimiento */
@@ -426,34 +426,34 @@
 
 /* Modo debug mejorado */
 .linear-graphics-debug .clinical-indicator {
-  border: 1px solid #000;
+  border: 1px solid var(--color-text-black);
   opacity: 0.8;
 }
 
 .linear-graphics-debug .hover-tooltip {
-  border: 1px dashed #ff6b6b;
+  border: 1px dashed var(--color-red-950);
 }
 
 .linear-graphics-debug .feedback-indicator {
-  border: 1px solid #333;
+  border: 1px solid var(--color-neutral-1100);
 }
 
 /* Soporte para temas oscuros */
 @media (prefers-color-scheme: dark) {
   .hover-tooltip {
-    background: rgba(255, 255, 255, 0.9);
-    color: #000;
+    background: var(--color-bg-white-90);
+    color: var(--color-text-black);
   }
   
   .hover-tooltip::after {
-    border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
+    border-color: var(--color-bg-white-90) transparent transparent transparent;
   }
   
   .auto-save-indicator.success {
-    background-color: #388E3C;
+    background-color: var(--color-green-800);
   }
   
   .auto-save-indicator.error {
-    background-color: #D32F2F;
+    background-color: var(--color-red-650);
   }
 }

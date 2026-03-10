@@ -1,0 +1,349 @@
+﻿/* Force content layout to single column for this page */
+.content:has(.consultas-page) {
+  grid-template-columns: 1fr;
+  overflow-x: hidden;
+}
+
+.consultas-page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font: var(--pd-font-base);
+  background-color: transparent;
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
+/* --- COLUMNA IZQUIERDA --- */
+.consultas-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+  overflow-y: hidden; /* Changed from hidden to auto in previous tool but maybe let's stick to hidden and scroll children? */
+  /* Wait, if the user sees scrolling, it's either the full page or the panel */
+  /* Cash page uses height: 100% on columns */
+  padding-right: 0rem; /* Remove padding right that might add width if box-sizing is off (it is on now) */
+  min-width: 0;
+}
+
+/* Panel Detalle Seleccionado */
+.selected-detail-panel {
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
+  box-sizing: border-box;
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  min-height: 0; 
+  overflow-y: hidden; /* Hide overflow on container, let content scroll? */
+  /* Actually, usually content scrolls. */
+  /* Let's see ConsultasPage.jsx, is there a scrollable inner div? */
+  /* If not, we set overflow-y: auto here */
+  overflow-y: auto;
+}
+
+/* --- COLUMNA DERECHA --- */
+.consultas-right {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
+  box-sizing: border-box;
+  padding: 1.25rem;
+  overflow: hidden;
+  height: 100%;
+  margin-top: 0;
+  min-width: 0;
+}
+
+/* Panel Siguiente Paciente (Highlight) */
+.next-patient-card {
+  background-color: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
+  padding: 1rem 1.5rem;
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.next-patient-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.next-patient-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-border-light);
+}
+
+.next-patient-info {
+  flex: 1;
+}
+
+.next-patient-info h2 {
+  font: var(--text-heading-xxs);
+  color: var(--color-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.next-patient-time {
+  font: var(--pd-font-body-md);
+  color: var(--color-text-secondary);
+  display: block;
+}
+
+.badge-status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font: var(--text-overline);
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.badge-status.confirmed {
+  background-color: var(--color-success-100);
+  color: var(--color-success);
+}
+
+.badge-status.waiting {
+  background-color: var(--color-yellow-100);
+  color: var(--color-yellow-700);
+}
+
+.next-patient-reason {
+  background: var(--color-bg-section);
+  padding: 1rem;
+  border-radius: var(--border-radius-md);
+  font: var(--pd-font-section-body);
+  color: var(--color-text-secondary);
+}
+
+.next-patient-reason strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--color-text-primary);
+}
+
+.start-consultation-btn {
+  background-color: var(--color-primary);
+  color: var(--color-bg-white);
+  border: none;
+  padding: 1rem;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font: var(--pd-font-label-md);
+  transition: var(--transition-medium);
+  width: 100%;
+  text-align: center;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 6px var(--color-black-10);
+}
+
+.start-consultation-btn:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.detail-header-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border-light);
+  padding-bottom: 1rem;
+}
+
+.patient-tags span {
+  background-color: var(--color-yellow-100);
+  color: var(--color-yellow-700);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font: var(--text-caption-sm);
+  margin-right: 0.5rem;
+}
+
+.timeline-section h4 {
+  color: var(--color-primary);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font: var(--text-subtitle-md);
+  border-bottom: 2px solid var(--color-bg-section);
+  padding-bottom: 0.5rem;
+}
+
+.timeline-container {
+  margin-bottom: 1.5rem;
+}
+
+.timeline-item {
+  border-left: 2px solid var(--color-primary-light);
+  padding-left: 1rem;
+  padding-bottom: 1rem;
+  position: relative;
+}
+
+.timeline-item:last-child {
+  border-left: 2px solid transparent;
+}
+
+.timeline-item::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  position: absolute;
+  left: -6px;
+  top: 2px;
+}
+
+.timeline-date {
+  font: var(--text-caption-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.timeline-content {
+  font: var(--pd-font-section-body);
+  color: var(--color-text-secondary);
+}
+
+.plan-today-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.plan-today-list li {
+  background-color: var(--color-bg-section);
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--border-radius-sm);
+  border-left: 4px solid var(--color-warning);
+  font: var(--pd-font-section-body);
+}
+
+.detail-actions {
+  margin-top: auto;
+  text-align: right;
+  padding-top: 1rem;
+}
+
+.secondary-btn {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font: var(--pd-font-label-md);
+  transition: all 0.2s;
+}
+
+.secondary-btn:hover {
+  background: var(--color-bg-section);
+}
+
+.consultas-right h3 {
+  color: var(--color-primary);
+  font: var(--text-heading-sm);
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.consultas-list-container {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 0.5rem;
+}
+
+.list-section-title {
+  font: var(--text-overline);
+  color: var(--color-text-muted);
+  margin: 1.5rem 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.list-section-title:first-child {
+  margin-top: 0;
+}
+
+.consultation-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background-color: var(--color-bg-white);
+  border-bottom: 1px solid var(--color-border-light);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-light);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.12s ease;
+  margin-bottom: 0.75rem;
+}
+
+.consultation-item:hover {
+  background-color: var(--color-bg-section);
+  transform: translateY(-2px);
+}
+
+.consultation-item.active {
+  background-color: var(--color-blue-500-15);
+  border-left: 4px solid var(--color-primary);
+}
+
+.consultation-time-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+  color: var(--color-primary);
+  font: var(--pd-font-label-md);
+  font-weight: var(--font-weight-medium);
+  margin-right: 1rem;
+}
+
+.time-hour {
+  font: var(--pd-font-body-md);
+}
+
+.time-ampm {
+  font: var(--text-caption-xs);
+  color: var(--color-text-muted);
+}
+
+.consultation-info {
+  flex: 1;
+}
+
+.consultation-patient-name {
+  font: var(--pd-font-section-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.consultation-reason {
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-secondary);
+}

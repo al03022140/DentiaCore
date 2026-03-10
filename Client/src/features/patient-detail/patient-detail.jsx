@@ -6,7 +6,7 @@ import userNot from "../../assets/images/avatars/UserNot.png"; // Imagen por def
 import AddPatient from "../add-patient/add-patient.jsx"; // Componente para agregar/editar pacientes
 import API from '../../shared/services/axios-instance.js'; // Instancia configurada de axios
 import { Modal, Input, message } from 'antd'; // Componente de tabla de Ant Design - Añadir message
-import { formatDateToDDMMYYYY, getCurrentDateFormatted } from '../../shared/utils/date-utils'; // Utilidades de fecha
+import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils'; // Utilidades de fecha
 
 // Importar componentes modulares de PatientDetailComponents
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
@@ -25,12 +25,8 @@ import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx'
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 
-// Utilidades y API
-// Funciones para formatear datos del paciente
-import { formatName, formatDate, calculateAge } from '../../shared/utils/formatters';
 // Funciones API para manejo de pacientes
 import { getPatientById } from '../../shared/services/api.js';
-import { prepareDataSource } from '../odontogram/utils/odontogram-utils';
 
 // Error Boundary para secciones críticas
 class OdontogramErrorBoundary extends React.Component {
@@ -133,6 +129,10 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
   return { areScriptsReadyState, initializationError, retryInitialization };
 }
 
+// Constantes para confirmación de eliminación
+const REQUIRED_DELETE_PHRASE = 'CONFIRMO ELIMINACION';
+const REQUIRED_DELETE_PHRASE_ACCENTED = 'CONFIRMO ELIMINACIÓN';
+
 // Componente principal para mostrar y editar detalles del paciente
 const PatientDetail = () => {
   // Añadir referencias para los canvas al principio del componente
@@ -140,7 +140,6 @@ const PatientDetail = () => {
   const canvas2Ref = useRef(null);
   
 
-  const [isSavingOdontogram, setIsSavingOdontogram] = useState(false);
   const { patientId } = useParams();
   const navigate = useNavigate();
 
@@ -154,22 +153,12 @@ const PatientDetail = () => {
   // Estados para el Odontograma Inicial (simplificados)
   const [initialData, setInitialData] = useState([]);
   const [initialImageUrl, setInitialImageUrl] = useState(null);
-  const [isInitialOdontogramSaved, setIsInitialOdontogramSaved] = useState(false);
   const [showInitialOdontogramImage, setShowInitialOdontogramImage] = useState(false); // Controla si se muestra imagen o canvas
-  const [capturedSuccessfully, setCapturedSuccessfully] = useState(false); // Ayuda a la lógica de visualización
   const [odontogramHistory, setOdontogramHistory] = useState([]);
 
   const [isDeleting, setIsDeleting] = useState(false);
-  // Confirmación por texto para eliminar paciente (usando modal como en notas de evolución)
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const requiredDeletePhrase = 'CONFIRMO ELIMINACION';
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
-const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
-  const imageLoadAttemptsRef = useRef(0);
-  const MAX_IMAGE_LOAD_ATTEMPTS = 3; // Número máximo de intentos
-
-  // Removido: const API_URL = '/api'; - ahora usamos la instancia configurada de axios
-  
   // Ref para controlar si ya se hizo el fetch inicial (ahora con estado)
   const [fetchedInitial, setFetchedInitial] = useState(false);
 
@@ -215,10 +204,8 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
   const resetOdontogramState = useCallback(() => {
     setInitialImageUrl(null);
     setShowInitialOdontogramImage(false);
-    setIsInitialOdontogramSaved(false);
     setInitialData([]);
     setOdontogramHistory([]);
-    setCapturedSuccessfully(false);
   }, []);
 
   const fetchPatientData = useCallback(async () => {
@@ -245,7 +232,7 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
     } finally {
       setLoading(false);
     }
-  }, [patientId, showInitialOdontogramImage]);
+  }, [patientId]);
 
   const loadScript = useCallback((src) => {
     return new Promise((resolve, reject) => {
@@ -310,8 +297,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
       if (data.exists) {
         setInitialImageUrl(formatImageUrl(data.imageUrl));
         setShowInitialOdontogramImage(true);
-        setIsInitialOdontogramSaved(true);
-        setCapturedSuccessfully(true);
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
         setOdontogramHistory(normalizeHistory(data.history));
@@ -341,8 +326,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
     setInitialData(datos || []);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setShowInitialOdontogramImage(true);
-    setIsInitialOdontogramSaved(true);
-    setCapturedSuccessfully(true);
     // Resetear fetchedInitial para permitir que checkInitialOdontogram se ejecute en futuros refreshes
     setFetchedInitial(false);
     
@@ -356,26 +339,22 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
   }, [formatImageUrl, normalizeHistory, checkInitialOdontogram]);
 
   // Handler para guardar datos del canvas clínico
-  const handleSaveClinicalCanvasData = useCallback(async (canvasDataUrl, odontogramData) => {
+  const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
       const result = await odontogramaService.default.saveClinicalOdontogramState(
         patientId,
-        canvasDataUrl,
-        odontogramData
+        entryData
       );
       
-      setClinicalOdontogramData(odontogramData);
-      setClinicalOdontogramExists(true);
-      message.success('Odontograma clínico guardado exitosamente');
-      
-      // Refrescar datos del paciente para reflejar cambios
-      await fetchPatientData();
+      // Usar la respuesta del servidor para actualizar el estado local
+      setClinicalOdontogramData(result.datos || entryData || []);
+      setClinicalOdontogramExists(result.exists ?? true);
     } catch (error) {
       console.error('Error al guardar odontograma clínico:', error);
       message.error('Error al guardar el odontograma clínico');
     }
-  }, [patientId, fetchPatientData, showInitialOdontogramImage]);
+  }, [patientId]);
 
   // Handler para eliminar estado del canvas clínico
   const handleDeleteClinicalCanvasState = useCallback(async () => {
@@ -447,10 +426,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
     }, 100);
   }, [patientData]);
 
-  // Función simple para imprimir la página tal como se ve
-  const handleSimplePrintClick = useCallback(() => {
-    window.print();
-  }, []);
   // Abrir modal de confirmación de eliminación (patrón igual a notas de evolución)
   const handleDeleteClick = useCallback(() => {
     setIsDeleteConfirmVisible(true);
@@ -460,8 +435,8 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
   // Confirmar en modal y ejecutar eliminación
   const handleDeleteConfirmOk = useCallback(async () => {
     const trimmed = deleteConfirmText.trim();
-    if (trimmed !== requiredDeletePhrase && trimmed !== requiredDeletePhraseAccented) {
-      message.warning(`Debes escribir ${requiredDeletePhrase} o ${requiredDeletePhraseAccented} para confirmar la eliminación.`);
+    if (trimmed !== REQUIRED_DELETE_PHRASE && trimmed !== REQUIRED_DELETE_PHRASE_ACCENTED) {
+      message.warning(`Debes escribir ${REQUIRED_DELETE_PHRASE} o ${REQUIRED_DELETE_PHRASE_ACCENTED} para confirmar la eliminación.`);
       return;
     }
     try {
@@ -521,7 +496,7 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
     if (patientData && patientId) {
       loadClinicalOdontogramState();
     }
-  }, [patientData, patientId, loadClinicalOdontogramState, showInitialOdontogramImage]);
+  }, [patientData, patientId, loadClinicalOdontogramState]);
 
   // Validaciones simplificadas antes del render
   if (loading) return <Loading />;
@@ -545,7 +520,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
 
       <div className="patient-detail__content">
         <Modal
-          title="Edit Patient"
           open={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}
           footer={null}
@@ -553,7 +527,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
         >
           {patientData && patientData.patient && (
             <AddPatient
-              isEditing={true}
               initialPatientData={patientData.patient}
               onSave={() => {
                 message.success("Patient updated successfully.");
@@ -569,16 +542,16 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
           <PatientInfoHeader
             patient={patientData.patient}
             userNot={userNot}
-            proximaCita={patientData.citas?.proxima}
-            ultimaCita={patientData.citas?.ultima}
+            proximaCita={patientData.citas?.proximaCita}
+            ultimaCita={patientData.citas?.ultimaCita}
             handleEditClick={handleEditClick}
             handlePrintClick={handlePrintClick}
-            handleSimplePrintClick={handleSimplePrintClick}
           />
 
           <PatientEvolutionNote 
             patientId={patientId}
             initialEvolutionNotes={patientData.patient.notas_evolucion}
+            patientData={patientData.patient}
           />
           
           <PatientContactInfo contacto={patientData.patient.contacto} email={patientData.patient.email} />
@@ -593,8 +566,8 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
           <PatientHygieneHabits habitos_higiene={patientData.patient.habitos_higiene} />
           <PatientDentalEvaluation patientData={patientData.patient} />
           <PatientAppointmentsInfo 
-            ultimaCita={patientData.citas?.ultima} 
-            proximaCita={patientData.citas?.proxima}
+            ultimaCita={patientData.citas?.ultimaCita} 
+            proximaCita={patientData.citas?.proximaCita}
           />
 
           {initializationError && (
@@ -667,11 +640,6 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
           </div>
         </div>
       </div>
-      {isSavingOdontogram && (
-        <div className="spinner-overlay">
-          <div className="spinner-placeholder">Saving...</div>
-        </div>
-      )}
 
       <Modal
         title="Confirmar eliminación"
@@ -681,11 +649,11 @@ const requiredDeletePhraseAccented = 'CONFIRMO ELIMINACIÓN';
         okText="Eliminar"
         cancelText="Cancelar"
       >
-        <p>Para confirmar la eliminación, escribe exactamente: <strong>{requiredDeletePhrase}</strong> o <strong>{requiredDeletePhraseAccented}</strong></p>
+        <p>Para confirmar la eliminación, escribe exactamente: <strong>{REQUIRED_DELETE_PHRASE}</strong> o <strong>{REQUIRED_DELETE_PHRASE_ACCENTED}</strong></p>
         <Input
           value={deleteConfirmText}
           onChange={(e) => setDeleteConfirmText(e.target.value)}
-          placeholder={`${requiredDeletePhrase} / ${requiredDeletePhraseAccented}`}
+          placeholder={`${REQUIRED_DELETE_PHRASE} / ${REQUIRED_DELETE_PHRASE_ACCENTED}`}
           aria-label="Texto de confirmación de eliminación"
         />
       </Modal>

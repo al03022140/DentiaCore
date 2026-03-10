@@ -115,8 +115,8 @@ export const MEASUREMENT_LIMITS = {
     description: 'Presencia de placa (0-1)'
   },
   anchuraEncia: {
-    min: -99,
-    max: 99,
+    min: 0,
+    max: 10,
     default: 0,
     unit: 'mm',
     description: 'Anchura de encía queratinizada'

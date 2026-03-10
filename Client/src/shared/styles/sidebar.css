@@ -1,118 +1,107 @@
-.sidebar-wrapper {
-  /* Variables para facilitar ajustes SOLO en el sidebar-wrapper */
-  --sidebar-width: 13.75rem; /* 220px/16 = 13.75rem */
-  --sidebar-bg: #003366;
-  --hover-bg: #00509e;
-  --active-bg: #012447;
-  --text-color: white;
-  --base-font-size: clamp(1rem, 1vw, 1.2rem);
+.sidebar-wrapper .sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  background-color: var(--sidebar-bg);
+  color: var(--text-color);
+  font: var(--text-fluid-sidebar);
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  height: 100vh;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
 
-  /* Sidebar escalable */
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-    background-color: var(--sidebar-bg);
-    color: var(--text-color);
-    display: flex;
-    flex-direction: column;
-    width: var(--sidebar-width);
-    height: 100vh;
-    box-sizing: border-box;
-    overflow-y: auto;
+/* Imagen adaptativa */
+.sidebar-wrapper .sidebar img {
+  width: 80%;
+  max-width: 9.375rem; /* 150px/16 = 9.375rem */
+  padding: 0.9375rem; /* 15px/16 = 0.9375rem */
+  margin-bottom: 1.25rem; /* 20px/16 = 1.25rem */
+  border-radius: 0.625rem;
+  display: block;
+  aspect-ratio: 1; /* Mantiene relación cuadrada */
+  object-fit: contain; /* Evita distorsión */
+}
+
+/* Lista escalable */
+.sidebar-wrapper .sidebar ul {
+  list-style: none;
+  padding: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.sidebar-wrapper .sidebar ul li {
+  font-family: var(--font-family-primary);
+  margin: clamp(0.5rem, 1.5vh, 1rem) 0; /* Margen vertical responsivo */
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.3s ease;
+}
+
+.sidebar-wrapper .sidebar ul li a {
+  text-decoration: none;
+  color: var(--text-color);
+  font: var(--text-fluid-sidebar-base); /* usa token centralizado (peso, tamaño, familia) */
+  display: block;
+  padding: 0.625rem 0.9375rem;
+  border-radius: 0.3125rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Efectos hover/active escalados */
+.sidebar-wrapper .sidebar ul li a:hover {
+  background-color: var(--hover-bg);
+  transform: scale(1.02);
+}
+
+.sidebar-wrapper .sidebar ul li a:active {
+  background-color: var(--active-bg);
+  transform: scale(0.98);
+}
+
+/* Focus accesible */
+.sidebar-wrapper .sidebar ul li a:focus-visible {
+  outline: 2px solid var(--text-color);
+  outline-offset: 2px;
+}
+
+/* Estado activo responsivo */
+.sidebar-wrapper .sidebar ul li a.active {
+  background-color: var(--active-bg);
+  font: var(--text-fluid-sidebar-active);
+}
+
+/* Media queries para ajustes específicos */
+@media (max-width: 768px) { /* Tablet */
+  .sidebar-wrapper .sidebar {
+    width: clamp(10rem, 25vw, 13.75rem);
   }
-
-  /* Imagen adaptativa */
-  .sidebar img {
-    width: 80%;
-    max-width: 9.375rem; /* 150px/16 = 9.375rem */
-    padding: 0.9375rem; /* 15px/16 = 0.9375rem */
-    margin-bottom: 1.25rem; /* 20px/16 = 1.25rem */
-    border-radius: 0.625rem;
-    display: block;
-    aspect-ratio: 1; /* Mantiene relación cuadrada */
-    object-fit: contain; /* Evita distorsión */
+  
+  .sidebar-wrapper .sidebar img {
+    max-width: 6.25rem;
   }
+}
 
-  /* Lista escalable */
-  .sidebar ul {
-    list-style: none;
-    padding: 0;
+@media (max-width: 480px) { /* Móvil */
+  .sidebar-wrapper .sidebar {
     width: 100%;
-    margin: 0;
+    min-height: auto;
+    max-height: none;
   }
-
-  .sidebar ul li {
-    font-family: 'Montserrat', sans-serif;
-    margin: clamp(0.5rem, 1.5vh, 1rem) 0; /* Margen vertical responsivo */
-    font-size: clamp(1.2rem, 1.5vw, 1.4rem); /* Texto escalable */
-    cursor: pointer;
-    transition: transform 0.2s ease, background-color 0.3s ease;
+  
+  .sidebar-wrapper .sidebar ul li {
+    font-size: 1.1rem;
   }
+}
 
-  .sidebar ul li a {
-    text-decoration: none;
-    color: var(--text-color);
-    display: block;
-    padding: 0.625rem 0.9375rem;
-    border-radius: 0.3125rem;
-    width: 100%;
-    box-sizing: border-box;
-    transition: all 0.2s ease-in-out;
-  }
-
-  /* Efectos hover/active escalados */
-  .sidebar ul li a:hover {
-    background-color: var(--hover-bg);
-    transform: scale(1.02);
-  }
-
-  .sidebar ul li a:active {
-    background-color: var(--active-bg);
-    transform: scale(0.98);
-  }
-
-  /* Focus accesible */
-  .sidebar ul li a:focus-visible {
-    outline: 2px solid var(--text-color);
-    outline-offset: 2px;
-  }
-
-  /* Estado activo responsivo */
-  .sidebar ul li a.active {
-    background-color: var(--active-bg);
-    font-weight: bold;
-    font-size: clamp(1.3rem, 1.6vw, 1.5rem);
-  }
-
-  /* Media queries para ajustes específicos */
-  @media (max-width: 768px) { /* Tablet */
-    .sidebar {
-      width: clamp(10rem, 25vw, 13.75rem);
-    }
-    
-    .sidebar img {
-      max-width: 6.25rem;
-    }
-  }
-
-  @media (max-width: 480px) { /* Móvil */
-    .sidebar {
-      width: 100%;
-      min-height: auto;
-      max-height: none;
-    }
-    
-    .sidebar ul li {
-      font-size: 1.1rem;
-    }
-  }
-
-  /* Para escalado del sistema operativo */
-  @media (resolution: 150dpi) {
-    .sidebar {
-      --base-font-size: 1.1rem;
-    }
+/* Para escalado del sistema operativo */
+@media (resolution: 150dpi) {
+  .sidebar-wrapper .sidebar {
+    font-size: 1.1rem;
   }
 }

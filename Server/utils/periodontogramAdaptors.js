@@ -178,7 +178,7 @@ function adaptTeethFromClientPayload(teeth) {
       })(),
       pronostico: (() => {
         const p = (toothVal?.pronostico || toothVal?.prognosis || 'bueno').toString().toLowerCase();
-        const allowed = ['bueno', 'regular', 'malo', 'dudoso', 'reservado'];
+        const allowed = ['bueno', 'regular', 'malo', 'dudoso'];
         const v = allowed.includes(p) ? p : 'bueno';
         return v.charAt(0).toUpperCase() + v.slice(1);
       })(),

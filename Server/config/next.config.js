@@ -1,5 +1,5 @@
 module.exports = {
-    async headers() {
+    headers() {
       return [
         {
           source: '/(.*)', // Aplica a todas las rutas de tu app

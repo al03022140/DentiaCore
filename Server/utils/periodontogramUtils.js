@@ -194,7 +194,7 @@ class PeriodontogramDataUtils {
    * @returns {boolean}
    */
   static needsDoubleFurca(toothNumber) {
-    return PERIODONTOGRAM_CONFIG.DOUBLE_FURCA_TEETH.includes(Number(toothNumber));
+    return PERIODONTOGRAM_CONFIG.DOUBLE_FURCA_CONFIG.TEETH.includes(Number(toothNumber));
   }
 
   /**
@@ -228,7 +228,7 @@ class PeriodontogramDataUtils {
    * @param {Object} frontendData
    * @returns {never}
    */
-  static transformToBackend(frontendData) {
+  static transformToBackend(_frontendData) {
     const error = new Error('transformToBackend está deprecado y retirado. El Backend no acepta transformaciones implícitas. Envíe formato canónico (4 caras, tripletas) desde el Front.');
     error.code = 'PERIODONTOGRAM_TRANSFORMER_DEPRECATED';
     throw error;

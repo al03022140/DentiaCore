@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Dent Application Launcher
-Aplicación de escritorio para iniciar y detener el servidor y frontend de Dent
+DentiaCore Application Launcher
+Aplicación de escritorio para iniciar y detener el servidor y frontend de DentiaCore
 Usa la paleta de colores del programa para mantener consistencia visual
 """
 
@@ -21,7 +21,7 @@ import urllib.error
 import shutil
 import socket
 
-class DentLauncher:
+class DentiaCoreLauncher:
     def __init__(self):
         # Colores del programa (extraídos de variables.css)
         self.colors = {
@@ -30,13 +30,22 @@ class DentLauncher:
             'primary_light': '#3498db',
             'text_primary': '#2c3e50',
             'text_secondary': '#555',
+            'text_muted': '#7f8c8d',
             'text_light': '#95a5a6',
-            'bg_white': '#fff',
+            'bg_white': '#ffffff',
             'bg_light': '#f9f9f9',
+            'bg_card': '#ffffff',
             'success': '#27ae60',
+            'success_hover': '#219a52',
             'warning': '#f39c12',
             'danger': '#e74c3c',
-            'border_light': '#e8e8e8'
+            'danger_hover': '#c0392b',
+            'border_light': '#e8e8e8',
+            'border_card': '#e8e8e8',
+            'neutral_250': '#f8f9fb',
+            'blue_500_08': '#007bff14',
+            'blue_500_25': '#007bff40',
+            'shadow': '#0000001a',
         }
         
         # Estado de los procesos
@@ -70,9 +79,9 @@ class DentLauncher:
     def setup_window(self):
         """Configurar la ventana principal"""
         self.root = tk.Tk()
-        self.root.title("Dent Application Launcher")
-        self.root.geometry("520x780")
-        self.root.minsize(520, 720)
+        self.root.title("DentiaCore Launcher")
+        self.root.geometry("540x820")
+        self.root.minsize(540, 780)
         self.root.configure(bg=self.colors['bg_light'])
         self.root.resizable(False, True)
         
@@ -90,281 +99,286 @@ class DentLauncher:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        
+
+    # ── Helpers de UI (Design System) ──────────────────────────────
+
+    def _create_rounded_card(self, parent, width, height, radius=16, bg='#ffffff',
+                              border_color='#e8e8e8', border_width=2):
+        """Crea un Canvas con un rectángulo redondeado que simula una card del design system."""
+        canvas = tk.Canvas(
+            parent, width=width, height=height,
+            bg=parent.cget('bg'), highlightthickness=0, bd=0,
+        )
+        self._draw_rounded_rect(canvas, border_width, border_width,
+                                 width - border_width, height - border_width,
+                                 radius, fill=bg, outline=border_color, width=border_width)
+        return canvas
+
+    @staticmethod
+    def _draw_rounded_rect(canvas, x1, y1, x2, y2, r, **kwargs):
+        """Dibuja un rectángulo con esquinas redondeadas en un Canvas."""
+        points = [
+            x1 + r, y1,
+            x2 - r, y1,
+            x2, y1,
+            x2, y1 + r,
+            x2, y2 - r,
+            x2, y2,
+            x2 - r, y2,
+            x1 + r, y2,
+            x1, y2,
+            x1, y2 - r,
+            x1, y1 + r,
+            x1, y1,
+        ]
+        return canvas.create_polygon(points, smooth=True, **kwargs)
+
+    def _make_styled_button(self, parent, text, bg, fg='white', hover_bg=None,
+                             font_spec=('Montserrat', 11, 'bold'), padx=24, pady=10,
+                             command=None, width=None):
+        """Crea un botón estilizado con efecto hover, alineado al design system."""
+        hover_bg = hover_bg or bg
+        btn = tk.Button(
+            parent,
+            text=text,
+            font=font_spec,
+            fg=fg,
+            bg=bg,
+            activebackground=hover_bg,
+            activeforeground=fg,
+            relief='flat',
+            bd=0,
+            padx=padx,
+            pady=pady,
+            cursor='hand2',
+            command=command,
+        )
+        if width:
+            btn.config(width=width)
+        btn.bind('<Enter>', lambda e: btn.config(bg=hover_bg))
+        btn.bind('<Leave>', lambda e: btn.config(bg=btn._orig_bg if hasattr(btn, '_orig_bg') else bg))
+        btn._orig_bg = bg
+        return btn
+
+    def _make_outline_button(self, parent, text, command=None,
+                              font_spec=('Montserrat', 9), padx=12, pady=6):
+        """Crea un botón outline (borde + fondo blanco) estilo design system."""
+        btn = tk.Button(
+            parent,
+            text=text,
+            font=font_spec,
+            fg=self.colors['text_primary'],
+            bg=self.colors['bg_white'],
+            activebackground=self.colors['border_light'],
+            activeforeground=self.colors['primary'],
+            relief='flat',
+            bd=0,
+            padx=padx,
+            pady=pady,
+            cursor='hand2',
+            highlightthickness=1,
+            highlightbackground=self.colors['border_light'],
+            highlightcolor=self.colors['primary'],
+            command=command,
+        )
+        btn.bind('<Enter>', lambda e: btn.config(bg=self.colors['blue_500_08'],
+                                                   fg=self.colors['primary']))
+        btn.bind('<Leave>', lambda e: btn.config(bg=self.colors['bg_white'],
+                                                   fg=self.colors['text_primary']))
+        return btn
+
+    def _make_section_title(self, parent, text, color=None):
+        """Crea un label de título de sección con el color primario del design system."""
+        color = color or self.colors['primary']
+        return tk.Label(
+            parent, text=text,
+            font=('Montserrat', 11), fg=color,
+            bg=parent.cget('bg'), anchor='w',
+        )
+
+    # ── Layout principal ──────────────────────────────────────────
+
     def create_widgets(self):
-        """Crear todos los widgets de la interfaz"""
-        # Frame principal
-        main_frame = tk.Frame(self.root, bg=self.colors['bg_light'], padx=30, pady=20)
+        """Crear todos los widgets de la interfaz — Design System DentiaCore"""
+        C = self.colors  # alias
+
+        # Scrollable main area
+        outer = tk.Frame(self.root, bg=C['bg_light'])
+        outer.pack(fill='both', expand=True)
+
+        main_frame = tk.Frame(outer, bg=C['bg_light'], padx=28, pady=24)
         main_frame.pack(fill='both', expand=True)
-        
-        # Título
-        title_label = tk.Label(
-            main_frame,
-            text="🦷 Dent Application Launcher",
-            font=('Montserrat', 20, 'bold'),
-            fg=self.colors['primary'],
-            bg=self.colors['bg_light']
-        )
-        title_label.pack(pady=(0, 30))
-        
-        # Frame de estado
-        status_frame = tk.Frame(main_frame, bg=self.colors['bg_white'], relief='solid', bd=1)
-        status_frame.pack(fill='x', pady=(0, 20))
-        
-        status_title = tk.Label(
-            status_frame,
-            text="Estado de Servicios",
-            font=('Montserrat', 12, 'bold'),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_white']
-        )
-        status_title.pack(pady=(10, 5))
-        
-        # Indicadores de estado
+
+        # ── Header ──
+        header = tk.Frame(main_frame, bg=C['bg_light'])
+        header.pack(fill='x', pady=(0, 20))
+
+        tk.Label(
+            header, text='🦷', font=('Segoe UI Emoji', 28),
+            bg=C['bg_light'],
+        ).pack(side='left', padx=(0, 10))
+
+        title_block = tk.Frame(header, bg=C['bg_light'])
+        title_block.pack(side='left')
+        tk.Label(
+            title_block, text='DentiaCore',
+            font=('Montserrat', 22, 'bold'), fg=C['primary'], bg=C['bg_light'],
+        ).pack(anchor='w')
+        tk.Label(
+            title_block, text='Application Launcher',
+            font=('Montserrat', 10), fg=C['text_muted'], bg=C['bg_light'],
+        ).pack(anchor='w')
+
+        # ── Card: Estado de Servicios ──
+        status_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
+                                highlightthickness=2, highlightbackground=C['border_card'],
+                                highlightcolor=C['border_card'])
+        status_card.pack(fill='x', pady=(0, 16), ipady=12, ipadx=16)
+
+        self._make_section_title(status_card, 'Estado de Servicios').pack(
+            anchor='w', padx=16, pady=(10, 8))
+
+        sep = tk.Frame(status_card, height=1, bg=C['border_light'])
+        sep.pack(fill='x', padx=16, pady=(0, 8))
+
+        status_row = tk.Frame(status_card, bg=C['bg_card'])
+        status_row.pack(fill='x', padx=16, pady=(0, 6))
+
         self.server_status = tk.Label(
-            status_frame,
-            text="🔴 Servidor: Detenido",
-            font=('Montserrat', 10),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_white']
+            status_row, text='● Servidor: Detenido',
+            font=('Montserrat', 10), fg=C['danger'], bg=C['bg_card'], anchor='w',
         )
-        self.server_status.pack(pady=2)
-        
+        self.server_status.pack(anchor='w', pady=2)
+
         self.client_status = tk.Label(
-            status_frame,
-            text="🔴 Frontend: Detenido",
-            font=('Montserrat', 10),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_white']
+            status_row, text='● Frontend: Detenido',
+            font=('Montserrat', 10), fg=C['danger'], bg=C['bg_card'], anchor='w',
         )
-        self.client_status.pack(pady=(2, 10))
-        
-        # Frame de botones principales
-        buttons_frame = tk.Frame(main_frame, bg=self.colors['bg_light'])
-        buttons_frame.pack(fill='x', pady=20)
-        
-        # Selección de modo
-        mode_frame = tk.Frame(main_frame, bg=self.colors['bg_light'])
-        mode_frame.pack(fill='x', pady=(0, 10))
+        self.client_status.pack(anchor='w', pady=(2, 4))
 
-        mode_label = tk.Label(
-            mode_frame,
-            text="Modo de despliegue",
-            font=('Montserrat', 11, 'bold'),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_light']
-        )
-        mode_label.pack(anchor='w')
+        # ── Card: Modo de despliegue ──
+        mode_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
+                              highlightthickness=2, highlightbackground=C['border_card'],
+                              highlightcolor=C['border_card'])
+        mode_card.pack(fill='x', pady=(0, 16), ipady=12, ipadx=16)
 
-        radio_frame = tk.Frame(mode_frame, bg=self.colors['bg_light'])
-        radio_frame.pack(anchor='w', pady=(5, 0))
+        self._make_section_title(mode_card, 'Modo de despliegue').pack(
+            anchor='w', padx=16, pady=(10, 8))
 
-        local_radio = tk.Radiobutton(
-            radio_frame,
-            text="Local",
-            variable=self.mode_var,
-            value='local',
-            font=('Montserrat', 10),
-            bg=self.colors['bg_light'],
-            activebackground=self.colors['bg_light'],
-            command=self.update_mode
-        )
-        local_radio.grid(row=0, column=0, padx=(0, 15))
+        sep2 = tk.Frame(mode_card, height=1, bg=C['border_light'])
+        sep2.pack(fill='x', padx=16, pady=(0, 10))
 
-        lan_radio = tk.Radiobutton(
-            radio_frame,
-            text="LAN",
-            variable=self.mode_var,
-            value='lan',
-            font=('Montserrat', 10),
-            bg=self.colors['bg_light'],
-            activebackground=self.colors['bg_light'],
-            command=self.update_mode
-        )
-        lan_radio.grid(row=0, column=1)
+        radio_frame = tk.Frame(mode_card, bg=C['bg_card'])
+        radio_frame.pack(anchor='w', padx=16, pady=(0, 6))
 
-        lan_entry_frame = tk.Frame(mode_frame, bg=self.colors['bg_light'])
-        lan_entry_frame.pack(fill='x', pady=(10, 0))
+        for txt, val in [('Local', 'local'), ('LAN', 'lan')]:
+            tk.Radiobutton(
+                radio_frame, text=txt, variable=self.mode_var, value=val,
+                font=('Montserrat', 10), bg=C['bg_card'],
+                activebackground=C['bg_card'], selectcolor=C['bg_card'],
+                fg=C['text_primary'], indicatoron=True, command=self.update_mode,
+            ).pack(side='left', padx=(0, 16))
+
+        lan_inner = tk.Frame(mode_card, bg=C['bg_card'])
+        lan_inner.pack(fill='x', padx=16, pady=(4, 8))
 
         self.lan_label = tk.Label(
-            lan_entry_frame,
-            text="URL pública (LAN):",
-            font=('Montserrat', 9),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_light']
+            lan_inner, text='URL pública (LAN):',
+            font=('Montserrat', 9), fg=C['text_muted'], bg=C['bg_card'],
         )
         self.lan_label.pack(anchor='w')
 
         self.lan_entry = tk.Entry(
-            lan_entry_frame,
-            textvariable=self.lan_url_var,
-            font=('Montserrat', 9),
-            relief='solid',
-            bd=1
+            lan_inner, textvariable=self.lan_url_var,
+            font=('Montserrat', 9), relief='flat', bd=0,
+            bg=C['neutral_250'],
+            highlightthickness=1, highlightbackground=C['border_light'],
+            highlightcolor=C['primary'],
         )
-        self.lan_entry.pack(fill='x', pady=(3, 0))
+        self.lan_entry.pack(fill='x', pady=(4, 0), ipady=6)
 
-        # Botón iniciar todo
-        self.start_all_btn = tk.Button(
-            buttons_frame,
-            text="🚀 Iniciar Aplicación Completa",
-            font=('Montserrat', 12, 'bold'),
-            fg='white',
-            bg=self.colors['primary'],
-            activebackground=self.colors['primary_hover'],
-            activeforeground='white',
-            relief='flat',
-            padx=20,
-            pady=12,
-            cursor='hand2',
-            command=self.start_all
+        # ── Botones principales ──
+        btns_frame = tk.Frame(main_frame, bg=C['bg_light'])
+        btns_frame.pack(fill='x', pady=(0, 10))
+
+        self.start_all_btn = self._make_styled_button(
+            btns_frame, text='🚀  Iniciar Aplicación Completa',
+            bg=C['primary'], hover_bg=C['primary_hover'],
+            font_spec=('Montserrat', 12, 'bold'), pady=13,
+            command=self.start_all,
         )
-        self.start_all_btn.pack(fill='x', pady=(0, 10))
-        
-        # Botón detener todo
-        self.stop_all_btn = tk.Button(
-            buttons_frame,
-            text="⏹️ Detener Todo",
-            font=('Montserrat', 12, 'bold'),
-            fg='white',
-            bg=self.colors['danger'],
-            activebackground='#c0392b',
-            activeforeground='white',
-            relief='flat',
-            padx=20,
-            pady=12,
-            cursor='hand2',
-            command=self.stop_all
+        self.start_all_btn.pack(fill='x', pady=(0, 8))
+
+        self.stop_all_btn = self._make_styled_button(
+            btns_frame, text='⏹  Detener Todo',
+            bg=C['danger'], hover_bg=C['danger_hover'],
+            font_spec=('Montserrat', 12, 'bold'), pady=13,
+            command=self.stop_all,
         )
-        self.stop_all_btn.pack(fill='x', pady=(0, 20))
-        
-        # Separador
-        separator = tk.Frame(main_frame, height=2, bg=self.colors['border_light'])
-        separator.pack(fill='x', pady=10)
-        
-        # Frame de controles individuales
-        individual_frame = tk.Frame(main_frame, bg=self.colors['bg_light'])
-        individual_frame.pack(fill='x')
-        
-        individual_title = tk.Label(
-            individual_frame,
-            text="Controles Individuales",
-            font=('Montserrat', 12, 'bold'),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_light']
+        self.stop_all_btn.pack(fill='x')
+
+        # ── Card: Controles Individuales ──
+        ctrl_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
+                              highlightthickness=2, highlightbackground=C['border_card'],
+                              highlightcolor=C['border_card'])
+        ctrl_card.pack(fill='x', pady=(16, 16), ipady=12, ipadx=16)
+
+        self._make_section_title(ctrl_card, 'Controles Individuales').pack(
+            anchor='w', padx=16, pady=(10, 8))
+
+        sep3 = tk.Frame(ctrl_card, height=1, bg=C['border_light'])
+        sep3.pack(fill='x', padx=16, pady=(0, 12))
+
+        grid_frame = tk.Frame(ctrl_card, bg=C['bg_card'])
+        grid_frame.pack(padx=16, pady=(0, 8))
+
+        self.server_btn = self._make_styled_button(
+            grid_frame, text='🖥  Servidor',
+            bg=C['primary_light'], hover_bg=C['primary'],
+            font_spec=('Montserrat', 10, 'bold'), padx=18, pady=9,
+            command=self.toggle_server,
         )
-        individual_title.pack(pady=(0, 15))
-        
-        # Botones individuales en grid
-        grid_frame = tk.Frame(individual_frame, bg=self.colors['bg_light'])
-        grid_frame.pack()
-        
-        # Botón servidor
-        self.server_btn = tk.Button(
-            grid_frame,
-            text="🖥️ Servidor",
-            font=('Montserrat', 10, 'bold'),
-            fg='white',
-            bg=self.colors['primary_light'],
-            activebackground=self.colors['primary'],
-            activeforeground='white',
-            relief='flat',
-            padx=15,
-            pady=8,
-            cursor='hand2',
-            command=self.toggle_server
+        self.server_btn.grid(row=0, column=0, padx=(0, 8), sticky='ew')
+
+        self.client_btn = self._make_styled_button(
+            grid_frame, text='🌐  Frontend',
+            bg=C['primary_light'], hover_bg=C['primary'],
+            font_spec=('Montserrat', 10, 'bold'), padx=18, pady=9,
+            command=self.toggle_client,
         )
-        self.server_btn.grid(row=0, column=0, padx=(0, 10), pady=5, sticky='ew')
-        
-        # Botón frontend
-        self.client_btn = tk.Button(
-            grid_frame,
-            text="🌐 Frontend",
-            font=('Montserrat', 10, 'bold'),
-            fg='white',
-            bg=self.colors['primary_light'],
-            activebackground=self.colors['primary'],
-            activeforeground='white',
-            relief='flat',
-            padx=15,
-            pady=8,
-            cursor='hand2',
-            command=self.toggle_client
-        )
-        self.client_btn.grid(row=0, column=1, padx=(10, 0), pady=5, sticky='ew')
-        
-        # Configurar grid
+        self.client_btn.grid(row=0, column=1, padx=(8, 0), sticky='ew')
+
         grid_frame.columnconfigure(0, weight=1)
         grid_frame.columnconfigure(1, weight=1)
-        
-        # Frame de accesos rápidos
-        quick_frame = tk.Frame(main_frame, bg=self.colors['bg_light'])
-        quick_frame.pack(fill='x', pady=(20, 0))
-        
-        quick_title = tk.Label(
-            quick_frame,
-            text="Accesos Rápidos",
-            font=('Montserrat', 12, 'bold'),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_light']
-        )
-        quick_title.pack(pady=(0, 10))
-        
-        # Botones de acceso rápido
-        quick_buttons_frame = tk.Frame(quick_frame, bg=self.colors['bg_light'])
-        quick_buttons_frame.pack()
-        
-        # Botón abrir aplicación
-        open_app_btn = tk.Button(
-            quick_buttons_frame,
-            text="🌍 Abrir Aplicación",
-            font=('Montserrat', 9),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_white'],
-            activebackground=self.colors['border_light'],
-            relief='solid',
-            bd=1,
-            padx=10,
-            pady=5,
-            cursor='hand2',
-            command=self.open_app
-        )
-        open_app_btn.grid(row=0, column=0, padx=(0, 5))
-        
-        # Botón limpiar pacientes
-        clear_patients_btn = tk.Button(
-            quick_buttons_frame,
-            text="🗑️ Limpiar Pacientes",
-            font=('Montserrat', 9),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_white'],
-            activebackground=self.colors['border_light'],
-            relief='solid',
-            bd=1,
-            padx=10,
-            pady=5,
-            cursor='hand2',
-            command=self.clear_patients
-        )
-        clear_patients_btn.grid(row=0, column=1, padx=5)
-        
-        # Botón abrir carpeta
-        open_folder_btn = tk.Button(
-            quick_buttons_frame,
-            text="📁 Abrir Carpeta",
-            font=('Montserrat', 9),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_white'],
-            activebackground=self.colors['border_light'],
-            relief='solid',
-            bd=1,
-            padx=10,
-            pady=5,
-            cursor='hand2',
-            command=self.open_folder
-        )
-        open_folder_btn.grid(row=0, column=2, padx=(5, 0))
-        
+
+        # ── Card: Accesos Rápidos ──
+        quick_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
+                               highlightthickness=2, highlightbackground=C['border_card'],
+                               highlightcolor=C['border_card'])
+        quick_card.pack(fill='x', pady=(0, 8), ipady=12, ipadx=16)
+
+        self._make_section_title(quick_card, 'Accesos Rápidos').pack(
+            anchor='w', padx=16, pady=(10, 8))
+
+        sep4 = tk.Frame(quick_card, height=1, bg=C['border_light'])
+        sep4.pack(fill='x', padx=16, pady=(0, 12))
+
+        qbtns = tk.Frame(quick_card, bg=C['bg_card'])
+        qbtns.pack(padx=16, pady=(0, 8))
+
+        self._make_outline_button(qbtns, '🌍  Abrir App', command=self.open_app).grid(
+            row=0, column=0, padx=(0, 6))
+        self._make_outline_button(qbtns, '🗑  Limpiar Pacientes', command=self.clear_patients).grid(
+            row=0, column=1, padx=6)
+        self._make_outline_button(qbtns, '📁  Abrir Carpeta', command=self.open_folder).grid(
+            row=0, column=2, padx=(6, 0))
+
+        # ── Footer ──
+        tk.Label(
+            main_frame, text='DentiaCore © 2025 — Sistema de Gestión Dental',
+            font=('Montserrat', 8), fg=C['text_light'], bg=C['bg_light'],
+        ).pack(pady=(12, 0))
+
         # Actualizar estado inicial
         self.update_ui_state()
         self.update_mode()
@@ -389,9 +403,6 @@ class DentLauncher:
                     f"No se pueden iniciar los servicios:\n\n{requirements_error}"
                 ))
                 return
-            
-            # Cambiar al directorio del proyecto
-            os.chdir(self.project_dir)
             
             # Matar puertos antes de iniciar (ya verificados en _verify_system_requirements)
             self._kill_port(5002)  # Puerto del servidor
@@ -448,9 +459,9 @@ class DentLauncher:
                 # 2. Iniciar solo el servidor primero
                 print("🔄 Iniciando servidor backend...")
                 self.server_process = subprocess.Popen(
-                    ['npm', 'run', 'server'],
+                    ['npm', 'run', 'dev'],
                     shell=True,
-                    cwd=self.project_dir,
+                    cwd=self.server_dir,
                     env=env,
                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
                 )
@@ -487,9 +498,6 @@ class DentLauncher:
                         "3. Las dependencias estén instaladas (npm install)"
                     ))
             
-            # Actualizar UI en el hilo principal
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar: {str(e)}\n\nAsegurate de:\n1. Tener MongoDB ejecutandose\n2. Haber instalado dependencias (npm install)\n3. No tener otros servicios en los puertos 5002, 5173, 5174"
             print(f"❌ Error en _start_all_thread: {error_msg}")
@@ -513,6 +521,8 @@ class DentLauncher:
             self.is_client_running = False
             
             self.root.after(0, lambda: messagebox.showerror("Error al Iniciar", error_msg))
+        finally:
+            # Asegurar que la UI se actualice incluso si hubo retornos tempranos
             self.root.after(0, self.update_ui_state)
             
     def stop_all(self):
@@ -524,8 +534,8 @@ class DentLauncher:
         """Hilo para detener todos los servicios"""
         try:
             if self.using_pm2:
-                subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-                subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
                 self.using_pm2 = False
 
             # Terminar procesos si existen (cliente primero, luego servidor)
@@ -652,6 +662,31 @@ class DentLauncher:
         except Exception:
             pass  # Ignorar errores si el puerto ya está libre
 
+    def _install_missing_dependencies(self):
+        """Intenta instalar las dependencias faltantes automáticamente."""
+        try:
+            print("🔄 Instalando dependencias faltantes...")
+            
+            # Instalar en raíz
+            print("📦 Instalando dependencias en raíz...")
+            subprocess.run(['npm', 'install'], cwd=self.project_dir, shell=True, check=True)
+            
+            # Instalar en Server
+            print("📦 Instalando dependencias en Server...")
+            subprocess.run(['npm', 'install'], cwd=self.server_dir, shell=True, check=True)
+            
+            # Instalar en Client
+            print("📦 Instalando dependencias en Client...")
+            subprocess.run(['npm', 'install'], cwd=self.client_dir, shell=True, check=True)
+            
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error instalando dependencias: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Error inesperado instalando dependencias: {e}")
+            return False
+
     def _verify_system_requirements(self):
         """Verificar todos los requisitos del sistema antes de iniciar"""
         try:
@@ -660,7 +695,11 @@ class DentLauncher:
             # 1. Verificar dependencias npm
             deps_ok, deps_error = self._check_npm_dependencies()
             if not deps_ok:
-                return False, f"Dependencias npm: {deps_error}\n\nEjecuta: npm install"
+                print("⚠️ Faltan dependencias, intentando instalar automáticamente...")
+                if self._install_missing_dependencies():
+                     print("✅ Dependencias instaladas correctamente.")
+                else:
+                     return False, f"Dependencias npm: {deps_error}\n\nEjecuta: npm install"
             
             # 2. Verificar puertos disponibles
             ports_to_check = [5002, 5173, 5174]
@@ -740,9 +779,16 @@ class DentLauncher:
         env_vars.setdefault('PORT', '5002')
         # Asegurar NODE_ENV
         env_vars.setdefault('NODE_ENV', 'development' if mode == 'local' else 'production')
-        # No forzar MONGODB_URI aquí: dejar que scripts/dent.js cargue .env
-        # Si el entorno ya define MONGODB_URI lo respetamos; de lo contrario
-        # dotenv en el servidor usará el valor de .env del proyecto.
+        
+        # Asegurar MONGODB_URI por defecto si no existe
+        if 'MONGODB_URI' not in env_vars:
+             # Intentar leer del .env del servidor para ver si está ahí
+             server_env = self._parse_env_file(str(self.server_dir / '.env'))
+             if 'MONGODB_URI' in server_env:
+                 env_vars['MONGODB_URI'] = server_env['MONGODB_URI']
+             else:
+                 # Valor por defecto seguro
+                 env_vars['MONGODB_URI'] = 'mongodb://127.0.0.1:27017/DentiaCore'
 
         self.current_env = env_vars
         return env_vars
@@ -844,7 +890,8 @@ class DentLauncher:
             self.lan_url_var.set('http://localhost:5002')
 
         if hasattr(self, 'lan_entry'):
-            self.lan_entry.config(state='normal' if is_lan else 'disabled')
+            self.lan_entry.config(state='normal' if is_lan else 'disabled',
+                                   bg=self.colors['neutral_250'] if is_lan else self.colors['border_light'])
         if hasattr(self, 'lan_label'):
             self.lan_label.config(fg=self.colors['text_primary'] if is_lan else self.colors['text_light'])
         if hasattr(self, 'client_btn'):
@@ -857,7 +904,7 @@ class DentLauncher:
         try:
             # Comprobar si ya existe la app en PM2
             exists = subprocess.run(
-                ['pm2', 'describe', 'dent-api'],
+                ['pm2', 'describe', 'dentiacore-api'],
                 shell=True,
                 cwd=server_dir,
                 env=env,
@@ -866,7 +913,7 @@ class DentLauncher:
             if exists.returncode == 0 and b"status" in exists.stdout.lower():
                 # Reiniciar actualizando variables de entorno del demonio
                 subprocess.run(
-                    ['pm2', 'restart', 'dent-api', '--update-env'],
+                    ['pm2', 'restart', 'dentiacore-api', '--update-env'],
                     shell=True,
                     cwd=server_dir,
                     env=env,
@@ -874,7 +921,7 @@ class DentLauncher:
                 )
             else:
                 subprocess.run(
-                    ['pm2', 'start', 'ecosystem.config.cjs', '--only', 'dent-api', '--update-env'],
+                    ['pm2', 'start', 'ecosystem.config.cjs', '--only', 'dentiacore-api', '--update-env'],
                     shell=True,
                     cwd=server_dir,
                     env=env,
@@ -974,17 +1021,17 @@ class DentLauncher:
                 )
                 self.root.after(0, lambda: messagebox.showerror("Servidor no disponible", msg))
 
-            self.root.after(0, self.update_ui_state)
-            
         except Exception as e:
             error_msg = f"Error al iniciar servidor: {str(e)}\n\nVerifica:\n1. MongoDB esta corriendo\n2. El puerto 5002 esta libre\n3. Dependencias instaladas"
             self.root.after(0, lambda: messagebox.showerror("Error Servidor", error_msg))
+        finally:
+            self.root.after(0, self.update_ui_state)
             
     def stop_server(self):
         """Detener solo el servidor"""
         if self.using_pm2:
-            subprocess.run(['pm2', 'stop', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-            subprocess.run(['pm2', 'delete', 'dent-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
             self.using_pm2 = False
         if self.server_process:
             self.server_process.terminate()
@@ -1031,7 +1078,9 @@ class DentLauncher:
             self.root.after(0, self.update_ui_state)
             
         except Exception as e:
+            self.is_client_running = False
             self.root.after(0, lambda: messagebox.showerror("Error", f"Error al iniciar frontend: {str(e)}"))
+            self.root.after(0, self.update_ui_state)
             
     def stop_client(self):
         """Detener solo el frontend"""
@@ -1160,6 +1209,7 @@ class DentLauncher:
                         db_dir = self.project_dir / 'DB'
                         try:
                             db_dir.mkdir(exist_ok=True)
+                            (db_dir / 'logs').mkdir(exist_ok=True)
                         except Exception:
                             pass
                         if exe_path:
@@ -1441,6 +1491,7 @@ class DentLauncher:
         """Abre una ventana de PowerShell o CMD y ejecuta mongod con la configuración dada."""
         try:
             db_dir.mkdir(exist_ok=True)
+            (db_dir / 'logs').mkdir(exist_ok=True)
         except Exception:
             pass
         exe = exe_path if exe_path else 'mongod'
@@ -1529,7 +1580,7 @@ class DentLauncher:
                 
                 # Crear request con timeout específico
                 request = urllib.request.Request(health_url)
-                request.add_header('User-Agent', 'DENT-Launcher/1.0')
+                request.add_header('User-Agent', 'DentiaCore-Launcher/1.0')
                 
                 with urllib.request.urlopen(request, timeout=5) as response:
                     if response.status == 200:
@@ -1606,43 +1657,57 @@ class DentLauncher:
         return False
             
     def update_ui_state(self):
-        """Actualizar el estado de la interfaz"""
+        """Actualizar el estado de la interfaz — Design System"""
+        C = self.colors
         current_mode = self.mode_var.get()
-        # Actualizar indicadores de estado
+
+        # Indicadores de estado
         if self.is_server_running:
-            self.server_status.config(text="🟢 Servidor: Ejecutándose", fg=self.colors['success'])
-            self.server_btn.config(text="⏹️ Detener Servidor")
+            self.server_status.config(text='● Servidor: Ejecutándose', fg=C['success'])
+            self.server_btn.config(text='⏹  Detener Servidor')
+            self.server_btn._orig_bg = C['danger']
+            self.server_btn.config(bg=C['danger'])
         else:
-            self.server_status.config(text="🔴 Servidor: Detenido", fg=self.colors['danger'])
-            self.server_btn.config(text="▶️ Iniciar Servidor")
+            self.server_status.config(text='● Servidor: Detenido', fg=C['danger'])
+            self.server_btn.config(text='▶  Iniciar Servidor')
+            self.server_btn._orig_bg = C['primary_light']
+            self.server_btn.config(bg=C['primary_light'])
             
         if current_mode == 'lan':
-            status_text = "🟢 Frontend servido por backend" if self.is_server_running else "🔴 Frontend: Dependiente del servidor"
-            self.client_status.config(text=status_text, fg=self.colors['success'] if self.is_server_running else self.colors['danger'])
-            self.client_btn.config(text="🌐 Modo LAN", state='disabled')
+            status_text = '● Frontend servido por backend' if self.is_server_running else '● Frontend: Dependiente del servidor'
+            self.client_status.config(text=status_text, fg=C['success'] if self.is_server_running else C['danger'])
+            self.client_btn.config(text='🌐  Modo LAN', state='disabled')
+            self.client_btn._orig_bg = C['primary_light']
+            self.client_btn.config(bg=C['primary_light'])
         elif self.is_client_running:
-            self.client_status.config(text="🟢 Frontend: Ejecutándose", fg=self.colors['success'])
-            self.client_btn.config(text="⏹️ Detener Frontend", state='normal')
+            self.client_status.config(text='● Frontend: Ejecutándose', fg=C['success'])
+            self.client_btn.config(text='⏹  Detener Frontend', state='normal')
+            self.client_btn._orig_bg = C['danger']
+            self.client_btn.config(bg=C['danger'])
         else:
-            self.client_status.config(text="🔴 Frontend: Detenido", fg=self.colors['danger'])
-            self.client_btn.config(text="▶️ Iniciar Frontend", state='normal')
+            self.client_status.config(text='● Frontend: Detenido', fg=C['danger'])
+            self.client_btn.config(text='▶  Iniciar Frontend', state='normal')
+            self.client_btn._orig_bg = C['primary_light']
+            self.client_btn.config(bg=C['primary_light'])
             
-        # Actualizar botones principales
+        # Botones principales
         all_running = self.is_server_running and (self.is_client_running or current_mode == 'lan')
         if all_running:
             self.start_all_btn.config(
                 state='disabled',
-                text="✅ Aplicación Ejecutándose",
-                bg=self.colors['success']
+                text='✅  Aplicación Ejecutándose',
             )
+            self.start_all_btn._orig_bg = C['success']
+            self.start_all_btn.config(bg=C['success'])
             self.stop_all_btn.config(state='normal')
         else:
             self.start_all_btn.config(
                 state='normal',
-                text="🚀 Iniciar Aplicación Completa",
-                bg=self.colors['primary']
+                text='🚀  Iniciar Aplicación Completa',
             )
-            self.stop_all_btn.config(state='normal', text="⏹️ Detener Todo")
+            self.start_all_btn._orig_bg = C['primary']
+            self.start_all_btn.config(bg=C['primary'])
+            self.stop_all_btn.config(state='normal', text='⏹  Detener Todo')
             
     def on_closing(self):
         """Manejar el cierre de la aplicación"""
@@ -1667,7 +1732,7 @@ class DentLauncher:
 def main():
     """Función principal"""
     try:
-        app = DentLauncher()
+        app = DentiaCoreLauncher()
         app.run()
     except Exception as e:
         messagebox.showerror("Error Fatal", f"Error al iniciar la aplicación: {str(e)}")

@@ -4,7 +4,7 @@
  * pero permite ciclar entre 3 estados: sin marcar, punto rojo, rectángulo rojo, cuadrado rojo
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import "../styles/bleeding-multiState-checkbox.css";
 

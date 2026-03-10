@@ -19,7 +19,7 @@ const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
 const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
 
 // Configuración de la base de datos
-const DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dental_clinic';
+const DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore';
 
 /**
  * Conectar a la base de datos

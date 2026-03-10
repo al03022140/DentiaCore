@@ -3,7 +3,6 @@
    ========================= */
 
 /* Importar estilos compartidos */
-@import '../../../shared/styles/variables.css';
 /* patient-detail-shared.css se importa centralmente desde patient-detail.css */
 
 /* Contenedor específico para las tarjetas médicas */
@@ -24,8 +23,8 @@
   margin-top: 0.5rem;
   margin-bottom: 0; /* Quitar margen inferior por defecto */
   /* Aplicar estilo de valor (Gris / Bolder) a la lista */
-  color: #7f8c8d; /* Actualizado para consistencia */
-  font-weight: 500;
+  color: var(--color-text-muted); /* Actualizado para consistencia */
+  font-weight: var(--font-weight-medium);
 }
 
 /* Elementos de la lista */
@@ -36,7 +35,7 @@
 
 /* Mensaje cuando no hay items */
 .patient-detail__info-card .no-items-message {
-  color: #95a5a6;
+  color: var(--color-text-light);
   font-style: italic;
   list-style: none;
   margin-left: -1rem; /* Compensar el padding-left de la lista */
@@ -44,13 +43,13 @@
 
 /* Estilos estándar para strong en elementos de medicamentos */
 .patient-detail__info-card li strong {
-  color: #000;
-  font-weight: bold;
+  color: var(--color-text-black);
+  font-weight: var(--font-weight-medium);
   margin-right: 5px;
 }
 
 /* Estilos estándar para span en elementos de medicamentos */
 .patient-detail__info-card li span {
-  color: #868686;
-  font-weight: bolder;
+  color: var(--color-neutral-680);
+  font-weight: var(--font-weight-normal);
 }

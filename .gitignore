@@ -1,4 +1,3 @@
-@'
 node_modules/
 .env
 .DS_Store
@@ -7,4 +6,33 @@ __pycache__/
 dist/
 build/
 .vscode/
-'@ | Out-File -Encoding utf8 .gitignore
+
+# MongoDB / WiredTiger
+DB/
+DB/**
+*.wt
+WiredTiger*
+DB/journal/
+DB-backup*/
+
+# Repo mirror and large artifacts
+repo-mirror.git/
+DENT-mirror*
+*.bfg-report/
+bfg.jar
+
+# Server runtime data
+Server/logs/
+Server/uploads/
+Server/tmp/
+
+
+# MongoDB tools and dumps
+tools/mongo/
+tools/mongo/bin/
+tools/mongo/bin/*.mdmp
+tools/mongo/bin/mongod.exe
+
+# Optional: ignore local OS/editor files
+.idea/
+.vscode/
