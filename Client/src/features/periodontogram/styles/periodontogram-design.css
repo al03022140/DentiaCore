@@ -1033,7 +1033,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 
 .tooth-number-btn {
   background: transparent;
-  color: #084888;
+  color: var(--color-primary);
   border: none;
   padding: 4px;
   font-weight: var(--font-weight-semibold);

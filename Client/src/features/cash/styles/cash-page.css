@@ -316,3 +316,146 @@
     min-height: 31.25rem;
   }
 }
+
+/* ── Cobros Pendientes de Citas ── */
+.pending-charges-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-charges-panel__count {
+  font: var(--pd-font-label-sm);
+  color: var(--color-text-muted);
+  background: var(--color-neutral-250);
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--border-radius-full);
+}
+
+.pending-charges-panel__empty {
+  color: var(--color-text-muted);
+  font: var(--pd-font-body-sm);
+  text-align: center;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+.pending-charges-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 0.35rem;
+}
+
+.pending-charges-panel__list::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+}
+
+.pending-charges-panel__list::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: var(--scrollbar-radius);
+}
+
+.pending-charges-panel__list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
+}
+
+.pending-charge-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--color-bg-white);
+}
+
+.pending-charge-item:hover {
+  border-color: var(--color-primary);
+  background: var(--color-blue-500-08);
+}
+
+.pending-charge-item__avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.pending-charge-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pending-charge-item__name {
+  font: var(--pd-font-body-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pending-charge-item__age {
+  font: var(--pd-font-label-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-normal);
+}
+
+.pending-charge-item__appt {
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pending-charge-item__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+}
+
+.pending-charge-item__items li {
+  font: var(--pd-font-label-sm);
+  color: var(--color-text-muted);
+}
+
+.pending-charge-item__items li::before {
+  content: '•';
+  margin-right: 0.25rem;
+  color: var(--color-primary);
+}
+
+.pending-charge-item__amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.pending-charge-item__total {
+  font: var(--pd-font-body-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.pending-charge-item__pending {
+  font: var(--pd-font-label-sm);
+  color: var(--color-warning);
+  font-weight: var(--font-weight-medium);
+}

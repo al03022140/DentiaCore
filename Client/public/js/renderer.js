@@ -28,18 +28,18 @@ function Renderer() {
 Renderer.prototype.drawSplash = function () {
     "use strict";
 
-    this.context.fillStyle = "#ffffff";
+    this.context.fillStyle = this.settings ? this.settings.COLOR_BG : "#ffffff";
     this.context.fillRect(0, 0, this.width, this.height);
 
     this.context.beginPath();
     this.context.textAlign = 'center';
-    this.context.fillStyle = "#000000";
+    this.context.fillStyle = this.settings ? this.settings.COLOR_TEXT : "#000000";
     this.context.font = "600 32px Montserrat, Arial, sans-serif";
     this.context.fillText("OdontoGraph", this.width / 2,
             this.height / 2 - 16);
 
     this.context.font = "600 24px Montserrat, Arial, sans-serif";
-    this.context.fillStyle = "#000000";
+    this.context.fillStyle = this.settings ? this.settings.COLOR_TEXT : "#000000";
 
     var year = new Date().getFullYear();
 
@@ -111,7 +111,7 @@ Renderer.prototype.clear = function (settings) {
     if (settings.DEBUG) {
         this.context.fillStyle = "#e6fff3";
     } else {
-        this.context.fillStyle = "#ffffff";
+        this.context.fillStyle = settings.COLOR_BG;
     }
 
     this.context.fillRect(0,
@@ -134,7 +134,7 @@ Renderer.prototype.clear = function (settings) {
 Renderer.prototype.renderText = function (text, x, y, color) {
     "use strict";
     if (color === undefined) {
-        color = "#000000"; // default color = black
+        color = this.settings ? this.settings.COLOR_TEXT : "#000000";
     }
 
     this.context.textAlign = 'left';
@@ -146,7 +146,7 @@ Renderer.prototype.renderText = function (text, x, y, color) {
 Renderer.prototype.renderText14 = function (text, x, y, color) {
     "use strict";
     if (color === undefined) {
-        color = "#000000"; // default color = black
+        color = this.settings ? this.settings.COLOR_TEXT : "#000000";
     }
 
     this.context.font = "14px Arial";
@@ -164,7 +164,7 @@ Renderer.prototype.renderNameValueTabbed = function (name, value, tab, x, y, col
     this.context.font = "14px Arial";
 
     if (color === undefined) {
-        color = "#000000"; // default color = black
+        color = this.settings ? this.settings.COLOR_TEXT : "#000000";
     }
 
     var text = name;
@@ -184,7 +184,7 @@ Renderer.prototype.renderNameValueTabbed = function (name, value, tab, x, y, col
 Renderer.prototype.renderTextCenter = function (text, x, y, color) {
     "use strict";
     if (color === undefined) {
-        color = "#000000"; // default color = black
+        color = this.settings ? this.settings.COLOR_TEXT : "#000000";
     }
 
 
@@ -198,7 +198,7 @@ Renderer.prototype.renderTextCenter = function (text, x, y, color) {
 Renderer.prototype.renderTextCenter16 = function (text, x, y, color) {
     "use strict";
     if (color === undefined) {
-        color = "#000000"; // default color = black
+        color = this.settings ? this.settings.COLOR_TEXT : "#000000";
     }
 
     this.context.font = "500 16px Montserrat, Arial, sans-serif";
@@ -254,7 +254,7 @@ Renderer.prototype.wrapText = function (text, x, y, maxWidth, lineHeight, maxLin
 
         if (testWidth > maxWidth && n > 0) {
 
-            this.renderText(line, x, y, "#000000");
+            this.renderText(line, x, y, this.settings.COLOR_TEXT);
             //this.context.fillText(line, x, y);
 
             line = words[n] + " ";
@@ -274,7 +274,7 @@ Renderer.prototype.wrapText = function (text, x, y, maxWidth, lineHeight, maxLin
         }
     }
 
-    this.renderText(line, x, y, "#000000");
+    this.renderText(line, x, y, this.settings.COLOR_TEXT);
 //    this.context.fillText(line, x, y);
 
 };

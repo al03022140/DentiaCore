@@ -53,6 +53,9 @@ const ROLE_PERMISSIONS = {
     'drafts.batch_sign',        // firmar borradores en lote (Centro de Firmas Pendientes)
     'notes.create.backdated',   // captura extemporánea — requiere motivo
     'notes.template.use',       // plantillas de evolución Anti-Olvidos
+    'notes.template.manage',    // CRUD de plantillas personales
+    'settings.read',            // leer configuración de clínica
+    'professional.update',      // actualizar su propio perfil profesional
     'session.lock',             // Modo Cortina
     // Legacy periodontogram permissions (compatibilidad)
     'read_periodontogram',
@@ -72,6 +75,7 @@ const ROLE_PERMISSIONS = {
     'consultas.update.draft',        // edición de borrador propio
     'appointments.read',
     'notes.template.use',            // plantillas de evolución Anti-Olvidos
+    'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina
     // Legacy
     'read_periodontogram',
@@ -89,6 +93,7 @@ const ROLE_PERMISSIONS = {
     'cash.read',
     'cash.manage',
     'stats.read.admin',
+    'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina
   ],
 };
@@ -108,10 +113,31 @@ const mergePermissions = (basePermissions = [], extraPermissions = []) => {
   return Array.from(merged);
 };
 
-const getEffectivePermissions = (user) => {
+/**
+ * Calcula los permisos efectivos del usuario:
+ * 1. Permisos base del rol (ROLE_PERMISSIONS)
+ * 2. + Overrides de rol desde ClinicSettings.rolePermissionOverrides
+ * 3. + Overrides individuales del usuario (user.permissions)
+ *
+ * @param {Object} user - documento de usuario
+ * @param {Object} [roleOverrides] - Map/Object de rolePermissionOverrides de ClinicSettings
+ */
+const getEffectivePermissions = (user, roleOverrides) => {
   if (!user) return [];
-  const basePermissions = getPermissionsForRole(user.rol || user.role);
-  return mergePermissions(basePermissions, user.permissions || []);
+  const role = normalizeRole(user.rol || user.role);
+  const basePermissions = getPermissionsForRole(role);
+
+  // Aplicar overrides de rol configurados por admin en ClinicSettings
+  let roleOverridePerms = [];
+  if (roleOverrides) {
+    const overrides = roleOverrides instanceof Map
+      ? roleOverrides.get(role)
+      : roleOverrides[role];
+    if (Array.isArray(overrides)) roleOverridePerms = overrides;
+  }
+
+  const withRoleOverrides = mergePermissions(basePermissions, roleOverridePerms);
+  return mergePermissions(withRoleOverrides, user.permissions || []);
 };
 
 /**

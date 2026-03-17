@@ -438,22 +438,4 @@
   border: 1px solid var(--color-neutral-1100);
 }
 
-/* Soporte para temas oscuros */
-@media (prefers-color-scheme: dark) {
-  .hover-tooltip {
-    background: var(--color-bg-white-90);
-    color: var(--color-text-black);
-  }
-  
-  .hover-tooltip::after {
-    border-color: var(--color-bg-white-90) transparent transparent transparent;
-  }
-  
-  .auto-save-indicator.success {
-    background-color: var(--color-green-800);
-  }
-  
-  .auto-save-indicator.error {
-    background-color: var(--color-red-650);
-  }
-}
+/* Soporte para temas oscuros - ahora manejado via CSS variables y [data-theme="dark"] en variables.css */

@@ -10,6 +10,9 @@ const appointmentRoutes = require('../routes/appointmentRoutes');
 const examRoutes = require('../routes/examRoutes');
 const draftRoutes = require('../routes/draftRoutes');
 const googleRoutes = require('../routes/googleRoutes');
+const settingsRoutes = require('../routes/settingsRoutes');
+const noteTemplateRoutes = require('../routes/noteTemplateRoutes');
+const patientChargeRoutes = require('../routes/patientChargeRoutes');
 const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
 const validarCapturaExtemporanea = require('../middlewares/capturaExtemporanea');
@@ -72,6 +75,9 @@ const configureRoutes = () => {
   router.use('/appointments', appointmentRoutes);
   router.use('/exams', examRoutes);
   router.use('/drafts', draftRoutes);
+  router.use('/settings', settingsRoutes);
+  router.use('/note-templates', noteTemplateRoutes);
+  router.use('/patient-charges', patientChargeRoutes);
 
   // Capturar rutas no encontradas
   router.use('*', (req, res) => {

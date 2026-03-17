@@ -144,7 +144,7 @@ Damage.prototype.drawPulpar = function (context, settings) {
     // Draw pulp line
     context.beginPath();
     context.rect(x, y, width, height);
-    context.fillStyle = "#000000";
+    context.fillStyle = settings.COLOR_TEXT;
     context.fill();
     
     context.restore();
@@ -1196,7 +1196,7 @@ Damage.prototype.drawTransposicionRight = function (context, settings) {
 
 Damage.prototype.drawDienteDiscomico = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1210,7 +1210,7 @@ Damage.prototype.drawDienteDiscomico = function (context, settings) {
 
 Damage.prototype.drawDienteEctopico = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1224,7 +1224,7 @@ Damage.prototype.drawDienteEctopico = function (context, settings) {
 
 Damage.prototype.drawImpactacion = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1272,8 +1272,8 @@ Damage.prototype.drawImplante = function (context, settings) {
         context.rect(x, y, width, height * 0.8); // Increased clip height to 80%
         context.clip();
         
-        // Draw white background for implant body
-        context.fillStyle = "#ffffff";
+        // Draw background for implant body
+        context.fillStyle = settings.COLOR_BG;
         context.fillRect(x, y, width, height);
         
         // Draw implant image
@@ -1315,7 +1315,7 @@ Damage.prototype.drawImplante = function (context, settings) {
 
 Damage.prototype.drawMacrodoncia = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1363,7 +1363,7 @@ context.restore();
 
 Damage.prototype.drawMicrodonica = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1377,7 +1377,7 @@ Damage.prototype.drawMicrodonica = function (context, settings) {
 
 Damage.prototype.drawSemiImpactaion = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;
@@ -1391,7 +1391,7 @@ Damage.prototype.drawSemiImpactaion = function (context, settings) {
 
 Damage.prototype.drawSuperficieDesgastada = function (context, settings) {
     "use strict";
-    this.rect.highlightWithColor(context, "#ffffff", 1);
+    this.rect.highlightWithColor(context, settings.COLOR_BG, 1);
 
     context.textAlign = "center";
     context.fillStyle = settings.COLOR_BLUE;

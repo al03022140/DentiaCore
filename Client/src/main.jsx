@@ -6,15 +6,18 @@ import './shared/styles/index.css';
 import { patchEnginePrototype } from './features/odontogram/utils/odontogram-utils';
 import { AuthProvider } from './app/auth/AuthContext';
 import { LockScreenProvider } from './shared/components/LockScreen';
+import { ThemeProvider } from './shared/context/ThemeContext';
 patchEnginePrototype();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <LockScreenProvider>
-        <App />
-      </LockScreenProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <LockScreenProvider>
+          <App />
+        </LockScreenProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 

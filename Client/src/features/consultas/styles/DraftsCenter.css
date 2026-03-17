@@ -94,14 +94,14 @@
 
 /* ── Mensajes ── */
 .drafts-success {
-  background: #e8f5e9;
+  background: var(--color-success-100);
   color: var(--color-success, #27ae60);
   padding: 0.4rem 1rem;
   font-size: 0.85rem;
 }
 
 .drafts-error {
-  background: #fdecea;
+  background: var(--color-danger-100);
   color: var(--color-danger, #e74c3c);
   padding: 0.4rem 1rem;
   font-size: 0.85rem;
@@ -144,7 +144,7 @@
 }
 
 .draft-card-type {
-  background: #e3f2fd;
+  background: var(--color-blue-500-12);
   color: var(--color-primary, #084888);
   padding: 0.15rem 0.5rem;
   border-radius: 10px;
@@ -186,7 +186,7 @@
 }
 
 .drafts-btn-sign:hover:not(:disabled) {
-  background: #219a52;
+  background: var(--color-green-600);
 }
 
 .drafts-btn-reject {
@@ -201,7 +201,7 @@
 }
 
 .drafts-btn-reject:hover:not(:disabled) {
-  background: #fdecea;
+  background: var(--color-danger-100);
 }
 
 /* ── PIN Modal ── */

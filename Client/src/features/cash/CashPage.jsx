@@ -4,6 +4,7 @@ import CashDashboard from './CashDashboard';
 import ActionsPanel from './ActionsPanel';
 import MovementsList from './MovementsList';
 import OpenBoxModal from './OpenBoxModal';
+import PendingChargesPanel from './PendingChargesPanel';
 import { getSessionStatus } from '../../shared/services/cashService';
 import './styles/cash-page.css';
 
@@ -84,6 +85,7 @@ const CashPage = () => {
         <div className="cash-card cash-movements-card">
           <MovementsList refreshTrigger={refreshTrigger} />
         </div>
+        <PendingChargesPanel refreshTrigger={refreshTrigger} />
       </div>
     </div>
   );

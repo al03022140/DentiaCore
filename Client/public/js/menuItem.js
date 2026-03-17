@@ -51,20 +51,20 @@ MenuItem.prototype.render = function (context, settings, constants) {
     "use strict";
 
     if (this.active) {
-        this.renderStateActive(context);
+        this.renderStateActive(context, settings);
     } else {
-        this.renderStateNormal(context);
+        this.renderStateNormal(context, settings);
     }
 
     if(this.highlight) {
-        this.renderStateFocus(context);
+        this.renderStateFocus(context, settings);
     } 
 
-    this.renderLabel(context);
+    this.renderLabel(context, settings);
 };
 
 
-MenuItem.prototype.renderStateNormal = function (context) {
+MenuItem.prototype.renderStateNormal = function (context, settings) {
     "use strict";
 
 
@@ -72,30 +72,30 @@ MenuItem.prototype.renderStateNormal = function (context) {
 
     context.beginPath();
     context.globalAlpha = 1;
-    context.fillStyle = "#ebf3f5";
+    context.fillStyle = settings ? settings.COLOR_MENU_BG : "#ebf3f5";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, this.rect.height);
 
-    context.fillStyle = "#f9fbfc";
+    context.fillStyle = settings ? settings.COLOR_MENU_TOP : "#f9fbfc";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, portion);
 
-    context.fillStyle = "#f9f9f9";
+    context.fillStyle = settings ? settings.COLOR_MENU_LINE : "#f9f9f9";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, 1);
 
-    context.fillStyle = "#e5eef1";
+    context.fillStyle = settings ? settings.COLOR_MENU_BOTTOM : "#e5eef1";
     context.fillRect(this.rect.x, this.rect.y + (portion * 4), this.rect.width, portion);
 
-    context.fillStyle = "#e9eef0";
+    context.fillStyle = settings ? settings.COLOR_MENU_BOTTOM_LINE : "#e9eef0";
     context.fillRect(this.rect.x, this.rect.y + (this.rect.height -1), this.rect.width, 1);
 
     context.globalAlpha = 1;
 
-    this.rect.outline(context ,"#35353f")
+    this.rect.outline(context, settings ? settings.COLOR_MENU_OUTLINE : "#35353f")
 
     context.restore();
 
 };
 
-MenuItem.prototype.renderStateActive = function (context) {
+MenuItem.prototype.renderStateActive = function (context, settings) {
     "use strict";
 
 
@@ -120,14 +120,14 @@ MenuItem.prototype.renderStateActive = function (context) {
 
     context.globalAlpha = 1;
 
-    this.rect.outline(context ,"#35353f")
+    this.rect.outline(context, settings ? settings.COLOR_MENU_OUTLINE : "#35353f")
 
     context.restore();
 
 };
 
 
-MenuItem.prototype.renderStateFocus = function (context) {
+MenuItem.prototype.renderStateFocus = function (context, settings) {
     "use strict";
 
     context.beginPath();
@@ -135,19 +135,19 @@ MenuItem.prototype.renderStateFocus = function (context) {
     context.fillStyle = "#b2dee7";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, this.rect.height);
     context.globalAlpha = 1.0;
-    this.rect.outline(context ,"#35353f")
+    this.rect.outline(context, settings ? settings.COLOR_MENU_OUTLINE : "#35353f")
     context.restore();
 
 };
 
-MenuItem.prototype.renderLabel = function (context) {
+MenuItem.prototype.renderLabel = function (context, settings) {
     "use strict";
 
     // Set text properties
     context.globalAlpha = 1;
     context.textAlign = "center";
-    context.fillStyle = "#000000"; // Matching the CSS color
-    context.font = "500 15px Montserrat"; // Matching CSS font-size and font-family
+    context.fillStyle = settings ? settings.COLOR_TEXT : "#000000";
+    context.font = "500 15px Montserrat";
 
     // Calculate vertical centering
     const textMetrics = context.measureText(this.textBox.text);

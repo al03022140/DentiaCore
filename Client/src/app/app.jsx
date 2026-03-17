@@ -16,9 +16,9 @@ import ConsultasPage from '../features/consultas/ConsultasPage';
 import StatisticsPage from '../features/statistics/StatisticsPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
-import UsersPage from '../features/users/UsersPage';
 import PermissionGate from './auth/PermissionGate';
 import DraftsCenter from '../features/consultas/DraftsCenter';
+import SettingsPage from '../features/settings/SettingsPage';
 
 const AppLayout = () => (
   <div className="dashboard">
@@ -80,17 +80,8 @@ const App = () => {
             <Route path="/consultas" element={<ConsultasPage />} />
             <Route path="/caja" element={<CashPage />} />
             <Route path="/estadisticas" element={<StatisticsPage />} />
-            <Route
-              path="/usuarios"
-              element={
-                <PermissionGate
-                  permissions={['users.read']}
-                  fallback={<div>Sin permisos para ver usuarios.</div>}
-                >
-                  <UsersPage />
-                </PermissionGate>
-              }
-            />
+            <Route path="/configuracion" element={<SettingsPage />} />
+            <Route path="/configuracion/:section" element={<SettingsPage />} />
           </Route>
         </Route>
       </Routes>

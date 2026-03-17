@@ -220,6 +220,16 @@ Engine.prototype.init = function () {
     this.clear.active = false;
     this.buttons.push(this.clear);
 
+    // Watch for theme changes and re-detect colors
+    var self = this;
+    this._themeObserver = new MutationObserver(function () {
+        self.settings.detectTheme();
+    });
+    this._themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+    });
+
 };
 
 /**
@@ -254,14 +264,14 @@ Engine.prototype.update = function () {
 
         if (this.settings.DEBUG) {
 
-            this.renderer.renderText("DEBUG MODE", 2, this.canvas.height, "#000000");
+            this.renderer.renderText("DEBUG MODE", 2, this.canvas.height, this.settings.COLOR_TEXT);
 
             this.renderer.renderText("X: " + this.cursorX + ", Y: " + this.cursorY,
-                128, this.canvas.height, "#000000");
+                128, this.canvas.height, this.settings.COLOR_TEXT);
 
 
             this.renderer.renderText("Selected Damage : " + this.selectedDamage,
-                220, this.canvas.height, "#000000");
+                220, this.canvas.height, this.settings.COLOR_TEXT);
         }
 
     } else {
@@ -2573,7 +2583,7 @@ Engine.prototype.createHeader = function () {
     this.renderer.renderTextCenter16("Odontogram",
         this.renderer.width / 2,
         seperation,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     seperation = 20;
 
@@ -2581,54 +2591,54 @@ Engine.prototype.createHeader = function () {
     this.renderer.renderText14("Office",
         4,
         seperation * 2,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14(": " + this.treatmentData.office,
         100,
         seperation * 2,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
 
     this.renderer.renderText14("Patient",
         4,
         seperation * 3,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14(": " + this.treatmentData.patient,
         100,
         seperation * 3,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
 
     this.renderer.renderText14("Appoint No.",
         4,
         seperation * 4,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14(": " + this.treatmentData.treatmentNumber,
         100,
         seperation * 4,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14("Date",
         this.renderer.width / 2,
         seperation * 4,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14(": " + this.treatmentData.treatmentDate,
         this.renderer.width / 2 + 120,
         seperation * 4,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14("Dentist",
         4,
         seperation * 5,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
     this.renderer.renderText14(": " + this.treatmentData.dentist,
         100,
         seperation * 5,
-        "#000000");
+        this.settings.COLOR_TEXT);
 
 };
 
@@ -2650,17 +2660,17 @@ Engine.prototype.printPreview = function () {
 
     if (this.settings.DEBUG) {
 
-        this.renderer.renderText("DEBUG MODE", 2, 15, "#000000");
+        this.renderer.renderText("DEBUG MODE", 2, 15, this.settings.COLOR_TEXT);
 
         this.renderer.renderText("X: " + this.cursorX + ", Y: " + this.cursorY,
-            128, 15, "#000000");
+            128, 15, this.settings.COLOR_TEXT);
     }
 
-    this.renderer.renderText("Specifications: ", 4, 1200, "#000000");
+    this.renderer.renderText("Specifications: ", 4, 1200, this.settings.COLOR_TEXT);
 
     this.renderer.wrapText(this.treatmentData.specs, 8, 1222, this.renderer.width - 8, 14, 5);
 
-    this.renderer.renderText("Observations: ", 4, 1300, "#000000");
+    this.renderer.renderText("Observations: ", 4, 1300, this.settings.COLOR_TEXT);
 
     this.renderer.wrapText(this.treatmentData.observations, 8, 1322, this.renderer.width - 8, 14, 5);
 };

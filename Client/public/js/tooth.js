@@ -459,11 +459,13 @@ Tooth.prototype.createSurfaces = function (settings) {
  * @param {type} context the canvas to draw on
  * @returns {undefined}
  */
-Tooth.prototype.drawId = function (context) {
+Tooth.prototype.drawId = function (context, settings) {
     "use strict";
+    var textColor = settings ? settings.COLOR_TEXT : "#000000";
+    var outlineColor = settings ? settings.COLOR_OUTLINE : "#000000";
     context.beginPath();
     context.textAlign = 'center';
-    context.fillStyle = "#000000";
+    context.fillStyle = textColor;
     context.font = "500 15px Montserrat, Arial, sans-serif";
 
     var space = 40;
@@ -501,7 +503,7 @@ Tooth.prototype.drawId = function (context) {
 
     context.lineWidth = 1;
     // set line color
-    context.strokeStyle = '#000000';
+    context.strokeStyle = outlineColor;
     context.stroke();
     context.restore();
 
@@ -522,17 +524,17 @@ Tooth.prototype.drawCheckBoxes = function (context, settings) {
         if (this.checkBoxes[i].state === 1) {
 
             this.checkBoxes[i].fillColor(context, settings.COLOR_RED);
-            this.checkBoxes[i].outline(context, "#000000");
+            this.checkBoxes[i].outline(context, settings.COLOR_OUTLINE);
 
 
         } else if (this.checkBoxes[i].state === 11) {
 
             this.checkBoxes[i].fillColor(context, settings.COLOR_BLUE);
-            this.checkBoxes[i].outline(context, "#000000");
+            this.checkBoxes[i].outline(context, settings.COLOR_OUTLINE);
 
         } else {
 
-            this.checkBoxes[i].outline(context, "#000000");
+            this.checkBoxes[i].outline(context, settings.COLOR_OUTLINE);
 
         }
 
@@ -548,7 +550,7 @@ Tooth.prototype.drawCheckBoxes = function (context, settings) {
 Tooth.prototype.drawTextBox = function (context, settings) {
     "use strict";
 
-    this.textBox.render(context, settings.COLOR_BLUE);
+    this.textBox.render(context, settings.COLOR_BLUE, settings);
 
     if (this.textBox.touching) {
         this.textBox.rect.highlightWithColor(context, "#36BE1B", 0.6);
@@ -705,7 +707,7 @@ Tooth.prototype.render = function (context, settings, constants) {
         }
 
         // id
-        this.drawId(context);
+        this.drawId(context, settings);
 
         // checkboxes
         this.drawCheckBoxes(context, settings);
@@ -752,7 +754,7 @@ Tooth.prototype.render = function (context, settings, constants) {
     if (settings.DEBUG) {
 
         if (this.tooth) {
-            this.rect.outline(context, "#000000");
+            this.rect.outline(context, settings.COLOR_OUTLINE);
         } else {
             this.rect.highlightEllipse(context, "#FFD100", 0.4, 2);
         }

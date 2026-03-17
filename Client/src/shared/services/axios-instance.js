@@ -81,7 +81,11 @@ API.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest?._retry) {
-      if (originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh')) {
+      if (
+        originalRequest?.url?.includes('/auth/login') ||
+        originalRequest?.url?.includes('/auth/refresh') ||
+        originalRequest?.url?.includes('/auth/verify-pin')
+      ) {
         return Promise.reject(error);
       }
 

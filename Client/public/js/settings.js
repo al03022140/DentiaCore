@@ -31,4 +31,57 @@ function Settings() {
     this.COLOR_BLACK = "#000000";
     this.COLOR_HIGHLIGHT_BAD = "#FF0000";
 
+    // Theme-aware colors (will be updated by detectTheme)
+    this.COLOR_BG = "#ffffff";
+    this.COLOR_TEXT = "#000000";
+    this.COLOR_OUTLINE = "#000000";
+    this.COLOR_LABEL = "#9a9a9a";
+    this.COLOR_TEXTBOX_BG = "#ffffff";
+
+    // Menu item normal state colors
+    this.COLOR_MENU_BG = "#ebf3f5";
+    this.COLOR_MENU_TOP = "#f9fbfc";
+    this.COLOR_MENU_LINE = "#f9f9f9";
+    this.COLOR_MENU_BOTTOM = "#e5eef1";
+    this.COLOR_MENU_BOTTOM_LINE = "#e9eef0";
+    this.COLOR_MENU_OUTLINE = "#35353f";
+
+    // Apply theme
+    this.detectTheme();
 }
+
+/**
+ * Detect current theme and update colors accordingly
+ */
+Settings.prototype.detectTheme = function () {
+    "use strict";
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    if (isDark) {
+        this.COLOR_BG = "#1e1e1e";
+        this.COLOR_TEXT = "#e0e0e0";
+        this.COLOR_OUTLINE = "#888888";
+        this.COLOR_LABEL = "#aaaaaa";
+        this.COLOR_TEXTBOX_BG = "#2a2a2a";
+
+        this.COLOR_MENU_BG = "#2a2a2a";
+        this.COLOR_MENU_TOP = "#333333";
+        this.COLOR_MENU_LINE = "#2e2e2e";
+        this.COLOR_MENU_BOTTOM = "#222222";
+        this.COLOR_MENU_BOTTOM_LINE = "#1a1a1a";
+        this.COLOR_MENU_OUTLINE = "#555555";
+    } else {
+        this.COLOR_BG = "#ffffff";
+        this.COLOR_TEXT = "#000000";
+        this.COLOR_OUTLINE = "#000000";
+        this.COLOR_LABEL = "#9a9a9a";
+        this.COLOR_TEXTBOX_BG = "#ffffff";
+
+        this.COLOR_MENU_BG = "#ebf3f5";
+        this.COLOR_MENU_TOP = "#f9fbfc";
+        this.COLOR_MENU_LINE = "#f9f9f9";
+        this.COLOR_MENU_BOTTOM = "#e5eef1";
+        this.COLOR_MENU_BOTTOM_LINE = "#e9eef0";
+        this.COLOR_MENU_OUTLINE = "#35353f";
+    }
+};

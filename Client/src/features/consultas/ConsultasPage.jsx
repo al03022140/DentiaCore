@@ -1,93 +1,80 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './styles/consultas-page.css';
 import userNot from '../../assets/images/avatars/UserNot.png';
+import { getTodayAppointments } from '../../shared/services/appointment-service';
+import CreateAppointmentModal from './components/CreateAppointmentModal';
 
-// Mock Data para visualizar la pantalla inmediatamente
-const MOCK_AGENDA = [
-  {
-    id: 101,
-    time: "09:00",
-    patientName: "Juan Pérez",
-    patientImage: null,
-    reason: "Limpieza General",
-    status: "Confirmado", // Pendiente, Confirmada, En Progreso, Completada
-    age: 34,
-    allergies: "Penicilina",
-    history: [
-      { date: "15/12/2025", action: "Consulta inicial" }
-    ],
-    plan: [
-      { id: 1, text: "Profilaxis completa", done: false },
-      { id: 2, text: "Revisión de caries", done: false }
-    ],
-    isCompleted: false
-  },
-  {
-    id: 102,
-    time: "10:30",
-    patientName: "María García",
-    patientImage: null,
-    reason: "Revisión Implante",
-    status: "En espera",
-    age: 45,
-    allergies: "Ninguna",
-    history: [
-      { date: "10/11/2025", action: "Colocación Implante 36" },
-      { date: "24/11/2025", action: "Retiro de puntos" }
-    ],
-    plan: [
-      { id: 1, text: "Radiografía de control", done: false },
-      { id: 2, text: "Evaluación de oseointegración", done: false }
-    ],
-    isCompleted: false
-  },
-  {
-    id: 103,
-    time: "12:00",
-    patientName: "Carlos López",
-    patientImage: null,
-    reason: "Dolor Muela",
-    status: "Pendiente",
-    age: 28,
-    allergies: "Ninguna",
-    history: [],
-    plan: [
-      { id: 1, text: "Diagnóstico urgencia", done: false }
-    ],
-    isCompleted: false
-  },
-  // Completados
-  {
-    id: 99,
-    time: "08:00",
-    patientName: "Ana Martínez",
-    patientImage: null,
-    reason: "Consulta Ortodoncia",
-    status: "Completada",
-    age: 22,
-    allergies: "Latex",
-    history: [],
-    plan: [],
-    isCompleted: true
-  }
-];
+const formatTime = (dateStr) => {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
+
+const calculateAge = (fechaNacimiento) => {
+  if (!fechaNacimiento) return '—';
+  const birth = new Date(fechaNacimiento);
+  const diff = Date.now() - birth.getTime();
+  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+};
+
+const getPatientName = (apt) => {
+  const p = apt.paciente_id;
+  if (!p) return 'Paciente desconocido';
+  return `${p.nombre || ''} ${p.apellidos || ''}`.trim();
+};
+
+const getPatientImage = (apt) => {
+  const p = apt.paciente_id;
+  if (!p || !p.foto) return null;
+  return `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${p.foto}`;
+};
+
+const statusMap = {
+  Pendiente: 'waiting',
+  Confirmada: 'confirmed',
+  Cancelada: 'cancelled',
+  Pasada: 'completed'
+};
 
 const ConsultasPage = () => {
   const navigate = useNavigate();
   const [selectedConsultation, setSelectedConsultation] = useState(null);
   const [nextPatient, setNextPatient] = useState(null);
-  const [agenda, setAgenda] = useState(MOCK_AGENDA);
+  const [agenda, setAgenda] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Al cargar, determinar quién es el siguiente paciente y seleccionar el primero por defecto
+  const loadAgenda = useCallback(async () => {
+    try {
+      setLoading(true);
+      const appointments = await getTodayAppointments();
+      setAgenda(Array.isArray(appointments) ? appointments : []);
+    } catch {
+      setAgenda([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAgenda(); }, [loadAgenda]);
+
+  // Determine next patient & default selection
   useEffect(() => {
-    // Lógica real: Filtrar por hora actual. Aquí simulamos que el "102" es el siguiente.
-    // En produccion usaríamos `new Date()` para comparar.
-    const upcoming = agenda.filter(a => !a.isCompleted);
-    
+    const now = new Date();
+    const upcoming = agenda.filter(a =>
+      a.estado !== 'Cancelada' && a.estado !== 'Pasada' && new Date(a.fecha_hora) >= now
+    );
+    const completed = agenda.filter(a => a.estado === 'Pasada' || a.estado === 'Cancelada');
+
     if (upcoming.length > 0) {
       setNextPatient(upcoming[0]);
       setSelectedConsultation(upcoming[0]);
+    } else if (completed.length > 0) {
+      setNextPatient(null);
+      setSelectedConsultation(completed[0]);
+    } else {
+      setNextPatient(null);
+      setSelectedConsultation(null);
     }
   }, [agenda]);
 
@@ -95,72 +82,75 @@ const ConsultasPage = () => {
     setSelectedConsultation(consultation);
   };
 
-  const handleStartConsultation = (patientId) => {
-    // Navegar al detalle del paciente
-    // En un caso real usaríamos el ID real de mongo (ej. _id)
-    // Aquí simulamos navegación a un ID genérico si no tenemos el real
-    navigate(`/patient/${patientId}`);
+  const handleStartConsultation = (apt) => {
+    const patientId = apt.paciente_id?._id || apt.paciente_id;
+    if (patientId) navigate(`/patient/${patientId}`);
   };
 
-  const renderTimeline = (history) => {
-    if (!history || history.length === 0) return <p className="text-muted">Sin historial reciente.</p>;
-    return (
-      <div className="timeline-container">
-        {history.map((item, idx) => (
-          <div key={idx} className="timeline-item">
-            <div className="timeline-date">{item.date}</div>
-            <div className="timeline-content">{item.action}</div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const now = new Date();
+  const upcomingConsultations = agenda.filter(a =>
+    a.estado !== 'Cancelada' && a.estado !== 'Pasada' && new Date(a.fecha_hora) >= now
+  );
+  const completedConsultations = agenda.filter(a =>
+    a.estado === 'Pasada' || a.estado === 'Cancelada'
+  );
 
-  const renderPlan = (plan) => {
-    if (!plan || plan.length === 0) return <p className="text-muted">No hay plan específico definido.</p>;
+  const renderItems = (items) => {
+    if (!items || items.length === 0) return <p className="text-muted">Sin servicios asignados.</p>;
     return (
       <ul className="plan-today-list">
-        {plan.map(item => (
-          <li key={item.id}>{item.text}</li>
+        {items.map((item, idx) => (
+          <li key={idx}>
+            {item.nombre} — x{item.cantidad} — ${item.subtotal?.toLocaleString('es-MX')}
+          </li>
         ))}
       </ul>
     );
   };
 
-  const upcomingConsultations = agenda.filter(c => !c.isCompleted);
-  const completedConsultations = agenda.filter(c => c.isCompleted);
-
   return (
     <div className="consultas-page">
       {/* --- COLUMNA IZQUIERDA --- */}
       <div className="consultas-left">
-        
+
         {/* Panel Superior: Siguiente Paciente */}
-        {nextPatient ? (
+        {loading ? (
+          <div className="next-patient-card">
+            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>Cargando agenda...</p>
+          </div>
+        ) : nextPatient ? (
           <div className="next-patient-card">
             <div className="next-patient-header">
-              <img 
-                src={nextPatient.patientImage || userNot} 
-                alt={nextPatient.patientName} 
+              <img
+                src={getPatientImage(nextPatient) || userNot}
+                alt={getPatientName(nextPatient)}
                 className="next-patient-avatar"
+                onError={e => { e.target.src = userNot; }}
               />
               <div className="next-patient-info">
-                <span className="next-patient-time">Siguiente: {nextPatient.time} hrs</span>
-                <h2>{nextPatient.patientName}</h2>
-                <span className={`badge-status ${nextPatient.status === 'Confirmado' ? 'confirmed' : 'waiting'}`}>
-                  {nextPatient.status}
+                <span className="next-patient-time">Siguiente: {formatTime(nextPatient.fecha_hora)} hrs</span>
+                <h2>{getPatientName(nextPatient)}</h2>
+                <span className={`badge-status ${statusMap[nextPatient.estado] || 'waiting'}`}>
+                  {nextPatient.estado}
                 </span>
               </div>
             </div>
 
             <div className="next-patient-reason">
               <strong>Motivo de visita:</strong>
-              {nextPatient.reason}
+              {nextPatient.motivo}
             </div>
 
-            <button 
+            {nextPatient.comentarioProcedimiento && (
+              <div className="next-patient-reason">
+                <strong>Procedimiento:</strong>
+                {nextPatient.comentarioProcedimiento}
+              </div>
+            )}
+
+            <button
               className="start-consultation-btn"
-              onClick={() => handleStartConsultation(nextPatient.id)}
+              onClick={() => handleStartConsultation(nextPatient)}
             >
               INICIAR CONSULTA AHORA
             </button>
@@ -176,33 +166,51 @@ const ConsultasPage = () => {
           <div className="selected-detail-panel">
             <div className="detail-header-info">
               <div>
-                <h3 style={{margin: 0, color: 'var(--color-primary)'}}>Detalle de Cita</h3>
-                <small>Seleccionada: {selectedConsultation.patientName}</small>
+                <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Cita</h3>
+                <small>Seleccionada: {getPatientName(selectedConsultation)}</small>
               </div>
               <div className="patient-tags">
-                <span>{selectedConsultation.age} años</span>
-                {selectedConsultation.allergies !== "Ninguna" && (
-                  <span style={{backgroundColor: '#f8d7da', color: '#721c24'}}>
-                    Alergia: {selectedConsultation.allergies}
-                  </span>
-                )}
+                <span>{calculateAge(selectedConsultation.paciente_id?.fecha_nacimiento)} años</span>
               </div>
             </div>
 
             <div className="timeline-section">
-              <h4>Historial Reciente (Lo que se ha hecho)</h4>
-              {renderTimeline(selectedConsultation.history)}
+              <h4>Motivo</h4>
+              <p>{selectedConsultation.motivo}</p>
             </div>
+
+            {selectedConsultation.comentarioProcedimiento && (
+              <div className="timeline-section">
+                <h4>Procedimiento</h4>
+                <p>{selectedConsultation.comentarioProcedimiento}</p>
+              </div>
+            )}
 
             <div className="timeline-section">
-              <h4>Plan para Hoy (A realizar)</h4>
-              {renderPlan(selectedConsultation.plan)}
+              <h4>Servicios a realizar</h4>
+              {renderItems(selectedConsultation.items)}
             </div>
 
+            {selectedConsultation.totalEstimado > 0 && (
+              <div className="timeline-section">
+                <h4>Total estimado</h4>
+                <p style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                  ${selectedConsultation.totalEstimado?.toLocaleString('es-MX')}
+                </p>
+              </div>
+            )}
+
+            {selectedConsultation.observaciones && (
+              <div className="timeline-section">
+                <h4>Observaciones</h4>
+                <p>{selectedConsultation.observaciones}</p>
+              </div>
+            )}
+
             <div className="detail-actions">
-              <button 
+              <button
                 className="secondary-btn"
-                 onClick={() => handleStartConsultation(selectedConsultation.id)}
+                onClick={() => handleStartConsultation(selectedConsultation)}
               >
                 Ver Expediente Completo
               </button>
@@ -213,54 +221,71 @@ const ConsultasPage = () => {
 
       {/* --- COLUMNA DERECHA --- */}
       <div className="consultas-right">
-        <h3>Agenda del Día</h3>
-        
+        <div className="consultas-right-header">
+          <h3>Agenda del Día</h3>
+          <button
+            className="consultas-add-btn"
+            onClick={() => setShowCreateModal(true)}
+            title="Nueva cita"
+          >
+            +
+          </button>
+        </div>
+
         <div className="consultas-list-container">
           <div className="list-section-title">Próximas Consultas</div>
           {upcomingConsultations.length > 0 ? (
-            upcomingConsultations.map(consultation => (
-              <div 
-                key={consultation.id} 
-                className={`consultation-item ${selectedConsultation?.id === consultation.id ? 'active' : ''}`}
-                onClick={() => handleSelectConsultation(consultation)}
+            upcomingConsultations.map(apt => (
+              <div
+                key={apt._id}
+                className={`consultation-item ${selectedConsultation?._id === apt._id ? 'active' : ''}`}
+                onClick={() => handleSelectConsultation(apt)}
               >
                 <div className="consultation-time-box">
-                  <span className="time-hour">{consultation.time}</span>
+                  <span className="time-hour">{formatTime(apt.fecha_hora)}</span>
                 </div>
                 <div className="consultation-info">
-                  <span className="consultation-patient-name">{consultation.patientName}</span>
-                  <span className="consultation-reason">{consultation.reason}</span>
+                  <span className="consultation-patient-name">{getPatientName(apt)}</span>
+                  <span className="consultation-reason">{apt.motivo}</span>
                 </div>
-                <div className="consultation-status">{consultation.status}</div>
+                <div className={`consultation-status badge-status ${statusMap[apt.estado] || 'waiting'}`}>
+                  {apt.estado}
+                </div>
               </div>
             ))
           ) : (
-            <p style={{padding: '1rem', fontStyle: 'italic', color: '#999'}}>No hay consultas pendientes.</p>
+            <p style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>No hay consultas pendientes.</p>
           )}
 
           <div className="list-section-title">Consultas Realizadas</div>
           {completedConsultations.length > 0 ? (
-            completedConsultations.map(consultation => (
-              <div 
-                key={consultation.id} 
+            completedConsultations.map(apt => (
+              <div
+                key={apt._id}
                 className="consultation-item completed"
-                onClick={() => handleSelectConsultation(consultation)}
+                onClick={() => handleSelectConsultation(apt)}
               >
                 <div className="consultation-time-box">
-                  <span className="time-hour">{consultation.time}</span>
+                  <span className="time-hour">{formatTime(apt.fecha_hora)}</span>
                 </div>
                 <div className="consultation-info">
-                  <span className="consultation-patient-name">{consultation.patientName}</span>
-                  <span className="consultation-reason">{consultation.reason}</span>
+                  <span className="consultation-patient-name">{getPatientName(apt)}</span>
+                  <span className="consultation-reason">{apt.motivo}</span>
                 </div>
-                <div className="consultation-status">Completada</div>
+                <div className="consultation-status">{apt.estado}</div>
               </div>
             ))
           ) : (
-            <p style={{padding: '1rem', fontStyle: 'italic', color: '#999'}}>Aún no hay consultas completadas.</p>
+            <p style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>Aún no hay consultas completadas.</p>
           )}
         </div>
       </div>
+
+      <CreateAppointmentModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={loadAgenda}
+      />
     </div>
   );
 };

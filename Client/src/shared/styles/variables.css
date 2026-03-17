@@ -449,7 +449,7 @@
   --sidebar-bg: var(--color-sidebar-bg);
   --hover-bg: var(--color-sidebar-hover);
   --active-bg: var(--color-sidebar-active);
-  --text-color: var(--color-bg-white);
+  --text-color: #fff;
 
   /* Main page: calendario / paciente */
   --calendar-border-radius: 1rem;
@@ -625,4 +625,277 @@
   --transition-fast: 0.2s ease;
   --transition-medium: 0.3s ease;
   --transition-slow: 0.5s ease;
+}
+
+/* =========================
+   DARK MODE TOKENS
+   ========================= */
+[data-theme="dark"] {
+  /* Paleta principal */
+  --color-primary: #4a9eff;
+  --color-primary-hover: #6bb3ff;
+  --color-primary-light: #5dade2;
+  --color-primary-dark: #3b8de0;
+
+  /* Texto */
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #b0b0b0;
+  --color-text-muted: #888;
+  --color-text-light: #999;
+  --color-text-placeholder: #666;
+  --color-text-strong: #f0f0f0;
+  --color-text-deep: #fafafa;
+  --color-text-black: #fff;
+  --color-text-dark: #e0e0e0;
+  --color-text-medium: #b0b0b0;
+  --color-text-disabled: #666;
+
+  /* Fondos */
+  --color-bg-white: #1e1e1e;
+  --color-bg-light: #252525;
+  --color-bg-section: #2a2020;
+  --color-background-card: #1e1e1e;
+  --color-background-light: #252525;
+  --color-background-white: #1e1e1e;
+  --color-background-subtle: #222;
+  --color-background-disabled: #2c2c2c;
+  --color-bg-white-90: rgba(30, 30, 30, 0.9);
+
+  /* Bordes */
+  --color-border-light: #333;
+  --color-border-medium: #444;
+  --color-border-dark: #3a3a3a;
+  --color-border-strong: #888;
+
+  /* Neutrales */
+  --color-neutral-50: #1a1a1a;
+  --color-neutral-100: #222;
+  --color-neutral-110: #262626;
+  --color-neutral-150: #262626;
+  --color-neutral-175: #2a2a2a;
+  --color-neutral-180: #2a2a2a;
+  --color-neutral-200: #2c2c2c;
+  --color-neutral-210: #333;
+  --color-neutral-220: #383838;
+  --color-neutral-250: #2e2e2e;
+  --color-neutral-300: #303030;
+  --color-neutral-350: #555;
+  --color-neutral-400: #3a3a3a;
+  --color-neutral-500: #444;
+  --color-neutral-600: #3a3a3a;
+  --color-neutral-620: #2c2c2c;
+  --color-neutral-650: #3a3a3a;
+  --color-neutral-680: #999;
+  --color-neutral-700: #3a3a3a;
+  --color-neutral-750: #aaa;
+  --color-neutral-800: #444;
+  --color-neutral-900: #999;
+  --color-neutral-950: #bbb;
+  --color-neutral-1000: #b0b0b0;
+  --color-neutral-1050: #ccc;
+  --color-neutral-1100: #ccc;
+  --color-neutral-100-90: rgba(34, 34, 34, 0.9);
+
+  /* Colores de estado (ajustados para contraste en fondo oscuro) */
+  --color-success: #2ecc71;
+  --color-warning: #f5a623;
+  --color-danger: #ff6b6b;
+  --color-info: #5dade2;
+  --color-error: #ff6b6b;
+
+  /* Azules */
+  --color-blue-200: #5da0e3;
+  --color-blue-400: #42a5f5;
+  --color-blue-500: #4a9eff;
+  --color-blue-600: #3b8de0;
+  --color-blue-700: #5b9fff;
+  --color-blue-750: #6bacf0;
+
+  /* Verdes */
+  --color-green-250: #1a3a1a;
+  --color-green-300: #1e4a1e;
+  --color-green-350: #4ea050;
+  --color-green-400: #66bb6a;
+  --color-green-450: #2ecc71;
+  --color-green-500: #43a047;
+  --color-green-600: #4caf50;
+  --color-green-650: #5bbd5e;
+  --color-green-700: #66bb6a;
+  --color-green-750: #2ecc71;
+  --color-green-800: #4caf50;
+  --color-teal-500: #26d9a8;
+  --color-teal-300: #5eded6;
+
+  /* Rojos (ajustados para fondo oscuro) */
+  --color-red-50: #2a1a1a;
+  --color-red-100: #2d1b1b;
+  --color-red-150: #3a2020;
+  --color-red-200: #3d2222;
+  --color-red-250: #4a2828;
+  --color-red-350: #e06b63;
+  --color-red-400: #ff6b6b;
+  --color-red-450: #e07a73;
+  --color-red-500: #ef5350;
+  --color-red-550: #ef5350;
+  --color-red-600: #e53935;
+  --color-red-650: #ef5350;
+  --color-red-700: #c62828;
+  --color-red-750: #ef5350;
+  --color-red-800: #e53935;
+  --color-red-850: #ff6b6b;
+  --color-red-900: #ff8a80;
+  --color-red-950: #ff8a80;
+
+  /* Amarillos */
+  --color-yellow-50: #2a2510;
+  --color-yellow-100: #3a3318;
+  --color-yellow-400: #fdd835;
+  --color-yellow-700: #c9a600;
+
+  /* Naranjas */
+  --color-orange-500: #ffb74d;
+  --color-orange-550: #ffa726;
+  --color-orange-600: #ff9800;
+  --color-orange-650: #ffb038;
+  --color-amber-500: #ffca28;
+  --color-purple-500: #b388ff;
+
+  /* Info / Danger / Success backgrounds */
+  --color-info-100: #1a2a35;
+  --color-danger-100: #3a2020;
+  --color-success-100: #1a3a1a;
+  --color-success-light: #1a3a1a;
+  --color-success-dark: #2ecc71;
+  --color-error-light: #3a2020;
+  --color-error-dark: #ef5350;
+  --color-warning-light: #3a3318;
+  --color-warning-dark: #c9a600;
+
+  /* Slates / Bluegray */
+  --color-slate-900: #b0c4de;
+  --color-slate-700: #8899b3;
+  --color-slate-600: #7a8fa8;
+  --color-slate-500: #8899b3;
+  --color-slate-200: #2a3550;
+  --color-slate-150: #1e2940;
+  --color-bluegray-900: #a0b0c0;
+  --color-bluegray-800: #8090a0;
+  --color-bluegray-300: #606a72;
+
+  /* Sidebar / Header */
+  --color-sidebar-bg: #0a1929;
+  --color-sidebar-hover: #0d2744;
+  --color-sidebar-active: #071422;
+  --color-header-bg: #2a2a2a73;
+
+  /* Transparencias negras → ajustadas para dark mode */
+  --color-black-04: rgba(255, 255, 255, 0.04);
+  --color-black-05: rgba(255, 255, 255, 0.05);
+  --color-black-08: rgba(255, 255, 255, 0.08);
+  --color-black-10: rgba(255, 255, 255, 0.1);
+  --color-black-12: rgba(255, 255, 255, 0.12);
+  --color-black-15: rgba(255, 255, 255, 0.15);
+  --color-black-20: rgba(255, 255, 255, 0.2);
+  --color-black-30: rgba(0, 0, 0, 0.5);
+  --color-black-40: rgba(0, 0, 0, 0.6);
+  --color-black-50: rgba(0, 0, 0, 0.7);
+  --color-black-70: rgba(0, 0, 0, 0.8);
+  --color-black-80: rgba(0, 0, 0, 0.9);
+
+  /* Transparencias con color (ajustadas) */
+  --color-blue-500-08: rgba(74, 158, 255, 0.08);
+  --color-blue-500-10: rgba(74, 158, 255, 0.1);
+  --color-blue-500-12: rgba(74, 158, 255, 0.12);
+  --color-blue-500-15: rgba(74, 158, 255, 0.15);
+  --color-blue-500-16: rgba(74, 158, 255, 0.16);
+  --color-blue-500-20: rgba(74, 158, 255, 0.2);
+  --color-blue-500-25: rgba(74, 158, 255, 0.25);
+  --color-blue-500-28: rgba(74, 158, 255, 0.28);
+  --color-blue-500-30: rgba(74, 158, 255, 0.3);
+  --color-blue-500-76: rgba(74, 158, 255, 0.76);
+  --color-blue-400-50: rgba(66, 165, 245, 0.5);
+  --color-blue-750-50: rgba(107, 172, 240, 0.5);
+  --color-blue-750-30: rgba(107, 172, 240, 0.3);
+  --color-red-500-10: rgba(239, 83, 80, 0.1);
+  --color-red-500-15: rgba(239, 83, 80, 0.15);
+  --color-red-500-20: rgba(239, 83, 80, 0.2);
+  --color-red-500-25: rgba(239, 83, 80, 0.25);
+  --color-red-500-30: rgba(239, 83, 80, 0.3);
+  --color-red-500-40: rgba(239, 83, 80, 0.4);
+  --color-red-550-30: rgba(239, 83, 80, 0.3);
+  --color-red-750-05: rgba(239, 83, 80, 0.05);
+  --color-red-750-20: rgba(239, 83, 80, 0.2);
+  --color-red-750-30: rgba(239, 83, 80, 0.3);
+  --color-red-750-50: rgba(239, 83, 80, 0.5);
+  --color-red-850-30: rgba(255, 107, 107, 0.3);
+  --color-red-850-60: rgba(255, 107, 107, 0.6);
+  --color-red-800-30: rgba(229, 57, 53, 0.3);
+  --color-red-800-50: rgba(229, 57, 53, 0.5);
+  --color-red-950-05: rgba(255, 138, 128, 0.05);
+  --color-red-950-20: rgba(255, 138, 128, 0.2);
+  --color-danger-10: rgba(255, 107, 107, 0.1);
+  --color-danger-12: rgba(255, 107, 107, 0.12);
+  --color-danger-22: rgba(255, 107, 107, 0.22);
+  --color-danger-30: rgba(255, 107, 107, 0.3);
+  --color-amber-500-10: rgba(255, 202, 40, 0.1);
+  --color-amber-500-30: rgba(255, 202, 40, 0.3);
+  --color-orange-500-20: rgba(255, 183, 77, 0.2);
+  --color-orange-550-50: rgba(255, 167, 38, 0.5);
+  --color-green-500-05: rgba(67, 160, 71, 0.05);
+  --color-green-500-10: rgba(67, 160, 71, 0.1);
+  --color-green-500-15: rgba(67, 160, 71, 0.15);
+  --color-green-500-25: rgba(67, 160, 71, 0.25);
+  --color-green-500-30: rgba(67, 160, 71, 0.3);
+  --color-green-700-50: rgba(102, 187, 106, 0.5);
+  --color-green-700-90: rgba(102, 187, 106, 0.9);
+  --color-teal-300-05: rgba(94, 222, 214, 0.05);
+  --color-gray-500-10: rgba(160, 160, 160, 0.1);
+  --color-neutral-900-30: rgba(153, 153, 153, 0.3);
+  --color-slate-900-08: rgba(176, 196, 222, 0.08);
+  --color-slate-900-18: rgba(176, 196, 222, 0.18);
+
+  /* Sombras */
+  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 0 5px rgba(0, 0, 0, 0.3);
+  --shadow-elevated: 0 10px 20px rgba(0, 0, 0, 0.3);
+  --shadow-notification: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+
+  /* Scrollbar */
+  --scrollbar-track: #2a2a2a;
+  --scrollbar-thumb: #555;
+  --scrollbar-thumb-hover: #777;
+
+  /* Calendar dark adjustments */
+  --home-calendar-event-background: #333;
+  --home-calendar-current-hour-bg: rgba(74, 158, 255, 0.76);
+  --home-calendar-current-hour-color: #fff;
+  --home-calendar-day-today-bg: #333;
+  --home-calendar-day-today-color: #e0e0e0;
+  --home-calendar-day-text-color: #e0e0e0;
+  --home-calendar-day-selected-bg: #4a9eff;
+  --home-calendar-day-hover-bg: #3a3a3a;
+  --home-calendar-hour-time-color: #b0b0b0;
+  --home-calendar-no-events-color: #888;
+  --home-calendar-sync-background: #333;
+  --home-calendar-sync-border-color: #444;
+  --home-calendar-sync-tooltip-bg: #e0e0e0;
+  --home-calendar-sync-tooltip-color: #1e1e1e;
+
+  /* Patient list dark tokens */
+  --pl-primary-color: #6bacf0;
+  --pl-secondary-color: #999;
+  --pl-text-color: #fff;
+  --pl-light-text-color: #e0e0e0;
+  --pl-background-color: #1e1e1e;
+  --pl-light-background: #262626;
+  --pl-border-color: #333;
+  --pl-shadow-color: rgba(255, 255, 255, 0.08);
+  --pl-shadow-hover: rgba(255, 255, 255, 0.12);
+
+  /* Patient detail */
+  --pd-definition-term-color: #fff;
 }

@@ -42,7 +42,7 @@
 }
 
 .captura-ext-dates {
-  background: #f5f5f5;
+  background: var(--color-neutral-180);
   border-radius: 8px;
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;

@@ -14,7 +14,6 @@ const Sidebar = () => {
   const canViewCash = hasPermission(permissions, ['cash.read', 'cash.manage', 'cash.open', 'cash.close']);
   const canViewConsultas = hasPermission(permissions, ['consultas.read', 'consultas.create', 'consultas.update']);
   const canViewStats = hasPermission(permissions, ['stats.read']);
-  const canViewUsers = hasPermission(permissions, ['users.read', 'users.create', 'users.update', 'users.disable']);
 
   return (
     <div className="sidebar-wrapper">
@@ -47,11 +46,9 @@ const Sidebar = () => {
                 <Link to="/estadisticas">Estadísticas</Link>
               </li>
             )}
-            {canViewUsers && (
-              <li>
-                <Link to="/usuarios">Usuarios</Link>
-              </li>
-            )}
+            <li>
+              <Link to="/configuracion">Configuración</Link>
+            </li>
           </ul>
         </nav>
       </div>

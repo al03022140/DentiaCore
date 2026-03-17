@@ -1,0 +1,379 @@
+/* ── CreateAppointmentModal ─────────────────────────────── */
+
+.cam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.cam-modal {
+  background: var(--color-bg-white);
+  border-radius: var(--card-border-radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.cam-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.cam-header h2 {
+  margin: 0;
+  font: var(--text-heading-sm);
+  color: var(--color-primary);
+}
+
+.cam-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.cam-close-btn:hover {
+  color: var(--color-danger);
+}
+
+/* Body */
+.cam-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.cam-section {
+  margin-bottom: 1.25rem;
+}
+
+.cam-label {
+  display: block;
+  font: var(--pd-font-label-md);
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.cam-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-sm);
+  font: var(--pd-font-body-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg-white);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.cam-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-blue-500-15);
+}
+
+.cam-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Patient search */
+.cam-search-wrapper {
+  position: relative;
+}
+
+.cam-searching {
+  font: var(--text-caption-sm);
+  color: var(--color-text-muted);
+  padding: 0.25rem 0;
+  display: block;
+}
+
+.cam-search-results {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-sm);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-bg-white);
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.cam-search-results li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cam-search-results li:hover {
+  background: var(--color-bg-section);
+}
+
+.cam-search-results li + li {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.cam-result-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.cam-result-age {
+  display: block;
+  font: var(--text-caption-sm);
+  color: var(--color-text-muted);
+}
+
+/* Selected patient card */
+.cam-patient-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-section);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.cam-patient-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.cam-patient-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cam-patient-info strong {
+  font: var(--pd-font-section-body);
+  color: var(--color-text-primary);
+}
+
+.cam-patient-info span {
+  font: var(--text-caption-sm);
+  color: var(--color-text-secondary);
+}
+
+.cam-remove-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.25rem;
+  transition: color 0.2s;
+}
+
+.cam-remove-btn:hover {
+  color: var(--color-danger);
+}
+
+/* Service catalog pills */
+.cam-catalog-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cam-pill {
+  padding: 0.375rem 0.875rem;
+  border-radius: 2rem;
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font: var(--text-caption-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.cam-pill:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+}
+
+.cam-pill--active,
+.cam-pill:disabled {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  opacity: 0.7;
+  cursor: default;
+}
+
+.cam-no-catalog {
+  font: var(--text-caption-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Items table */
+.cam-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+.cam-items-table th {
+  text-align: left;
+  font: var(--text-overline);
+  color: var(--color-text-muted);
+  padding: 0.5rem 0.5rem;
+  border-bottom: 2px solid var(--color-border-light);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cam-items-table td {
+  padding: 0.5rem;
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-light);
+  vertical-align: middle;
+}
+
+.cam-items-table tfoot td {
+  border-bottom: none;
+  padding-top: 0.75rem;
+  font: var(--pd-font-label-md);
+  color: var(--color-primary);
+}
+
+.cam-item-input {
+  width: 80px;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-sm);
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-white);
+  box-sizing: border-box;
+}
+
+.cam-item-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.cam-remove-item {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.cam-remove-item:hover {
+  color: var(--color-danger);
+}
+
+/* Error */
+.cam-error {
+  background: var(--color-danger-100, #fef2f2);
+  color: var(--color-danger, #dc2626);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--border-radius-sm);
+  font: var(--text-caption-sm);
+  margin-top: 0.5rem;
+}
+
+/* Footer */
+.cam-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.cam-btn {
+  padding: 0.625rem 1.5rem;
+  border-radius: var(--border-radius-md);
+  font: var(--pd-font-label-md);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.cam-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cam-btn--secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
+}
+
+.cam-btn--secondary:hover:not(:disabled) {
+  background: var(--color-bg-section);
+}
+
+.cam-btn--primary {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  box-shadow: 0 2px 8px var(--color-black-10, rgba(0,0,0,0.1));
+}
+
+.cam-btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .cam-modal {
+    max-width: 100%;
+    max-height: 95vh;
+    margin: 0.5rem;
+  }
+
+  .cam-body {
+    padding: 1rem;
+  }
+
+  .cam-item-input {
+    width: 60px;
+  }
+}

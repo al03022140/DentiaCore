@@ -140,7 +140,7 @@ Construir una aplicación fiable y mantenible que permita a profesionales dental
 2. Abrir una terminal y en la raíz:
 
 ```powershell
-cd "d:\DENT -1.1"
+cd DentiaCore
 npm install
 ```
 

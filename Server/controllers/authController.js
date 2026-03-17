@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/users');
+const ClinicSettings = require('../models/clinicSettings');
 const { getEffectivePermissions } = require('../utils/permissions');
 const auditLogger = require('../middlewares/auditLogger');
 
@@ -69,7 +70,9 @@ const signRefreshToken = (user) => {
 };
 
 const respondWithTokens = async (res, user) => {
-  const permissions = getEffectivePermissions(user);
+  const settings = await ClinicSettings.getSettings();
+  const roleOverrides = settings.rolePermissionOverrides || {};
+  const permissions = getEffectivePermissions(user, roleOverrides);
   const accessToken = signAccessToken(user, permissions);
   const refreshToken = signRefreshToken(user);
 
@@ -220,7 +223,9 @@ const me = async (req, res, next) => {
     return res.status(404).json({ message: 'Usuario no encontrado' });
   }
 
-  const permissions = getEffectivePermissions(user);
+  const settings = await ClinicSettings.getSettings();
+  const roleOverrides = settings.rolePermissionOverrides || {};
+  const permissions = getEffectivePermissions(user, roleOverrides);
   return res.json({
     id: user._id,
     nombre: user.nombre,

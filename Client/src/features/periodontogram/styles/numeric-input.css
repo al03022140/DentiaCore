@@ -11,13 +11,14 @@
 
 .numeric-input {
   width: 100%;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-dark);
   border-radius: 4px;
   padding: 4px 6px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
   text-align: center;
-  background-color: #fff;
+  background-color: var(--color-bg-white);
+  color: var(--color-text-primary);
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
   outline: none;
@@ -57,49 +58,49 @@
 
 /* Estados del input */
 .numeric-input:hover {
-  border-color: #bbb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-border-medium);
+  box-shadow: 0 1px 3px var(--color-black-10);
 }
 
 .numeric-input--focused,
 .numeric-input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-  background-color: #fff;
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 2px var(--color-blue-500-25);
+  background-color: var(--color-bg-white);
 }
 
 .numeric-input--invalid {
-  border-color: #dc3545;
-  background-color: #fff5f5;
+  border-color: var(--color-red-500);
+  background-color: var(--color-red-100);
 }
 
 .numeric-input--invalid:focus {
-  border-color: #dc3545;
-  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25);
+  border-color: var(--color-red-500);
+  box-shadow: 0 0 0 2px var(--color-red-500-25);
 }
 
 .numeric-input--disabled {
-  background-color: #f8f9fa;
-  border-color: #e9ecef;
-  color: #6c757d;
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-400);
+  color: var(--color-neutral-900);
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .numeric-input--disabled:hover {
-  border-color: #e9ecef;
+  border-color: var(--color-neutral-400);
   box-shadow: none;
 }
 
 .numeric-input--readonly {
-  background-color: #f8f9fa;
-  border-color: #e9ecef;
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-400);
   cursor: default;
 }
 
 .numeric-input--readonly:focus {
   box-shadow: none;
-  border-color: #e9ecef;
+  border-color: var(--color-neutral-400);
 }
 
 /* Mensaje de error */
@@ -109,8 +110,8 @@
   left: 0;
   right: 0;
   max-width: 65px;
-  background-color: #dc3545;
-  color: white;
+  background-color: var(--color-red-500);
+  color: #fff;
   font-size: 10px;
   padding: 2px 4px;
   border-radius: 0 0 3px 3px;
@@ -154,26 +155,26 @@
 
 /* Estilos para inputs de profundidad de sondaje - usando estilo de anchura */
 .probing-depth-input {
-  background-color: #f8f9fa;
-  border-color: #6c757d;
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-900);
 }
 
 .probing-depth-input:focus {
-  background-color: white;
-  border-color: #28a745;
-  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+  background-color: var(--color-bg-white);
+  border-color: var(--color-green-500);
+  box-shadow: 0 0 0 2px var(--color-green-500-25);
 }
 
 /* Estilos para inputs de margen gingival - usando estilo de anchura */
 .gingival-margin-input {
-  background-color: #f8f9fa;
-  border-color: #6c757d;
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-900);
 }
 
 .gingival-margin-input:focus {
-  background-color: white;
-  border-color: #28a745;
-  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+  background-color: var(--color-bg-white);
+  border-color: var(--color-green-500);
+  box-shadow: 0 0 0 2px var(--color-green-500-25);
 }
 
 /* Responsive design */
@@ -244,37 +245,4 @@
   }
 }
 
-/* Modo oscuro */
-@media (prefers-color-scheme: dark) {
-  .numeric-input {
-    background-color: #2d3748;
-    border-color: #4a5568;
-    color: #e2e8f0;
-  }
-  
-  .numeric-input:hover {
-    border-color: #718096;
-  }
-  
-  .numeric-input--focused,
-  .numeric-input:focus {
-    border-color: #63b3ed;
-    box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.25);
-  }
-  
-  .numeric-input--disabled {
-    background-color: #1a202c;
-    border-color: #2d3748;
-    color: #718096;
-  }
-  
-  .numeric-input--readonly {
-    background-color: #1a202c;
-    border-color: #2d3748;
-  }
-  
-  .numeric-input--invalid {
-    border-color: #fc8181;
-    background-color: #2d1b1b;
-  }
-}
+/* Modo oscuro - ahora manejado via CSS variables y [data-theme="dark"] en variables.css */

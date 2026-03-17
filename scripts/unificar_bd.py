@@ -140,7 +140,27 @@ def clean_orphans(client):
     )
     total_cleaned = 0
 
-    # Odontogramas: campo patientId → Patient
+    # Colecciones que referencian pacientes (campo → colección)
+    patient_ref_collections = [
+        ("odontogramas", "patientId"),
+        ("examens", "paciente_id"),
+        ("tratamientos", "paciente_id"),
+        ("appointments", "paciente_id"),
+        ("cashmovements", "paciente_id"),
+    ]
+
+    for col_name, field in patient_ref_collections:
+        if col_name in db.list_collection_names():
+            orphans = [
+                d["_id"] for d in db[col_name].find({}, {"_id": 1, field: 1})
+                if d.get(field) and str(d[field]) not in patient_ids
+            ]
+            if orphans:
+                db[col_name].delete_many({"_id": {"$in": orphans}})
+                print(f"    {col_name} huérfanos eliminados: {len(orphans)}")
+                total_cleaned += len(orphans)
+
+    # Odontogramas: campo patientId → Patient (legacy fallback check)
     if "odontogramas" in db.list_collection_names():
         orphans = [
             d["_id"] for d in db["odontogramas"].find({}, {"_id": 1, "patientId": 1})

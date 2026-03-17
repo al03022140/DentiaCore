@@ -1,0 +1,472 @@
+/* ========================================
+   Settings Page — DentiaCore
+   ======================================== */
+
+.settings-page {
+  width: 100%;
+  margin: 0;
+  padding: 0 var(--spacing-lg);
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-page::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-title {
+  max-width: 720px;
+  font: var(--text-heading-lg);
+  color: var(--color-primary);
+  margin: 0;
+  padding: var(--spacing-xl) 0 1rem;
+  border-bottom: none;
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-light);
+  z-index: 10;
+}
+
+/* ── Settings List ────────────────────── */
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 0.75rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border-light);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-family-primary);
+}
+
+.settings-row:hover {
+  background-color: var(--color-bg-section);
+}
+
+.settings-row-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2.2rem;
+  text-align: center;
+}
+
+.settings-row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-row-name {
+  font-size: 1.4rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.settings-row-desc {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+
+.settings-row-badge {
+  font: var(--text-caption-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.settings-row-arrow {
+  font-size: 1.3rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Settings Section ─────────────────── */
+
+.settings-section {
+  width: 100%;
+  margin: 0;
+  padding: 0 var(--spacing-lg);
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-section::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-section-header {
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-xl) 0 1rem;
+  margin: 0;
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-light);
+  z-index: 10;
+}
+
+.settings-back-btn {
+  font: var(--text-body-sm);
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-fast);
+}
+
+.settings-back-btn:hover {
+  background: var(--color-blue-500-08);
+}
+
+.settings-section-title {
+  font: var(--text-heading-md);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.settings-section-body {
+  max-width: 720px;
+  background: var(--color-bg-white);
+  border: var(--card-border);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+/* ── Form Elements ────────────────────── */
+
+.settings-form-group {
+  margin-bottom: var(--spacing-xl);
+}
+
+.settings-form-group label {
+  display: block;
+  font: var(--text-label-strong);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.settings-form-group input,
+.settings-form-group select,
+.settings-form-group textarea {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--border-radius-md);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-white);
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.settings-form-group input:focus,
+.settings-form-group select:focus,
+.settings-form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-blue-500-16);
+}
+
+.settings-form-group .hint {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-xs);
+}
+
+/* ── Buttons ──────────────────────────── */
+
+.settings-btn-primary {
+  padding: var(--button-padding-md);
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  border: none;
+  border-radius: var(--border-radius-md);
+  font: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--button-transition);
+}
+
+.settings-btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.settings-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-btn-secondary {
+  padding: var(--button-padding-md);
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--border-radius-md);
+  font: var(--text-body-sm);
+  cursor: pointer;
+  transition: var(--button-transition);
+}
+
+.settings-btn-secondary:hover {
+  background: var(--color-blue-500-08);
+}
+
+.settings-btn-danger {
+  padding: var(--button-padding-md);
+  background: var(--color-danger);
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-md);
+  font: var(--text-body-sm);
+  cursor: pointer;
+  transition: var(--button-transition);
+}
+
+.settings-btn-danger:hover {
+  background: var(--color-red-600);
+}
+
+.settings-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+}
+
+/* ── Radio Group (Apariencia) ─────────── */
+
+.settings-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.settings-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.settings-radio-option:hover {
+  border-color: var(--color-primary);
+  background: var(--color-blue-500-08);
+}
+
+.settings-radio-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-blue-500-12);
+}
+
+.settings-radio-option input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
+/* ── Toggle Switch ────────────────────── */
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.settings-toggle:last-child {
+  border-bottom: none;
+}
+
+.settings-toggle-label {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+.settings-toggle-desc {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.settings-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.settings-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--color-border-medium);
+  border-radius: 12px;
+  transition: var(--transition-fast);
+}
+
+.settings-switch .slider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: var(--transition-fast);
+}
+
+.settings-switch input:checked + .slider {
+  background: var(--color-primary);
+}
+
+.settings-switch input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+/* ── Signature Pad ────────────────────── */
+
+.signature-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.signature-toggle {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.signature-toggle button {
+  padding: var(--button-padding-sm);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-white);
+  cursor: pointer;
+  font: var(--text-caption);
+  transition: var(--transition-fast);
+}
+
+.signature-toggle button.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.signature-canvas {
+  border: 2px dashed var(--color-border-medium);
+  border-radius: var(--border-radius-lg);
+  cursor: crosshair;
+  touch-action: none;
+  width: 100%;
+  height: 150px;
+  background: var(--color-bg-white);
+}
+
+.signature-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-lg);
+  background: var(--color-bg-light);
+}
+
+.signature-preview img {
+  max-height: 80px;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+/* ── Note Template Editor ─────────────── */
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-light);
+}
+
+.template-item-name {
+  font: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.template-item-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+/* ── Message ──────────────────────────── */
+
+.settings-message {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font: var(--text-caption);
+  margin-bottom: var(--spacing-md);
+}
+
+.settings-message.success {
+  background: var(--color-success-100);
+  color: var(--color-success);
+}
+
+.settings-message.error {
+  background: var(--color-danger-100);
+  color: var(--color-danger);
+}
+
+/* ── Responsive ───────────────────────── */
+
+@media (max-width: 768px) {
+  .settings-page,
+  .settings-section {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .settings-card {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+}

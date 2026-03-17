@@ -1,39 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import "../styles/next-patient.css";
 import userNot from '../../../assets/images/avatars/UserNot.png';
-import API from '../../../shared/services/axios-instance';
+import { getTodayAppointments } from '../../../shared/services/appointment-service';
 
 const NextPatient = () => {
   const [nextPatient, setNextPatient] = useState(null);
 
   useEffect(() => {
-    const fetchPatients = async () => {
+    const fetchNextPatient = async () => {
       try {
-        const { data } = await API.get('/patients');
+        const appointments = await getTodayAppointments();
         const now = new Date();
 
-        // Verificar que data tenga la estructura esperada
-        const patients = data.patients || data;
-        if (!Array.isArray(patients)) {
+        if (!Array.isArray(appointments)) {
           setNextPatient(null);
           return;
         }
 
-        // Filtrar pacientes con citas futuras y ordenarlos
-        const upcomingPatient = patients
-          .filter(patient => patient.appointment && new Date(patient.appointment) > now)
-          .sort((a, b) => new Date(a.appointment) - new Date(b.appointment))[0];
+        // Find first upcoming appointment that isn't cancelled/past
+        const upcoming = appointments
+          .filter(apt => apt.estado !== 'Cancelada' && apt.estado !== 'Pasada' && new Date(apt.fecha_hora) > now)
+          .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))[0];
 
-        setNextPatient(upcomingPatient || null);
+        setNextPatient(upcoming || null);
       } catch (error) {
-        console.error('Error al obtener los pacientes:', error);
+        console.error('Error al obtener citas:', error);
       }
     };
 
-    fetchPatients();
+    fetchNextPatient();
   }, []);
 
-  // Si no hay un próximo paciente, muestra un mensaje predeterminado
   if (!nextPatient) {
     return (
       <div className="patient-info-wrapper no-patient">
@@ -44,17 +41,28 @@ const NextPatient = () => {
     );
   }
 
+  const patient = nextPatient.paciente_id;
+  const patientName = patient ? `${patient.nombre || ''} ${patient.apellidos || ''}`.trim() : 'Paciente';
+  const patientImage = patient?.foto
+    ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${patient.foto}`
+    : null;
+
   return (
     <div className="patient-info-wrapper">
       <div className="patient-info">
         <div className="patient-image">
-          <img src={nextPatient.image || userNot} alt={nextPatient.name || 'Paciente'} />
+          <img
+            src={patientImage || userNot}
+            alt={patientName}
+            onError={e => { e.target.src = userNot; }}
+          />
         </div>
         <div className="patient-details">
           <p>Próximo Paciente:</p>
-          <strong>{nextPatient.name}</strong>
+          <strong>{patientName}</strong>
           <p>
-            {new Date(nextPatient.appointment).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(nextPatient.fecha_hora).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+            {nextPatient.motivo ? ` — ${nextPatient.motivo}` : ''}
           </p>
         </div>
       </div>

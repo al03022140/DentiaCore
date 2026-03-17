@@ -33,6 +33,10 @@ tools/mongo/bin/
 tools/mongo/bin/*.mdmp
 tools/mongo/bin/mongod.exe
 
+# Security: local token/credential files
+token.txt
+*.token
+
 # Optional: ignore local OS/editor files
 .idea/
 .vscode/

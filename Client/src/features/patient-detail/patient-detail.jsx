@@ -24,6 +24,7 @@ import PatientHygieneHabits from './components/patient-hygiene-habits.jsx';
 import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx';
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
+import PatientChargesCard from './components/patient-charges-card.jsx';
 
 // Funciones API para manejo de pacientes
 import { getPatientById } from '../../shared/services/api.js';
@@ -569,6 +570,8 @@ const PatientDetail = () => {
             ultimaCita={patientData.citas?.ultimaCita} 
             proximaCita={patientData.citas?.proximaCita}
           />
+
+          <PatientChargesCard patientId={patientId} />
 
           {initializationError && (
             <div className="canvas-error">

@@ -37,6 +37,22 @@ const appointmentSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // ── Procedimiento y cobro ──────────────────────────────────
+    comentarioProcedimiento: {
+        type: String,
+        trim: true
+    },
+    items: [{
+        nombre: { type: String, required: true, trim: true },
+        cantidad: { type: Number, required: true, min: 1 },
+        precioUnitario: { type: Number, required: true, min: 0 },
+        subtotal: { type: Number, required: true, min: 0 }
+    }],
+    totalEstimado: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     // ── Campos de auditoría (roles.MD §5) ──────────────────────
     creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },

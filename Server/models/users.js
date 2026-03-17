@@ -80,6 +80,25 @@ const userSchema = new mongoose.Schema({
     default: null,
     trim: true
   },
+  // ── Perfil profesional (Pantalla Configuración) ────────────
+  firmaDigitalUrl: { type: String, default: null },
+  especialidad: { type: String, default: null, trim: true },
+  universidad: { type: String, default: null, trim: true },
+  registroSSA: { type: String, default: null, trim: true },
+  // ── Preferencias de usuario ────────────────────────────────
+  preferences: {
+    theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
+    defaultAppointmentDuration: { type: Number, default: 30 },
+    prescriptionDefaults: {
+      header: { type: String, default: '' },
+      footer: { type: String, default: '' }
+    },
+    reminders: {
+      pendingDrafts: { type: Boolean, default: true },
+      upcomingAppointments: { type: Boolean, default: true },
+      endOfDay: { type: Boolean, default: false }
+    }
+  },
   fecha_registro: {
     type: Date,
     default: Date.now
@@ -97,6 +116,12 @@ userSchema.pre('save', async function(next) {
     next(error);
   }
 });
+
+// **Validación condicional: cédula obligatoria para doctores (NOM-004 Art. 5.10)**
+userSchema.path('cedulaProfesional').validate(function(v) {
+  if (this.rol === 'doctor') return !!v && v.trim().length > 0;
+  return true;
+}, 'La cédula profesional es obligatoria para doctores');
 
 // **Método para comparar contraseñas en autenticación**
 userSchema.methods.compararContraseña = async function(contraseñaIngresada) {

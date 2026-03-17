@@ -58,14 +58,16 @@ TextBox.prototype.setLabel = function (label) {
  * @param {type} context
  * @returns {undefined}
  */
-TextBox.prototype.drawLabel = function (context) {
+TextBox.prototype.drawLabel = function (context, settings) {
     "use strict";
-    this.rect.outline(context, "#000000");
+    var outlineColor = settings ? settings.COLOR_OUTLINE : "#000000";
+    var labelColor = settings ? settings.COLOR_LABEL : "#9a9a9a";
+    this.rect.outline(context, outlineColor);
 
     context.beginPath();
 
     context.textAlign = "center";
-    context.fillStyle = "#9a9a9a";
+    context.fillStyle = labelColor;
     context.font = "11px Arial";
 
     context.fillText(this.label,
@@ -84,14 +86,16 @@ TextBox.prototype.drawLabel = function (context) {
  * @param {type} color color of the text to draw
  * @returns {void}
  */
-TextBox.prototype.drawText = function (context, color) {
+TextBox.prototype.drawText = function (context, color, settings) {
     "use strict";
+    var bgColor = settings ? settings.COLOR_TEXTBOX_BG : "#ffffff";
+    var outlineColor = settings ? settings.COLOR_OUTLINE : "#000000";
     context.beginPath();
 
-    // if there is text, create a white background
+    // if there is text, create a background
     // to clear the area of the text box
     if (this.text !== "") {
-        context.fillStyle = "#ffffff";
+        context.fillStyle = bgColor;
 
         context.fillRect(this.rect.x,
                 this.rect.y,
@@ -100,7 +104,7 @@ TextBox.prototype.drawText = function (context, color) {
 
     }
 
-    this.rect.outline(context, "#000000");
+    this.rect.outline(context, outlineColor);
     
     context.textAlign = "center";
     context.fillStyle = color;
@@ -122,9 +126,9 @@ TextBox.prototype.drawText = function (context, color) {
  * @param {type} color the color of the text
  * @returns {undefined}
  */
-TextBox.prototype.render = function (context, color) {
+TextBox.prototype.render = function (context, color, settings) {
     "use strict";
-    this.drawText(context, color);
+    this.drawText(context, color, settings);
 };
 
 TextBox.prototype.setNote = function(note, preserveFecha) {

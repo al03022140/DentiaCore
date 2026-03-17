@@ -7,7 +7,7 @@ const LockScreenContext = createContext(null);
 
 const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos (roles.MD §9.3)
 const CHECK_INTERVAL_MS = 30 * 1000;         // comprobar cada 30s
-const MAX_PIN_ATTEMPTS = 5;
+const MAX_PIN_ATTEMPTS = 3;
 
 export const LockScreenProvider = ({ children }) => {
   const { user, logout } = useAuth();
