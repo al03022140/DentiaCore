@@ -428,7 +428,7 @@ class DentiaCoreLauncher:
                 if not started:
                     self.server_process = subprocess.Popen(
                         ['npm', 'run', 'start'],
-                        shell=True,
+                        shell=(sys.platform == 'win32'),
                         cwd=self.server_dir,
                         env=env,
                         creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -460,7 +460,7 @@ class DentiaCoreLauncher:
                 print("🔄 Iniciando servidor backend...")
                 self.server_process = subprocess.Popen(
                     ['npm', 'run', 'dev'],
-                    shell=True,
+                    shell=(sys.platform == 'win32'),
                     cwd=self.server_dir,
                     env=env,
                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -477,7 +477,7 @@ class DentiaCoreLauncher:
                     time.sleep(2)  # Pequeña pausa adicional para asegurar estabilidad
                     self.client_process = subprocess.Popen(
                         ['npm', 'run', 'client'],
-                        shell=True,
+                        shell=(sys.platform == 'win32'),
                         cwd=self.project_dir,
                         env=env,
                         creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -534,8 +534,8 @@ class DentiaCoreLauncher:
         """Hilo para detener todos los servicios"""
         try:
             if self.using_pm2:
-                subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
+                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
                 self.using_pm2 = False
 
             # Terminar procesos si existen (cliente primero, luego servidor)
@@ -567,9 +567,9 @@ class DentiaCoreLauncher:
                 self.mongo_process = None
                 
             # Matar puertos específicos como respaldo
-            subprocess.run(['npx', 'kill-port', '5173'], shell=True, capture_output=True)
-            subprocess.run(['npx', 'kill-port', '5174'], shell=True, capture_output=True)
-            subprocess.run(['npx', 'kill-port', '5002'], shell=True, capture_output=True)
+            self._kill_port(5173)
+            self._kill_port(5174)
+            self._kill_port(5002)
             
             self.is_server_running = False
             self.is_client_running = False
@@ -653,12 +653,23 @@ class DentiaCoreLauncher:
     def _kill_port(self, port):
         """Matar proceso en un puerto específico antes de iniciar un servicio"""
         try:
-            subprocess.run(
-                ['npx', 'kill-port', str(port)],
-                shell=True,
-                capture_output=True,
-                timeout=5
-            )
+            if sys.platform != 'win32':
+                # On macOS/Linux use lsof — does not require npx/node in PATH
+                result = subprocess.run(
+                    ['lsof', '-ti', f':{port}'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.stdout.strip():
+                    for pid in result.stdout.strip().split('\n'):
+                        if pid.strip():
+                            subprocess.run(['kill', '-9', pid.strip()], capture_output=True, timeout=5)
+            else:
+                subprocess.run(
+                    ['npx', 'kill-port', str(port)],
+                    shell=True,
+                    capture_output=True,
+                    timeout=5
+                )
         except Exception:
             pass  # Ignorar errores si el puerto ya está libre
 
@@ -669,15 +680,15 @@ class DentiaCoreLauncher:
             
             # Instalar en raíz
             print("📦 Instalando dependencias en raíz...")
-            subprocess.run(['npm', 'install'], cwd=self.project_dir, shell=True, check=True)
-            
+            subprocess.run(['npm', 'install'], cwd=self.project_dir, shell=(sys.platform == 'win32'), check=True)
+
             # Instalar en Server
             print("📦 Instalando dependencias en Server...")
-            subprocess.run(['npm', 'install'], cwd=self.server_dir, shell=True, check=True)
-            
+            subprocess.run(['npm', 'install'], cwd=self.server_dir, shell=(sys.platform == 'win32'), check=True)
+
             # Instalar en Client
             print("📦 Instalando dependencias en Client...")
-            subprocess.run(['npm', 'install'], cwd=self.client_dir, shell=True, check=True)
+            subprocess.run(['npm', 'install'], cwd=self.client_dir, shell=(sys.platform == 'win32'), check=True)
             
             return True
         except subprocess.CalledProcessError as e:
@@ -740,16 +751,26 @@ class DentiaCoreLauncher:
             return False, error_msg
 
     def _check_mongodb_status(self):
-        """Verificar si MongoDB está ejecutándose"""
+        """Verificar si MongoDB está ejecutándose (multiplataforma)"""
         try:
-            # Verificar proceso mongod
-            result = subprocess.run(
-                ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
-                shell=True,
-                capture_output=True,
-                text=True
-            )
-            return 'mongod.exe' in result.stdout
+            if sys.platform == 'win32':
+                result = subprocess.run(
+                    ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                return 'mongod.exe' in (result.stdout or '')
+            else:
+                # Para macOS/Linux usar pgrep
+                result = subprocess.run(
+                    ['pgrep', '-f', 'mongod'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                return result.returncode == 0
         except Exception:
             return False
 
@@ -905,7 +926,7 @@ class DentiaCoreLauncher:
             # Comprobar si ya existe la app en PM2
             exists = subprocess.run(
                 ['pm2', 'describe', 'dentiacore-api'],
-                shell=True,
+                shell=(sys.platform == 'win32'),
                 cwd=server_dir,
                 env=env,
                 capture_output=True
@@ -914,7 +935,7 @@ class DentiaCoreLauncher:
                 # Reiniciar actualizando variables de entorno del demonio
                 subprocess.run(
                     ['pm2', 'restart', 'dentiacore-api', '--update-env'],
-                    shell=True,
+                    shell=(sys.platform == 'win32'),
                     cwd=server_dir,
                     env=env,
                     check=True
@@ -922,7 +943,7 @@ class DentiaCoreLauncher:
             else:
                 subprocess.run(
                     ['pm2', 'start', 'ecosystem.config.cjs', '--only', 'dentiacore-api', '--update-env'],
-                    shell=True,
+                    shell=(sys.platform == 'win32'),
                     cwd=server_dir,
                     env=env,
                     check=True
@@ -966,7 +987,7 @@ class DentiaCoreLauncher:
                 if not started:
                     self.server_process = subprocess.Popen(
                         ['npm', 'run', 'start'],
-                        shell=True,
+                        shell=(sys.platform == 'win32'),
                         cwd=server_dir,
                         env=env,
                         creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -983,7 +1004,7 @@ class DentiaCoreLauncher:
                     return
                 self.server_process = subprocess.Popen(
                     ['npm', 'run', 'dev'],
-                    shell=True,
+                    shell=(sys.platform == 'win32'),
                     cwd=server_dir,
                     env=env,
                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -1030,13 +1051,13 @@ class DentiaCoreLauncher:
     def stop_server(self):
         """Detener solo el servidor"""
         if self.using_pm2:
-            subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
-            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=True, cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
+            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
             self.using_pm2 = False
         if self.server_process:
             self.server_process.terminate()
             self.server_process = None
-        subprocess.run(['npx', 'kill-port', '5002'], shell=True, capture_output=True)
+        self._kill_port(5002)
         # Si iniciamos Mongo, detenerlo
         if self.mongo_process:
             try:
@@ -1067,7 +1088,7 @@ class DentiaCoreLauncher:
 
             self.client_process = subprocess.Popen(
                 ['npm', 'run', 'dev'],
-                shell=True,
+                shell=(sys.platform == 'win32'),
                 cwd=client_dir,
                 env=self.current_env,
                 creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
@@ -1087,8 +1108,8 @@ class DentiaCoreLauncher:
         if self.client_process:
             self.client_process.terminate()
             self.client_process = None
-        subprocess.run(['npx', 'kill-port', '5173'], shell=True, capture_output=True)
-        subprocess.run(['npx', 'kill-port', '5174'], shell=True, capture_output=True)
+        self._kill_port(5173)
+        self._kill_port(5174)
         self.is_client_running = False
         self.update_ui_state()
         
@@ -1129,7 +1150,7 @@ class DentiaCoreLauncher:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                shell=True
+                shell=(sys.platform == 'win32')
             )
             
             if result.returncode == 0:
@@ -1142,12 +1163,13 @@ class DentiaCoreLauncher:
             
     def open_folder(self):
         """Abrir la carpeta del proyecto"""
+        project_path = str(self.project_dir)
         if sys.platform == 'win32':
-            os.startfile(self.project_dir)
+            os.startfile(project_path)
         elif sys.platform == 'darwin':
-            subprocess.run(['open', self.project_dir])
+            subprocess.run(['open', project_path])
         else:
-            subprocess.run(['xdg-open', self.project_dir])
+            subprocess.run(['xdg-open', project_path])
 
     def _ensure_client_build(self):
         """Construir el frontend para producción si corresponde."""
@@ -1161,7 +1183,7 @@ class DentiaCoreLauncher:
             self.root.after(0, lambda: self.start_all_btn.config(text='⏳ Construyendo Frontend...', state='disabled'))
             subprocess.run(
                 ['npm', 'run', 'build'],
-                shell=True,
+                shell=(sys.platform == 'win32'),
                 cwd=self.client_dir,
                 env=env,
                 check=True
@@ -1170,8 +1192,15 @@ class DentiaCoreLauncher:
             self.root.after(0, lambda: messagebox.showerror('Build Frontend', f'Fallo al construir el frontend: {e}'))
 
     def _ensure_mongo_running(self):
-        """Verifica que MongoDB esté ejecutándose como servicio de Windows."""
-        # Verificar si mongod está activo mediante tasklist (Windows)
+        """Verifica que MongoDB esté ejecutándose en cualquier plataforma."""
+        # Para Unix/macOS/Linux
+        if sys.platform != 'win32':
+            if self._is_mongod_process_running():
+                print("✅ MongoDB proceso detectado en Unix")
+                return self._wait_for_mongo_ready()
+            return self._ensure_mongo_running_unix()
+
+        # Para Windows
         if sys.platform == 'win32':
             try:
                 check = subprocess.run(
@@ -1316,6 +1345,120 @@ class DentiaCoreLauncher:
             'Verifica que el servicio esté ejecutándose y sin errores.'
         ))
         return False
+
+    # ── Funciones auxiliares para macOS/Linux ──────────────────────────────
+
+    def _ensure_mongo_running_unix(self):
+        """Verifica y inicia MongoDB en macOS/Linux."""
+        try:
+            # Buscar mongod usando las rutas conocidas (incluye /opt/homebrew para Apple Silicon)
+            mongod_path = self._find_mongod_unix() or 'mongod'
+
+            # Verificar si mongod está disponible
+            result = subprocess.run(
+                [mongod_path, '--version'],
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                # mongod está disponible, intentar arrancar usando brew services (macOS)
+                if sys.platform == 'darwin':
+                    try:
+                        # Intenta usar brew services si está disponible
+                        subprocess.run(
+                            ['brew', 'services', 'start', 'mongodb-community'],
+                            capture_output=True,
+                            timeout=10,
+                            check=False
+                        )
+                        print("🔄 Iniciando MongoDB con brew services...")
+                        time.sleep(3)
+                        if self._wait_for_mongo_ready():
+                            return True
+                        # brew services no logró iniciar MongoDB, intentar mongod directo
+                        print("⚠️ brew services no inició MongoDB, intentando mongod directo...")
+                    except Exception as e:
+                        print(f"⚠️ brew services no disponible: {e}")
+
+                # Fallback: lanzar mongod directamente
+                db_dir = self.project_dir / 'DB'
+                db_dir.mkdir(exist_ok=True)
+                (db_dir / 'logs').mkdir(exist_ok=True)
+
+                log_file = str(db_dir / 'logs' / 'mongod.log')
+                cmd = [
+                    mongod_path,
+                    '--dbpath', str(db_dir),
+                    '--logpath', log_file,
+                    '--bind_ip', '0.0.0.0',
+                ]
+
+                self.mongo_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setsid if sys.platform != 'win32' else None
+                )
+                print(f"🔄 MongoDB iniciado (PID: {self.mongo_process.pid})")
+                time.sleep(2)
+                return self._wait_for_mongo_ready()
+        except Exception as e:
+            print(f"⚠️ Error al iniciar MongoDB en UNIX: {e}")
+            return False
+
+        # mongod --version falló: MongoDB no está instalado
+        print("⚠️ mongod no está disponible en este sistema")
+        return False
+
+    def _find_mongod_unix(self):
+        """Encuentra mongod en sistemas Unix (macOS/Linux)."""
+        import shutil
+
+        # Rutas comunes para Homebrew en macOS
+        homebrew_paths = [
+            '/usr/local/bin/mongod',
+            '/opt/homebrew/bin/mongod',
+            '/usr/local/mongodb/bin/mongod',
+            Path.home() / 'mongodb' / 'bin' / 'mongod',
+        ]
+
+        # Intentar rutas comunes primero
+        for path_str in homebrew_paths:
+            path = Path(path_str)
+            if path.exists():
+                return str(path)
+
+        # Intentar encontrar en PATH
+        mongod_path = shutil.which('mongod')
+        if mongod_path:
+            return mongod_path
+
+        # Búsqueda en variables de entorno
+        env_paths = os.environ.get('MONGODB_HOME', '') or os.environ.get('MONGO_HOME', '')
+        if env_paths:
+            for base_path in env_paths.split(':'):
+                mongo_bin = Path(base_path) / 'bin' / 'mongod'
+                if mongo_bin.exists():
+                    return str(mongo_bin)
+
+        return None
+
+    def _is_mongod_process_running(self):
+        """Verifica si hay un proceso mongod ejecutándose en Unix."""
+        try:
+            result = subprocess.run(
+                ['pgrep', '-f', 'mongod'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    # ── Fin de funciones auxiliares para macOS/Linux ──────────────────────────────
 
     def _find_mongod_exe(self):
         """Busca mongod.exe priorizando la versión embebida del proyecto y luego otras fuentes."""
@@ -1731,6 +1874,12 @@ class DentiaCoreLauncher:
 
 def main():
     """Función principal"""
+    # Ensure Homebrew paths are in PATH on macOS (needed when launched from Finder/.app or without shell profile)
+    if sys.platform == 'darwin':
+        _brew_paths = '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin'
+        _current = os.environ.get('PATH', '')
+        if '/opt/homebrew/bin' not in _current:
+            os.environ['PATH'] = _brew_paths + ':' + _current
     try:
         app = DentiaCoreLauncher()
         app.run()
