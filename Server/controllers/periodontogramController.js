@@ -2,7 +2,7 @@ const Patient = require('../models/patient');
 const Periodontogram = require('../models/periodontogram');
 const PeriodontogramHistory = require('../models/periodontogramHistory');
 const mongoose = require('mongoose');
-const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
+const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { validatePeriodontogramData } = require('../schemas/unified-periodontogram-schema');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
@@ -277,8 +277,8 @@ exports.updateFullPeriodontogram = [
     
     try {
       const { id } = req.params;
-      const { date, teeth, modifiedBy } = req.body;
-      const userId = modifiedBy || req.user?.id || null;
+      const { date, teeth } = req.body;
+      const userId = req.user?.id || null;
 
       // Rechazar claves legacy si vienen en este endpoint (aunque no se procesen dientes aquí)
       const legacyInUpdate = collectForbiddenKeys(req.body);
@@ -311,6 +311,16 @@ exports.updateFullPeriodontogram = [
           success: false,
           message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
         });
+      }
+
+      // BORRADOR: solo el creador o un admin pueden modificar
+      if (periodontogram && periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+        if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== req.user?.id) {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el creador o un administrador pueden modificar este borrador'
+          });
+        }
       }
       
       if (!periodontogram) {
@@ -468,6 +478,24 @@ exports.deletePeriodontogram = [
           message: 'Periodontograma no encontrado'
         });
       }
+
+      // NOM-024: Los registros OFICIAL no se pueden eliminar
+      if (periodontogram.estadoRegistro === 'OFICIAL') {
+        return res.status(403).json({
+          success: false,
+          message: 'No se puede eliminar un periodontograma en estado OFICIAL'
+        });
+      }
+
+      // BORRADOR: solo el creador o un admin pueden eliminar
+      if (periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+        if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el creador o un administrador pueden eliminar este borrador'
+          });
+        }
+      }
       
       // Soft delete - cambiar estado a archived
       periodontogram.status = 'archived';
@@ -603,6 +631,16 @@ exports.savePeriodontogramData = [
           success: false,
           message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
         });
+      }
+
+      // BORRADOR: solo el creador o un admin pueden modificar
+      if (periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+        if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el creador o un administrador pueden modificar este borrador'
+          });
+        }
       }
 
       // Determinar estadoRegistro según permisos (asistente → BORRADOR)

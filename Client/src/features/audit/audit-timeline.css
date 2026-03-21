@@ -1,0 +1,176 @@
+.audit-timeline {
+  padding: 1rem;
+  max-width: 800px;
+}
+
+.audit-timeline__title {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+  color: var(--color-text-dark);
+}
+
+.audit-timeline__error {
+  color: var(--color-danger, #e53e3e);
+  padding: 0.75rem;
+  background: #fff5f5;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.audit-timeline__loading,
+.audit-timeline__empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.audit-timeline__list {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.audit-timeline__list::before {
+  content: '';
+  position: absolute;
+  left: 0.9rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border-medium, #ddd);
+}
+
+.audit-timeline__item {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.audit-timeline__marker {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid #718096;
+  background: var(--color-bg-white, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  z-index: 1;
+  margin-left: -1rem;
+}
+
+.audit-timeline__content {
+  flex: 1;
+  background: var(--color-bg-white, #fff);
+  border: 1px solid var(--color-border-medium, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+}
+
+.audit-timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.audit-timeline__header--clickable {
+  cursor: pointer;
+}
+
+.audit-timeline__header--clickable:hover {
+  opacity: 0.85;
+}
+
+.audit-timeline__desc {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--color-text-dark);
+}
+
+.audit-timeline__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.audit-timeline__expand-icon {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.audit-timeline__campos {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.audit-timeline__diff {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.audit-timeline__diff-section {
+  flex: 1;
+  min-width: 200px;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.audit-timeline__diff-section pre {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.7rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.audit-timeline__diff--antes {
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+}
+
+.audit-timeline__diff--despues {
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+}
+
+.audit-timeline__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-medium, #e2e8f0);
+}
+
+.audit-timeline__pagination button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--color-border-medium, #ccc);
+  border-radius: 6px;
+  background: var(--color-bg-white);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.audit-timeline__pagination button:hover:not(:disabled) {
+  background: var(--color-bg-light, #f7f7f7);
+}
+
+.audit-timeline__pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.audit-timeline__pagination span {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}

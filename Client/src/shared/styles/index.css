@@ -1,5 +1,18 @@
 @import './variables.css';
 
+/*
+  Tipografía fluida: escala el font-size base según el ancho de pantalla.
+  Referencia: 1440 px → 16 px (100 %).
+    · mínimo : 12 px (pantallas ≤ 1080 px)
+    · fluido  : 100vw / 90  ≈ 1.111vw
+    · máximo  : 20 px (pantallas ≥ 1800 px)
+  Como todas las fuentes usan rem, escalan proporcionalmente y siempre
+  se ven como si el navegador estuviera al 100 % de zoom en 1440 px.
+*/
+html {
+  font-size: clamp(12px, calc(100vw / 90), 20px);
+}
+
 html, body, #root {
   height: 100%;
 }

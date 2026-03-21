@@ -3,11 +3,13 @@ const Usuario = require('../models/users');
 const ClinicSettings = require('../models/clinicSettings');
 const { getEffectivePermissions } = require('../utils/permissions');
 const auditLogger = require('../middlewares/auditLogger');
+const { hashToken, generateSecureToken, getJwtSecret, validatePasswordStrength } = require('../utils/crypto');
+const logger = require('../utils/logger');
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MINUTES = 15;
+const PASSWORD_RESET_TTL_MINUTES = 30;
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'dev-secret';
 const getAccessTtl = () => process.env.JWT_ACCESS_TTL || '15m';
 const getRefreshTtl = () => process.env.JWT_REFRESH_TTL || '7d';
 const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
@@ -76,7 +78,8 @@ const respondWithTokens = async (res, user) => {
   const accessToken = signAccessToken(user, permissions);
   const refreshToken = signRefreshToken(user);
 
-  user.refreshToken = refreshToken;
+  // Store hashed refresh token — never store raw tokens in DB
+  user.refreshTokenHash = hashToken(refreshToken);
   user.refreshTokenExpiresAt = new Date(Date.now() + parseDurationToMs(getRefreshTtl()));
   await user.save();
 
@@ -126,7 +129,7 @@ const login = async (req, res, next) => {
 
     // Registrar login fallido en auditoría (NOM-024)
     auditLogger.registrarManual(
-      { user: { id: user._id, role: user.rol }, ip: req.ip },
+      { user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip },
       'login_fallido',
       { resourceType: 'usuario', resourceId: user._id, detalles: { intentos: user.failedLoginAttempts } }
     ).catch(() => {});
@@ -139,7 +142,7 @@ const login = async (req, res, next) => {
   user.lastLoginAt = new Date();
 
   // Registrar login exitoso en auditoría
-  auditLogger.registrarManual({ user: { id: user._id, role: user.rol }, ip: req.ip }, 'login_exitoso', {
+  auditLogger.registrarManual({ user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip }, 'login_exitoso', {
     resourceType: 'usuario',
     resourceId: user._id,
   }).catch(() => {});
@@ -173,7 +176,13 @@ const refresh = async (req, res, next) => {
     return res.status(401).json({ message: 'Refresh token inválido' });
   }
 
-  if (user.refreshToken !== token) {
+  // Compare hashed refresh token
+  if (user.refreshTokenHash !== hashToken(token)) {
+    // Possible token reuse attack — invalidate all sessions for this user
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
+    await user.save();
+    logger.warn(`Refresh token reuse detected for user ${user._id}`);
     return res.status(401).json({ message: 'Refresh token inválido' });
   }
 
@@ -191,7 +200,7 @@ const logout = async (req, res, next) => {
       const payload = jwt.verify(token, getJwtSecret());
       const user = await Usuario.findById(payload.sub);
       if (user) {
-        user.refreshToken = null;
+        user.refreshTokenHash = null;
         user.refreshTokenExpiresAt = null;
         await user.save();
       }
@@ -203,7 +212,7 @@ const logout = async (req, res, next) => {
   // Registrar logout en auditoría (NOM-024)
   if (req.user) {
     auditLogger.registrarManual(
-      { user: { id: req.user.id, role: req.user.role }, ip: req.ip },
+      req,
       'logout',
       { resourceType: 'usuario', resourceId: req.user.id }
     ).catch(() => {});
@@ -359,6 +368,99 @@ const unlockScreen = async (req, res, next) => {
   }
 };
 
+// ── Password Reset: Request ─────────────────────────────────
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body || {};
+
+    // Always return the same response to prevent user enumeration
+    const genericResponse = { message: 'Si el email existe, se ha enviado un enlace de restablecimiento.' };
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email es requerido' });
+    }
+
+    const user = await Usuario.findOne({ email: email.toLowerCase().trim(), active: true });
+    if (!user) {
+      return res.json(genericResponse);
+    }
+
+    // Generate secure reset token
+    const rawToken = generateSecureToken(32);
+    user.passwordResetToken = hashToken(rawToken);
+    user.passwordResetExpires = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+    await user.save();
+
+    // Log the reset request (token is logged server-side only for admin retrieval in dev)
+    logger.info(`Password reset requested for ${user.email}. Token expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`);
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info(`[DEV ONLY] Reset token for ${user.email}: ${rawToken}`);
+    }
+
+    auditLogger.registrarManual(
+      { user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip },
+      'password_reset_solicitado',
+      { resourceType: 'usuario', resourceId: user._id }
+    ).catch(() => {});
+
+    // TODO: Integrate email sending here. Send rawToken in a reset URL to the user's email.
+    // Example: await sendEmail(user.email, 'Password Reset', `Reset link: ${CLIENT_URL}/reset-password?token=${rawToken}`);
+
+    return res.json(genericResponse);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Password Reset: Confirm ─────────────────────────────────
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body || {};
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+    }
+
+    const strength = validatePasswordStrength(newPassword);
+    if (!strength.valid) {
+      return res.status(400).json({ message: strength.message });
+    }
+
+    const hashedToken = hashToken(token);
+    const user = await Usuario.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+      active: true
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Token inválido o expirado' });
+    }
+
+    // Set new password and clear reset token + all sessions
+    user.contraseña = newPassword;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    user.lastPasswordChangeAt = new Date();
+    await user.save();
+
+    auditLogger.registrarManual(
+      { user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip },
+      'password_reset_completado',
+      { resourceType: 'usuario', resourceId: user._id }
+    ).catch(() => {});
+
+    res.clearCookie('refreshToken', buildCookieOptions());
+    return res.json({ message: 'Contraseña restablecida correctamente. Inicie sesión nuevamente.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   login,
   refresh,
@@ -368,4 +470,6 @@ module.exports = {
   verifyPin,
   lockScreen,
   unlockScreen,
+  forgotPassword,
+  resetPassword,
 };

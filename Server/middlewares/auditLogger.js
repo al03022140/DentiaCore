@@ -20,36 +20,46 @@ const METHOD_EVENT_MAP = {
   DELETE: 'soft_delete',
 };
 
-// ── Mapa de ruta base → resourceType ────────────────────────────
-// NOTA: las rutas deben coincidir con los mounts reales en config/routes.js
-const ROUTE_RESOURCE_MAP = {
-  '/api/patients':        'patient',       // incluye sub-rutas de odontograma
-  '/api/periodontograms': 'periodontograma',
-  '/api/exams':           'examen',
-  '/api/appointments':    'cita',
-  '/api/cash':            'caja',
-  '/api/users':           'usuario',
-  '/api/drafts':          'session', // batch-sign triggers are logged by controller
-};
+// ── Patrones de ruta → resourceType (orden: más específico primero) ─
+// Se usan regex para detectar correctamente sub-rutas de pacientes.
+const ROUTE_RESOURCE_PATTERNS = [
+  [/\/api\/patients\/[^/]+\/odontograma/i,       'odontograma'],
+  [/\/api\/patients\/[^/]+\/periodontogram/i,     'periodontograma'],
+  [/\/api\/patients\/[^/]+\/treatment-plan/i,     'plan_tratamiento'],
+  [/\/api\/patients\/[^/]+\/evolution-note/i,     'nota_evolucion'],
+  [/\/api\/patients/i,                             'patient'],
+  [/\/api\/periodontograms/i,                      'periodontograma'],
+  [/\/api\/exams/i,                                'examen'],
+  [/\/api\/appointments/i,                         'cita'],
+  [/\/api\/cash/i,                                 'caja'],
+  [/\/api\/users/i,                                'usuario'],
+  [/\/api\/drafts/i,                               'session'],
+  [/\/api\/patient-charges/i,                      'cargo'],
+  [/\/api\/note-templates/i,                       'plantilla'],
+  [/\/api\/settings/i,                             'configuracion'],
+];
 
 /**
- * Detectar resourceType a partir de la URL.
+ * Detectar resourceType a partir de la URL (usando patrones ordenados).
  */
 function detectResourceType(url) {
-  for (const [prefix, type] of Object.entries(ROUTE_RESOURCE_MAP)) {
-    if (url.startsWith(prefix)) return type;
+  for (const [pattern, type] of ROUTE_RESOURCE_PATTERNS) {
+    if (pattern.test(url)) return type;
   }
   return null;
 }
 
 /**
  * Extraer patientId de params, body o query.
+ * Para sub-rutas de pacientes (/api/patients/:id/...) el id del paciente
+ * está en req.params.id.
  */
 function extractPatientId(req) {
   return req.params?.patientId
     || req.body?.patientId
     || req.body?.paciente
     || req.query?.patientId
+    || (/\/api\/patients\//.test(req.originalUrl) ? req.params?.id : null)
     || null;
 }
 
@@ -136,6 +146,23 @@ function auditLogger(opciones = {}) {
           : undefined;
 
         setImmediate(() => {
+          // Construir detalles con diff antes/después si hay snapshot
+          const detalles = {};
+          if (req._snapshotAntes && (method === 'PUT' || method === 'PATCH')) {
+            detalles.antes = req._snapshotAntes;
+            if (camposEditados && req.body) {
+              const despues = {};
+              for (const campo of camposEditados) {
+                if (req.body[campo] !== undefined) {
+                  despues[campo] = req.body[campo];
+                }
+              }
+              if (Object.keys(despues).length > 0) {
+                detalles.despues = despues;
+              }
+            }
+          }
+
           AuditLog.registrar({
             userId:       req.user.id,
             userName:     req.user.nombre || null,
@@ -145,6 +172,7 @@ function auditLogger(opciones = {}) {
             resourceId,
             patientId,
             camposEditados,
+            detalles:     Object.keys(detalles).length > 0 ? detalles : undefined,
             motivo:       req.body?.motivo || req.body?.motivoSuperadmin || null,
             ip:           req.ip || req.connection?.remoteAddress,
           }).catch(err => console.error('[AuditLogger] Error al registrar:', err.message));

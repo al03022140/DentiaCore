@@ -9,6 +9,7 @@
  * Ver roles.MD §5 para la lista completa de eventos.
  */
 const mongoose = require('mongoose');
+const { computeEntryHash } = require('../utils/integrity');
 
 const auditLogSchema = new mongoose.Schema({
   // ── Quién ─────────────────────────────────────────────────────
@@ -73,6 +74,9 @@ const auditLogSchema = new mongoose.Schema({
       // Captura extemporánea (roles.MD §9.5)
       'captura_extemporanea',
 
+      // Firma electrónica (NOM-024 autenticidad)
+      'firma_electronica',
+
       // Superadmin
       'operacion_superadmin',
     ]
@@ -91,10 +95,14 @@ const auditLogSchema = new mongoose.Schema({
       'examen',
       'receta',
       'tratamiento',
+      'plan_tratamiento',
+      'nota_evolucion',
       'cita',
       'caja',
+      'cargo',
       'usuario',
       'plantilla',
+      'configuracion',
       'session',
     ]
   },
@@ -139,6 +147,12 @@ const auditLogSchema = new mongoose.Schema({
     default: null
   },
 
+  // HMAC-SHA256 de los campos críticos del entry (tamper detection)
+  entryHash: {
+    type: String,
+    default: null
+  },
+
   // Actor secundario (delegación controlada)
   assistantId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -175,9 +189,20 @@ auditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 157680000 }); // 5 
  * @returns {Promise<AuditLog>}
  */
 auditLogSchema.statics.registrar = function(data) {
+  const timestamp = data.timestamp || new Date();
+  const entryData = { ...data, timestamp };
+
+  // Compute HMAC for tamper detection
+  let entryHash = null;
+  try {
+    entryHash = computeEntryHash(entryData);
+  } catch (err) {
+    console.error('[AuditLog] Error computing entryHash:', err.message);
+  }
+
   return this.create({
-    ...data,
-    timestamp: data.timestamp || new Date()
+    ...entryData,
+    entryHash
   });
 };
 

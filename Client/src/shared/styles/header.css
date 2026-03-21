@@ -16,11 +16,16 @@
   box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
 }
 
-.header h1 {
+.header h1,
+.header .header-greeting {
   font: var(--text-display-xl);
   color: var(--color-text-secondary);
   flex: 1;
+  min-width: 0;
   text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .header__title {
   font-family: var(--font-family-primary);

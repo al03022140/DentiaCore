@@ -20,8 +20,12 @@
 }
 
 .lock-screen-icon {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  margin-bottom: 1.2rem;
+  min-height: 80px;
 }
 
 .lock-screen-card h2 {

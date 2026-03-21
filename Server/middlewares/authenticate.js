@@ -1,12 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-const getJwtSecret = () => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET must be set in production environment');
-  }
-  return secret || 'dev-secret';
-};
+const { getJwtSecret } = require('../utils/crypto');
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization || '';

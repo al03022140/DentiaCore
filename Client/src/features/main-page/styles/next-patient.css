@@ -34,7 +34,7 @@
 .patient-info-wrapper .patient-image img {
   width: var(--home-nextpatient-image-size);
   height: var(--home-nextpatient-image-size);
-  border-radius: 50%;
+  border-radius: var(--border-radius-circle);
   object-fit: cover;
   margin-right: var(--home-nextpatient-image-margin);
 }
@@ -56,10 +56,7 @@
 .patient-info-wrapper .patient-details strong {
   font: var(--home-nextpatient-text-strong);
   color: var(--patient-heading-color);
-  margin: 0.3125rem 0;
-}
-
-/* 📌 Ajustes Responsivos */
+    margin: var(--home-nextpatient-strong-margin);
 @media (max-width: 1200px) {
   .patient-info-wrapper .patient-info {
     padding: var(--home-nextpatient-padding-1200);
@@ -75,7 +72,7 @@
   }
   .patient-info-wrapper .patient-details strong {
     font: var(--home-nextpatient-text-strong-1200);
-    margin: 0.25rem 0;
+    margin: var(--home-nextpatient-strong-margin-1200);
   }
 }
 
@@ -94,7 +91,7 @@
   }
   .patient-info-wrapper .patient-details strong {
     font: var(--home-nextpatient-text-strong-1200);
-    margin: 0.25rem 0;
+    margin: var(--home-nextpatient-strong-margin-1200);
   }
 }
 
@@ -113,7 +110,7 @@
   }
   .patient-info-wrapper .patient-details strong {
     font: var(--home-nextpatient-text-strong-576);
-    margin: 0.2rem 0;
+    margin: var(--home-nextpatient-strong-margin-576);
   }
 }
 
@@ -132,7 +129,7 @@
   }
   .patient-info-wrapper .patient-details strong {
     font: var(--home-nextpatient-text-strong-480);
-    margin: 0.15rem 0;
+    margin: var(--home-nextpatient-strong-margin-480);
   }
 }
 
@@ -152,6 +149,6 @@
   }
   .patient-info-wrapper .patient-details strong {
     font: var(--home-nextpatient-text-strong-125dpi);
-    margin: 0.25rem 0;
+    margin: var(--home-nextpatient-strong-margin-1200);
   }
 }

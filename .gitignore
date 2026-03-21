@@ -1,9 +1,16 @@
 node_modules/
 .env
+.env.*
+!.env.example
+Client/.env
+Server/.env
+Server/.env.*
+!Server/.env.example
 .DS_Store
 __pycache__/
 *.pyc
 dist/
+Client/dist/
 build/
 .vscode/
 

@@ -17,6 +17,16 @@ const loginRateLimit = rateLimit({
   legacyHeaders: false
 });
 
+const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    message: 'Demasiadas solicitudes de restablecimiento. Intente nuevamente en 15 minutos.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 const withValidation = (rules) => [
   ...rules,
   (req, res, next) => {
@@ -44,6 +54,26 @@ router.post(
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 router.get('/me', authenticate, authController.me);
+
+// ── Password Reset (rate limited, no auth required) ───────────
+router.post(
+  '/forgot-password',
+  passwordResetRateLimit,
+  withValidation([
+    body('email').isEmail().withMessage('Email inválido')
+  ]),
+  authController.forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  passwordResetRateLimit,
+  withValidation([
+    body('token').isString().notEmpty().withMessage('Token requerido'),
+    body('newPassword').isString().isLength({ min: 8 }).withMessage('Contraseña inválida (mín. 8 caracteres)')
+  ]),
+  authController.resetPassword
+);
 
 // ── PIN y Modo Cortina (roles.MD §9.3) ────────────────────────
 router.post('/set-pin', authenticate, withValidation([

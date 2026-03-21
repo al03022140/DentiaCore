@@ -53,6 +53,7 @@ const patientCtrl = require('../controllers/patientsController');
 const checkPatient = require('../middlewares/checkPatient');
 const { authorize, filterPatientFields, requireClinicalRole } = require('../middlewares/authorize');
 const backdatedEntry = require('../middlewares/backdatedEntry');
+const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 // Middleware de validación de ID
 const validateId = (req, res, next) => {
@@ -167,19 +168,19 @@ const handleMulterError = (err, req, res, _next) => {
 // ── Rutas básicas de pacientes ───────────────────────────────────
 router
   .route('/')
-  .get(authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getAllPatients)
-  .post(authorize(['patients.create']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
-  .delete(authorize(['patients.delete']), patientCtrl.deleteAllPatients);
+  .get(readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getAllPatients)
+  .post(writeLimiter, authorize(['patients.create']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
+  .delete(writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 
-router.post('/batch', authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
+router.post('/batch', writeLimiter, authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
 
 // ── Rutas de paciente específico ─────────────────────────────────
 router
   .route('/:id')
   .all(validateId)
-  .get(authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getPatientById)
-  .put(authorize(['patients.update']), uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
-  .delete(authorize(['patients.delete']), patientCtrl.deletePatient);
+  .get(readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getPatientById)
+  .put(writeLimiter, authorize(['patients.update']), uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
+  .delete(writeLimiter, authorize(['patients.delete']), patientCtrl.deletePatient);
 
 /**
  * @swagger

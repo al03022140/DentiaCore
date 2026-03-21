@@ -100,6 +100,31 @@ class DentiaCoreLauncher:
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
+    def _safe_popen(self, cmd, **kwargs):
+        """
+        Wrapper seguro para subprocess.Popen que maneja errores con CREATE_NEW_CONSOLE.
+        
+        En sistemas virtualizados o integrados, CREATE_NEW_CONSOLE puede fallar.
+        Este método intenta con la flag, y si falla, reinenta sin ella.
+        """
+        if sys.platform == 'win32' and 'creationflags' not in kwargs:
+            kwargs['creationflags'] = subprocess.CREATE_NEW_CONSOLE
+        
+        try:
+            return subprocess.Popen(cmd, **kwargs)
+        except (OSError, Exception) as e:
+            # Si falla con CREATE_NEW_CONSOLE, intentar sin ella
+            if sys.platform == 'win32' and kwargs.get('creationflags') == subprocess.CREATE_NEW_CONSOLE:
+                print(f"⚠️ CREATE_NEW_CONSOLE falló ({e}), reintentar sin nueva consola...")
+                kwargs.pop('creationflags', None)
+                try:
+                    return subprocess.Popen(cmd, **kwargs)
+                except Exception as e2:
+                    print(f"❌ Fallo final en Popen: {e2}")
+                    raise
+            else:
+                raise
+
     # ── Helpers de UI (Design System) ──────────────────────────────
 
     def _create_rounded_card(self, parent, width, height, radius=16, bg='#ffffff',
@@ -426,12 +451,11 @@ class DentiaCoreLauncher:
                 self._ensure_client_build()
                 started = self._start_server_with_pm2(env)
                 if not started:
-                    self.server_process = subprocess.Popen(
+                    self.server_process = self._safe_popen(
                         ['npm', 'run', 'start'],
                         shell=(sys.platform == 'win32'),
                         cwd=self.server_dir,
-                        env=env,
-                        creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                        env=env
                     )
                     self.using_pm2 = False
                 target_url = env.get('PUBLIC_URL', 'http://localhost:5002')
@@ -458,12 +482,11 @@ class DentiaCoreLauncher:
                 
                 # 2. Iniciar solo el servidor primero
                 print("🔄 Iniciando servidor backend...")
-                self.server_process = subprocess.Popen(
+                self.server_process = self._safe_popen(
                     ['npm', 'run', 'dev'],
                     shell=(sys.platform == 'win32'),
                     cwd=self.server_dir,
-                    env=env,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                    env=env
                 )
                 self.using_pm2 = False
                 
@@ -475,12 +498,11 @@ class DentiaCoreLauncher:
                     # 4. Solo si el servidor está listo, iniciar el cliente
                     print("🔄 Servidor listo, iniciando cliente frontend...")
                     time.sleep(2)  # Pequeña pausa adicional para asegurar estabilidad
-                    self.client_process = subprocess.Popen(
+                    self.client_process = self._safe_popen(
                         ['npm', 'run', 'client'],
                         shell=(sys.platform == 'win32'),
                         cwd=self.project_dir,
-                        env=env,
-                        creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                        env=env
                     )
                     # Dar tiempo al cliente para iniciar
                     time.sleep(5)
@@ -654,22 +676,70 @@ class DentiaCoreLauncher:
         """Matar proceso en un puerto específico antes de iniciar un servicio"""
         try:
             if sys.platform != 'win32':
-                # On macOS/Linux use lsof — does not require npx/node in PATH
-                result = subprocess.run(
-                    ['lsof', '-ti', f':{port}'],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.stdout.strip():
-                    for pid in result.stdout.strip().split('\n'):
-                        if pid.strip():
-                            subprocess.run(['kill', '-9', pid.strip()], capture_output=True, timeout=5)
+                # On macOS/Linux: try lsof first, fallback to ps
+                try:
+                    result = subprocess.run(
+                        ['lsof', '-ti', f':{port}'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.stdout.strip():
+                        for pid in result.stdout.strip().split('\n'):
+                            if pid.strip():
+                                subprocess.run(['kill', '-9', pid.strip()], capture_output=True, timeout=5)
+                except FileNotFoundError:
+                    # lsof not available, fallback to netstat
+                    try:
+                        result = subprocess.run(
+                            ['netstat', '-tulpn'],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        for line in result.stdout.split('\n'):
+                            if f':{port}' in line:
+                                # Extract PID and kill it
+                                parts = line.split()
+                                if len(parts) >= 7:
+                                    try:
+                                        pid = parts[-1].split('/')[0]
+                                        if pid.isdigit():
+                                            subprocess.run(['kill', '-9', pid], capture_output=True, timeout=5)
+                                    except:
+                                        pass
+                    except:
+                        pass
             else:
-                subprocess.run(
-                    ['npx', 'kill-port', str(port)],
-                    shell=True,
-                    capture_output=True,
-                    timeout=5
-                )
+                # Windows: use taskkill (built-in) instead of npx kill-port
+                # First, find PID using netstat
+                try:
+                    result = subprocess.run(
+                        ['netstat', '-ano'],
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    for line in result.stdout.split('\n'):
+                        if f':{port}' in line and 'LISTENING' in line:
+                            parts = line.split()
+                            if parts:
+                                pid = parts[-1].strip()
+                                if pid.isdigit():
+                                    subprocess.run(
+                                        ['taskkill', '/F', '/PID', pid],
+                                        shell=True,
+                                        capture_output=True,
+                                        timeout=5
+                                    )
+                except Exception:
+                    # Fallback: try npx if available
+                    try:
+                        subprocess.run(
+                            ['npx', 'kill-port', str(port)],
+                            shell=True,
+                            capture_output=True,
+                            timeout=5
+                        )
+                    except:
+                        pass
         except Exception:
             pass  # Ignorar errores si el puerto ya está libre
 
@@ -985,12 +1055,11 @@ class DentiaCoreLauncher:
                 self._ensure_client_build()
                 started = self._start_server_with_pm2(env)
                 if not started:
-                    self.server_process = subprocess.Popen(
+                    self.server_process = self._safe_popen(
                         ['npm', 'run', 'start'],
                         shell=(sys.platform == 'win32'),
                         cwd=server_dir,
-                        env=env,
-                        creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                        env=env
                     )
                     self.using_pm2 = False
             else:
@@ -1002,12 +1071,11 @@ class DentiaCoreLauncher:
                         'Por favor, inicia el servicio de MongoDB y vuelve a intentar.'
                     ))
                     return
-                self.server_process = subprocess.Popen(
+                self.server_process = self._safe_popen(
                     ['npm', 'run', 'dev'],
                     shell=(sys.platform == 'win32'),
                     cwd=server_dir,
-                    env=env,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                    env=env
                 )
                 self.using_pm2 = False
             
@@ -1086,12 +1154,11 @@ class DentiaCoreLauncher:
             client_dir = self.client_dir
             self._apply_mode_environment()
 
-            self.client_process = subprocess.Popen(
+            self.client_process = self._safe_popen(
                 ['npm', 'run', 'dev'],
                 shell=(sys.platform == 'win32'),
                 cwd=client_dir,
-                env=self.current_env,
-                creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                env=self.current_env
             )
             
             time.sleep(3)  # Aumentar tiempo de espera
@@ -1197,7 +1264,9 @@ class DentiaCoreLauncher:
         if sys.platform != 'win32':
             if self._is_mongod_process_running():
                 print("✅ MongoDB proceso detectado en Unix")
-                return self._wait_for_mongo_ready()
+                if self._wait_for_mongo_ready():
+                    return True
+                print("⚠️ Se detectó proceso mongod pero no respondió en 27017. Reintentando arranque...")
             return self._ensure_mongo_running_unix()
 
         # Para Windows
@@ -1262,9 +1331,28 @@ class DentiaCoreLauncher:
                             cwd=str(self.project_dir),
                             shell=shell_flag,
                             stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == 'win32' else 0
+                            stderr=subprocess.DEVNULL
                         )
+                        if sys.platform == 'win32':
+                            try:
+                                # Attempt to create new console if supported
+                                self.mongo_process = subprocess.Popen(
+                                    cmd,
+                                    cwd=str(self.project_dir),
+                                    shell=shell_flag,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                                )
+                            except (OSError, Exception):
+                                # Fallback: start without new console
+                                self.mongo_process = subprocess.Popen(
+                                    cmd,
+                                    cwd=str(self.project_dir),
+                                    shell=shell_flag,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
                         time.sleep(2)
                         check2 = subprocess.run(
                             ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
@@ -1366,17 +1454,28 @@ class DentiaCoreLauncher:
                 # mongod está disponible, intentar arrancar usando brew services (macOS)
                 if sys.platform == 'darwin':
                     try:
-                        # Intenta usar brew services si está disponible
-                        subprocess.run(
-                            ['brew', 'services', 'start', 'mongodb-community'],
-                            capture_output=True,
-                            timeout=10,
-                            check=False
-                        )
-                        print("🔄 Iniciando MongoDB con brew services...")
-                        time.sleep(3)
-                        if self._wait_for_mongo_ready():
-                            return True
+                        # Probar variantes comunes del nombre de servicio en Homebrew
+                        brew_services = [
+                            'mongodb-community',
+                            'mongodb/brew/mongodb-community',
+                            'mongodb-community@8.0',
+                            'mongodb-community@7.0',
+                            'mongodb-community@6.0',
+                        ]
+                        for service_name in brew_services:
+                            proc = subprocess.run(
+                                ['brew', 'services', 'start', service_name],
+                                capture_output=True,
+                                text=True,
+                                timeout=12,
+                                check=False
+                            )
+                            if proc.returncode == 0:
+                                print(f"🔄 Iniciando MongoDB con brew services ({service_name})...")
+                                time.sleep(3)
+                                if self._wait_for_mongo_ready(timeout=12):
+                                    return True
+
                         # brew services no logró iniciar MongoDB, intentar mongod directo
                         print("⚠️ brew services no inició MongoDB, intentando mongod directo...")
                     except Exception as e:
@@ -1416,12 +1515,32 @@ class DentiaCoreLauncher:
         """Encuentra mongod en sistemas Unix (macOS/Linux)."""
         import shutil
 
-        # Rutas comunes para Homebrew en macOS
+        # Rutas comunes para diferentes gestores de paquetes e instalaciones manuales
+        # Orden: Apple Silicon Homebrew, Intel Homebrew, MacPorts, instalaciones manuales
         homebrew_paths = [
-            '/usr/local/bin/mongod',
+            # Apple Silicon (M1/M2/M3) - Homebrew
             '/opt/homebrew/bin/mongod',
+            '/opt/homebrew/opt/mongodb-community/bin/mongod',
+            '/opt/homebrew/opt/mongodb-community@8.0/bin/mongod',
+            '/opt/homebrew/opt/mongodb-community@7.0/bin/mongod',
+            '/opt/homebrew/opt/mongodb-community@6.0/bin/mongod',
+            
+            # Intel Macs - Homebrew
+            '/usr/local/bin/mongod',
+            '/usr/local/opt/mongodb-community/bin/mongod',
+            '/usr/local/opt/mongodb-community@8.0/bin/mongod',
+            '/usr/local/opt/mongodb-community@7.0/bin/mongod',
+            '/usr/local/opt/mongodb-community@6.0/bin/mongod',
+            
+            # MacPorts
+            '/opt/local/bin/mongod',
+            '/opt/local/opt/mongodb-community/bin/mongod',
+            
+            # Instalación manual en directorios comunes
             '/usr/local/mongodb/bin/mongod',
+            '/opt/mongodb/bin/mongod',
             Path.home() / 'mongodb' / 'bin' / 'mongod',
+            Path.home() / '.local' / 'mongodb' / 'bin' / 'mongod',
         ]
 
         # Intentar rutas comunes primero
@@ -1454,7 +1573,21 @@ class DentiaCoreLauncher:
                 text=True,
                 timeout=5
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                return True
+        except FileNotFoundError:
+            # pgrep no disponible, usar ps como fallback
+            pass
+
+        # Fallback a ps (disponible en todos los sistemas Unix)
+        try:
+            result = subprocess.run(
+                ['ps', 'aux'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return 'mongod' in (result.stdout or '')
         except Exception:
             return False
 
@@ -1647,24 +1780,53 @@ class DentiaCoreLauncher:
             else:
                 inner = f'"{exe}" --dbpath "{db_dir}" --bind_ip 0.0.0.0'
             command = ['cmd.exe', '/c', f'cd /d "{self.project_dir}" && {inner}']
-            subprocess.Popen(
-                command,
-                cwd=str(self.project_dir),
-                creationflags=subprocess.CREATE_NEW_CONSOLE
-            )
+            try:
+                subprocess.Popen(
+                    command,
+                    cwd=str(self.project_dir),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+            except (OSError, Exception) as e:
+                print(f"⚠️ Error al abrir CMD: {e}, intentando sin nueva consola...")
+                try:
+                    subprocess.Popen(
+                        command,
+                        cwd=str(self.project_dir)
+                    )
+                except Exception as e2:
+                    print(f"❌ Error al lanzar mongod: {e2}")
         else:
+            # PowerShell: usar variables para evitar problemas con espacios en paths
             ps_cmds = [f"Set-Location '{self.project_dir}'"]
-            # Forzar siempre --dbpath para apuntar a la carpeta DB del proyecto.
+            
+            # Usar variables PS para manejar rutas con espacios correctamente
+            ps_cmds.append(f"$exe = @'{exe}'; $dbdir = @'{db_dir}'; $config = @'{cfg}'")
+            
             if cfg.exists():
-                ps_cmds.append(f"& '{exe}' --config '{cfg}' --dbpath '{db_dir}'")
+                # Variables PowerShell manejo seguro
+                ps_cmds.append("$cmd = @($exe.Trim('\"'), '--config', $config.Trim('\"'), '--dbpath', $dbdir.Trim('\"'), '--bind_ip', '0.0.0.0')")
             else:
-                ps_cmds.append(f"& '{exe}' --dbpath '{db_dir}'")
+                ps_cmds.append("$cmd = @($exe.Trim('\"'), '--dbpath', $dbdir.Trim('\"'), '--bind_ip', '0.0.0.0')")
+            
+            ps_cmds.append("& $cmd[0] @($cmd[1..($cmd.Length-1)])")
+            
             command = ['powershell.exe', '-NoProfile', '-Command', '; '.join(ps_cmds)]
-            subprocess.Popen(
-                command,
-                cwd=str(self.project_dir),
-                creationflags=subprocess.CREATE_NEW_CONSOLE
-            )
+            try:
+                subprocess.Popen(
+                    command,
+                    cwd=str(self.project_dir),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+            except (OSError, Exception) as e:
+                print(f"⚠️ Error al abrir PowerShell: {e}, intentando sin nueva consola...")
+                try:
+                    subprocess.Popen(
+                        command,
+                        cwd=str(self.project_dir)
+                    )
+                except Exception as e2:
+                    print(f"❌ Error al lanzar mongod: {e2}")
+        
         time.sleep(2)
         check = subprocess.run(
             ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
@@ -1872,6 +2034,23 @@ class DentiaCoreLauncher:
         """Ejecutar la aplicación"""
         self.root.mainloop()
 
+def _find_compatible_python():
+    """On macOS, find a Python with Tcl/Tk >= 8.6 (system Python ships Tcl/Tk 8.5 which crashes on macOS 13+)."""
+    candidates = [
+        '/opt/homebrew/bin/python3.13',
+        '/opt/homebrew/bin/python3.12',
+        '/opt/homebrew/bin/python3.11',
+        '/opt/homebrew/bin/python3',
+        '/usr/local/bin/python3',
+    ]
+    for py in candidates:
+        if py == sys.executable:
+            continue
+        if os.path.isfile(py) and os.access(py, os.X_OK):
+            return py
+    return None
+
+
 def main():
     """Función principal"""
     # Ensure Homebrew paths are in PATH on macOS (needed when launched from Finder/.app or without shell profile)
@@ -1880,6 +2059,24 @@ def main():
         _current = os.environ.get('PATH', '')
         if '/opt/homebrew/bin' not in _current:
             os.environ['PATH'] = _brew_paths + ':' + _current
+
+    # Pre-flight: detect old Tcl/Tk that crashes on modern macOS
+    if sys.platform == 'darwin' and tk.TkVersion < 8.6:
+        better = _find_compatible_python()
+        if better:
+            os.execv(better, [better] + sys.argv)
+        else:
+            print(
+                "ERROR: El Python actual usa Tcl/Tk"
+                f" {tk.TkVersion} que no es compatible con esta versión de macOS.\n"
+                "Solución: instala Python de Homebrew:\n"
+                "  brew install python-tk@3.13\n"
+                "Luego ejecuta:\n"
+                "  /opt/homebrew/bin/python3.13 launcher.py",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     try:
         app = DentiaCoreLauncher()
         app.run()

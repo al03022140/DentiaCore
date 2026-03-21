@@ -5,7 +5,7 @@
   "scripts": {
     "kill-port": "npx kill-port 5002 || echo Port 5002 cleared",
     "kill-client-port": "npx kill-port 5173 || echo Port 5173 cleared & npx kill-port 5174 || echo Port 5174 cleared",
-    "mongod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\start-mongo.ps1",
+    "mongod": "node scripts/start-mongo.js",
     "client": "npm run dev --prefix Client",
     "server": "nodemon Server/scripts/dent.js",
     "dev": "npm run kill-port && cross-env NODE_ENV=development concurrently \"npm run mongod\" \"npm run client\" \"npm run server\"",
@@ -26,6 +26,7 @@
     "fs-extra": "^11.3.0",
     "html2canvas": "^1.4.1",
     "joi": "^17.13.3",
+    "mongoose": "^9.3.1",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",

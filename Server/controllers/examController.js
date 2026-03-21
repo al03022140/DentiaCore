@@ -1,7 +1,7 @@
 const Exam = require('../models/exam.js');
 const Patient = require('../models/patient.js');
-const Doctor = require('../models/users.js'); // Suponiendo que los doctores están en el modelo 'users'
-const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
+const Doctor = require('../models/users.js');
+const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 
 // 📌 Obtener todos los exámenes
 exports.getAllExams = async (req, res) => {
@@ -114,6 +114,16 @@ exports.updateExam = async (req, res) => {
             return res.status(403).json({ message: 'No se puede modificar un registro en estado OFICIAL. Use addendum para correcciones.' });
         }
 
+        // BORRADOR only editable by creator, assigned doctor, or admin
+        if (exam.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user.role)) {
+            const userId = req.user.id;
+            const isCreator = exam.creadoPor && exam.creadoPor.toString() === userId;
+            const isAssignedDoctor = exam.doctor_id && exam.doctor_id.toString() === userId;
+            if (!isCreator && !isAssignedDoctor) {
+                return res.status(403).json({ message: 'Solo el creador o el doctor asignado pueden modificar este borrador' });
+            }
+        }
+
         // Verificar si el paciente o doctor han sido modificados y existen
         if (req.body.paciente_id) {
             const paciente = await Patient.findById(req.body.paciente_id);
@@ -162,6 +172,21 @@ exports.deleteExam = async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id);
         if (!exam) return res.status(404).json({ message: 'Examen no encontrado' });
+
+        // OFICIAL records cannot be deleted (NOM-024 immutability)
+        if (exam.estadoRegistro === 'OFICIAL') {
+            return res.status(403).json({ message: 'No se puede eliminar un registro en estado OFICIAL' });
+        }
+
+        // BORRADOR only deletable by creator, assigned doctor, or admin
+        if (!isAdminRole(req.user.role)) {
+            const userId = req.user.id;
+            const isCreator = exam.creadoPor && exam.creadoPor.toString() === userId;
+            const isAssignedDoctor = exam.doctor_id && exam.doctor_id.toString() === userId;
+            if (!isCreator && !isAssignedDoctor) {
+                return res.status(403).json({ message: 'Solo el creador o el doctor asignado pueden eliminar este borrador' });
+            }
+        }
 
         exam.deletedAt = new Date();
         exam.deletedBy = req.user?.id || null;

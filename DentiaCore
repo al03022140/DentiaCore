@@ -1,0 +1,12 @@
+#!/bin/bash
+# DentiaCore Launcher Script for macOS/Linux
+cd "$(dirname "$0")"
+# Find best Python3 — prefer Homebrew (has modern Tcl/Tk) over system Python
+PYTHON=""
+for py in /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 /opt/homebrew/bin/python3.11 /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+    if [ -x "$py" ]; then
+        PYTHON="$py"
+        break
+    fi
+done
+"${PYTHON:-python3}" launcher.py "$@"

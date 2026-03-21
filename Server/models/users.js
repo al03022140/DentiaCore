@@ -1,11 +1,14 @@
 const mongoose = require('mongoose');
+const { validatePasswordStrength } = require('../utils/crypto');
 let bcrypt;
 try {
   bcrypt = require('bcrypt');
 } catch (_e) {
-  // Fallback a bcryptjs si bcrypt n está disponible (evita compilaciones nativas en Windows)
+  // Fallback a bcryptjs si bcrypt nativo no está disponible (evita compilaciones nativas en Windows)
   bcrypt = require('bcryptjs');
 }
+
+const SALT_ROUNDS = 12;
 
 const userSchema = new mongoose.Schema({
   nombre: {
@@ -55,11 +58,20 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  refreshToken: {
+  refreshTokenHash: {
     type: String,
     default: null
   },
   refreshTokenExpiresAt: {
+    type: Date,
+    default: null
+  },
+  // ── Password reset ─────────────────────────────────────────
+  passwordResetToken: {
+    type: String,
+    default: null
+  },
+  passwordResetExpires: {
     type: Date,
     default: null
   },
@@ -109,7 +121,15 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
   if (!this.isModified('contraseña')) return next();
   try {
-    const salt = await bcrypt.genSalt(10);
+    // Enforce password complexity on plaintext passwords (skip if already hashed)
+    const isAlreadyHashed = /^\$2[aby]\$/.test(this.contraseña);
+    if (!isAlreadyHashed) {
+      const strength = validatePasswordStrength(this.contraseña);
+      if (!strength.valid) {
+        return next(new Error(strength.message));
+      }
+    }
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
     this.contraseña = await bcrypt.hash(this.contraseña, salt);
     next();
   } catch (error) {
@@ -133,7 +153,7 @@ userSchema.methods.setPin = async function(pin) {
   if (!/^\d{4}$/.test(pin)) {
     throw new Error('El PIN debe ser exactamente 4 dígitos numéricos');
   }
-  const salt = await bcrypt.genSalt(12);
+  const salt = await bcrypt.genSalt(SALT_ROUNDS);
   this.pinHash = await bcrypt.hash(pin, salt);
   this.pinFailedAttempts = 0;
 };

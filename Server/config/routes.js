@@ -13,8 +13,11 @@ const googleRoutes = require('../routes/googleRoutes');
 const settingsRoutes = require('../routes/settingsRoutes');
 const noteTemplateRoutes = require('../routes/noteTemplateRoutes');
 const patientChargeRoutes = require('../routes/patientChargeRoutes');
+const auditRoutes = require('../routes/auditRoutes');
+const signingRoutes = require('../routes/signingRoutes');
 const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
+const snapshotCapture = require('../middlewares/snapshotCapture');
 const validarCapturaExtemporanea = require('../middlewares/capturaExtemporanea');
 
 // Configuración de rutas
@@ -63,6 +66,9 @@ const configureRoutes = () => {
   // Middleware de auditoría automática para escrituras (NOM-024)
   router.use(auditLogger());
 
+  // Captura de snapshot antes de escrituras para diff en audit trail
+  router.use(snapshotCapture);
+
   // Validación de captura extemporánea en escrituras clínicas (roles.MD §9.5)
   router.use(validarCapturaExtemporanea);
 
@@ -78,6 +84,8 @@ const configureRoutes = () => {
   router.use('/settings', settingsRoutes);
   router.use('/note-templates', noteTemplateRoutes);
   router.use('/patient-charges', patientChargeRoutes);
+  router.use('/audit', auditRoutes);
+  router.use('/sign', signingRoutes);
 
   // Capturar rutas no encontradas
   router.use('*', (req, res) => {

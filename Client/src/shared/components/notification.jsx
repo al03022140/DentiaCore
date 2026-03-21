@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../Styles/Notification.css';
+import checkCircle2Icon from '../../assets/images/icons/check circle 2.svg';
 
 /**
  * Componente para mostrar notificaciones temporales
@@ -32,7 +33,7 @@ const Notification = ({ message, type = 'info', duration = 3000, onClose }) => {
     <div className={`notification ${type} ${visible ? 'visible' : 'hidden'}`}>
       <div className="notification-content">
         <div className="notification-icon">
-          {type === 'success' && '✅'}
+          {type === 'success' && <img src={checkCircle2Icon} alt="✓" width="20" height="20" />}
           {type === 'error' && '❌'}
           {type === 'warning' && '⚠️'}
           {type === 'info' && 'ℹ️'}

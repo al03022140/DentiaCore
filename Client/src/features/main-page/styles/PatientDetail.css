@@ -11,7 +11,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
+  min-height: var(--home-patientdetail-state-min-height);
   font-size: var(--font-size-large);
   color: var(--color-text-medium);
   background-color: var(--color-bg-light);
@@ -24,7 +24,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
+  min-height: var(--home-patientdetail-state-min-height);
   padding: var(--spacing-xl);
   background-color: var(--color-red-50);
   border: 1px solid var(--color-red-250);
@@ -54,7 +54,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
+  min-height: var(--home-patientdetail-state-min-height);
   padding: var(--spacing-xl);
   background-color: var(--color-yellow-50);
   border: 1px solid var(--color-yellow-400);
@@ -67,8 +67,8 @@
   font-size: var(--font-size-large);
   color: var(--color-text-dark);
   margin-bottom: var(--spacing-lg);
-  max-width: 600px;
-  line-height: 1.5;
+  max-width: var(--home-patientdetail-message-max-width);
+  line-height: var(--home-patientdetail-message-line-height);
 }
 
 .back-to-list-button {

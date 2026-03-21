@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import plusIcon from '../../../assets/images/icons/plus.svg';
+import menosIcon from '../../../assets/images/icons/menos.svg';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
 
 const CashSection = () => {
@@ -108,6 +110,9 @@ const CashSection = () => {
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }}
           />
           <button type="button" className="settings-btn-secondary" onClick={addCategory}>Agregar</button>
+                  <button type="button" className="settings-btn-secondary" onClick={addCategory}>
+                    <img src={plusIcon} alt="Agregar" width="16" height="16" style={{verticalAlign:'middle',marginRight:4}} /> Agregar
+                  </button>
         </div>
       </div>
 
@@ -158,6 +163,9 @@ const CashSection = () => {
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
           />
           <button type="button" className="settings-btn-secondary" onClick={addService}>Agregar</button>
+                  <button type="button" className="settings-btn-secondary" onClick={addService}>
+                    <img src={plusIcon} alt="Agregar" width="16" height="16" style={{verticalAlign:'middle',marginRight:4}} /> Agregar
+                  </button>
         </div>
       </div>
 

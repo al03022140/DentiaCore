@@ -19,6 +19,16 @@ const { getUploadsBase } = require('../utils/uploads');
 const connectDB = require('../config/db');
 const configureRoutes = require('../config/routes');
 const googleRouter = require('../routes/googleRoutes');
+const { getJwtSecret } = require('../utils/crypto');
+const { globalLimiter, botGuard } = require('../middlewares/rateLimiter');
+
+// Validate JWT_SECRET early — fail fast if insecure
+try {
+  getJwtSecret();
+} catch (err) {
+  console.error(`\n❌ ${err.message}\n`);
+  process.exit(1);
+}
 
 // 1) Inicializar Express
 const app = express();
@@ -85,6 +95,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
 
+// Abuse protection: bot guard + global rate limit
+app.use(botGuard);
+app.use(globalLimiter);
+
 // Middleware urlencoded condicional aplicado después de morgan
 app.use((req, res, next) => {
   logger.debug('🔍 Checking Content-Type: %s', req.headers['content-type']);
@@ -102,7 +116,8 @@ fsExtra.ensureDirSync(uploadsBase);
 app.use('/uploads', express.static(uploadsBase));
 app.use(express.static(path.join(__dirname, '../../Client/dist')));
 
-// 5) Endpoints de debug (async/await) - ANTES del router principal
+// 5) Endpoints de debug (async/await) - SOLO EN DESARROLLO
+if (process.env.NODE_ENV !== 'production') {
 app.get('/api/debug/uploads/:id/odontograma-inicial', async (req, res, next) => {
     const dir = path.join(uploadsBase, 'pacientes', req.params.id, 'odontograma-inicial');
     const staticPath = uploadsBase;
@@ -247,6 +262,7 @@ app.get('/api/debug/uploads/:id/periodontograma', async (req, res, next) => {
         next(error);
     }
 });
+} // end of development-only debug endpoints
 
 // 7) Rutas API
 // Importante: montar primero las rutas específicas (Google) antes del router principal con catch-all

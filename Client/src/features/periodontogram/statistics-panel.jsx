@@ -9,6 +9,8 @@ import { getToothData } from "./utils/periodontogram-utils";
 import { UniversalToothValidator } from "../../shared/validators/universal-tooth-validator";
 import { ADVANCED_LOGGING_CONFIG } from './utils/config.js';
 import './styles/statistics-panel.css';
+import stadisticsIcon from '../../assets/images/icons/stadistics.svg';
+import checkCircle2Icon from '../../assets/images/icons/check circle 2.svg';
 
 const StatisticsPanel = ({
   data = null,
@@ -272,12 +274,12 @@ const StatisticsPanel = ({
             fontSize: '14px',
             color: '#1976d2'
           }}>
-            📊 <strong>Fórmulas con 96 sitios (32×3):</strong><br/>
+            <img src={stadisticsIcon} alt="" width="16" height="16" /> <strong>Fórmulas con 96 sitios (32×3):</strong><br/>
             • %SS = (Sitios con sangrado / Sitios válidos de dientes presentes) × 100<br/>
             • %P = (Sitios con placa / Sitios válidos de dientes presentes) × 100<br/>
             • Media PS = ∑profundidades reales / # sitios válidos (≠999)<br/>
             • Media NIC = ∑(profundidad + margen) / # sitios válidos (≠999)<br/>
-            <em>✅ Base: 96 sitios totales, ajustado por {statistics.presentTeeth} dientes presentes</em>
+            <em><img src={checkCircle2Icon} alt="✓" width="14" height="14" /> Base: 96 sitios totales, ajustado por {statistics.presentTeeth} dientes presentes</em>
           </div>
           <button 
             onClick={() => setSampleDataVersion(prev => prev + 1)}

@@ -1,0 +1,22 @@
+#!/opt/homebrew/bin/python3.13
+# -*- coding: utf-8 -*-
+# DentiaCore macOS App Launcher
+# CFBundleExecutable: Python (a Mach-O binary) interprets this script, so that
+# macOS Launch Services (Sonoma 14+ / Sequoia 15+ / Tahoe 26+) can track the
+# app process correctly. A plain bash script causes error -10669.
+import sys, os, runpy
+
+# Navigate: Contents/MacOS/ → Contents/ → DentiaCore.app/ → project_root/
+_here = os.path.dirname(os.path.abspath(__file__))
+_root = os.path.dirname(os.path.dirname(os.path.dirname(_here)))
+
+os.chdir(_root)
+sys.path.insert(0, _root)
+
+# Ensure Homebrew tools (node, mongod, etc.) are in PATH for Finder launches
+_brew = '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin'
+if '/opt/homebrew/bin' not in os.environ.get('PATH', ''):
+    os.environ['PATH'] = _brew + ':' + os.environ.get('PATH', '')
+
+sys.argv[0] = os.path.join(_root, 'launcher.py')
+runpy.run_path(sys.argv[0], run_name='__main__')

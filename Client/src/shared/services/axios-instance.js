@@ -84,7 +84,10 @@ API.interceptors.response.use(
       if (
         originalRequest?.url?.includes('/auth/login') ||
         originalRequest?.url?.includes('/auth/refresh') ||
-        originalRequest?.url?.includes('/auth/verify-pin')
+        // Sólo excluir verify-pin si el servidor devuelve valid:false (PIN incorrecto).
+        // Si valid es undefined, es el middleware de auth rechazando por token expirado
+        // → dejar pasar al bloque de refresh para que se renueve y se reintente.
+        (originalRequest?.url?.includes('/auth/verify-pin') && error.response?.data?.valid === false)
       ) {
         return Promise.reject(error);
       }

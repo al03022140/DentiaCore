@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, message } from 'antd';
 import API from '../../../shared/services/axios-instance.js';
+import SignatureBadge from '../../../shared/components/SignatureBadge.jsx';
+import SignatureModal from '../../../shared/components/SignatureModal.jsx';
+import { useAuth } from '../../../app/auth/AuthContext.jsx';
 import '../styles/patient-evolution-note.css';
 
 const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientData }) => {
+  const { user } = useAuth();
+  const canSign = user?.role === 'doctor' || user?.role === 'superadmin';
   const [procedimiento, setProcedimiento] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [correcciones, setCorrecciones] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notes, setNotes] = useState(Array.isArray(initialEvolutionNotes) ? initialEvolutionNotes : []);
+
+  // Firma electrónica
+  const [signModalOpen, setSignModalOpen] = useState(false);
+  const [signTarget, setSignTarget] = useState(null);
 
   // Confirm modal state (reuse pattern requiring typing 'Confirmar')
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
@@ -167,6 +176,7 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
                 <th>Procedimiento</th>
                 <th>Observaciones</th>
                 <th>Correcciones</th>
+                <th>Firma</th>
               </tr>
             </thead>
             <tbody>
@@ -178,11 +188,24 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
                     <td>{n.procedimiento || ''}</td>
                     <td>{n.observaciones || ''}</td>
                     <td>{n.correcciones || ''}</td>
+                    <td>
+                      <SignatureBadge
+                        firmadoPor={n.firmadoPor}
+                        firmadoEn={n.firmadoEn}
+                        firmaDesactualizada={n.firmaDesactualizada}
+                        contentHash={n.contentHash}
+                        canSign={canSign}
+                        onSignClick={() => {
+                          setSignTarget({ noteId: n._id, index: idx });
+                          setSignModalOpen(true);
+                        }}
+                      />
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="no-data">Sin notas registradas</td>
+                  <td colSpan="6" className="no-data">Sin notas registradas</td>
                 </tr>
               )}
             </tbody>
@@ -254,6 +277,33 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
           Fecha de impresión: {new Date().toLocaleDateString()}
         </div>
       </div>
+
+      {/* Modal de firma electrónica para notas de evolución */}
+      <SignatureModal
+        isOpen={signModalOpen}
+        onClose={() => { setSignModalOpen(false); setSignTarget(null); }}
+        onSigned={(result) => {
+          if (signTarget !== null) {
+            setNotes(prev => prev.map((n, idx) => {
+              if (idx === signTarget.index) {
+                return {
+                  ...n,
+                  firmadoPor: { nombre: user?.nombre, cedulaProfesional: user?.cedulaProfesional },
+                  firmadoEn: result.firmadoEn,
+                  contentHash: result.contentHash,
+                  firmaDesactualizada: false,
+                };
+              }
+              return n;
+            }));
+            message.success('Nota firmada exitosamente');
+          }
+          setSignTarget(null);
+        }}
+        resourceType="patient"
+        resourceId={patientId}
+        description={signTarget !== null ? `Nota de evolución #${(notes[signTarget.index]?.numero_procedimiento ?? signTarget.index + 1)}` : ''}
+      />
     </section>
   );
 };

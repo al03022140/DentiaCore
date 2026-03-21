@@ -167,6 +167,9 @@ if [ -f "$SERVER_DIR/package.json" ]; then
     print_step "Instalando dependencias del servidor..."
     cd "$SERVER_DIR"
     npm install --no-audit --no-fund
+    # macOS/Linux: npm may not preserve +x bits on .bin scripts when extracted
+    # from zips or git-cloned without proper umask. Fix them explicitly.
+    chmod -R +x node_modules/.bin/ 2>/dev/null || true
     print_ok "Dependencias del servidor instaladas"
 fi
 
@@ -275,13 +278,25 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # Get Python3 path for .app bundle
-# On macOS prefer Homebrew Python3 which includes tkinter (system Python3 does not)
+# On macOS prefer Homebrew Python3 which includes modern Tcl/Tk (system Python3
+# ships Tcl/Tk 8.5 which crashes on macOS 13+).
+# The check must verify Tcl/Tk >= 8.6, NOT just "import tkinter" which succeeds
+# even with the broken 8.5 version.
+
+_tk_ok() {
+    # Returns 0 if the given python has tkinter with Tcl/Tk >= 8.6
+    "$1" -c "import tkinter; assert float(tkinter.TkVersion) >= 8.6" 2>/dev/null
+}
+
 PYTHON_PATH=""
 if [ "$OS_TYPE" = "mac" ]; then
-    for brew_python in /opt/homebrew/bin/python3 /usr/local/bin/python3; do
-        if [ -x "$brew_python" ] && "$brew_python" -c "import tkinter" 2>/dev/null; then
+    # Search versioned Homebrew Pythons first (3.13, 3.12, 3.11 …), then unversioned
+    for brew_python in /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 \
+                       /opt/homebrew/bin/python3.11 /opt/homebrew/bin/python3 \
+                       /usr/local/bin/python3; do
+        if [ -x "$brew_python" ] && _tk_ok "$brew_python"; then
             PYTHON_PATH="$brew_python"
-            print_ok "Python3 con tkinter encontrado en: $PYTHON_PATH"
+            print_ok "Python3 con Tcl/Tk moderno encontrado en: $PYTHON_PATH"
             break
         fi
     done
@@ -289,19 +304,23 @@ fi
 
 if [ -z "$PYTHON_PATH" ]; then
     PYTHON_PATH=$(command -v python3)
-    # Verify tkinter is available
-    if ! "$PYTHON_PATH" -c "import tkinter" 2>/dev/null; then
-        print_warn "⚠️  Python3 en $PYTHON_PATH no tiene tkinter"
+    if ! _tk_ok "$PYTHON_PATH"; then
+        print_warn "⚠️  Python3 en $PYTHON_PATH tiene Tcl/Tk < 8.6 (incompatible con macOS moderno)"
         if [ "$OS_TYPE" = "mac" ]; then
-            print_step "Instalando Python3 con tkinter via Homebrew..."
-            brew install python3
-            HOMEBREW_PYTHON="/opt/homebrew/bin/python3"
-            [ -x "$HOMEBREW_PYTHON" ] || HOMEBREW_PYTHON="/usr/local/bin/python3"
-            if [ -x "$HOMEBREW_PYTHON" ] && "$HOMEBREW_PYTHON" -c "import tkinter" 2>/dev/null; then
-                PYTHON_PATH="$HOMEBREW_PYTHON"
-                print_ok "Python3 con tkinter instalado en: $PYTHON_PATH"
+            print_step "Instalando Python3 con Tcl/Tk moderno via Homebrew..."
+            brew install python-tk@3.13 || brew install python3
+            for brew_python in /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 \
+                               /opt/homebrew/bin/python3.11 /opt/homebrew/bin/python3 \
+                               /usr/local/bin/python3; do
+                if [ -x "$brew_python" ] && _tk_ok "$brew_python"; then
+                    PYTHON_PATH="$brew_python"
+                    break
+                fi
+            done
+            if _tk_ok "$PYTHON_PATH"; then
+                print_ok "Python3 con Tcl/Tk moderno instalado en: $PYTHON_PATH"
             else
-                print_err "No se pudo obtener Python3 con tkinter. Instala: brew install python3"
+                print_err "No se pudo obtener Python3 con Tcl/Tk >= 8.6. Instala manualmente: brew install python-tk@3.13"
                 exit 1
             fi
         else
@@ -315,11 +334,19 @@ fi
 
 # Create a shell script launcher
 LAUNCHER_SCRIPT="$REPO_ROOT/DentiaCore"
-cat > "$LAUNCHER_SCRIPT" << LAUNCHER_EOF
+cat > "$LAUNCHER_SCRIPT" << 'LAUNCHER_EOF'
 #!/bin/bash
 # DentiaCore Launcher Script for macOS/Linux
-cd "\$(dirname "\$0")"
-$PYTHON_PATH launcher.py "\$@"
+cd "$(dirname "$0")"
+# Find best Python3 — prefer Homebrew (has modern Tcl/Tk) over system Python
+PYTHON=""
+for py in /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 /opt/homebrew/bin/python3.11 /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+    if [ -x "$py" ]; then
+        PYTHON="$py"
+        break
+    fi
+done
+"${PYTHON:-python3}" launcher.py "$@"
 LAUNCHER_EOF
 
 chmod +x "$LAUNCHER_SCRIPT"
@@ -343,22 +370,29 @@ if [ "$OS_TYPE" = "mac" ]; then
     mkdir -p "$MACOS_DIR"
     mkdir -p "$RESOURCES_DIR"
 
-    # Create executable launcher (PYTHON_PATH and REPO_ROOT are substituted at install time)
+    # Create Python-script executable launcher.
+    # Using Python (a Mach-O binary via shebang) instead of bash avoids the
+    # -10669 Launch Services error on macOS Sonoma 14+ / Tahoe 26+ which
+    # requires CFBundleExecutable to be a Mach-O binary, not a shell script.
     cat > "$MACOS_DIR/DentiaCore" << MACOS_LAUNCHER_EOF
-#!/bin/bash
+#!${PYTHON_PATH}
+# -*- coding: utf-8 -*-
 # DentiaCore macOS App Launcher
-# Add Homebrew paths for both Intel (/usr/local) and Apple Silicon (/opt/homebrew)
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:\$PATH"
-# Load user shell environment for nvm, rvm, etc.
-if [ -f "\$HOME/.zprofile" ]; then
-    source "\$HOME/.zprofile" 2>/dev/null
-elif [ -f "\$HOME/.bash_profile" ]; then
-    source "\$HOME/.bash_profile" 2>/dev/null
-elif [ -f "\$HOME/.profile" ]; then
-    source "\$HOME/.profile" 2>/dev/null
-fi
-cd "$REPO_ROOT"
-$PYTHON_PATH launcher.py "\$@"
+# CFBundleExecutable: Python (Mach-O binary) invokes this script directly.
+import sys, os, runpy
+
+_here = os.path.dirname(os.path.abspath(__file__))
+_root = os.path.dirname(os.path.dirname(os.path.dirname(_here)))
+
+os.chdir(_root)
+sys.path.insert(0, _root)
+
+_brew = '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin'
+if '/opt/homebrew/bin' not in os.environ.get('PATH', ''):
+    os.environ['PATH'] = _brew + ':' + os.environ.get('PATH', '')
+
+sys.argv[0] = os.path.join(_root, 'launcher.py')
+runpy.run_path(sys.argv[0], run_name='__main__')
 MACOS_LAUNCHER_EOF
 
     chmod +x "$MACOS_DIR/DentiaCore"

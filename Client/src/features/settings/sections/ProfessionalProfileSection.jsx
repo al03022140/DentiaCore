@@ -6,6 +6,7 @@ import {
   deleteFirma,
   getFirmaUrl,
 } from '../../../shared/services/settingsService';
+import pencilIcon from '../../../assets/images/icons/pencil.svg';
 
 const ProfessionalProfileSection = () => {
   const { user, refreshUser } = useAuth();
@@ -230,7 +231,7 @@ const ProfessionalProfileSection = () => {
             onClick={() => setFirmaMode('draw')}
             type="button"
           >
-            ✏️ Dibujar
+            <img src={pencilIcon} alt="" width="16" height="16" /> Dibujar
           </button>
         </div>
 

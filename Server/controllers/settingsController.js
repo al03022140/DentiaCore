@@ -3,6 +3,7 @@ const Usuario = require('../models/users');
 const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
+const { validatePasswordStrength } = require('../utils/crypto');
 
 let bcrypt;
 try { bcrypt = require('bcrypt'); } catch (_e) { bcrypt = require('bcryptjs'); }
@@ -75,7 +76,7 @@ exports.updateMyPreferences = async (req, res) => {
       if (req.body[key] !== undefined) updates[`preferences.${key}`] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true })
-      .select('-contraseña -refreshToken -pinHash');
+      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar preferencias', error: error.message });
@@ -91,9 +92,12 @@ exports.changeMyPassword = async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Se requiere contraseña actual y nueva' });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 8 caracteres' });
+
+    const strength = validatePasswordStrength(newPassword);
+    if (!strength.valid) {
+      return res.status(400).json({ message: strength.message });
     }
+
     const user = await Usuario.findById(userId);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
@@ -102,8 +106,11 @@ exports.changeMyPassword = async (req, res) => {
 
     user.contraseña = newPassword;
     user.lastPasswordChangeAt = new Date();
+    // Invalidate existing sessions — force re-login with new password
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
     await user.save();
-    res.json({ message: 'Contraseña actualizada correctamente' });
+    res.json({ message: 'Contraseña actualizada correctamente. Inicie sesión nuevamente.' });
   } catch (error) {
     res.status(500).json({ message: 'Error al cambiar contraseña', error: error.message });
   }
@@ -114,12 +121,18 @@ exports.changeMyPassword = async (req, res) => {
 exports.changeMyPin = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
-    const { pin } = req.body;
+    const { pin, currentPassword } = req.body;
     if (!pin || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: 'El PIN debe ser exactamente 4 dígitos' });
     }
+    if (!currentPassword) {
+      return res.status(400).json({ message: 'Se requiere la contraseña actual para cambiar el PIN' });
+    }
     const user = await Usuario.findById(userId);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    const isMatch = await user.compararContraseña(currentPassword);
+    if (!isMatch) return res.status(401).json({ message: 'Contraseña actual incorrecta' });
 
     await user.setPin(pin);
     await user.save();
@@ -140,7 +153,7 @@ exports.updateProfessionalProfile = async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true })
-      .select('-contraseña -refreshToken -pinHash');
+      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar perfil profesional', error: error.message });
@@ -220,7 +233,7 @@ exports.updateMyProfile = async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true })
-      .select('-contraseña -refreshToken -pinHash');
+      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
     if (error.code === 11000) {
@@ -243,7 +256,7 @@ exports.updateUserPermissions = async (req, res) => {
       return res.status(400).json({ message: 'permissions debe ser un array' });
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: { permissions } }, { new: true })
-      .select('-contraseña -refreshToken -pinHash');
+      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
     res.json(user);
   } catch (error) {

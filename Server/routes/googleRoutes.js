@@ -42,8 +42,10 @@ function cleanupProcessedCodes() {
     }
 }
 
+const { oauthLimiter } = require('../middlewares/rateLimiter');
+
 // Ruta para obtener la URL de autorización (montada bajo /api/google)
-router.get('/auth/url', (req, res) => {
+router.get('/auth/url', oauthLimiter, (req, res) => {
     try {
         // Detectar el origen del cliente llamante y validarlo contra la whitelist
         const chosenClientUrl = selectClientUrlFromRequest(req) || getClientUrl();
@@ -63,7 +65,7 @@ router.get('/auth/url', (req, res) => {
 });
 
 // Callback de OAuth (ruta absoluta bajo /api/google)
-router.get('/oauth2callback', async (req, res, _next) => {
+router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
     try {
         const { code, error: oauthError, state } = req.query;
         // Determinar URL de cliente objetivo desde el state (si es válido) o fallback
@@ -128,9 +130,11 @@ router.get('/oauth2callback', async (req, res, _next) => {
 // Obtener eventos del calendario (montada bajo /api/google)
 router.get('/calendar/events', async (req, res, next) => {
     try {
-        const accessToken = req.headers.authorization?.replace('Bearer ', '') || req.query.accessToken;
+        // Only accept token from Authorization header — never from query params (prevents URL logging)
+        const authHeader = req.headers.authorization || '';
+        const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
         if (!accessToken) {
-            return res.status(401).json({ error: 'Se requiere access token' });
+            return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
         }
         // Crear cliente OAuth2 por solicitud para evitar condiciones de carrera
         const perRequestClient = new google.auth.OAuth2(
@@ -140,14 +144,49 @@ router.get('/calendar/events', async (req, res, next) => {
         );
         perRequestClient.setCredentials({ access_token: accessToken });
         const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
-        const response = await calendar.events.list({
+
+        // Accept optional query params for date range
+        const listParams = {
             calendarId: 'primary',
-            timeMin: new Date().toISOString(),
-            maxResults: 10,
             singleEvents: true,
-            orderBy: 'startTime'
+            orderBy: 'startTime',
+        };
+        if (req.query.timeMin) listParams.timeMin = req.query.timeMin;
+        else listParams.timeMin = new Date().toISOString();
+        if (req.query.timeMax) listParams.timeMax = req.query.timeMax;
+        if (req.query.maxResults) listParams.maxResults = Math.min(Number(req.query.maxResults) || 250, 2500);
+
+        const response = await calendar.events.list(listParams);
+        res.json({ items: response.data.items || [] });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Crear evento en Google Calendar (montada bajo /api/google)
+router.post('/calendar/events', async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization || '';
+        const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+        if (!accessToken) {
+            return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
+        }
+        const { summary, description, location, start, end } = req.body;
+        if (!summary || !start || !end) {
+            return res.status(400).json({ error: 'Se requiere summary, start y end' });
+        }
+        const perRequestClient = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+        );
+        perRequestClient.setCredentials({ access_token: accessToken });
+        const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
+        const response = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: { summary, description, location, start, end },
         });
-        res.json(response.data.items);
+        res.status(201).json(response.data);
     } catch (error) {
         next(error);
     }

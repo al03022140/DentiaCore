@@ -23,12 +23,13 @@ const Exam = require('../models/exam');
 const OdontogramaModel = require('../models/odontograma');
 const AuditLog = require('../models/auditLog');
 const { getEffectivePermissions } = require('../utils/permissions');
+const { getJwtSecret } = require('../utils/crypto');
 
 jest.setTimeout(60000);
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────────
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_SECRET = getJwtSecret();
 
 function makeToken(user) {
   const permissions = getEffectivePermissions(user);

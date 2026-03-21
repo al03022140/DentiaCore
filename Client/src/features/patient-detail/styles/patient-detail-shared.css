@@ -305,6 +305,16 @@
   RESPONSIVE
   =================================================================== */
 
+/* ≤960px: reducir min-width del grid para que encaje en pantallas medianas */
+@media (max-width: 960px) {
+  .patient-detail__section {
+    padding: var(--spacing-md);
+  }
+  .patient-detail__info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .patient-detail__section {
     padding: var(--spacing-md);

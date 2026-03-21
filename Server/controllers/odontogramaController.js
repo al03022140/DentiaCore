@@ -9,7 +9,7 @@ const {
 } = require('../helpers/odontograma');
 const OdontogramaModel = require('../models/odontograma');
 const fsExtra = require('fs-extra');
-const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
+const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 
 const _unlinkAsync = util.promisify(fs.unlink);
 
@@ -230,6 +230,16 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       });
     }
 
+    // BORRADOR: solo el creador o un admin pueden modificar
+    if (existingDoc && existingDoc.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      if (existingDoc.creadoPor && existingDoc.creadoPor.toString() !== req.user?.id) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden modificar este borrador' }
+        });
+      }
+    }
+
     // Determinar estadoRegistro según permisos (asistente → BORRADOR)
     const userPerms = getEffectivePermissions(req.user);
     let estadoRegistro = 'OFICIAL';
@@ -239,7 +249,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
 
     const auditFields = {
       estado: estadoRegistro,
-      creadoPor: req.user?.id || null,
+      creadoPor: existingDoc?.creadoPor || req.user?.id || null,
       modificadoPor: req.user?.id || null,
       modificadoEn: new Date()
     };
@@ -432,6 +442,24 @@ const deleteInitialOdontogram = async (req, res, next) => {
       });
     }
 
+    // NOM-024: Los registros OFICIAL no se pueden eliminar
+    if (doc.estado === 'OFICIAL') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede eliminar un odontograma en estado OFICIAL' }
+      });
+    }
+
+    // BORRADOR: solo el creador o un admin pueden eliminar
+    if (doc.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      if (doc.creadoPor && doc.creadoPor.toString() !== req.user?.id) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden eliminar este borrador' }
+        });
+      }
+    }
+
     doc.estado = 'ARCHIVADO';
     doc.deletedAt = new Date();
     doc.deletedBy = req.user?.id || null;
@@ -582,6 +610,16 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       });
     }
 
+    // BORRADOR: solo el creador o un admin pueden modificar
+    if (existingClinic && existingClinic.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      if (existingClinic.creadoPor && existingClinic.creadoPor.toString() !== req.user?.id) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden modificar este borrador clínico' }
+        });
+      }
+    }
+
     // Determinar estadoRegistro según permisos (asistente → BORRADOR)
     const userPerms = getEffectivePermissions(req.user);
     let estadoRegistro = 'OFICIAL';
@@ -706,6 +744,24 @@ const deleteClinicalOdontogramState = async (req, res, next) => {
         success: false,
         error: { code: 'DOCUMENT_NOT_FOUND', message: 'Estado del odontograma clínico no encontrado' }
       });
+    }
+
+    // NOM-024: Los registros OFICIAL no se pueden eliminar
+    if (doc.estado === 'OFICIAL') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede eliminar un odontograma clínico en estado OFICIAL' }
+      });
+    }
+
+    // BORRADOR: solo el creador o un admin pueden eliminar
+    if (doc.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      if (doc.creadoPor && doc.creadoPor.toString() !== req.user?.id) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden eliminar este borrador clínico' }
+        });
+      }
     }
 
     doc.estado = 'ARCHIVADO';

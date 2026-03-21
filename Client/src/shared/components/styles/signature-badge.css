@@ -1,0 +1,83 @@
+.signature-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.signature-badge--unsigned {
+  background: var(--color-bg-light, #f5f5f5);
+  color: var(--color-text-muted, #888);
+  border: 1px dashed var(--color-border-medium, #ccc);
+}
+
+.signature-badge--signed {
+  background: #e6f9ed;
+  color: #1a7a3a;
+  border: 1px solid #b2e5c5;
+}
+
+.signature-badge--outdated {
+  background: #fff8e1;
+  color: #8a6d00;
+  border: 1px solid #ffe082;
+}
+
+.signature-badge__icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.signature-badge__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.signature-badge__text {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.signature-badge__signer {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.signature-badge__cedula {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.signature-badge__date {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.signature-badge__btn {
+  margin-left: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-primary);
+  color: #fff;
+  transition: opacity 0.2s;
+}
+
+.signature-badge__btn:hover {
+  opacity: 0.85;
+}
+
+.signature-badge__btn--re-sign {
+  background: #d69e2e;
+}
+
+.signature-badge__btn--re-sign:hover {
+  background: #b7890f;
+}

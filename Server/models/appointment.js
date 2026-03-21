@@ -57,6 +57,7 @@ const appointmentSchema = new mongoose.Schema({
     creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     modificadoEn: { type: Date, default: null },
+    integrityHash: { type: String, default: null },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     deleteReason: { type: String, default: null }

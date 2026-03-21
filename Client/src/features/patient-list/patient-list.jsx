@@ -5,11 +5,12 @@ import './styles/patient-list.css';
 import userNot from '../../assets/images/avatars/UserNot.png';
 
 // Imágenes
-import filtroIcon from '../../assets/images/icons/filtro.png';
+import filtroIcon from '../../assets/images/icons/filter.svg';
 import arrowIcon from '../../assets/images/icons/arrow.png';
 import arrowLeft from '../../assets/images/icons/arrow-left.png';
 import arrowRight from '../../assets/images/icons/arrow-right.png';
 import plusIcon from '../../assets/images/icons/plus.svg';
+import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 
 // Utilidades y API
 import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
@@ -186,7 +187,7 @@ const PatientList = () => {
         {/* ACCIONES (Agregar Paciente y Ordenar) */}
         <div className="actions-container">
           <button className="add-patient-button" onClick={() => navigate('/add-patient')}>
-            <img src={plusIcon} alt="Agregar Paciente" />
+            <img src={addPatientIcon} alt="Agregar Paciente" />
           </button>
 
           <div className="filter-button-container">

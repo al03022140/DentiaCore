@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import plusIcon from '../../../assets/images/icons/plus.svg';
 
 const Medic = ({ 
   formData, 
@@ -1274,7 +1275,7 @@ const Medic = ({
                         handleAddItem("medicacion", { nombre: "", dosis: "", frecuencia: "" });
                       }}
                     >
-                      ➕ Agregar Medicación
+                      <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Medicación
                     </button>
                   </div>
 
@@ -1314,7 +1315,7 @@ const Medic = ({
                         handleAddItem("alergias", { sustancia: "", reaccion: "" });
                       }}
                     >
-                      ➕ Agregar Alergia
+                      <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Alergia
                     </button>
                   </div>
         </div>

@@ -1,3 +1,4 @@
+import plusIcon from '../../../assets/images/icons/plus.svg';
 
 const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
   return (
@@ -61,7 +62,7 @@ const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
         }
         className="action-button"
       >
-        ➕ Agregar Contacto
+        <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Contacto
       </button>
     </section>
   );

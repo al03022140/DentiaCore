@@ -80,6 +80,10 @@ const signDraft = async (req, res) => {
       return res.status(400).json({ message: 'resourceType y pin son requeridos' });
     }
 
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({ message: 'ID de borrador inválido' });
+    }
+
     // Verificar PIN
     const user = await Usuario.findById(req.user.id);
     if (!user || !user.pinHash) {
@@ -264,6 +268,10 @@ const rejectDraft = async (req, res) => {
       return res.status(400).json({
         message: 'resourceType y motivo (mínimo 5 caracteres) son requeridos'
       });
+    }
+
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({ message: 'ID de borrador inválido' });
     }
 
     const resolved = resolveModel(resourceType);

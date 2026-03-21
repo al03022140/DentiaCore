@@ -34,8 +34,17 @@
 .patient-list-wrapper .no-patients-msg {
   font: var(--text-fluid-pl-empty);
   color: var(--pl-light-text-color);
-  margin: 2rem 0;
-  padding: 1.5rem;
+  margin: 2.5rem 0 2.5rem 0;
+  padding: 1.5rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  min-height: 6rem;
+  background: none;
+  border: none;
 }
 
 /* Grid de pacientes */
@@ -379,27 +388,68 @@
 }
 
 /* Adaptaciones responsivas */
-@media (max-width: 768px) {
+
+/* ≤1400px: 4 columnas */
+@media (max-width: 1400px) {
   .patient-list-wrapper .patient-list {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .patient-list-wrapper .patient-card {
+    width: 100% !important;
+  }
+}
+
+/* ≤1200px: 3 columnas */
+@media (max-width: 1200px) {
+  .patient-list-wrapper .patient-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .patient-list-wrapper .patient-card {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100px !important;
+  }
+  .patient-list-wrapper .search-input {
+    width: 65%;
+  }
+}
+
+/* ≤900px: 2 columnas */
+@media (max-width: 900px) {
+  .patient-list-wrapper .patient-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .patient-list-wrapper .patient-card {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 90px !important;
   }
   .patient-list-wrapper .patient-photo img {
     width: 3.5rem;
     height: 3.5rem;
   }
+  .patient-list-wrapper .search-input {
+    width: 80%;
+  }
 }
 
-@media (max-width: 480px) {
+/* ≤600px: 1 columna */
+@media (max-width: 600px) {
   .patient-list-wrapper .patient-list {
     grid-template-columns: 1fr;
   }
   .patient-list-wrapper .patient-card {
-    min-height: 100px;
-    padding: 0.75rem;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 80px !important;
+    padding: 0.75rem !important;
   }
   .patient-list-wrapper .patient-photo img {
     width: 3rem;
     height: 3rem;
+  }
+  .patient-list-wrapper .search-input {
+    width: 95%;
   }
   .patient-list-wrapper .patient-age,
   .patient-list-wrapper .patient-visit {

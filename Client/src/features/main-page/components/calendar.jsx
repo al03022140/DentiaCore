@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import '../Styles/Calendar.css';
+import checkCircle2Icon from '../../../assets/images/icons/check circle 2.svg';
 
 // Helpers de estado de autenticación (evita ReferenceError y duplicación de lógica)
 const AUTH_PROGRESS_KEY = 'authInProgress';
@@ -80,7 +81,7 @@ const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [systemDate, setSystemDate] = useState(new Date());
   // Estado para la hora inicial visible en la agenda (se muestran 7 horas consecutivas)
-  const [topHour, setTopHour] = useState(() => Math.max(0, new Date().getHours() - 1));
+  const [topHour, setTopHour] = useState(() => Math.max(0, Math.min(new Date().getHours() - 1, 17)));
   const currentHour = systemDate.getHours();
 
   const isInitializedRef = useRef(false);
@@ -177,7 +178,7 @@ const Calendar = () => {
       const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       const timeMax = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999).toISOString();
 
-      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}`;
+      const url = `${import.meta.env.VITE_API_URL}/api/google/calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
 
       const response = await fetch(url, {
         method: "GET",
@@ -385,7 +386,7 @@ const Calendar = () => {
         end: { dateTime: `${eventForm.date}T${eventForm.endTime}:00`, timeZone },
       };
       const response = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        `${import.meta.env.VITE_API_URL}/api/google/calendar/events`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -426,7 +427,7 @@ const Calendar = () => {
       const timeMin = new Date(year, month - 1, 1).toISOString();
       const timeMax = new Date(year, month + 2, 0, 23, 59, 59, 999).toISOString();
       fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}`,
+        `${import.meta.env.VITE_API_URL}/api/google/calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       )
         .then(res => { if (res.ok) return res.json(); throw new Error('fetch error'); })
@@ -615,7 +616,7 @@ const Calendar = () => {
         {syncStatus === 'loading' ? '🔄' :
          syncStatus === 'error' ? '❌' :
          syncStatus === 'connection-error' ? '❌❌' :
-         '✅'}
+         <img src={checkCircle2Icon} alt="✓" width="20" height="20" />}
       </div>
 
       {/* Botón para agregar evento */}

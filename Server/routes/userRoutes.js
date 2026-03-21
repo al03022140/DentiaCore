@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const usersController = require('../controllers/usersController');
 const authorize = require('../middlewares/authorize');
+const { accountCreationLimiter } = require('../middlewares/rateLimiter');
 
 const router = express.Router();
 
@@ -20,11 +21,13 @@ router.get('/', authorize(['users.read']), usersController.getAllUsers);
 
 router.post(
   '/',
+  accountCreationLimiter,
   authorize(['users.create']),
   withValidation([
     body('nombre').isString().notEmpty().withMessage('Nombre requerido'),
     body('email').isEmail().withMessage('Email inválido'),
     body('contraseña').isString().isLength({ min: 8 }).withMessage('Contraseña inválida'),
+    body('pin').isString().matches(/^\d{4}$/).withMessage('PIN inválido: debe tener 4 dígitos'),
     body('rol').isString().notEmpty().withMessage('Rol requerido')
   ]),
   usersController.createUser

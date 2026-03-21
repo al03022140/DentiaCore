@@ -1,3 +1,5 @@
+import plusIcon from '../../../assets/images/icons/plus.svg';
+
 const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
   return (
     <section className="form-section">
@@ -77,7 +79,7 @@ const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
         }
         className="action-button"
       >
-        ➕ Agregar Antecedente Familiar
+        <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Antecedente Familiar
       </button>
     </section>
   );

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useAuth } from '../../app/auth/AuthContext';
 import API from '../services/axios-instance';
 import './styles/lock-screen.css';
+import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
 
 const LockScreenContext = createContext(null);
 
@@ -61,8 +62,15 @@ export const LockScreenProvider = ({ children }) => {
         }
         return true;
       }
-    } catch {
-      // PIN incorrecto
+    } catch (err) {
+      // Si el servidor responde con valid:false es PIN incorrecto → contabilizar intento.
+      // Cualquier otro error (red, refresh fallido, etc.) no penaliza los intentos.
+      const isWrongPin = err?.response?.data?.valid === false;
+      if (!isWrongPin) {
+        setError('Error de conexión. Intente de nuevo.');
+        setPinInput('');
+        return false;
+      }
     }
 
     const newAttempts = attempts + 1;
@@ -120,7 +128,11 @@ export const LockScreenProvider = ({ children }) => {
       {user && isLocked && (
         <div className="lock-screen-overlay">
           <div className="lock-screen-card">
-            <div className="lock-screen-icon">&#128274;</div>
+            <div className="lock-screen-icon">
+              {user.nombre === 'Administrador Local'
+                ? <img src={lockBlockedIcon} alt="Administrador Local" style={{ width: 80, height: 80 }} />
+                : <span style={{ fontSize: '4.5rem', lineHeight: 1 }}>🔒</span>}
+            </div>
             <h2>Pantalla bloqueada</h2>
             <p className="lock-screen-user">{user.nombre || 'Usuario'}</p>
             <p className="lock-screen-hint">Ingrese su PIN para desbloquear</p>

@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const router = express.Router();
 const cashController = require('../controllers/cashController');
 const { authorize } = require('../middlewares/authorize');
+const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 // Helper de validación para responder 400 con detalles claros
 const withValidation = (rules) => [
@@ -19,10 +20,11 @@ const withValidation = (rules) => [
 	}
 ];
 
-router.get('/balance/monthly', authorize(['cash.read']), cashController.getMonthlyBalance);
-router.get('/session/status', authorize(['cash.read']), cashController.getSessionStatus);
+router.get('/balance/monthly', readLimiter, authorize(['cash.read']), cashController.getMonthlyBalance);
+router.get('/session/status', readLimiter, authorize(['cash.read']), cashController.getSessionStatus);
 router.post(
 	'/session/open',
+	writeLimiter,
 	authorize(['cash.manage']),
 	withValidation([
 		body('initialAmount')
@@ -33,9 +35,10 @@ router.post(
 	]),
 	cashController.openBox
 );
-router.post('/session/close', authorize(['cash.manage']), cashController.closeBox);
+router.post('/session/close', writeLimiter, authorize(['cash.manage']), cashController.closeBox);
 router.post(
 	'/movements',
+	writeLimiter,
 	authorize(['cash.manage']),
 	withValidation([
 		body('amount')
@@ -56,6 +59,6 @@ router.post(
 	]),
 	cashController.addMovement
 );
-router.get('/movements', authorize(['cash.read']), cashController.getLastMovements);
+router.get('/movements', readLimiter, authorize(['cash.read']), cashController.getLastMovements);
 
 module.exports = router;

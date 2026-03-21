@@ -1,6 +1,16 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, 'Server/.env') });
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+function loadDotenv() {
+  try {
+    return require('dotenv');
+  } catch (_) {
+    return require(path.resolve(__dirname, 'Server/node_modules/dotenv'));
+  }
+}
+
+const dotenv = loadDotenv();
+dotenv.config({ path: path.resolve(__dirname, 'Server/.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 const connectDB = require('./Server/config/db');
 const Usuario = require('./Server/models/users');
 

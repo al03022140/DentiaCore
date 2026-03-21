@@ -28,6 +28,8 @@
   box-sizing: border-box;
   height: 100%;
   min-height: 0; /* permitir que hijos con height:100% encogan sin forzar overflow */
+  overflow-y: auto; /* permitir scroll vertical en páginas largas (patient-detail, add-patient) */
+  overflow-x: hidden;
 }
 
 
@@ -112,5 +114,77 @@ td, th {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
+  }
+}
+
+/* =========================
+   BREAKPOINTS RESPONSIVOS
+   ========================= */
+
+/* Laptop pequeño / tablet amplio (≤1280px) */
+@media (max-width: 1280px) {
+  .content {
+    padding: 14px;
+  }
+  .home {
+    gap: 1.25rem;
+  }
+}
+
+/* Tablet (≤1024px): home pasa a una columna */
+@media (max-width: 1024px) {
+  .dashboard {
+    margin-left: clamp(10rem, 18vw, 13.75rem);
+  }
+  .content {
+    padding: 12px;
+  }
+  .home {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow-y: auto;
+  }
+  .left-section,
+  .right-section {
+    height: auto;
+    overflow: visible;
+    min-height: 0;
+  }
+  /* En tablet la sección derecha muestra el reloj arriba y estadísticas abajo */
+  .right-section .clock {
+    flex: 0 0 auto;
+  }
+  .right-section .patient-stats {
+    min-height: 260px;
+    flex: 1 1 260px;
+  }
+}
+
+/* Tablet pequeña (≤768px) */
+@media (max-width: 768px) {
+  .dashboard {
+    margin-left: clamp(10rem, 25vw, 13.75rem);
+  }
+  .content {
+    padding: 10px;
+    grid-template-columns: 1fr;
+  }
+  .home {
+    gap: 1rem;
+  }
+}
+
+/* Pantallas pequeñas (≤640px): reducir espacio lateral para priorizar contenido */
+@media (max-width: 640px) {
+  .dashboard {
+    margin-left: clamp(6.5rem, 22vw, 9rem);
+  }
+  .content {
+    padding: 8px;
+  }
+  .home,
+  .left-section,
+  .right-section {
+    gap: 0.75rem;
   }
 }

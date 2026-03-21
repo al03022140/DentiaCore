@@ -62,3 +62,44 @@
   top: 1rem; /* Ajustar según sea necesario */
   right: 1rem; /* Ajustar según sea necesario */
 }
+
+/* =========================
+   RESPONSIVO
+   ========================= */
+
+/* Tablet / laptop pequeño (≤960px): apilar foto y detalles */
+@media (max-width: 960px) {
+  .patient-detail__info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .patient-detail__photo img {
+    margin-right: 0;
+    margin-bottom: 1rem;
+    width: 100px;
+    height: 100px;
+  }
+  .patient-detail__details {
+    width: 100%;
+  }
+  .Boton_Editar {
+    position: static;
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* Smartphone (≤600px) */
+@media (max-width: 600px) {
+  .patient-detail__photo img {
+    width: 80px;
+    height: 80px;
+  }
+  .patient-detail__details h1 {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+}

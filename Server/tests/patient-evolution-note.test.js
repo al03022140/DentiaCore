@@ -7,10 +7,11 @@ const app = require('../scripts/dent');
 const Patient = require('../models/patient');
 const Usuario = require('../models/users');
 const { getEffectivePermissions } = require('../utils/permissions');
+const { getJwtSecret } = require('../utils/crypto');
 
 jest.setTimeout(30000);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_SECRET = getJwtSecret();
 
 function makeToken(user) {
   const permissions = getEffectivePermissions(user);

@@ -13,19 +13,29 @@ import AccountsPermissionsSection from './sections/AccountsPermissionsSection';
 import SecuritySection from './sections/SecuritySection';
 import AppointmentsSection from './sections/AppointmentsSection';
 import CashSection from './sections/CashSection';
+import TraceabilitySection from './sections/TraceabilitySection';
 import './settings.css';
+import bellIcon from '../../assets/images/icons/bell.svg';
+import shieldIcon from '../../assets/images/icons/shield.svg';
+import calendarIcon from '../../assets/images/icons/Calendar.svg';
+import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
+import trazability2Icon from '../../assets/images/icons/trazability 2.svg';
+import userIcon from '../../assets/images/icons/user.svg';
+import hospitalIcon from '../../assets/images/icons/hospital.svg';
+import pencilIcon from '../../assets/images/icons/pencil.svg';
 
 const SECTIONS = [
-  { id: 'apariencia', name: 'Apariencia', icon: '🎨', desc: 'Tema claro, oscuro o del sistema', roles: null },
-  { id: 'perfil', name: 'Mi Perfil', icon: '👤', desc: 'Nombre, correo, contraseña y PIN', roles: null },
+  { id: 'apariencia', name: 'Apariencia', icon: <img src={pencilIcon} alt="Apariencia" width="20" height="20" />, desc: 'Tema claro, oscuro o del sistema', roles: null },
+  { id: 'perfil', name: 'Mi Perfil', icon: <img src={userIcon} alt="Mi Perfil" width="20" height="20" />, desc: 'Nombre, correo, contraseña y PIN', roles: null },
   { id: 'perfil-profesional', name: 'Perfil Profesional', icon: '🩺', desc: 'Firma digital y cédula profesional', roles: ['doctor', 'administrador', 'superadmin'] },
-  { id: 'notificaciones', name: 'Notificaciones', icon: '🔔', desc: 'Recordatorios de citas y alertas', roles: null },
+  { id: 'notificaciones', name: 'Notificaciones', icon: <img src={bellIcon} alt="" width="20" height="20" />, desc: 'Recordatorios de citas y alertas', roles: null },
   { id: 'preferencias-clinicas', name: 'Preferencias Clínicas', icon: '⚕️', desc: 'Plantillas de notas, formato receta, duración cita', roles: ['doctor'] },
-  { id: 'clinica', name: 'Clínica', icon: '🏥', desc: 'Nombre, dirección, logo y contacto', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: '🔐', desc: 'Controlar accesos por rol y por usuario', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'seguridad', name: 'Seguridad', icon: '🛡️', desc: 'Tiempo de inactividad, bloqueo de sesión', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'citas', name: 'Citas', icon: '📅', desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'clinica', name: 'Clínica', icon: <img src={hospitalIcon} alt="Clínica" width="20" height="20" />, desc: 'Nombre, dirección, logo y contacto', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: <img src={lockBlockedIcon} alt="" width="20" height="20" />, desc: 'Controlar accesos por rol y por usuario', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'seguridad', name: 'Seguridad', icon: <img src={shieldIcon} alt="" width="20" height="20" />, desc: 'Tiempo de inactividad, bloqueo de sesión', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'citas', name: 'Citas', icon: <img src={calendarIcon} alt="" width="20" height="20" />, desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
   { id: 'caja', name: 'Caja', icon: '💰', desc: 'Categorías de movimiento, moneda, defaults', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'trazabilidad', name: 'Trazabilidad', icon: <img src={trazability2Icon} alt="" width="20" height="20" />, desc: 'Registro de acciones por usuario, fecha o paciente', roles: ['administrador', 'superadmin'], permission: 'audit.read.full' },
 ];
 
 const SECTION_COMPONENTS = {
@@ -39,6 +49,7 @@ const SECTION_COMPONENTS = {
   'seguridad': SecuritySection,
   'citas': AppointmentsSection,
   'caja': CashSection,
+  'trazabilidad': TraceabilitySection,
 };
 
 const SettingsPage = () => {

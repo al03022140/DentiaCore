@@ -144,6 +144,9 @@ const odontogramaSchema = new Schema({
   modificadoEn: { type: Date, default: null },
   firmadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
   firmadoEn: { type: Date, default: null },
+  contentHash: { type: String, default: null },
+  firmaDesactualizada: { type: Boolean, default: false },
+  integrityHash: { type: String, default: null },
   autorizadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
   // Soft-delete (NOM-004 Art. 5.4)
   deletedAt: { type: Date, default: null },

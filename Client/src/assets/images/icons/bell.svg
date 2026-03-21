@@ -1,0 +1,44 @@
+<svg
+  version="1.1"
+  id="bell_icon"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  viewBox="0 0 100 100"
+  width="100"
+  height="100"
+  xml:space="preserve"
+>
+  <style type="text/css">
+    .st0{
+      fill:none;
+      stroke:#000000;
+      stroke-width:6;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      stroke-miterlimit:10;
+    }
+  </style>
+
+  <g id="top_loop">
+    <path class="st0" d="M44,20 A6,6 0 0,1 56,20" />
+  </g>
+
+  <g id="bell_body">
+    <path
+      class="st0"
+      d="
+        M50,20
+        C32,20 25,35 25,55
+        C25,70 15,75 15,75
+        H85
+        C85,75 75,70 75,55
+        C75,35 68,20 50,20
+        Z
+      "
+    />
+  </g>
+
+  <g id="clapper">
+    <path class="st0" d="M40,75 A10,10 0 0,0 60,75" />
+  </g>
+</svg>

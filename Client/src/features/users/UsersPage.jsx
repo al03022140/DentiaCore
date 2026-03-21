@@ -7,6 +7,8 @@ const EMPTY_FORM = {
   nombre: '',
   email: '',
   contraseña: '',
+  pin: '',
+  confirmPin: '',
   rol: 'recepcionista'
 };
 
@@ -35,14 +37,31 @@ const UsersPage = () => {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const nextValue = name === 'pin' || name === 'confirmPin'
+      ? value.replace(/\D/g, '').slice(0, 4)
+      : value;
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   const handleCreate = async (event) => {
     event.preventDefault();
     setError(null);
+    if (!/^\d{4}$/.test(form.pin)) {
+      setError('El PIN es obligatorio y debe tener 4 dígitos');
+      return;
+    }
+    if (form.pin !== form.confirmPin) {
+      setError('La confirmación del PIN no coincide');
+      return;
+    }
     try {
-      await API.post('/users', form);
+      await API.post('/users', {
+        nombre: form.nombre,
+        email: form.email,
+        contraseña: form.contraseña,
+        pin: form.pin,
+        rol: form.rol
+      });
       setForm(EMPTY_FORM);
       await loadUsers();
     } catch (err) {
@@ -105,6 +124,28 @@ const UsersPage = () => {
             placeholder="Contraseña"
             value={form.contraseña}
             onChange={handleChange}
+            required
+          />
+          <input
+            type="password"
+            name="pin"
+            placeholder="PIN de desbloqueo (4 dígitos)"
+            value={form.pin}
+            onChange={handleChange}
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
+            required
+          />
+          <input
+            type="password"
+            name="confirmPin"
+            placeholder="Confirmar PIN"
+            value={form.confirmPin}
+            onChange={handleChange}
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
             required
           />
           <select name="rol" value={form.rol} onChange={handleChange}>
