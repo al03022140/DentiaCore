@@ -1,4 +1,5 @@
 @import './variables.css';
+@import './figma-tokens.css';
 
 /*
   Tipografía fluida: escala el font-size base según el ancho de pantalla.
@@ -90,21 +91,21 @@ code {
 .delete-patient-btn,
 .logout-button,
 .patient-list-wrapper .filter-button {
-  --btn-bg: var(--color-bg-white);
-  --btn-text: var(--color-text-dark);
+  --btn-bg: var(--figma-bg-card);
+  --btn-text: var(--figma-text-primary);
   --btn-border: transparent;
-  --btn-hover-bg: var(--color-neutral-600);
-  --btn-hover-text: var(--color-text-dark);
-  --btn-disabled-bg: var(--color-slate-150);
-  --btn-disabled-text: var(--color-slate-700);
-  --btn-disabled-border: var(--color-slate-200);
-  --btn-padding: var(--button-padding-md);
-  --btn-radius: var(--border-radius-md);
-  --btn-font: var(--text-label);
+  --btn-hover-bg: var(--figma-bg-neutral);
+  --btn-hover-text: var(--figma-text-primary);
+  --btn-disabled-bg: var(--figma-bg-input);
+  --btn-disabled-text: var(--figma-text-secondary);
+  --btn-disabled-border: var(--figma-border-default);
+  --btn-padding: var(--figma-btn-padding);
+  --btn-radius: var(--figma-radius-sm);
+  --btn-font: var(--figma-text-label);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--button-gap);
+  gap: var(--figma-gap-inline);
   padding: var(--btn-padding);
   border: 1px solid var(--btn-border);
   border-radius: var(--btn-radius);
@@ -112,8 +113,9 @@ code {
   color: var(--btn-text);
   font: var(--btn-font);
   cursor: pointer;
-  transition: var(--button-transition);
+  transition: background-color 0.2s ease, color 0.15s ease, border-color 0.2s ease, transform 0.15s ease;
   text-decoration: none;
+  height: var(--figma-btn-height);
 }
 
 .button-primary:hover,
@@ -173,10 +175,10 @@ code {
 .back-to-list-button {
   --btn-bg: var(--color-primary);
   --btn-hover-bg: var(--color-primary-hover);
-  --btn-text: var(--color-bg-white);
+  --btn-text: var(--figma-text-on-dark);
   --btn-border: transparent;
-  --btn-disabled-bg: var(--color-slate-700);
-  --btn-disabled-text: var(--color-slate-150);
+  --btn-disabled-bg: var(--figma-bg-neutral);
+  --btn-disabled-text: var(--figma-text-secondary);
   --btn-disabled-border: transparent;
 }
 
@@ -185,12 +187,12 @@ code {
 }
 
 .button-secondary {
-  --btn-bg: var(--color-bg-white);
+  --btn-bg: var(--figma-bg-card);
   --btn-border: var(--color-primary);
   --btn-text: var(--color-primary);
   --btn-hover-bg: var(--color-primary);
-  --btn-hover-text: var(--color-bg-white);
-  --btn-font: var(--pd-font-button-secondary);
+  --btn-hover-text: var(--figma-text-on-dark);
+  --btn-font: var(--figma-text-label);
 }
 
 .save-button {
@@ -252,24 +254,24 @@ code {
 
 .logout-button {
   --btn-bg: transparent;
-  --btn-border: var(--color-black-08);
-  --btn-text: var(--color-text-dark);
-  --btn-hover-bg: var(--color-black-04);
-  --btn-hover-text: var(--color-text-dark);
-  --btn-padding: var(--button-padding-xs);
-  --btn-radius: 6px;
-  --btn-font: var(--text-label);
+  --btn-border: var(--figma-border-default);
+  --btn-text: var(--figma-text-primary);
+  --btn-hover-bg: var(--figma-bg-neutral);
+  --btn-hover-text: var(--figma-text-primary);
+  --btn-padding: var(--figma-badge-padding);
+  --btn-radius: var(--figma-radius-sm);
+  --btn-font: var(--figma-text-small);
 }
 
 .patient-list-wrapper .filter-button {
-  --btn-bg: var(--pl-light-background);
-  --btn-border: var(--pl-border-color);
-  --btn-text: var(--color-text-dark);
-  --btn-hover-bg: var(--color-neutral-600);
-  --btn-hover-text: var(--color-text-dark);
-  --btn-padding: var(--button-padding-sm);
-  --btn-radius: 0.5rem;
-  --btn-font: var(--text-fluid-pl-filter);
+  --btn-bg: var(--figma-bg-input);
+  --btn-border: var(--figma-border-default);
+  --btn-text: var(--figma-text-primary);
+  --btn-hover-bg: var(--figma-bg-neutral);
+  --btn-hover-text: var(--figma-text-primary);
+  --btn-padding: var(--figma-btn-padding);
+  --btn-radius: var(--figma-radius-sm);
+  --btn-font: var(--figma-text-small);
 }
 
 /* Botones tipo .btn (periodontogram) */
@@ -330,21 +332,21 @@ code {
 }
 
 .action-button {
-  background-color: var(--color-neutral-150);
-  border: 2px solid var(--color-border-light);
-  border-radius: 1rem;
-  color: var(--color-text-black);
-  padding: 10px 15px;
+  background-color: var(--figma-bg-input);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
+  color: var(--figma-text-primary);
+  padding: var(--figma-btn-padding);
 }
 
 .action-button:hover {
-  background-color: var(--color-neutral-600);
-  border-color: var(--color-neutral-350);
-  transform: scale(1.05);
+  background-color: var(--figma-bg-neutral);
+  border-color: var(--figma-text-secondary);
+  transform: translateY(-1px);
 }
 
 .action-button:active {
-  transform: scale(0.95);
+  transform: translateY(0);
 }
 
 .trash-button {

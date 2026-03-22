@@ -1,154 +1,80 @@
 .patient-info-wrapper {
-  /* Variables locales consumidas en este archivo */
-  --patient-bg-color: var(--home-nextpatient-bg);
-  --patient-text-color: var(--home-nextpatient-text-color);
-  --patient-heading-color: var(--home-nextpatient-heading-color);
-  --patient-border-radius: var(--home-nextpatient-border-radius);
-  --patient-box-shadow: var(--home-nextpatient-box-shadow);
+  --patient-bg-color: var(--figma-bg-card);
+  --patient-text-color: var(--figma-text-secondary);
+  --patient-heading-color: var(--figma-text-primary);
+  --patient-border-radius: var(--figma-radius-lg);
+  --patient-box-shadow: var(--figma-shadow-card);
 }
 
-/* Contenedor de información del paciente */
 .patient-info-wrapper .patient-info {
   display: flex;
   align-items: center;
-  padding: var(--home-nextpatient-padding);
+  padding: var(--figma-space-lg) var(--figma-space-2xl);
   border-radius: var(--patient-border-radius);
   background-color: var(--patient-bg-color);
-  border: var(--card-border);
+  border: 1px solid var(--figma-border-default);
   box-shadow: var(--patient-box-shadow);
   width: 100%;
-  height: var(--home-nextpatient-height);
   box-sizing: border-box;
-  margin-top: 0;
-  min-height: var(--home-nextpatient-min-height);
+  min-height: 72px;
+  gap: var(--figma-space-lg);
 }
 
-/* Estado vacío: igualar altura al reloj */
 .patient-info-wrapper.no-patient .patient-info {
-  height: calc(clamp(8.5vw, 5vw, 8vw) + 2 * var(--home-clock-padding));
-  min-height: unset;
+  min-height: 60px;
   justify-content: center;
 }
 
-/* Imagen del paciente */
 .patient-info-wrapper .patient-image img {
-  width: var(--home-nextpatient-image-size);
-  height: var(--home-nextpatient-image-size);
-  border-radius: var(--border-radius-circle);
+  width: var(--figma-avatar-size);
+  height: var(--figma-avatar-size);
+  border-radius: var(--figma-radius-full);
   object-fit: cover;
-  margin-right: var(--home-nextpatient-image-margin);
+  flex-shrink: 0;
 }
 
-/* Detalles del paciente */
 .patient-info-wrapper .patient-details {
-  font: var(--home-nextpatient-text);
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  gap: 2px;
 }
 
 .patient-info-wrapper .patient-details p {
   margin: 0;
   color: var(--patient-text-color);
-  font: var(--home-nextpatient-text-secondary);
+  font: var(--figma-text-caption);
 }
 
 .patient-info-wrapper .patient-details strong {
-  font: var(--home-nextpatient-text-strong);
+  font: var(--figma-text-body);
   color: var(--patient-heading-color);
-    margin: var(--home-nextpatient-strong-margin);
-@media (max-width: 1200px) {
-  .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-1200);
-    margin-top: var(--home-nextpatient-margin-top-1200);
-  }
-  .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-1200);
-    height: var(--home-nextpatient-image-size-1200);
-    margin-right: var(--home-nextpatient-image-margin-1200);
-  }
-  .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-1200);
-  }
-  .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-1200);
-    margin: var(--home-nextpatient-strong-margin-1200);
-  }
+  margin: 0;
 }
 
-@media (max-width: 992px) {
+@media (max-width: 768px) {
   .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-992);
-    margin-top: var(--home-nextpatient-margin-top-1200);
+    padding: var(--figma-space-md) var(--figma-space-lg);
   }
   .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-992);
-    height: var(--home-nextpatient-image-size-992);
-    margin-right: var(--home-nextpatient-image-margin-1200);
-  }
-  .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-1200);
-  }
-  .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-1200);
-    margin: var(--home-nextpatient-strong-margin-1200);
-  }
-}
-
-@media (max-width: 576px) {
-  .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-576);
-    margin-top: var(--home-nextpatient-margin-top-576);
-  }
-  .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-576);
-    height: var(--home-nextpatient-image-size-576);
-    margin-right: var(--home-nextpatient-image-margin-576);
-  }
-  .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-576);
-  }
-  .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-576);
-    margin: var(--home-nextpatient-strong-margin-576);
+    width: 36px;
+    height: 36px;
   }
 }
 
 @media (max-width: 480px) {
   .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-480);
-    margin-top: var(--home-nextpatient-margin-top-576);
+    padding: var(--figma-space-xs) var(--figma-space-md);
+    gap: var(--figma-space-md);
   }
   .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-480);
-    height: var(--home-nextpatient-image-size-480);
-    margin-right: var(--home-nextpatient-image-margin-576);
-  }
-  .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-480);
+    width: 32px;
+    height: 32px;
   }
   .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-480);
-    margin: var(--home-nextpatient-strong-margin-480);
-  }
-}
-
-/* 📌 Ajustes para escala de 125% */
-@media (resolution: 125dpi) {
-  .patient-info-wrapper .patient-info {
-    padding: var(--home-nextpatient-padding-1200);
-    margin-top: var(--home-nextpatient-margin-top-1200);
-  }
-  .patient-info-wrapper .patient-image img {
-    width: var(--home-nextpatient-image-size-992);
-    height: var(--home-nextpatient-image-size-992);
-    margin-right: var(--home-nextpatient-image-margin-1200);
+    font: var(--figma-text-label);
   }
   .patient-info-wrapper .patient-details p {
-    font: var(--home-nextpatient-text-secondary-125dpi);
-  }
-  .patient-info-wrapper .patient-details strong {
-    font: var(--home-nextpatient-text-strong-125dpi);
-    margin: var(--home-nextpatient-strong-margin-1200);
+    font: var(--figma-text-small-regular);
   }
 }

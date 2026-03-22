@@ -155,7 +155,7 @@
   --color-sidebar-hover: #00509e;
   --color-sidebar-active: #012447;
 
-  --color-header-bg: #d5d5d573;
+  --color-header-bg: var(--color-bg-white);
   --color-black-04: rgba(0, 0, 0, 0.04);
   --color-black-05: rgba(0, 0, 0, 0.05);
   --color-black-08: rgba(0, 0, 0, 0.08);
@@ -444,7 +444,7 @@
   --scrollbar-thumb-border: 0.125rem;
 
   /* Layout header/sidebar */
-  --app-header-height: 15vh;
+  --app-header-height: 64px;
   --sidebar-width: 13.75rem;
   --sidebar-bg: var(--color-sidebar-bg);
   --hover-bg: var(--color-sidebar-hover);
@@ -685,6 +685,17 @@
   --transition-fast: 0.2s ease;
   --transition-medium: 0.3s ease;
   --transition-slow: 0.5s ease;
+
+  /* =========================
+     BREAKPOINTS ESTANDAR
+     (Referencia para @media queries - CSS no soporta variables en media queries)
+     --breakpoint-xs:  480px   — Móviles pequeños
+     --breakpoint-sm:  576px   — Móviles
+     --breakpoint-md:  768px   — Tablets portrait
+     --breakpoint-lg:  1024px  — Tablets landscape / laptop pequeño
+     --breakpoint-xl:  1280px  — Desktop
+     --breakpoint-xxl: 1400px  — Desktop amplio
+     ========================= */
 }
 
 /* =========================
@@ -846,7 +857,7 @@
   --color-sidebar-bg: #0a1929;
   --color-sidebar-hover: #0d2744;
   --color-sidebar-active: #071422;
-  --color-header-bg: #2a2a2a73;
+  --color-header-bg: var(--color-bg-white);
 
   /* Transparencias negras → ajustadas para dark mode */
   --color-black-04: rgba(255, 255, 255, 0.04);

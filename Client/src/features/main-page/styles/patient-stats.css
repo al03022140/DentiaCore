@@ -1,51 +1,40 @@
-/* Contenedor de estadísticas de pacientes */
 .patient-stats-container {
-  background-color: var(--home-stats-background);
-  border-radius: var(--home-stats-border-radius);
-  padding: var(--home-stats-padding);
-  box-shadow: var(--home-stats-shadow);
-  border: var(--home-stats-border);
+  background-color: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg);
+  padding: var(--figma-space-2xl);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
   flex-grow: 1;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   min-height: 0;
-  font: var(--home-stats-font);
   display: flex;
   flex-direction: column;
 }
 
 .patient-stats-container canvas {
-  flex-grow: 1; /* Asegura que el canvas ocupe todo el alto disponible */
-  width: 100%; /* Asegura que el canvas ocupe todo el ancho disponible */
+  flex-grow: 1;
+  width: 100%;
   min-height: 100%;
-  height: 100%; /* Asegura que el canvas ocupe todo el alto disponible */
+  height: 100%;
 }
 
-/* Ajustes responsivos - solo padding cambia, font se hereda del base */
-@media (max-width: 1200px) {
-  .patient-stats-container { padding: var(--home-stats-padding-1200); }
+.patient-stats-error {
+  color: var(--color-danger);
+  font: var(--figma-text-caption);
+  text-align: center;
+  padding: var(--figma-space-2xl);
 }
-@media (max-width: 992px) {
-  .patient-stats-container { padding: var(--home-stats-padding-992); }
-}
+
 @media (max-width: 768px) {
-  .patient-stats-container { padding: var(--home-stats-padding-768); }
-}
-@media (max-width: 576px) {
-  .patient-stats-container { padding: var(--home-stats-padding-576); }
-}
-@media (max-width: 480px) {
-  .patient-stats-container { padding: var(--home-stats-padding-480); }
+  .patient-stats-container {
+    padding: var(--figma-space-lg);
+  }
 }
 
-/* Ajustes para escala de pantalla */
-@media (resolution: 125dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-125dpi); }
-}
-@media (resolution: 150dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-150dpi); }
-}
-@media (resolution: 200dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-200dpi); }
+@media (max-width: 480px) {
+  .patient-stats-container {
+    padding: var(--figma-space-md);
+  }
 }
