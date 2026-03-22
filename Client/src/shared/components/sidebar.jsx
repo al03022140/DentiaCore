@@ -1,13 +1,16 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import '../styles/sidebar.css';
-import logo from "../../assets/images/logos/logo.png"; // Importa la imagen
+import logo from "../../assets/images/logos/logo.png";
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
+import { useSidebar } from '../context/SidebarContext';
 
 
 const Sidebar = () => {
   const { user } = useAuth();
+  const { isOpen, isMobile, close } = useSidebar();
+  const location = useLocation();
   const permissions = user?.permissions || [];
 
   const canViewPatients = hasPermission(permissions, ['patients.read', 'patients.create', 'patients.update']);
@@ -15,46 +18,54 @@ const Sidebar = () => {
   const canViewConsultas = hasPermission(permissions, ['consultas.read', 'consultas.create', 'consultas.update']);
   const canViewStats = hasPermission(permissions, ['stats.read']);
 
+  const handleNavClick = () => {
+    close();
+  };
+
   return (
-    <div className="sidebar-wrapper">
-      <div className="sidebar">
-        <nav className="sidebar">
-          <div className="logo">
-            <img src={logo} alt="Logo" className="sidebar-logo" />
-          </div>
-          <ul>
-            <li>
-              <Link to="/">Inicio</Link>
-            </li>
-            {canViewPatients && (
+    <>
+      {isMobile && isOpen && (
+        <div className="sidebar-overlay" onClick={close} />
+      )}
+      <div className={`sidebar-wrapper ${isOpen ? 'sidebar--open' : 'sidebar--closed'} ${isMobile ? 'sidebar--mobile' : ''}`}>
+        <div className="sidebar">
+          <nav className="sidebar">
+            <div className="logo">
+              <img src={logo} alt="Logo" className="sidebar-logo" />
+            </div>
+            <ul>
               <li>
-                <Link to="/pacientes">Pacientes</Link>
+                <Link to="/" onClick={handleNavClick} className={location.pathname === '/' ? 'active' : ''}>Inicio</Link>
               </li>
-            )}
-            {canViewCash && (
+              {canViewPatients && (
+                <li>
+                  <Link to="/pacientes" onClick={handleNavClick} className={location.pathname.startsWith('/pacientes') || location.pathname.startsWith('/patient') ? 'active' : ''}>Pacientes</Link>
+                </li>
+              )}
+              {canViewCash && (
+                <li>
+                  <Link to="/caja" onClick={handleNavClick} className={location.pathname === '/caja' ? 'active' : ''}>Caja</Link>
+                </li>
+              )}
+              {canViewConsultas && (
+                <li>
+                  <Link to="/consultas" onClick={handleNavClick} className={location.pathname === '/consultas' ? 'active' : ''}>Consultas</Link>
+                </li>
+              )}
+              {canViewStats && (
+                <li>
+                  <Link to="/estadisticas" onClick={handleNavClick} className={location.pathname === '/estadisticas' ? 'active' : ''}>Estadísticas</Link>
+                </li>
+              )}
               <li>
-                <Link to="/caja">Caja</Link>
+                <Link to="/configuracion" onClick={handleNavClick} className={location.pathname.startsWith('/configuracion') ? 'active' : ''}>Configuración</Link>
               </li>
-            )}
-            {canViewConsultas && (
-              <li>
-                <Link to="/consultas">Consultas</Link>
-              </li>
-            )}
-            {canViewStats && (
-              <li>
-                <Link to="/estadisticas">Estadísticas</Link>
-              </li>
-            )}
-            <li>
-              <Link to="/configuracion">Configuración</Link>
-            </li>
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
 export default Sidebar;
-

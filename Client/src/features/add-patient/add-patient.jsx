@@ -4,7 +4,7 @@ import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import defaultAvatar from "../../assets/images/avatars/UserNot.png";
 import "./styles/add-patient.css";
-import { message, Modal } from 'antd';
+import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
 
 // Importar componentes de las secciones
@@ -29,6 +29,32 @@ const REQUIRED_FIELDS = [
   { path: ["contacto", "ciudad"], label: "Ciudad" },
   { path: ["contacto", "entidad_federativa"], label: "Entidad federativa" }
 ];
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-+()]{7,20}$/;
+
+const validateFormat = (data) => {
+  const errors = [];
+  if (data.email && !EMAIL_REGEX.test(data.email)) {
+    errors.push({ label: 'El correo electrónico tiene un formato inválido' });
+  }
+  const phone = data.contacto?.telefono;
+  if (phone && !PHONE_REGEX.test(phone)) {
+    errors.push({ label: 'El teléfono tiene un formato inválido (mín. 7 dígitos)' });
+  }
+  if (data.fecha_nacimiento) {
+    const birthDate = new Date(data.fecha_nacimiento);
+    const today = new Date();
+    if (birthDate > today) {
+      errors.push({ label: 'La fecha de nacimiento no puede ser futura' });
+    }
+    const age = today.getFullYear() - birthDate.getFullYear();
+    if (age > 150) {
+      errors.push({ label: 'La fecha de nacimiento parece incorrecta (>150 años)' });
+    }
+  }
+  return errors;
+};
 
 class PatientValidationError extends Error {
   constructor(message, details) {
@@ -108,10 +134,19 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
   return canvas.toDataURL("image/jpeg");
 };
 
+const WIZARD_STEPS = [
+  { title: 'Identificación', description: 'Documento y datos personales' },
+  { title: 'Contacto', description: 'Información de contacto' },
+  { title: 'Emergencia', description: 'Contactos de emergencia y antecedentes' },
+  { title: 'Médico', description: 'Encuesta médica' },
+  { title: 'Hábitos', description: 'Higiene y evaluación dental' },
+];
+
 const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [hoverUpload, setHoverUpload] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const fileInputRef = useRef(null);
   const patientToEdit = initialPatientData || location.state?.patientToEdit || null;
 
@@ -831,6 +866,24 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       throw new PatientValidationError("Faltan campos obligatorios", missingFields);
     }
 
+    const formatErrors = validateFormat(patientData);
+    if (formatErrors.length > 0) {
+      Modal.error({
+        title: "Errores de formato",
+        content: (
+          <div>
+            <p>Corrige los siguientes errores:</p>
+            <ul>
+              {formatErrors.map(({ label }, i) => (
+                <li key={i}>{label}</li>
+              ))}
+            </ul>
+          </div>
+        )
+      });
+      throw new PatientValidationError("Errores de formato", formatErrors);
+    }
+
     // Si hay una foto en base64, convertirla a archivo
     if (patientData.photoURL && patientData.photoURL.startsWith('data:image/')) {
       try {
@@ -977,29 +1030,96 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   };
   
 
+  const stepSections = [
+    // Step 0: Identificación + Datos Personales
+    <>
+      <Identification formData={formData} handleNestedChange={handleNestedChange} />
+      <PersonalData
+        formData={formData}
+        handleChange={handleChange}
+        handleSituacionLaboralChange={(field) => {
+          setFormData(prev => ({
+            ...prev,
+            situacion_laboral: {
+              empleado: field === 'empleado',
+              pensionado: field === 'pensionado',
+              desempleado: field === 'desempleado',
+              jubilado: field === 'jubilado'
+            }
+          }));
+        }}
+      />
+    </>,
+    // Step 1: Contacto
+    <>
+      <ContactInfo formData={formData} handleNestedChange={handleNestedChange} handleChange={handleChange} />
+    </>,
+    // Step 2: Emergencia + Antecedentes
+    <>
+      <EmergencyInfo formData={formData} handleArrayChange={handleArrayChange} setFormData={setFormData} />
+      <FamilyHistory formData={formData} handleArrayChange={handleArrayChange} setFormData={setFormData} />
+    </>,
+    // Step 3: Encuesta Médica + Sección femenina
+    <>
+      <Medic
+        formData={formData}
+        setFormData={setFormData}
+        handleTripleNestedChange={handleTripleNestedChange}
+        handleDoubleNestedChange={handleDoubleNestedChange}
+        handleRemoveItem={handleRemoveItem}
+        handleAddItem={handleAddItem}
+        handleEnfermedadGraveChange={handleEnfermedadGraveChange}
+        handleArrayChange={handleArrayChange}
+      />
+      <WomenSection formData={formData} setFormData={setFormData} handleDoubleNestedChange={handleDoubleNestedChange} />
+    </>,
+    // Step 4: Hábitos + Evaluación Dental
+    <>
+      <Habits
+        formData={formData}
+        handleNestedChange={handleNestedChange}
+        handleDoubleNestedChange={handleDoubleNestedChange}
+        handleToggleAzucar={(tipo) => {
+          setFormData(prev => {
+            const currentTipos = prev.habitos_higiene.consumo_azucar.tipo || [];
+            const newTipos = currentTipos.includes(tipo)
+              ? currentTipos.filter(t => t !== tipo)
+              : [...currentTipos, tipo];
+            return {
+              ...prev,
+              habitos_higiene: {
+                ...prev.habitos_higiene,
+                consumo_azucar: {
+                  ...prev.habitos_higiene.consumo_azucar,
+                  tipo: newTipos
+                }
+              }
+            };
+          });
+        }}
+      />
+      <DentalEvaluation
+        formData={formData}
+        handleNestedChange={handleNestedChange}
+        handleDoubleNestedChange={handleDoubleNestedChange}
+        handleTripleNestedChange={handleTripleNestedChange}
+      />
+    </>,
+  ];
+
+  const isLastStep = currentStep === WIZARD_STEPS.length - 1;
+
   return (
     <div className="add-patient-wrapper">
       <div className="scrollable-form">
         <div className="add-patient-container">
-          {/* Sección para subir y ajustar la foto */}
           <div className="add-patient-header">
-            {/* Contenedor padre con position: relative */}
             <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-              {/* Contenedor del círculo de la foto */}
-              <div 
+              <div
                   className={`patient-photo-container ${isCropping ? 'cropping-mode' : ''}`}
-                  onMouseEnter={() => {
-                    if (!isCropping) {
-                      setHoverUpload(true);
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    if (!isCropping) {
-                      setHoverUpload(false);
-                    }
-                  }}
+                  onMouseEnter={() => { if (!isCropping) setHoverUpload(true); }}
+                  onMouseLeave={() => { if (!isCropping) setHoverUpload(false); }}
                   onClick={() => {
-                    // Solo abrir el selector de archivos si no hay foto y no está en modo recorte
                     if (!formData.photoURL && !imageSrc && !isCropping) {
                       fileInputRef.current && fileInputRef.current.click();
                     }
@@ -1024,21 +1144,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
                     />
                   </div>
                 ) : (
-                  <img
-                    src={formData.photoURL || defaultAvatar}
-                    alt="Avatar del paciente"
-                    className="patient-photo"
-                  />
+                  <img src={formData.photoURL || defaultAvatar} alt="Avatar del paciente" className="patient-photo" />
                 )}
-                {/* Input oculto para seleccionar archivo */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleImageUpload}
-                />
-                {/* Overlay para "Subir" o "Editar" */}
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
                 {!isCropping && hoverUpload && (
                   <div className="upload-text"
                     onClick={(e) => {
@@ -1056,145 +1164,55 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
                     {formData.photoURL && !imageSrc ? "Editar" : "Subir"}
                   </div>
                 )}
-
               </div>
-                
-              {/* Botones para recortar y eliminar, solo cuando hay imagen cargada */}
               {imageSrc && (
                 <div className="image-controls-outside">
-                  <button 
-                    className="trash-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePhoto(e);
-                    }}
-                  >
-                    🗑️ Eliminar
+                  <button className="trash-button" onClick={(e) => { e.stopPropagation(); handleDeletePhoto(e); }}>
+                    Eliminar
                   </button>
-                  <button className="crop-button" onClick={handleCropImage}>
-                    Guardar
-                  </button>
+                  <button className="crop-button" onClick={handleCropImage}>Guardar</button>
                 </div>
               )}
             </div>
-
             <h2 className="add-patient-title">{patientToEdit ? "Editar Paciente" : "Agregar Paciente"}</h2>
           </div>
 
-          {/* Formulario principal */ }
+          <Steps
+            current={currentStep}
+            items={WIZARD_STEPS}
+            onChange={(step) => setCurrentStep(step)}
+            className="add-patient-steps"
+            size="small"
+            responsive
+          />
+
           <form className="add-patient-form" onSubmit={handleSubmit}>
-              {/* SECCIÓN: IDENTIFICACIÓN */}
-              <Identification 
-                formData={formData}
-                handleNestedChange={handleNestedChange}
-              />
+            {stepSections[currentStep]}
 
-              {/* SECCIÓN: DATOS PERSONALES */}
-              <PersonalData 
-                formData={formData}
-                handleChange={handleChange}
-                handleSituacionLaboralChange={(field, checked) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    situacion_laboral: {
-                      empleado: field === 'empleado',
-                      pensionado: field === 'pensionado',
-                      desempleado: field === 'desempleado',
-                      jubilado: field === 'jubilado'
-                    }
-                  }));
-                }}
-              />
-
-              {/* SECCIÓN: INFORMACIÓN DE CONTACTO */}
-              <ContactInfo 
-                formData={formData}
-                handleNestedChange={handleNestedChange}
-                handleChange={handleChange}
-              />
-
-              {/* SECCIÓN: CONTACTO DE EMERGENCIA */}
-              <EmergencyInfo 
-                formData={formData}
-                handleArrayChange={handleArrayChange}
-                setFormData={setFormData}
-              />
-
-              {/* SECCIÓN: ANTECEDENTES HEREDO FAMILIARES */}
-              <FamilyHistory 
-                formData={formData}
-                handleArrayChange={handleArrayChange}
-                setFormData={setFormData}
-              />
-
-              {/* SECCIÓN: ENCUESTA MÉDICA */}
-              <Medic 
-                formData={formData}
-                setFormData={setFormData}
-                handleTripleNestedChange={handleTripleNestedChange}
-                handleDoubleNestedChange={handleDoubleNestedChange}
-                handleRemoveItem={handleRemoveItem}
-                handleAddItem={handleAddItem}
-                handleEnfermedadGraveChange={handleEnfermedadGraveChange}
-                handleArrayChange={handleArrayChange}
-              />
-
-              {/* SECCIÓN: HÁBITOS DE HIGIENE BUCODENTAL */}
-              <Habits 
-                formData={formData}
-                handleNestedChange={handleNestedChange}
-                handleDoubleNestedChange={handleDoubleNestedChange}
-                handleToggleAzucar={(tipo) => {
-                  setFormData(prev => {
-                    const currentTipos = prev.habitos_higiene.consumo_azucar.tipo || [];
-                    const newTipos = currentTipos.includes(tipo)
-                      ? currentTipos.filter(t => t !== tipo)
-                      : [...currentTipos, tipo];
-                    return {
-                      ...prev,
-                      habitos_higiene: {
-                        ...prev.habitos_higiene,
-                        consumo_azucar: {
-                          ...prev.habitos_higiene.consumo_azucar,
-                          tipo: newTipos
-                        }
-                      }
-                    };
-                  });
-                }}
-              />
-
-              {/* SECCIÓN: EVALUACIÓN DENTAL Y OCLUSAL */}
-              <DentalEvaluation 
-                formData={formData}
-                handleNestedChange={handleNestedChange}
-                handleDoubleNestedChange={handleDoubleNestedChange}
-                handleTripleNestedChange={handleTripleNestedChange}
-              />
-
-              {/* SECCIÓN ESPECÍFICA PARA MUJERES - Solo aparece si el sexo es Femenino */}
-              <WomenSection 
-                formData={formData}
-                setFormData={setFormData}
-                handleDoubleNestedChange={handleDoubleNestedChange}
-              />
-              
-
-                {/* BOTONES DE ACCIÓN */}
-                <div className="actions-container">
-                  <button type="submit" className="confirm-button">
-                    {patientToEdit ? "Actualizar Paciente" : "Guardar Paciente"}
-                  </button>
-                  <button onClick={handleCancelEdit} className="cancel-button">
-                    Cancelar
-                  </button>
-              </div>
-            </form>
-          
+            <div className="actions-container wizard-actions">
+              {currentStep > 0 && (
+                <button type="button" className="back-button" onClick={() => setCurrentStep(prev => prev - 1)}>
+                  ← Anterior
+                </button>
+              )}
+              {!isLastStep && (
+                <button type="button" className="confirm-button" onClick={() => setCurrentStep(prev => prev + 1)}>
+                  Siguiente →
+                </button>
+              )}
+              {isLastStep && (
+                <button type="submit" className="confirm-button">
+                  {patientToEdit ? "Actualizar Paciente" : "Guardar Paciente"}
+                </button>
+              )}
+              <button type="button" onClick={handleCancelEdit} className="cancel-button">
+                Cancelar
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
-  
   );
 };
 

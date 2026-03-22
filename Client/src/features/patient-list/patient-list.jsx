@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { message, Skeleton } from 'antd';
 import './styles/patient-list.css';
 import userNot from '../../assets/images/avatars/UserNot.png';
 
@@ -165,7 +165,13 @@ const PatientList = () => {
     return (
       <div className="patient-list-wrapper">
         <div className="patient-list-container">
-          <p className="no-patients-msg">Cargando pacientes...</p>
+          <div className="patient-list skeleton-list">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="patient-card" style={{ pointerEvents: 'none' }}>
+                <Skeleton avatar active paragraph={{ rows: 1 }} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

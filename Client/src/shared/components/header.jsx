@@ -1,13 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import { useLockScreen } from './LockScreen';
-import logo from "../../assets/images/logos/logo.png";
+import { useSidebar } from '../context/SidebarContext';
 import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
 import '../styles/header.css';
 
 const Header = () => {
   const { logout, user } = useAuth();
   const { lock } = useLockScreen();
+  const { isMobile, toggle } = useSidebar();
   const h1Ref = useRef(null);
   const fullName = user?.nombre || 'Dr. Jefferson';
   const firstName = fullName.split(' ')[0];
@@ -49,6 +50,13 @@ const Header = () => {
 
   return (
     <div className="header">
+      {isMobile && (
+        <button className="hamburger-button" onClick={toggle} aria-label="Abrir menú">
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
+        </button>
+      )}
       <h1 ref={h1Ref} className="header-greeting" title={`Buenos días, ${fullName}`}>Buenos días, {displayName}</h1>
       <div className="header-actions">
         <button className="lock-button" onClick={() => lock('manual')} title="Bloquear pantalla">
@@ -63,4 +71,3 @@ const Header = () => {
 };
 
 export default Header;
-

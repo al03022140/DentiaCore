@@ -254,9 +254,11 @@
   background: var(--color-neutral-50);
   border-radius: 8px;
   border: 1px solid var(--color-neutral-700);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   display: flex;
   flex-direction: column;
+  -webkit-overflow-scrolling: touch;
   gap: 20px;
   padding: 5px;
 }
@@ -1057,5 +1059,60 @@
   
   .saved-statistics p {
     font-size: 12px;
+  }
+}
+
+/* Mobile: horizontal scroll with a minimum width to keep the grid readable */
+@media (max-width: 768px) {
+  .periodontogram-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .periodontogram-container > * {
+    min-width: 700px;
+  }
+
+  .periodontogram-section::before {
+    content: '← Desliza horizontalmente para ver el periodontograma completo →';
+    display: block;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border-light);
+    margin-bottom: 0.5rem;
+  }
+
+  .header-controls {
+    width: 100%;
+  }
+
+  .header-controls .btn {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .periodontogram-section::before {
+    font-size: 0.7rem;
+  }
+
+  .header-controls {
+    gap: 8px;
+  }
+
+  .history-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .history-selector select {
+    width: 100%;
   }
 }

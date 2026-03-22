@@ -11,16 +11,23 @@ const Clock = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Formatear la hora en mayúsculas con espacio entre números y AM/PM
-  const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+  // Formatear la hora y separar el sufijo AM/PM
+  const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
     .replace(/\s/g, '') // Eliminar espacios
     .replace(/\./g, '') // Eliminar puntos
-    .toUpperCase()
-    .replace(/(AM|PM)$/, ' $1'); // Agregar espacio antes de AM/PM
+    .toUpperCase();
+
+  // Separar la hora y el sufijo AM/PM
+  const match = timeString.match(/(\d{2}:\d{2})(AM|PM)$/);
+  const hourPart = match ? match[1] : timeString;
+  const ampmPart = match ? match[2] : '';
 
   return (
     <div className="clock">
-      {formattedTime}
+      {hourPart}
+      {ampmPart && (
+        <span className="clock-ampm">{ampmPart}</span>
+      )}
     </div>
   );
 };

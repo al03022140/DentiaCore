@@ -1,14 +1,13 @@
-// Importaciones principales
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // Hooks de React Router
-import "./styles/patient-detail.css"; // Estilos CSS del componente
-import userNot from "../../assets/images/avatars/UserNot.png"; // Imagen por defecto para pacientes sin foto
-import AddPatient from "../add-patient/add-patient.jsx"; // Componente para agregar/editar pacientes
-import API from '../../shared/services/axios-instance.js'; // Instancia configurada de axios
-import { Modal, Input, message } from 'antd'; // Componente de tabla de Ant Design - Añadir message
-import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils'; // Utilidades de fecha
+import { useParams, useNavigate } from "react-router-dom";
+import { Tabs, Modal, Input, message, Skeleton } from 'antd';
+import "./styles/patient-detail.css";
+import userNot from "../../assets/images/avatars/UserNot.png";
+import AddPatient from "../add-patient/add-patient.jsx";
+import API from '../../shared/services/axios-instance.js';
+import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
+import { useAuth } from '../../app/auth/AuthContext';
 
-// Importar componentes modulares de PatientDetailComponents
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';
 import PatientInfoHeader from './components/patient-info-header.jsx';
@@ -26,10 +25,8 @@ import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientChargesCard from './components/patient-charges-card.jsx';
 
-// Funciones API para manejo de pacientes
 import { getPatientById } from '../../shared/services/api.js';
 
-// Error Boundary para secciones críticas
 class OdontogramErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -60,34 +57,32 @@ class OdontogramErrorBoundary extends React.Component {
   }
 }
 
-// Componentes de UI para estados de carga/error
 const Loading = () => (
-  <div className="loading-container">Loading patient data...</div>
+  <div className="loading-container">
+    <Skeleton active paragraph={{ rows: 6 }} />
+  </div>
 );
 
 const ErrorFallback = ({ msg, onRetry }) => (
   <div className="error-container">
     Error: {msg}
-    <button onClick={onRetry} className="retry-button">Retry</button>
+    <button onClick={onRetry} className="retry-button">Reintentar</button>
   </div>
 );
 
-const NoData = ({ message, onNavigateBack }) => (
+const NoData = ({ message: msg, onNavigateBack }) => (
   <div className="no-data-container">
-    <div className="no-data-message">{message}</div>
+    <div className="no-data-message">{msg}</div>
     <button onClick={onNavigateBack} className="back-to-list-button">
       ← Regresar a la lista de pacientes
     </button>
   </div>
 );
 
-// Custom hook para la lógica de inicialización odontograma
 function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram, loadScriptsSequentially) {
   const [areScriptsReadyState, setAreScriptsReadyState] = useState(false);
   const [initializationError, setInitializationError] = useState(null);
 
-  // Este efecto debe ejecutarse solo una vez al montar el componente.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let mounted = true;
     async function init() {
@@ -107,12 +102,12 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
     }
     init();
     return () => { mounted = false; };
-  }, []); // Intencionalmente deps vacías: solo al montar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const retryInitialization = useCallback(() => {
     setInitializationError(null);
     setAreScriptsReadyState(false);
-    // Reejecutar la lógica de init
     (async () => {
       try {
         const scriptsLoaded = await loadScriptsSequentially();
@@ -130,40 +125,30 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
   return { areScriptsReadyState, initializationError, retryInitialization };
 }
 
-// Constantes para confirmación de eliminación
 const REQUIRED_DELETE_PHRASE = 'CONFIRMO ELIMINACION';
 const REQUIRED_DELETE_PHRASE_ACCENTED = 'CONFIRMO ELIMINACIÓN';
 
-// Componente principal para mostrar y editar detalles del paciente
 const PatientDetail = () => {
-  // Añadir referencias para los canvas al principio del componente
   const canvas1Ref = useRef(null);
   const canvas2Ref = useRef(null);
-  
+  const { user } = useAuth();
 
   const { patientId } = useParams();
   const navigate = useNavigate();
 
-
   const [patientData, setPatientData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  
-  // Estados para el Odontograma Inicial (simplificados)
   const [initialData, setInitialData] = useState([]);
   const [initialImageUrl, setInitialImageUrl] = useState(null);
-  const [showInitialOdontogramImage, setShowInitialOdontogramImage] = useState(false); // Controla si se muestra imagen o canvas
+  const [showInitialOdontogramImage, setShowInitialOdontogramImage] = useState(false);
   const [odontogramHistory, setOdontogramHistory] = useState([]);
-
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
-  // Ref para controlar si ya se hizo el fetch inicial (ahora con estado)
   const [fetchedInitial, setFetchedInitial] = useState(false);
 
-  // 1) Declara todos los callbacks primero
   const formatImageUrl = useCallback((url) => {
     if (!url) return '';
     if (url.startsWith('data:') || url.startsWith('http')) return url;
@@ -189,8 +174,8 @@ const PatientDetail = () => {
             fullUrl += `?t=${Date.now()}`;
         }
         return fullUrl;
-    } catch (error) {
-        console.error('Invalid URL format for formatImageUrl:', url, error);
+    } catch (e) {
+        console.error('Invalid URL format for formatImageUrl:', url, e);
         return '';
     }
   }, [patientId]);
@@ -214,21 +199,16 @@ const PatientDetail = () => {
     setError(null);
     try {
       const response = await getPatientById(patientId);
-      
-      // La respuesta del API ya viene con la estructura correcta: { patient: ..., citas: ... }
       const normalizedData = {
         patient: response.patient || null,
         citas: response.citas || null
       };
-      
       if (!normalizedData.patient) {
-        console.error('❌ No se encontró información del paciente en la respuesta');
         throw new Error('Patient data not found in response');
       }
-      
       setPatientData(normalizedData);
     } catch (e) {
-      console.error('❌ Error al cargar datos del paciente:', e);
+      console.error('Error al cargar datos del paciente:', e);
       setError(e instanceof Error ? e.message : 'Unknown error occurred');
     } finally {
       setLoading(false);
@@ -260,10 +240,8 @@ const PatientDetail = () => {
         };
       }
       return true;
-    } else {
-      console.warn('Engine no disponible para aplicar parche.');
-      return false;
     }
+    return false;
   }, []);
 
   const loadScriptsSequentially = useCallback(async () => {
@@ -282,8 +260,8 @@ const PatientDetail = () => {
         return true;
       }
       return false;
-    } catch (error) {
-      throw error;
+    } catch (err) {
+      throw err;
     }
   }, [loadScript, patchEnginePrototype]);
 
@@ -292,9 +270,7 @@ const PatientDetail = () => {
     setFetchedInitial(true);
     if (!patientId) return;
     try {
-      const { data } = await API.get(
-        `/patients/${patientId}/odontograma-inicial`
-      );
+      const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
       if (data.exists) {
         setInitialImageUrl(formatImageUrl(data.imageUrl));
         setShowInitialOdontogramImage(true);
@@ -304,88 +280,70 @@ const PatientDetail = () => {
       } else {
         resetOdontogramState();
       }
-    } catch (error) {
+    } catch {
       resetOdontogramState();
     }
   }, [patientId, formatImageUrl, normalizeHistory, resetOdontogramState, fetchedInitial]);
 
-  // Consolidar handler de borrado
   const deleteInitial = useCallback(async () => {
     try {
       await API.delete(`/patients/${patientId}/odontograma-inicial`);
       message.success('Odontograma inicial eliminado.');
-      setFetchedInitial(false); // permitimos un nuevo fetch
-      await checkInitialOdontogram(); // volvemos a recargar
+      setFetchedInitial(false);
+      await checkInitialOdontogram();
     } catch {
       message.error('Error al eliminar odontograma inicial.');
     }
   }, [patientId, checkInitialOdontogram]);
 
   const handleSaveSuccess = useCallback(async (receivedImageUrl, datos, receivedHistory) => {
-    // Actualizar el estado con los nuevos datos del odontograma
     setInitialImageUrl(formatImageUrl(receivedImageUrl));
     setInitialData(datos || []);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setShowInitialOdontogramImage(true);
-    // Resetear fetchedInitial para permitir que checkInitialOdontogram se ejecute en futuros refreshes
     setFetchedInitial(false);
-    
-    // Refrescar los datos del servidor para asegurar consistencia
     try {
-      await checkInitialOdontogram(true); // Forzar refresh
-    } catch (error) {
-      console.error('Error al refrescar datos del odontograma inicial:', error);
+      await checkInitialOdontogram(true);
+    } catch (err) {
+      console.error('Error al refrescar datos del odontograma inicial:', err);
     }
-
   }, [formatImageUrl, normalizeHistory, checkInitialOdontogram]);
 
-  // Handler para guardar datos del canvas clínico
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      const result = await odontogramaService.default.saveClinicalOdontogramState(
-        patientId,
-        entryData
-      );
-      
-      // Usar la respuesta del servidor para actualizar el estado local
+      const result = await odontogramaService.default.saveClinicalOdontogramState(patientId, entryData);
       setClinicalOdontogramData(result.datos || entryData || []);
       setClinicalOdontogramExists(result.exists ?? true);
-    } catch (error) {
-      console.error('Error al guardar odontograma clínico:', error);
+    } catch (err) {
+      console.error('Error al guardar odontograma clínico:', err);
       message.error('Error al guardar el odontograma clínico');
     }
   }, [patientId]);
 
-  // Handler para eliminar estado del canvas clínico
   const handleDeleteClinicalCanvasState = useCallback(async () => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
       await odontogramaService.default.deleteClinicalOdontogramState(patientId);
-      
-      // Limpiar el estado local inmediatamente
       setClinicalOdontogramData([]);
       setClinicalOdontogramExists(false);
-      
       message.success('Estado del odontograma clínico eliminado exitosamente');
-      // Actualizar los datos del paciente para reflejar los cambios
       await fetchPatientData();
-    } catch (error) {
-      console.error('Error al eliminar estado del odontograma clínico:', error);
+    } catch (err) {
+      console.error('Error al eliminar estado del odontograma clínico:', err);
       message.error('Error al eliminar el estado del odontograma clínico');
     }
   }, [patientId, fetchPatientData]);
 
-  const handleEditClick = useCallback(() => {
-    // Abrir el modal de edición en lugar de navegar
-    setIsEditModalOpen(true);
-  }, []);
+  const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
+
+  const getDoctorName = useCallback(() => {
+    if (user?.nombre) return user.nombre;
+    return 'Doctor';
+  }, [user]);
 
   const handlePrintClick = useCallback(() => {
-    // Agregar clase para impresión
     document.body.classList.add('printing-mode');
-    
-    // Crear sección de aceptación del paciente
     const acceptanceSection = document.createElement('div');
     acceptanceSection.className = 'patient-acceptance-section print-only';
     acceptanceSection.innerHTML = `
@@ -395,29 +353,23 @@ const PatientDetail = () => {
         <div class="signatures-container">
           <div class="signature-block">
             <div class="signature-line"></div>
-            <p class="signature-label">${patientData.patient.primer_nombre} ${patientData.patient.apellido_paterno} ${patientData.patient.apellido_materno}</p>
+            <p class="signature-label">${patientData.patient.primer_nombre} ${patientData.patient.apellido_paterno} ${patientData.patient.apellido_materno || ''}</p>
             <p class="signature-title">Firma del Paciente</p>
           </div>
           <div class="signature-block">
             <div class="signature-line"></div>
-            <p class="signature-label">Dr. Jeferson Arley Ramirez Mejia</p>
+            <p class="signature-label">${getDoctorName()}</p>
             <p class="signature-title">Firma del Doctor</p>
           </div>
         </div>
       </div>
     `;
-    
-    // Agregar la sección al final del contenido
     const patientDetailBody = document.querySelector('.patient-detail__body');
     if (patientDetailBody) {
       patientDetailBody.appendChild(acceptanceSection);
     }
-    
-    // Imprimir
     setTimeout(() => {
       window.print();
-      
-      // Limpiar después de imprimir
       setTimeout(() => {
         document.body.classList.remove('printing-mode');
         if (acceptanceSection && acceptanceSection.parentNode) {
@@ -425,15 +377,13 @@ const PatientDetail = () => {
         }
       }, 100);
     }, 100);
-  }, [patientData]);
+  }, [patientData, getDoctorName]);
 
-  // Abrir modal de confirmación de eliminación (patrón igual a notas de evolución)
   const handleDeleteClick = useCallback(() => {
     setIsDeleteConfirmVisible(true);
     setDeleteConfirmText('');
   }, []);
 
-  // Confirmar en modal y ejecutar eliminación
   const handleDeleteConfirmOk = useCallback(async () => {
     const trimmed = deleteConfirmText.trim();
     if (trimmed !== REQUIRED_DELETE_PHRASE && trimmed !== REQUIRED_DELETE_PHRASE_ACCENTED) {
@@ -454,7 +404,6 @@ const PatientDetail = () => {
     }
   }, [deleteConfirmText, patientId, navigate]);
 
-  // Cancelar modal de confirmación de eliminación
   const handleDeleteConfirmCancel = useCallback(() => {
     setIsDeleteConfirmVisible(false);
     setDeleteConfirmText('');
@@ -464,52 +413,148 @@ const PatientDetail = () => {
     areScriptsReadyState,
     initializationError,
     retryInitialization
-  } = useOdontogramSetup(
-    patientId,
-    fetchPatientData,
-    checkInitialOdontogram,
-    loadScriptsSequentially
-  );
+  } = useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram, loadScriptsSequentially);
 
-
-
-  // Estado para el odontograma clínico
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
 
-  // Cargar estado del odontograma clínico
   const loadClinicalOdontogramState = useCallback(async () => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
       const clinicalState = await odontogramaService.default.getClinicalOdontogramState(patientId);
-
       setClinicalOdontogramData(clinicalState.datos || []);
       setClinicalOdontogramExists(clinicalState.exists || false);
-    } catch (error) {
-      console.error('Error al cargar estado del odontograma clínico:', error);
+    } catch {
       setClinicalOdontogramData([]);
       setClinicalOdontogramExists(false);
     }
   }, [patientId]);
 
-  // Cargar estado clínico cuando se carga el paciente
   useEffect(() => {
     if (patientData && patientId) {
       loadClinicalOdontogramState();
     }
   }, [patientData, patientId, loadClinicalOdontogramState]);
 
-  // Validaciones simplificadas antes del render
   if (loading) return <Loading />;
   if (error) return <ErrorFallback msg={error} onRetry={fetchPatientData} />;
   if (!patientData || !patientData.patient) {
     return (
-      <NoData 
-        message="No se encontró información del paciente. El ID proporcionado no existe en la base de datos." 
+      <NoData
+        message="No se encontró información del paciente. El ID proporcionado no existe en la base de datos."
         onNavigateBack={() => navigate("/pacientes")}
       />
     );
   }
+
+  const tabItems = [
+    {
+      key: 'personal',
+      label: 'Información Personal',
+      children: (
+        <>
+          <PatientContactInfo contacto={patientData.patient.contacto} email={patientData.patient.email} />
+          <PatientDocumentInfo documento={patientData.patient.documento} />
+          <PatientEmergencyContacts contactos={patientData.patient.contactos_emergencia} />
+          <PatientAppointmentsInfo
+            ultimaCita={patientData.citas?.ultimaCita}
+            proximaCita={patientData.citas?.proximaCita}
+          />
+          <PatientChargesCard patientId={patientId} />
+        </>
+      ),
+    },
+    {
+      key: 'medical',
+      label: 'Historia Médica',
+      children: (
+        <>
+          <PatientFamilyHistory antecedentes={patientData.patient.antecedentes_heredo_familiares} />
+          <PatientMedicalSurvey encuesta={patientData.patient.encuesta_medica} />
+          <PatientFemaleInfo
+            informacion_femenina={patientData.patient.informacion_femenina}
+            sexo={patientData.patient.sexo}
+          />
+          <PatientHygieneHabits habitos_higiene={patientData.patient.habitos_higiene} />
+        </>
+      ),
+    },
+    {
+      key: 'dental',
+      label: 'Evaluación Dental',
+      children: (
+        <>
+          <PatientDentalEvaluation patientData={patientData.patient} />
+
+          {initializationError && (
+            <div className="canvas-error">
+              <p>No se pudo cargar el módulo de odontograma:</p>
+              <p>{initializationError}</p>
+              <p>
+                <a href="#" onClick={(e) => { e.preventDefault(); retryInitialization(); }}>
+                  Reintentar inicialización
+                </a>
+              </p>
+            </div>
+          )}
+
+          {!initializationError && areScriptsReadyState ? (
+            <OdontogramErrorBoundary>
+              <OdontogramInitialSection
+                canvasRef={canvas1Ref}
+                patientId={patientId}
+                initialTableData={initialData}
+                initialImageUrl={initialImageUrl}
+                showInitialOdontogramImage={showInitialOdontogramImage}
+                setShowInitialOdontogramImage={setShowInitialOdontogramImage}
+                onDelete={deleteInitial}
+                onSaveSuccess={handleSaveSuccess}
+                onRetryImageLoad={checkInitialOdontogram}
+                areScriptsReady={areScriptsReadyState}
+                formatImageUrl={formatImageUrl}
+              />
+            </OdontogramErrorBoundary>
+          ) : !areScriptsReadyState && !initializationError ? (
+            <div className="loading-container">
+              <Skeleton active paragraph={{ rows: 3 }} />
+            </div>
+          ) : null}
+
+          {!initializationError && areScriptsReadyState ? (
+            <OdontogramErrorBoundary>
+              <OdontogramClinicalSection
+                patientId={patientId}
+                clinicalData={clinicalOdontogramData}
+                onDelete={handleDeleteClinicalCanvasState}
+                onDataSave={handleSaveClinicalCanvasData}
+                areScriptsReady={areScriptsReadyState}
+                canvasRef={canvas2Ref}
+              />
+            </OdontogramErrorBoundary>
+          ) : null}
+
+          <PeriodontogramSection patientId={patientId} />
+        </>
+      ),
+    },
+    {
+      key: 'treatment',
+      label: 'Tratamiento',
+      children: (
+        <>
+          <PatientEvolutionNote
+            patientId={patientId}
+            initialEvolutionNotes={patientData.patient.notas_evolucion}
+            patientData={patientData.patient}
+          />
+          <PatientTreatmentPlan
+            patientId={patientId}
+            initialTreatmentPlan={patientData.patient.planes_tratamiento}
+          />
+        </>
+      ),
+    },
+  ];
 
   return (
     <div className="patient-detail">
@@ -530,7 +575,7 @@ const PatientDetail = () => {
             <AddPatient
               initialPatientData={patientData.patient}
               onSave={() => {
-                message.success("Patient updated successfully.");
+                message.success("Paciente actualizado correctamente.");
                 setIsEditModalOpen(false);
                 fetchPatientData();
               }}
@@ -549,87 +594,14 @@ const PatientDetail = () => {
             handlePrintClick={handlePrintClick}
           />
 
-          <PatientEvolutionNote 
-            patientId={patientId}
-            initialEvolutionNotes={patientData.patient.notas_evolucion}
-            patientData={patientData.patient}
-          />
-          
-          <PatientContactInfo contacto={patientData.patient.contacto} email={patientData.patient.email} />
-          <PatientDocumentInfo documento={patientData.patient.documento} />
-          <PatientEmergencyContacts contactos={patientData.patient.contactos_emergencia} />
-          <PatientFamilyHistory antecedentes={patientData.patient.antecedentes_heredo_familiares} />
-          <PatientMedicalSurvey encuesta={patientData.patient.encuesta_medica} />
-          <PatientFemaleInfo 
-            informacion_femenina={patientData.patient.informacion_femenina} 
-            sexo={patientData.patient.sexo}
-          />
-          <PatientHygieneHabits habitos_higiene={patientData.patient.habitos_higiene} />
-          <PatientDentalEvaluation patientData={patientData.patient} />
-          <PatientAppointmentsInfo 
-            ultimaCita={patientData.citas?.ultimaCita} 
-            proximaCita={patientData.citas?.proximaCita}
+          <Tabs
+            defaultActiveKey="personal"
+            items={tabItems}
+            className="patient-detail-tabs"
+            size="large"
+            destroyInactiveTabPane={false}
           />
 
-          <PatientChargesCard patientId={patientId} />
-
-          {initializationError && (
-            <div className="canvas-error">
-              <p>Could not load odontogram module:</p>
-              <p>{initializationError}</p>
-              <p>
-                Please{" "}
-                <a href="#" onClick={(e) => { e.preventDefault(); retryInitialization(); }}>
-                  retry initialization
-                </a>
-                . If the problem persists, contact support.
-              </p>
-            </div>
-          )}
-
-          {!initializationError && areScriptsReadyState ? (
-            <OdontogramErrorBoundary>
-              <OdontogramInitialSection
-                canvasRef={canvas1Ref}
-                patientId={patientId}
-                initialTableData={initialData}
-                initialImageUrl={initialImageUrl}
-                showInitialOdontogramImage={showInitialOdontogramImage}
-                setShowInitialOdontogramImage={setShowInitialOdontogramImage}
-                onDelete={deleteInitial}
-                onSaveSuccess={handleSaveSuccess}
-                onRetryImageLoad={checkInitialOdontogram}
-
-                areScriptsReady={areScriptsReadyState}
-                formatImageUrl={formatImageUrl}
-              />
-            </OdontogramErrorBoundary>
-          ) : !areScriptsReadyState && !initializationError ? (
-            <div className="loading-container">Loading initial odontogram module...</div>
-          ) : null}
-          
-          {!initializationError && areScriptsReadyState ? (
-            <OdontogramErrorBoundary>
-              <OdontogramClinicalSection
-                patientId={patientId}
-                clinicalData={clinicalOdontogramData}
-                onDelete={handleDeleteClinicalCanvasState}
-                onDataSave={handleSaveClinicalCanvasData}
-
-                areScriptsReady={areScriptsReadyState}
-                canvasRef={canvas2Ref}
-              />
-            </OdontogramErrorBoundary>
-          ) : null}
-
-          <PeriodontogramSection patientId={patientId} />
-
-          <PatientTreatmentPlan 
-            patientId={patientId} 
-            initialTreatmentPlan={patientData.patient.planes_tratamiento}
-          />
-
-          {/* Botón rojo de eliminar paciente con el mismo formato del botón de imprimir, ubicado al final y alineado a la derecha */}
           <div className="patient-detail__bottom-actions">
             <button
               className="Boton_Eliminar"

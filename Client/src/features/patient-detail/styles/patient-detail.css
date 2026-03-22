@@ -362,6 +362,55 @@
 }
 
 /* =========================
+  TABS DE DETALLE DEL PACIENTE
+  ========================= */
+.patient-detail-tabs {
+  margin-top: var(--spacing-lg);
+}
+
+.patient-detail-tabs .ant-tabs-nav {
+  margin-bottom: var(--spacing-xl);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg-light);
+  padding-top: var(--spacing-sm);
+}
+
+.patient-detail-tabs .ant-tabs-tab {
+  font: var(--text-label-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  color: var(--color-text-secondary);
+}
+
+.patient-detail-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.patient-detail-tabs .ant-tabs-ink-bar {
+  background: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .patient-detail-tabs .ant-tabs-nav-list {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+  .patient-detail-tabs .ant-tabs-tab {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font: var(--text-caption-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .patient-detail-tabs .ant-tabs-tab {
+    font: var(--text-caption-xs);
+    padding: var(--spacing-xs) var(--spacing-xs);
+  }
+}
+
+/* =========================
   RESPONSIVO
   ========================= */
 
