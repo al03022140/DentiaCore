@@ -2,12 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, Modal, Input, message, Skeleton } from 'antd';
 import "./styles/patient-detail.css";
-import userNot from "../../assets/images/avatars/UserNot.png";
+import userNot from "../../assets/images/icons/Profile Default.svg";
 import AddPatient from "../add-patient/add-patient.jsx";
 import API from '../../shared/services/axios-instance.js';
 import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
-import { useAuth } from '../../app/auth/AuthContext';
-
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';
 import PatientInfoHeader from './components/patient-info-header.jsx';
@@ -24,6 +22,7 @@ import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx'
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientChargesCard from './components/patient-charges-card.jsx';
+import CreateAppointmentModal from '../consultas/components/CreateAppointmentModal';
 
 import { getPatientById } from '../../shared/services/api.js';
 
@@ -86,13 +85,14 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
   useEffect(() => {
     let mounted = true;
     async function init() {
+      if (!patientId) return;
       try {
         const scriptsLoaded = await loadScriptsSequentially();
         if (!mounted) return;
         setAreScriptsReadyState(scriptsLoaded);
         await fetchPatientData();
         if (scriptsLoaded) {
-          await checkInitialOdontogram();
+          await checkInitialOdontogram(true);
         }
       } catch (err) {
         if (mounted) {
@@ -102,8 +102,7 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
     }
     init();
     return () => { mounted = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [patientId, loadScriptsSequentially, fetchPatientData, checkInitialOdontogram]);
 
   const retryInitialization = useCallback(() => {
     setInitializationError(null);
@@ -113,14 +112,14 @@ function useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram,
         const scriptsLoaded = await loadScriptsSequentially();
         setAreScriptsReadyState(scriptsLoaded);
         await fetchPatientData();
-        if (scriptsLoaded) {
-          await checkInitialOdontogram();
+        if (scriptsLoaded && patientId) {
+          await checkInitialOdontogram(true);
         }
       } catch (err) {
         setInitializationError(err.message || 'Error cargando datos.');
       }
     })();
-  }, [loadScriptsSequentially, fetchPatientData, checkInitialOdontogram]);
+  }, [loadScriptsSequentially, fetchPatientData, checkInitialOdontogram, patientId]);
 
   return { areScriptsReadyState, initializationError, retryInitialization };
 }
@@ -131,8 +130,6 @@ const REQUIRED_DELETE_PHRASE_ACCENTED = 'CONFIRMO ELIMINACIÓN';
 const PatientDetail = () => {
   const canvas1Ref = useRef(null);
   const canvas2Ref = useRef(null);
-  const { user } = useAuth();
-
   const { patientId } = useParams();
   const navigate = useNavigate();
 
@@ -148,6 +145,11 @@ const PatientDetail = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const [fetchedInitial, setFetchedInitial] = useState(false);
+  /** 'loading' | 'saved' | 'none' — resultado de GET /odontograma-inicial para la UI */
+  const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
+  const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
+  const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
+  const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
 
   const formatImageUrl = useCallback((url) => {
     if (!url) return '';
@@ -230,24 +232,13 @@ const PatientDetail = () => {
     });
   }, []);
 
-  const patchEnginePrototype = useCallback(() => {
-    if (window.Engine) {
-      if (!window.Engine.prototype._originalCheckInitialOdontogramStatus) {
-        window.Engine.prototype._originalCheckInitialOdontogramStatus = window.Engine.prototype.checkInitialOdontogramStatus;
-        window.Engine.prototype.checkInitialOdontogramStatus = function() {
-          this.hasSavedInitialOdontogram = false;
-          return Promise.resolve({ hasSaved: false });
-        };
-      }
-      return true;
-    }
-    return false;
+  const verifyEngineLoaded = useCallback(() => {
+    return !!(window.Engine && window.Tooth && typeof window.Tooth.prototype.refresh === 'function');
   }, []);
 
   const loadScriptsSequentially = useCallback(async () => {
     try {
-      if (window.Engine && window.Tooth && typeof window.Tooth.prototype.refresh === 'function') {
-        patchEnginePrototype();
+      if (verifyEngineLoaded()) {
         return true;
       }
       const scripts = ['constants.js', 'settings.js', 'rect.js', 'textBox.js', 'damage.js', 'tooth.js', 'menuItem.js', 'renderer.js', 'odontogramaGenerator.js', 'collisionHandler.js', 'engine.js'];
@@ -255,20 +246,17 @@ const PatientDetail = () => {
         await loadScript(script);
       }
       await new Promise(resolve => setTimeout(resolve, 100));
-      if (window.Engine && window.Tooth && typeof window.Tooth.prototype.refresh === 'function') {
-        patchEnginePrototype();
-        return true;
-      }
-      return false;
+      return verifyEngineLoaded();
     } catch (err) {
       throw err;
     }
-  }, [loadScript, patchEnginePrototype]);
+  }, [loadScript, verifyEngineLoaded]);
 
   const checkInitialOdontogram = useCallback(async (forceRefresh = false) => {
     if (!forceRefresh && fetchedInitial) return;
-    setFetchedInitial(true);
     if (!patientId) return;
+    setFetchedInitial(true);
+    setInitialOdontogramLoadStatus('loading');
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
       if (data.exists) {
@@ -277,11 +265,14 @@ const PatientDetail = () => {
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
         setOdontogramHistory(normalizeHistory(data.history));
+        setInitialOdontogramLoadStatus('saved');
       } else {
         resetOdontogramState();
+        setInitialOdontogramLoadStatus('none');
       }
     } catch {
       resetOdontogramState();
+      setInitialOdontogramLoadStatus('none');
     }
   }, [patientId, formatImageUrl, normalizeHistory, resetOdontogramState, fetchedInitial]);
 
@@ -290,7 +281,7 @@ const PatientDetail = () => {
       await API.delete(`/patients/${patientId}/odontograma-inicial`);
       message.success('Odontograma inicial eliminado.');
       setFetchedInitial(false);
-      await checkInitialOdontogram();
+      await checkInitialOdontogram(true);
     } catch {
       message.error('Error al eliminar odontograma inicial.');
     }
@@ -308,6 +299,12 @@ const PatientDetail = () => {
       console.error('Error al refrescar datos del odontograma inicial:', err);
     }
   }, [formatImageUrl, normalizeHistory, checkInitialOdontogram]);
+
+  useEffect(() => {
+    resetOdontogramState();
+    setFetchedInitial(false);
+    setInitialOdontogramLoadStatus('loading');
+  }, [patientId, resetOdontogramState]);
 
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
@@ -337,47 +334,9 @@ const PatientDetail = () => {
 
   const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
 
-  const getDoctorName = useCallback(() => {
-    if (user?.nombre) return user.nombre;
-    return 'Doctor';
-  }, [user]);
-
   const handlePrintClick = useCallback(() => {
-    document.body.classList.add('printing-mode');
-    const acceptanceSection = document.createElement('div');
-    acceptanceSection.className = 'patient-acceptance-section print-only';
-    acceptanceSection.innerHTML = `
-      <div class="acceptance-content">
-        <h2>Aceptación del Paciente</h2>
-        <p>Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
-        <div class="signatures-container">
-          <div class="signature-block">
-            <div class="signature-line"></div>
-            <p class="signature-label">${patientData.patient.primer_nombre} ${patientData.patient.apellido_paterno} ${patientData.patient.apellido_materno || ''}</p>
-            <p class="signature-title">Firma del Paciente</p>
-          </div>
-          <div class="signature-block">
-            <div class="signature-line"></div>
-            <p class="signature-label">${getDoctorName()}</p>
-            <p class="signature-title">Firma del Doctor</p>
-          </div>
-        </div>
-      </div>
-    `;
-    const patientDetailBody = document.querySelector('.patient-detail__body');
-    if (patientDetailBody) {
-      patientDetailBody.appendChild(acceptanceSection);
-    }
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        document.body.classList.remove('printing-mode');
-        if (acceptanceSection && acceptanceSection.parentNode) {
-          acceptanceSection.parentNode.removeChild(acceptanceSection);
-        }
-      }, 100);
-    }, 100);
-  }, [patientData, getDoctorName]);
+    navigate(`/patient/${patientId}/imprimir?autoPrint=1`);
+  }, [navigate, patientId]);
 
   const handleDeleteClick = useCallback(() => {
     setIsDeleteConfirmVisible(true);
@@ -415,9 +374,6 @@ const PatientDetail = () => {
     retryInitialization
   } = useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram, loadScriptsSequentially);
 
-  const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
-  const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
-
   const loadClinicalOdontogramState = useCallback(async () => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
@@ -453,12 +409,14 @@ const PatientDetail = () => {
       label: 'Información Personal',
       children: (
         <>
+          <h2 className="print-section-title">Información Personal</h2>
           <PatientContactInfo contacto={patientData.patient.contacto} email={patientData.patient.email} />
           <PatientDocumentInfo documento={patientData.patient.documento} />
           <PatientEmergencyContacts contactos={patientData.patient.contactos_emergencia} />
           <PatientAppointmentsInfo
             ultimaCita={patientData.citas?.ultimaCita}
             proximaCita={patientData.citas?.proximaCita}
+            onAddAppointment={() => setShowCreateAppointmentModal(true)}
           />
           <PatientChargesCard patientId={patientId} />
         </>
@@ -469,6 +427,7 @@ const PatientDetail = () => {
       label: 'Historia Médica',
       children: (
         <>
+          <h2 className="print-section-title">Historia Médica</h2>
           <PatientFamilyHistory antecedentes={patientData.patient.antecedentes_heredo_familiares} />
           <PatientMedicalSurvey encuesta={patientData.patient.encuesta_medica} />
           <PatientFemaleInfo
@@ -484,6 +443,7 @@ const PatientDetail = () => {
       label: 'Evaluación Dental',
       children: (
         <>
+          <h2 className="print-section-title">Evaluación Dental</h2>
           <PatientDentalEvaluation patientData={patientData.patient} />
 
           {initializationError && (
@@ -507,9 +467,10 @@ const PatientDetail = () => {
                 initialImageUrl={initialImageUrl}
                 showInitialOdontogramImage={showInitialOdontogramImage}
                 setShowInitialOdontogramImage={setShowInitialOdontogramImage}
+                initialSnapshotStatus={initialOdontogramLoadStatus}
                 onDelete={deleteInitial}
                 onSaveSuccess={handleSaveSuccess}
-                onRetryImageLoad={checkInitialOdontogram}
+                onRetryImageLoad={() => checkInitialOdontogram(true)}
                 areScriptsReady={areScriptsReadyState}
                 formatImageUrl={formatImageUrl}
               />
@@ -542,6 +503,7 @@ const PatientDetail = () => {
       label: 'Tratamiento',
       children: (
         <>
+          <h2 className="print-section-title">Tratamiento</h2>
           <PatientEvolutionNote
             patientId={patientId}
             initialEvolutionNotes={patientData.patient.notas_evolucion}
@@ -562,6 +524,22 @@ const PatientDetail = () => {
         <button className="back-button" onClick={() => navigate("/pacientes")}>
           ← Regresar
         </button>
+        <div className="patient-detail__header-actions">
+          <button
+            className="Boton_Editar button-primary"
+            onClick={handleEditClick}
+            aria-label="Editar datos del paciente"
+          >
+            Editar
+          </button>
+          <button
+            className="Boton_Imprimir"
+            onClick={handlePrintClick}
+            aria-label="Imprimir datos del paciente con formato especial"
+          >
+            Imprimir Formato
+          </button>
+        </div>
       </div>
 
       <div className="patient-detail__content">
@@ -590,8 +568,6 @@ const PatientDetail = () => {
             userNot={userNot}
             proximaCita={patientData.citas?.proximaCita}
             ultimaCita={patientData.citas?.ultimaCita}
-            handleEditClick={handleEditClick}
-            handlePrintClick={handlePrintClick}
           />
 
           <Tabs
@@ -599,7 +575,6 @@ const PatientDetail = () => {
             items={tabItems}
             className="patient-detail-tabs"
             size="large"
-            destroyInactiveTabPane={false}
           />
 
           <div className="patient-detail__bottom-actions">
@@ -615,6 +590,13 @@ const PatientDetail = () => {
           </div>
         </div>
       </div>
+
+      <CreateAppointmentModal
+        visible={showCreateAppointmentModal}
+        onClose={() => setShowCreateAppointmentModal(false)}
+        onCreated={fetchPatientData}
+        fixedPatient={patientData?.patient ?? null}
+      />
 
       <Modal
         title="Confirmar eliminación"

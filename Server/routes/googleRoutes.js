@@ -9,7 +9,10 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_REDIRECT_URI
 );
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
+const SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/userinfo.email',
+];
 
 // Guardado temporal de códigos procesados para evitar uso doble y 'invalid_grant'
 const processedAuthCodes = new Map(); // code -> timestamp (ms)
@@ -44,19 +47,68 @@ function cleanupProcessedCodes() {
 
 const { oauthLimiter } = require('../middlewares/rateLimiter');
 
+// Endpoint puente: lee el token de la cookie httpOnly y lo devuelve al cliente
+// Necesario porque el OAuth callback redirige con ?google_auth=success + cookie
+router.get('/auth/token', (req, res) => {
+    const accessToken = req.cookies?.google_access_token;
+    const refreshToken = req.cookies?.google_refresh_token;
+    const expiresIn = req.cookies?.google_expires_in;
+    if (!accessToken) {
+        return res.status(401).json({ error: 'No hay token de Google en sesión' });
+    }
+    res.json({
+        accessToken,
+        refreshToken: refreshToken || null,
+        expiresIn: Number(expiresIn) || 3600,
+    });
+});
+
+// Endpoint de información del usuario autenticado con Google
+router.get('/auth/userinfo', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization || '';
+        const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+        if (!accessToken) {
+            return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
+        }
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!response.ok) {
+            return res.status(response.status).json({ error: 'No se pudo obtener información del usuario de Google' });
+        }
+        const data = await response.json();
+        res.json({ email: data.email || null, picture: data.picture || null });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener información del usuario de Google' });
+    }
+});
+
 // Ruta para obtener la URL de autorización (montada bajo /api/google)
 router.get('/auth/url', oauthLimiter, (req, res) => {
     try {
+        // Guard: fail fast if Google credentials are not configured
+        if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+            return res.status(503).json({
+                error: 'Google Calendar no está configurado. Agrega GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el archivo Server/.env para habilitar esta función.'
+            });
+        }
+
         // Detectar el origen del cliente llamante y validarlo contra la whitelist
         const chosenClientUrl = selectClientUrlFromRequest(req) || getClientUrl();
+        const returnPath = sanitizeReturnPath(req.query.returnPath || '');
+
+        // Encode client URL + optional return path in OAuth state
+        const statePayload = returnPath
+            ? JSON.stringify({ url: chosenClientUrl, path: returnPath })
+            : chosenClientUrl;
 
         const url = oauth2Client.generateAuthUrl({
             access_type: 'offline', // Solicita refresh_token
             scope: SCOPES,
             include_granted_scopes: true,
             prompt: 'consent', // Siempre solicitar consentimiento para obtener refresh_token
-            // Guardar a qué cliente debemos regresar
-            state: encodeURIComponent(chosenClientUrl)
+            state: encodeURIComponent(statePayload)
         });
         res.json({ url });
     } catch (_error) {
@@ -87,8 +139,13 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
             return res.redirect(`${clientUrl}`);
         }
 
-        const { tokens } = await oauth2Client.getToken(code);
-        oauth2Client.setCredentials(tokens);
+        // Use a per-request client for token exchange to avoid stale singleton state
+        const exchangeClient = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+        );
+        const { tokens } = await exchangeClient.getToken(code);
         rememberProcessedCode(code);
         
         // Redirigir al frontend con tokens en cookies httpOnly en lugar de URL params
@@ -113,17 +170,52 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
           res.cookie('google_expires_in', String(expiresInSec), cookieOptions);
         }
 
-        return res.redirect(`${clientUrl}?google_auth=success`);
+        const returnPath = getReturnPathFromState(state);
+        return res.redirect(`${clientUrl}${returnPath}?google_auth=success`);
     } catch (error) {
-        // Manejo específico del error invalid_grant
-        if (error.message && error.message.includes('invalid_grant')) {
-            const clientUrl = selectClientUrlFromState(req.query.state) || getClientUrl();
-            return res.redirect(`${clientUrl}?error=invalid_grant&message=${encodeURIComponent('Código de autorización expirado. Por favor, intenta nuevamente.')}`);
-        }
-        
-        // Otros errores
+        const errMsg = error.message || String(error);
+        console.error('[OAuth callback error]', errMsg);
         const clientUrl = selectClientUrlFromState(req.query.state) || getClientUrl();
-        return res.redirect(`${clientUrl}?error=auth_error&message=${encodeURIComponent('Error en la autenticación. Por favor, intenta nuevamente.')}`);
+        const returnPath = getReturnPathFromState(req.query.state);
+
+        if (errMsg.includes('invalid_grant')) {
+            return res.redirect(`${clientUrl}${returnPath}?error=invalid_grant&message=${encodeURIComponent(errMsg)}`);
+        }
+        if (errMsg.includes('redirect_uri_mismatch')) {
+            return res.redirect(`${clientUrl}${returnPath}?error=redirect_uri_mismatch&message=${encodeURIComponent(errMsg)}`);
+        }
+        if (errMsg.includes('invalid_client')) {
+            return res.redirect(`${clientUrl}${returnPath}?error=invalid_client&message=${encodeURIComponent(errMsg)}`);
+        }
+        return res.redirect(`${clientUrl}${returnPath}?error=auth_error&message=${encodeURIComponent(errMsg)}`);
+    }
+});
+
+// Listar calendarios del usuario (para selector de calendario destino)
+router.get('/calendar/list', async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization || '';
+        const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+        if (!accessToken) {
+            return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
+        }
+        const perRequestClient = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+        );
+        perRequestClient.setCredentials({ access_token: accessToken });
+        const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
+        const response = await calendar.calendarList.list({ minAccessRole: 'writer' });
+        const calendars = (response.data.items || []).map(c => ({
+            id: c.id,
+            summary: c.summary,
+            primary: c.primary || false,
+            backgroundColor: c.backgroundColor || null,
+        }));
+        res.json({ calendars });
+    } catch (error) {
+        next(error);
     }
 });
 
@@ -145,9 +237,10 @@ router.get('/calendar/events', async (req, res, next) => {
         perRequestClient.setCredentials({ access_token: accessToken });
         const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
 
-        // Accept optional query params for date range
+        // Accept optional query params for date range and calendar selection
+        const calendarId = req.query.calendarId || 'primary';
         const listParams = {
-            calendarId: 'primary',
+            calendarId,
             singleEvents: true,
             orderBy: 'startTime',
         };
@@ -171,7 +264,7 @@ router.post('/calendar/events', async (req, res, next) => {
         if (!accessToken) {
             return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
         }
-        const { summary, description, location, start, end } = req.body;
+        const { summary, description, location, start, end, calendarId: bodyCalendarId } = req.body;
         if (!summary || !start || !end) {
             return res.status(400).json({ error: 'Se requiere summary, start y end' });
         }
@@ -182,8 +275,9 @@ router.post('/calendar/events', async (req, res, next) => {
         );
         perRequestClient.setCredentials({ access_token: accessToken });
         const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
+        const targetCalendarId = bodyCalendarId || 'primary';
         const response = await calendar.events.insert({
-            calendarId: 'primary',
+            calendarId: targetCalendarId,
             requestBody: { summary, description, location, start, end },
         });
         res.status(201).json(response.data);
@@ -262,13 +356,38 @@ module.exports = router;
  }
  
  // Helper: seleccionar URL de cliente a partir del parámetro state validado
+ // Supports both legacy plain-URL format and new JSON {url, path} format
  function selectClientUrlFromState(stateParam) {
      if (!stateParam) return null;
      try {
          const decoded = decodeURIComponent(stateParam);
          const allowed = getAllowedClientUrls();
+         if (decoded.startsWith('{')) {
+             const parsed = JSON.parse(decoded);
+             return allowed.includes(parsed.url) ? parsed.url : null;
+         }
          return allowed.includes(decoded) ? decoded : null;
      } catch (_e) {
          return null;
      }
+ }
+
+ // Helper: sanitize return path to prevent open-redirect attacks
+ function sanitizeReturnPath(path) {
+     if (!path || typeof path !== 'string') return '';
+     if (!path.startsWith('/') || path.startsWith('//')) return '';
+     if (path.includes('://')) return '';
+     return path;
+ }
+
+ // Helper: extract return path from OAuth state parameter
+ function getReturnPathFromState(stateParam) {
+     if (!stateParam) return '';
+     try {
+         const decoded = decodeURIComponent(stateParam);
+         if (decoded.startsWith('{')) {
+             return sanitizeReturnPath(JSON.parse(decoded).path || '');
+         }
+         return '';
+     } catch { return ''; }
  }

@@ -1,5 +1,6 @@
 @import './variables.css';
 @import './figma-tokens.css';
+@import './print-light-mode.css';
 
 /*
   Tipografía fluida: escala el font-size base según el ancho de pantalla.
@@ -367,4 +368,24 @@ code {
   transform: scale(0.95);
   background-color: var(--color-red-750);
   color: var(--color-bg-white);
+}
+
+/* Iconos SVG cargados como <img>: trazo #383838 en los archivos; en oscuro se invierten a blanco */
+img.theme-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] img.theme-icon {
+  filter: brightness(0) invert(1);
+}
+
+/* Silueta de perfil (sin foto): mismo gris en claro, blanco en oscuro */
+img.profile-default-avatar {
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] img.profile-default-avatar {
+  filter: brightness(0) invert(1);
 }

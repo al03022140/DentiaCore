@@ -19,6 +19,9 @@
   --color-text-deep: #030303;
   --color-text-black: #000;
   --color-text-dark: #2e2e2e;
+
+  /* Iconos monocromáticos (SVG como <img>, ver .theme-icon en index.css) */
+  --color-icon-stroke: #383838;
   
   /* Colores de Fondo */
   --color-bg-white: #fff;
@@ -444,7 +447,7 @@
   --scrollbar-thumb-border: 0.125rem;
 
   /* Layout header/sidebar */
-  --app-header-height: 64px;
+  --app-header-height: 80px;
   --sidebar-width: 13.75rem;
   --sidebar-bg: var(--color-sidebar-bg);
   --hover-bg: var(--color-sidebar-hover);
@@ -495,7 +498,7 @@
   --home-calendar-container-border-width: 2px;
   --home-calendar-border-width: 1px;
   --home-calendar-container-height: 55vh;
-  --home-calendar-day-display-padding: 1rem;
+  --home-calendar-day-display-padding: 0.5rem 1rem;
   --home-calendar-schedule-title-margin: 0.5rem 0;
   --home-calendar-schedule-title-padding: 0.5rem;
   --home-calendar-schedule-padding: 0;
@@ -511,10 +514,10 @@
   --home-calendar-hour-time-color: var(--color-text-dark);
   --home-calendar-no-events-color: var(--color-text-light);
   --home-calendar-hour-events-gap: 0.375rem;
-  --home-calendar-month-calendar-padding: 1rem;
-  --home-calendar-month-title-padding: 0.5rem 0;
-  --home-calendar-days-grid-gap: 0.125rem;
-  --home-calendar-day-padding: 0.5rem;
+  --home-calendar-month-calendar-padding: 0.4rem 1rem;
+  --home-calendar-month-title-padding: 0.2rem 0;
+  --home-calendar-days-grid-gap: 0.4rem;
+  --home-calendar-day-padding: 0.2rem;
   --home-calendar-day-radius: 0.3125rem;
   --home-calendar-day-today-bg: var(--color-neutral-180);
   --home-calendar-day-today-color: var(--color-text-dark);
@@ -596,7 +599,7 @@
   --home-calendar-day-cell-font-size-560: 0.9rem;
 
   /* Home: Calendario - Responsive 480px (adicional) */
-  --home-calendar-days-grid-gap-480: 0.15rem;
+  --home-calendar-days-grid-gap-480: 0.3rem;
   --home-calendar-hour-padding-480: 0.45rem;
   --home-calendar-hour-min-height-480: 2.5rem;
   --home-calendar-event-padding-480: 0.2rem 0.35rem;
@@ -720,6 +723,8 @@
   --color-text-dark: #e0e0e0;
   --color-text-medium: #b0b0b0;
   --color-text-disabled: #666;
+
+  --color-icon-stroke: #f0f0f0;
 
   /* Fondos */
   --color-bg-white: #1e1e1e;

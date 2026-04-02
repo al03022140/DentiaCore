@@ -7,6 +7,7 @@ import {
   getFirmaUrl,
 } from '../../../shared/services/settingsService';
 import pencilIcon from '../../../assets/images/icons/pencil.svg';
+import folderUploadIcon from '../../../assets/images/icons/folder-upload.svg';
 
 const ProfessionalProfileSection = () => {
   const { user, refreshUser } = useAuth();
@@ -224,14 +225,14 @@ const ProfessionalProfileSection = () => {
             onClick={() => setFirmaMode('upload')}
             type="button"
           >
-            📁 Subir archivo
+            <img src={folderUploadIcon} alt="" width="16" height="16" className="theme-icon" /> Subir archivo
           </button>
           <button
             className={firmaMode === 'draw' ? 'active' : ''}
             onClick={() => setFirmaMode('draw')}
             type="button"
           >
-            <img src={pencilIcon} alt="" width="16" height="16" /> Dibujar
+            <img src={pencilIcon} alt="" width="16" height="16" className="theme-icon" /> Dibujar
           </button>
         </div>
 

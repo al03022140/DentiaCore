@@ -16,6 +16,8 @@
   /* Permitir que el documento maneje el scroll sin barras internas */
   overflow: visible;
   padding: 0;
+  /* Mismo fondo que .dashboard para que sticky y scroll no contrasten (claro / oscuro) */
+  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
 /* Los estilos para strong y span están definidos en patient-detail-shared.css */
@@ -34,6 +36,8 @@
   max-width: 1600px; /* Limitar ancho para evitar desbordes visuales */
   width: 100%;
   box-sizing: border-box;
+  background: var(--figma-bg-page, var(--color-bg-light));
+  /* NO overflow aquí: cualquier overflow != visible rompe position:sticky en hijos */
 }
 
 /* =========================
@@ -45,6 +49,7 @@
   overflow: visible;
   padding-bottom: 100px;
   box-sizing: border-box;
+  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
 /* =========================
@@ -147,8 +152,30 @@
 .odontograma-header1, .odontograma-header2 {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+}
+
+.odontograma-initial-heading-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+}
+
+.odontograma-initial-heading-block h2 {
+  margin: 0;
+}
+
+.odontograma-initial-status-line {
+  margin: 0;
+  font: var(--pd-font-card-list);
+  color: var(--color-neutral-680);
+  max-width: 42rem;
+  line-height: 1.45;
 }
 
 
@@ -253,6 +280,161 @@
   max-width: 100%;
 }
 
+/* =========================
+  ODONTOGRAMA FULLSCREEN MODAL
+  ========================= */
+.odontograma-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: odonto-fade-in 0.25s ease;
+}
+
+.odontograma-fullscreen-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  background: var(--color-bg-white);
+  border-bottom: 1px solid var(--color-border-medium);
+  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.odontograma-fullscreen-header h3 {
+  margin: 0;
+  font: var(--pd-font-section-title);
+  color: var(--color-text-dark);
+}
+
+.odontograma-fullscreen-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--color-bg-light);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--color-text-dark);
+  transition: background var(--transition-medium), color var(--transition-medium);
+}
+
+.odontograma-fullscreen-close:hover {
+  background: var(--color-red-100);
+  color: var(--color-red-600);
+}
+
+@keyframes odonto-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.odontograma-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-white);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-text-dark);
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  z-index: 5;
+  transition: background var(--transition-medium), border-color var(--transition-medium), box-shadow var(--transition-medium);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.odontograma-expand-btn:hover {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.odontograma-canvas-container {
+  position: relative;
+}
+
+.odontograma-canvas-container.odontograma-canvas-fullscreen {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+  width: calc(100% - 64px);
+  max-width: 1400px;
+  max-height: calc(100vh - 64px);
+  background: var(--color-bg-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px var(--spacing-xl) var(--spacing-xl);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25), 0 8px 24px rgba(0, 0, 0, 0.15);
+  animation: odonto-modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes odonto-modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.odontograma-canvas-fullscreen .odontograma-canvas {
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--border-radius-sm);
+}
+
+.odontograma-canvas-fullscreen .odontograma-expand-btn {
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  z-index: 1003;
+}
+
+.odontograma-canvas-fullscreen .loading-overlay,
+.odontograma-canvas-fullscreen .loading-spinner,
+.odontograma-canvas-fullscreen .error-container {
+  z-index: 1003;
+}
+
+@media print {
+  .odontograma-fullscreen-backdrop,
+  .odontograma-fullscreen-header,
+  .odontograma-expand-btn {
+    display: none !important;
+  }
+  .odontograma-canvas-container.odontograma-canvas-fullscreen {
+    position: static;
+    max-width: 100%;
+    padding: 0;
+  }
+}
+
 .odontograma-table-container {
   width: 18rem !important;
   flex-shrink: 0;
@@ -289,11 +471,126 @@
   text-overflow: ellipsis;
 }
 
+/* Overlay “Guardando…” (odontograma clínico) */
+.odontograma-saving-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.odontograma-saving-overlay__text {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .odontograma-saving-overlay {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.odontograma-tools-hint {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--color-text-secondary);
+}
+
+/* Modo oscuro: tablas y pestañas del odontograma (Ant Design sigue tokens claros por defecto) */
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table.ant-table-wrapper .ant-table,
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-table-container {
+  background: var(--color-bg-white) !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-table-thead > tr > th {
+  background: var(--color-neutral-100) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border-light) !important;
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-table-tbody > tr > td {
+  background: var(--color-bg-white) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border-light) !important;
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: var(--color-neutral-100) !important;
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-empty-description {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container .ant-tabs-nav::before {
+  border-color: var(--color-border-light);
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container .ant-tabs-tab {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container .ant-pagination {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container .ant-pagination .ant-pagination-item a {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table h3 {
+  color: var(--color-text-strong);
+}
+
 /* =========================
-  BOTÓN BACK / REGRESAR
+  HEADER: BOTÓN BACK + ACCIONES (EDITAR / IMPRIMIR)
   ========================= */
-.back-button {
+.patient-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.patient-detail__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.patient-detail__header-actions .Boton_Editar,
+.patient-detail__header-actions .Boton_Imprimir {
+  min-height: 2.0rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.back-button {
+  /* Mantiene altura consistente con los demás botones */
+  min-height: 2.0rem;
+  height: auto; /* override global height */
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--pd-font-action);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Botón Editar (combina con button-primary global) */
+.patient-detail__header-actions .Boton_Editar.button-primary {
+  height: auto; /* override global height */
+  min-height: 2.0rem;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--pd-font-action);
 }
 
 /* =========================
@@ -371,10 +668,25 @@
 .patient-detail-tabs .ant-tabs-nav {
   margin-bottom: var(--spacing-xl);
   position: sticky;
-  top: 0;
+  top: -25px;
   z-index: 10;
-  background: var(--color-bg-light);
-  padding-top: var(--spacing-sm);
+  background: var(--figma-bg-page, var(--color-bg-light));
+  padding-top: var(--spacing-xl);
+  padding-bottom: var(--spacing-md);
+}
+
+/* Escudo de color: cubre laterales y el pequeño gap inferior sin tocar
+   el contenido que hay encima (no sube del borde superior de la barra) */
+.patient-detail-tabs .ant-tabs-nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -9999px;
+  right: -9999px;
+  /* Extiende unos píxeles más abajo del borde para tapar el gap del margin */
+  bottom: -12px;
+  background: var(--figma-bg-page, var(--color-bg-light));
+  z-index: -1;
 }
 
 .patient-detail-tabs .ant-tabs-tab {
@@ -470,25 +782,12 @@
   IMPRESIÓN
   ========================= */
 
-/* Estilos para el botón de imprimir */
-.patient-detail__actions {
-  display: flex;
-  gap: var(--spacing-lg);
-  align-items: center;
-  position: relative;
-}
-
-.patient-detail__actions .Boton_Imprimir {
-  position: absolute;
-  top: 1.0rem;
-  right: 8rem;
-}
-
+/* Botón Imprimir - usado en patient-detail__header-actions */
 .Boton_Imprimir {
   background-color: var(--color-green-700);
   color: var(--color-bg-white);
   border: none;
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
@@ -496,7 +795,7 @@
   order: -1;
   white-space: nowrap;
   min-width: max-content;
-  min-height: 2.4rem;
+  min-height: 2.0rem;
 }
 
 .Boton_Imprimir:hover {
@@ -507,7 +806,7 @@
   background-color: var(--color-blue-400);
   color: var(--color-bg-white);
   border: none;
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
@@ -533,14 +832,14 @@
   background-color: var(--color-red-550);
   color: var(--color-bg-white);
   border: none;
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   font: var(--pd-font-action);
   transition: background-color var(--transition-medium);
   white-space: nowrap;
   min-width: max-content;
-  min-height: 2.4rem;
+  min-height: 2.0rem;
 }
 
 .Boton_Eliminar:hover {
@@ -597,397 +896,289 @@
   margin: 0;
 }
 
+/* Título de sección solo visible al imprimir */
+.print-section-title {
+  display: none;
+}
+
 /* Estilos específicos para impresión */
 @media print {
-  /* Ocultar elementos no necesarios en impresión */
+
+  /* ── Configuración de página ── */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
   html, body {
-    width: 100vw !important;
-    min-width: 0 !important;
-    max-width: 100vw !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    box-sizing: border-box !important;
+    background: #fff !important;
     overflow: visible !important;
     height: auto !important;
+    font-size: 11pt !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* ── Ocultar cromo de la interfaz ── */
   .patient-detail__header,
+  .patient-detail__header-actions,
   .back-button,
   .Boton_Editar,
   .Boton_Imprimir,
   .Boton_Eliminar,
-  .delete-patient-btn,
+  .danger-zone,
   .patient-detail__bottom-actions,
   .sidebar,
   .header,
   .navigation,
-  .modal,
-  .spinner-overlay {
+  .ant-modal-root,
+  .ant-modal-mask,
+  .ant-modal-wrap,
+  .spinner-overlay,
+  .ant-tabs-nav,
+  .ant-tabs-nav-wrap,
+  .ant-tabs-nav-list,
+  .ant-tabs-ink-bar,
+  .canvas-error,
+  button:not(.print-visible) {
     display: none !important;
   }
 
-  /* Mostrar sección de aceptación solo en impresión */
-  .patient-acceptance-section {
+  /* ── Contenedor raíz ── */
+  .patient-detail {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .patient-detail__content {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .patient-detail__body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* ── Título de sección (solo en impresión) ── */
+  .print-section-title {
     display: block !important;
+    font-size: 14pt !important;
+    font-weight: bold !important;
+    color: #000 !important;
+    margin: 0 0 0.6rem 0 !important;
+    padding: 0.3rem 0 0.4rem 0 !important;
+    border-bottom: 2px solid #333 !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
-  /* Ajustar el contenedor principal para impresión */
-   .patient-detail {
-     margin: 0 !important;
-     padding: 0 !important;
-     box-shadow: none !important;
-    background: var(--color-bg-white) !important;
-     min-height: auto !important;
-     height: auto !important;
-     width: 100% !important;
-     max-width: none !important;
-     overflow: visible !important;
-   }
-
-   .patient-detail__content {
-     padding: var(--spacing-lg) !important;
-     margin: 0 !important;
-     width: 100% !important;
-     max-width: none !important;
-     height: auto !important;
-     overflow: visible !important;
-   }
-
-   .patient-detail__body {
-     margin: 0 !important;
-     padding: 0 !important;
-     width: 100% !important;
-     height: auto !important;
-     overflow: visible !important;
-   }
-
-  /* Ajustar secciones para impresión */
-   .patient-detail__section {
-     page-break-inside: avoid;
-     margin-bottom: var(--spacing-lg) !important;
-     padding: var(--spacing-lg) !important;
-     box-shadow: none !important;
-    border: var(--border-radius-sm) solid var(--color-border-dark) !important;
-     width: 100% !important;
-     box-sizing: border-box !important;
-   }
-
-   /* Ajustar información del paciente */
-   .patient-detail__info {
-     border-bottom: var(--card-border-width) solid var(--color-neutral-1100) !important;
-     margin-bottom: var(--spacing-xl) !important;
-     padding-bottom: var(--spacing-lg) !important;
-     width: 100% !important;
-     display: flex !important;
-     flex-wrap: wrap !important;
-   }
-
-   .patient-detail__photo {
-     flex-shrink: 0 !important;
-     margin-right: var(--spacing-xl) !important;
-   }
-
-   .patient-detail__details {
-     flex: 1 !important;
-     min-width: 0 !important;
-   }
-
-  .patient-detail__actions {
-    display: none !important;
+  /* ── Tabs: mostrar TODOS los paneles apilados ── */
+  .ant-tabs {
+    display: block !important;
+    overflow: visible !important;
   }
 
-  /* Ajustar foto del paciente */
-  .patient-detail__photo img {
-    width: 6.25rem !important;
-    height: 6.25rem !important;
+  .ant-tabs-content-holder {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    transform: none !important;
   }
 
-  /* Ajustar títulos */
-   .patient-detail__section h2 {
-     color: var(--color-text-black) !important;
-     font: var(--text-print-title) !important;
-     margin-bottom: var(--spacing-md) !important;
-     margin-top: var(--spacing-sm) !important;
-   }
-
-   .patient-detail__section h3 {
-     color: var(--color-neutral-1100) !important;
-     font: var(--text-print-subtitle) !important;
-     margin-bottom: var(--spacing-sm) !important;
-   }
-
-   /* Ajustar texto */
-   .patient-detail__section p,
-   .patient-detail__section span,
-   .patient-detail__section strong {
-     color: var(--color-text-black) !important;
-     font: var(--text-print-body) !important;
-     line-height: 1.3 !important;
-     margin-bottom: var(--spacing-xs) !important;
-   }
-
-   /* Ajustar información del header del paciente */
-   .patient-detail__details h1 {
-     font: var(--text-print-hero) !important;
-     margin-bottom: var(--spacing-lg) !important;
-    color: var(--color-text-black) !important;
-     letter-spacing: 1px !important;
-   }
-
-   .patient-detail__details p {
-     margin: var(--spacing-xs) 0 !important;
-     font: var(--text-data-sm) !important;
-     letter-spacing: 0.5px !important;
-   }
-
-  /* Configuración de página - sin márgenes para usar todo el ancho */
-   @page {
-     margin: 0;
-     size: A4 portrait;
-   }
-
-   /* Layout principal en impresión - usar absolutamente todo el ancho */
-   .patient-detail__content {
-     display: flex !important;
-     flex-direction: row !important;
-     gap: var(--border-radius-sm) !important;
-     align-items: flex-start !important;
-     justify-content: flex-start !important;
-     width: 100vw !important;
-     max-width: 100vw !important;
-     padding: 0 !important;
-     margin: 0 !important;
-     box-sizing: border-box !important;
-   }
-
-   /* Columna izquierda: info general */
-   .patient-detail__info {
-     flex: 1 1 100% !important;
-     max-width: 100% !important;
-     min-width: 0 !important;
-     margin-right: 0 !important;
-     border-bottom: none !important;
-     padding-right: 0 !important;
-     padding-bottom: 0 !important;
-     box-sizing: border-box !important;
-     display: block !important;
-   }
-
-   /* Columna derecha: secciones de contacto, documentos, etc */
-   .patient-detail__body {
-     flex: 1 1 100% !important;
-     max-width: 100% !important;
-     min-width: 0 !important;
-     margin: 0 !important;
-     padding: 0 !important;
-     box-sizing: border-box !important;
-     display: block !important;
-   }
-
-   /* Ajustar el ancho de elementos específicos */
-   .patient-detail__subsection,
-   .patient-detail__definition-list {
-     width: 100% !important;
-     box-sizing: border-box !important;
-   }
-
-   /* Mejorar el layout de listas de definición */
-   .patient-detail__section dl {
-     width: 100% !important;
-     margin: 0 !important;
-   }
-
-   .patient-detail__section dl > div {
-     width: 100% !important;
-     margin-bottom: var(--spacing-sm) !important;
-     padding: var(--spacing-sm) !important;
-   }
-
-   /* Ajustar tablas */
-   .patient-detail__section table {
-     width: 100% !important;
-     border-collapse: collapse !important;
-     font: var(--text-data-8xs) !important;
-     margin: var(--spacing-sm) 0 !important;
-   }
-
-   .patient-detail__section th,
-   .patient-detail__section td {
-     border: var(--border-radius-sm) solid var(--color-text-black) !important;
-     padding: var(--spacing-xs) !important;
-     text-align: left !important;
-     vertical-align: top !important;
-   }
-
-   .patient-detail__section th {
-     background-color: var(--color-neutral-175) !important;
-     font: var(--text-data-8xs) !important;
-   }
-
-   /* Ajustar odontogramas */
-   .odontogram-container {
-     width: 100% !important;
-     margin: var(--spacing-sm) 0 !important;
-   }
-
-   .odontogram-grid {
-     width: 100% !important;
-     max-width: none !important;
-   }
-
-   .tooth-cell {
-     font: var(--text-data-9xs) !important;
-     padding: 2px !important;
-   }
-
-  /* Evitar saltos de página en elementos importantes */
-  .patient-detail__info,
-  .patient-acceptance-section {
-    page-break-inside: avoid;
+  .ant-tabs-content,
+  .ant-tabs-content-animated {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    transform: none !important;
+    width: 100% !important;
   }
 
-  /* Forzar salto de página antes de la sección de aceptación */
-  .patient-acceptance-section {
-    page-break-before: always;
-  }
-
-  /* NUEVAS REGLAS: Separar odontogramas y historial médico en hojas diferentes */
-  
-  /* Forzar salto de página antes de las secciones de odontograma */
-  .patient-detail_odontograma {
-    page-break-before: always;
-    page-break-inside: avoid;
-  }
-
-  /* PERIODONTOGRAMA: Forzar que SIEMPRE aparezca en nueva página */
-  .periodontogram-section {
-    page-break-before: always !important;
-    page-break-inside: auto !important; /* Permitir división si es necesario */
+  /* Forzar TODOS los tab panes visibles (el JS también lo hace, esto es respaldo) */
+  .ant-tabs-tabpane,
+  .ant-tabs-tabpane-hidden,
+  [class*="ant-tabs-tabpane"] {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: relative !important;
+    pointer-events: none !important;
   }
 
-  /* Forzar salto de página antes del historial médico */
-  .patient-detail__section[aria-labelledby*="historial"],
-  .patient-detail__section[aria-labelledby*="medical-survey"] {
-    page-break-before: always;
-    page-break-inside: avoid;
+  /* Salto de página entre secciones de tabs */
+  .ant-tabs-tabpane + .ant-tabs-tabpane {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
   }
 
-  /* ODONTOGRAMA: Contenedor principal con escala moderada */
+  /* ── Header del paciente ── */
+  .patient-detail__info {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+    border-bottom: 2px solid #333 !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 1rem !important;
+    page-break-inside: avoid !important;
+    width: 100% !important;
+  }
+
+  .patient-detail__photo {
+    flex-shrink: 0 !important;
+  }
+
+  .patient-detail__photo img {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 50% !important;
+    border: 1px solid #ccc !important;
+    object-fit: cover !important;
+  }
+
+  .patient-detail__details {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .patient-detail__details h1 {
+    font-size: 16pt !important;
+    font-weight: bold !important;
+    margin: 0 0 0.3rem 0 !important;
+    color: #000 !important;
+  }
+
+  .patient-detail__details p {
+    font-size: 9pt !important;
+    margin: 2px 0 !important;
+    color: #333 !important;
+  }
+
+  /* ── Secciones generales ── */
+  .patient-detail__section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 0.8rem !important;
+    padding: 0.6rem 0.8rem !important;
+    box-shadow: none !important;
+    border: 1px solid #bbb !important;
+    border-radius: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+  }
+
+  .patient-detail__section h2 {
+    font-size: 12pt !important;
+    font-weight: bold !important;
+    color: #000 !important;
+    margin: 0 0 0.4rem 0 !important;
+    border-bottom: 1px solid #ccc !important;
+    padding-bottom: 0.2rem !important;
+  }
+
+  .patient-detail__section h3 {
+    font-size: 10pt !important;
+    font-weight: 600 !important;
+    color: #222 !important;
+    margin: 0.3rem 0 0.2rem 0 !important;
+  }
+
+  .patient-detail__section p,
+  .patient-detail__section span,
+  .patient-detail__section strong,
+  .patient-detail__section li {
+    font-size: 9pt !important;
+    color: #000 !important;
+    line-height: 1.4 !important;
+  }
+
+  .patient-detail__subsection,
+  .patient-detail__definition-list {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Tablas ── */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+    margin: 0.3rem 0 !important;
+  }
+
+  th, td {
+    border: 1px solid #888 !important;
+    padding: 3px 5px !important;
+    text-align: left !important;
+    vertical-align: top !important;
+  }
+
+  th {
+    background-color: #e8e8e8 !important;
+    font-weight: bold !important;
+  }
+
+  /* ── Odontograma ── */
+  .patient-detail_odontograma {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
   .odontogram-container {
     width: 100% !important;
     max-width: none !important;
-    margin: 30px 0 !important;
-    transform: scale(1.5) !important;
-    transform-origin: top left !important;
+    margin: 0.5rem 0 !important;
+    overflow: visible !important;
   }
 
-  /* Canvas e imágenes del odontograma - representación visual MUY GRANDE */
   .odontogram-canvas,
   .odontogram-image {
     width: 100% !important;
-    max-width: none !important;
+    max-width: 100% !important;
     height: auto !important;
-    transform: scale(4.0) !important;
-    transform-origin: center !important;
-    margin: 3rem 0 !important;
+    display: block !important;
   }
 
-  /* Tablas del odontograma - tamaño normal como solicitado */
   .odontograma-table {
-    font: var(--text-data-5xs) !important;
-    margin: var(--spacing-xl) 0 !important;
-    transform: scale(1.0) !important;
-    transform-origin: center !important;
+    font-size: 7pt !important;
+    margin: 0.4rem 0 !important;
   }
 
   .odontograma-table th,
   .odontograma-table td {
-    padding: var(--spacing-sm) !important;
-    font: var(--text-data-6xs) !important;
+    padding: 2px 4px !important;
+    font-size: 7pt !important;
   }
 
-  /* PERIODONTOGRAMA: Configuración diferenciada por modo */
-  
-  /* MODO IMAGEN: Escalas más grandes para imágenes guardadas - USAR TODO EL ANCHO */
-  .saved-images-container {
-      position: relative !important;
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      padding: var(--spacing-xl) 2.5rem !important;
-      margin: 0 var(--spacing-xl) !important;
-      box-sizing: border-box !important;
-      z-index: 1000 !important;
-    }
-
-  .saved-images-container .periodontogram-container,
-  .saved-images-container .saved-image-section {
-    width: 100% !important;
-    max-width: none !important;
-    margin: var(--spacing-xl) 0 !important;
-    transform: scale(1.0) !important;
-    transform-origin: top left !important;
-  }
-
-  /* Imágenes guardadas del periodontograma - usar todo el ancho disponible */
-  .saved-periodontogram-image {
-    width: 100% !important;
-    max-width: none !important;
-    height: auto !important;
-    transform: scale(1.25) !important;
-    transform-origin: center !important;
-    margin: var(--spacing-xxl) 0 !important;
-  }
-
-  /* MODO RENDER: Escalas más pequeñas para vista editable - PERO NO EN IMPRESIÓN */
-  .periodontogram-container:not(.saved-images-container .periodontogram-container) {
-    width: 100% !important;
-    max-width: none !important;
-    margin: 10px 0 !important;
-    transform: none !important; /* Eliminar transformación en impresión */
-    transform-origin: top left !important;
-  }
-
-  /* Canvas y elementos editables del periodontograma - SIN ESCALA EN IMPRESIÓN */
-  .periodontogram-editable {
-    width: 100% !important;
-    max-width: none !important;
-    height: auto !important;
-    transform: none !important; /* Eliminar transformación en impresión */
-    transform-origin: center !important;
-    margin: 10px 0 !important;
-  }
-
-  /* Contenedores específicos del periodontograma - SIN ESCALA EN IMPRESIÓN */
-  .periodontogram-superior:not(.saved-images-container .periodontogram-superior),
-  .periodontogram-inferior:not(.saved-images-container .periodontogram-inferior) {
-    margin: 5px 0 !important;
-    transform: none !important; /* Eliminar transformación en impresión */
-    transform-origin: center !important;
-  }
-
-  /* Tablas del periodontograma - SIN ESCALA EN IMPRESIÓN */
-  .periodontogram-section:not(.saved-images-container .periodontogram-section) table {
-    font: var(--text-data-10xs) !important;
-    margin: 5px 0 !important;
-    transform: none !important; /* Eliminar transformación en impresión */
-    transform-origin: center !important;
-  }
-
-  .periodontogram-section:not(.saved-images-container .periodontogram-section) th,
-  .periodontogram-section:not(.saved-images-container .periodontogram-section) td {
-    padding: 2px !important;
-    font: var(--text-data-11xs) !important;
-  }
-
-  /* Asegurar que el periodontograma no se corte y se muestre completo */
+  /* ── Periodontograma ── */
   .periodontogram-section {
-    page-break-before: always !important; /* Nueva página */
-    page-break-inside: auto !important; /* Permitir salto si es muy grande */
+    page-break-before: always !important;
+    break-before: page !important;
+    page-break-inside: auto !important;
     break-inside: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     overflow: visible !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -995,51 +1186,94 @@
 
   .periodontogram-container {
     overflow: visible !important;
-    page-break-inside: auto !important;
+    width: 100% !important;
+    transform: none !important;
+  }
+
+  .saved-images-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .saved-periodontogram-image {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0.5rem 0 !important;
+  }
+
+  .periodontogram-editable,
+  .periodontogram-superior,
+  .periodontogram-inferior,
+  .periodontogram-design,
+  .periodontogram-data-table {
+    transform: none !important;
+    overflow: visible !important;
     width: 100% !important;
   }
 
-  /* Forzar que canvas se impriman correctamente */
-  .periodontogram-section canvas,
-  .linear-graphics-canvas,
-  .tooth-image {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    page-break-inside: avoid !important;
+  .periodontogram-section table {
+    font-size: 6pt !important;
   }
 
-  /* Asegurar que las secciones de arco no se corten */
+  .periodontogram-section th,
+  .periodontogram-section td {
+    padding: 2px !important;
+    font-size: 6pt !important;
+  }
+
   .arch-section {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     overflow: visible !important;
   }
 
-  /* Evitar transformaciones que puedan cortar el contenido en impresión */
-  .periodontogram-design,
-  .periodontogram-data-table {
-    transform: none !important;
-    overflow: visible !important;
+  .periodontogram-section canvas,
+  .linear-graphics-canvas,
+  .tooth-image {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     page-break-inside: avoid !important;
+    max-width: 100% !important;
   }
 
-  /* FORZAR que TODAS las secciones sean visibles en impresión */
-  .patient-detail__section,
-  .periodontogram-section,
-  .patient-detail_odontograma,
-  section,
-  div[class*="section"] {
+  /* ── Sección de aceptación (solo en impresión) ── */
+  .patient-acceptance-section {
     display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
+    page-break-before: always !important;
+    break-before: page !important;
   }
 
-  /* Asegurar que no hay límites de altura que corten el contenido */
+  /* ── Evitar corte en elementos críticos ── */
+  .patient-detail__info,
+  .patient-acceptance-section,
+  .acceptance-content {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ── Altura libre para todo el contenido ── */
   * {
     max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ant-tabs-tabpane > * {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* ── Ocultar elementos de UI de Ant Design no deseados ── */
+  .ant-skeleton,
+  .ant-message,
+  .ant-tooltip,
+  .ant-popover,
+  .loading-container {
+    display: none !important;
   }
 }
 
@@ -1060,8 +1294,6 @@
   font: var(--text-heading-xxs);
 }
 
-.delete-patient-btn {
-}
 
 .delete-confirm {
   display: flex;

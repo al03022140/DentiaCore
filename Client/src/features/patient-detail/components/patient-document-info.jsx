@@ -13,7 +13,7 @@ const PatientDocumentInfo = ({ documento = null }) => {
     return (
       <section className="patient-detail__section" aria-labelledby={sectionId}>
         <SectionHeader title="Documento de Identificación" id={sectionId} />
-        <p>No hay información del documento.</p>
+        <p className="patient-detail__empty-message">No hay información del documento.</p>
       </section>
     );
   }

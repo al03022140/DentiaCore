@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descriptions, Statistic } from 'antd';
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, SearchOutlined, LockOutlined } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
@@ -31,15 +31,12 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
     }
   }, []);
 
-  useEffect(() => {
-    fetchPatients();
-  }, [fetchPatients]);
-
   const showModal = (type) => {
     setActionType(type);
     setIsModalOpen(true);
     form.resetFields();
     form.setFieldsValue({ paymentMethod: 'CASH' });
+    if (type === 'INCOME') fetchPatients();
   };
 
   const handleOk = async () => {

@@ -41,10 +41,9 @@
   color: #fff;
 }
 
+/* Visual card heredada de .patient-detail__empty-message (shared).
+   Solo se sobreescribe font-size; el padding/bg/sombra vienen del shared. */
 .patient-charges-card__empty {
-  text-align: center;
-  color: var(--color-text-secondary);
-  padding: 2rem 0;
   font-size: 0.95rem;
 }
 

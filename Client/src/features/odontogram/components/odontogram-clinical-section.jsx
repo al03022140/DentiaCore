@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Table, Modal, message, Tabs } from 'antd';
 import { prepareDataSource } from '../utils/odontogram-utils.js';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
@@ -64,13 +64,13 @@ const OdontogramClinicalSection = ({
     // -----------------------------
 
     // --- Estados ---
-    // Eliminados: canvasData, detectedDamages, observations, specifications, showAllTeeth, showSpinner
     const [isSaving, setIsSaving] = useState(false);
     const [engineError, setEngineError] = useState(null);
-    const [isEngineInitialized, setIsEngineInitialized] = useState(false); // NUEVO ESTADO para habilitar el botón
-    const [clinicalHistory, setClinicalHistory] = useState([]); // NUEVO: Estado para el historial clínico
-    const [loadingHistory, setLoadingHistory] = useState(false); // NUEVO: Estado de carga del historial
-    const [currentCanvasData, setCurrentCanvasData] = useState([]); // NUEVO: Estado para datos actuales del canvas
+    const [isEngineInitialized, setIsEngineInitialized] = useState(false);
+    const [clinicalHistory, setClinicalHistory] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [currentCanvasData, setCurrentCanvasData] = useState([]);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Consolidar refs del motor
     const engineManagerRef = useRef({
@@ -78,6 +78,15 @@ const OdontogramClinicalSection = ({
         handlers: null,
         initialized: false
     });
+
+    useEffect(() => {
+        if (!isFullscreen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsFullscreen(false);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isFullscreen]);
 
     // Envolver getDamageNameFromIdInternal con useCallback para estabilidad si se pasa como prop o dependencia compleja
     // Si solo se usa internamente en el efecto de saveOdontograma, y este ya depende de engineManagerRef.current.instance,
@@ -518,7 +527,35 @@ const OdontogramClinicalSection = ({
               </div>
               <div className="odontograma-wrapper">
                 <div className="odontograma-container odontograma-flex-container">
-                  <div className="odontograma-canvas-container" style={{ position: 'relative' }}>
+                  {isFullscreen && (
+                    <div
+                      className="odontograma-fullscreen-backdrop"
+                      onClick={() => setIsFullscreen(false)}
+                    />
+                  )}
+                  <div className={`odontograma-canvas-container${isFullscreen ? ' odontograma-canvas-fullscreen' : ''}`}>
+                    {isFullscreen && (
+                      <div className="odontograma-fullscreen-header">
+                        <h3>Odontograma Clínico</h3>
+                        <button
+                          className="odontograma-fullscreen-close"
+                          onClick={() => setIsFullscreen(false)}
+                          title="Cerrar (Esc)"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                    {!isFullscreen && (
+                      <button
+                        className="odontograma-expand-btn"
+                        onClick={() => setIsFullscreen(true)}
+                        title="Ampliar odontograma"
+                        aria-label="Ampliar odontograma"
+                      >
+                        ⛶
+                      </button>
+                    )}
                     {engineError && <div className="error-message">{engineError}</div>}
                     <canvas 
                       id="odontograma-canvas-2" 
@@ -528,19 +565,8 @@ const OdontogramClinicalSection = ({
                       ref={canvasRef}
                     />
                     {isSaving && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(255,255,255,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2
-                      }}>
-                        <span style={{ fontSize: 24, color: '#1890ff' }}>Guardando...</span>
+                      <div className="odontograma-saving-overlay" role="status" aria-live="polite">
+                        <span className="odontograma-saving-overlay__text">Guardando...</span>
                       </div>
                     )}
                   </div>

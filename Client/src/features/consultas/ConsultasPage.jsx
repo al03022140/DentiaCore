@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from 'antd';
+import { PlusCircleOutlined } from '@ant-design/icons';
 import './styles/consultas-page.css';
-import userNot from '../../assets/images/avatars/UserNot.png';
+import userNot from '../../assets/images/icons/Profile Default.svg';
 import { getTodayAppointments } from '../../shared/services/appointment-service';
 import CreateAppointmentModal from './components/CreateAppointmentModal';
 
@@ -95,8 +97,12 @@ const ConsultasPage = () => {
     a.estado === 'Pasada' || a.estado === 'Cancelada'
   );
 
+  const agendaIsEmpty = !loading && agenda.length === 0;
+
   const renderItems = (items) => {
-    if (!items || items.length === 0) return <p className="text-muted">Sin servicios asignados.</p>;
+    if (!items || items.length === 0) {
+      return <p className="consultas-inline-empty">Sin servicios asignados.</p>;
+    }
     return (
       <ul className="plan-today-list">
         {items.map((item, idx) => (
@@ -115,8 +121,8 @@ const ConsultasPage = () => {
 
         {/* Panel Superior: Siguiente Paciente */}
         {loading ? (
-          <div className="next-patient-card">
-            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>Cargando agenda...</p>
+          <div className="next-patient-card next-patient-card--loading">
+            <p className="consultas-card-loading-text">Cargando agenda…</p>
           </div>
         ) : nextPatient ? (
           <div className="next-patient-card">
@@ -124,8 +130,11 @@ const ConsultasPage = () => {
               <img
                 src={getPatientImage(nextPatient) || userNot}
                 alt={getPatientName(nextPatient)}
-                className="next-patient-avatar"
-                onError={e => { e.target.src = userNot; }}
+                className={`next-patient-avatar${getPatientImage(nextPatient) ? '' : ' profile-default-avatar'}`}
+                onError={e => {
+                  e.target.src = userNot;
+                  e.target.classList.add('profile-default-avatar');
+                }}
               />
               <div className="next-patient-info">
                 <span className="next-patient-time">Siguiente: {formatTime(nextPatient.fecha_hora)} hrs</span>
@@ -149,6 +158,7 @@ const ConsultasPage = () => {
             )}
 
             <button
+              type="button"
               className="start-consultation-btn"
               onClick={() => handleStartConsultation(nextPatient)}
             >
@@ -156,13 +166,34 @@ const ConsultasPage = () => {
             </button>
           </div>
         ) : (
-          <div className="next-patient-card">
-            <h2>No hay más pacientes por hoy.</h2>
+          <div className="next-patient-card next-patient-card--empty">
+            <div className="next-patient-header">
+              <img
+                src={userNot}
+                alt=""
+                className="next-patient-avatar next-patient-avatar--placeholder profile-default-avatar"
+              />
+              <div className="next-patient-info">
+                <span className="next-patient-time">
+                  {agendaIsEmpty ? 'Agenda vacía' : 'Sin citas pendientes'}
+                </span>
+                <h2>
+                  {agendaIsEmpty
+                    ? 'No hay citas para hoy'
+                    : 'No hay más pacientes pendientes hoy'}
+                </h2>
+                <p className="next-patient-empty-caption">
+                  {agendaIsEmpty
+                    ? 'Crea una cita con «Nueva cita» en la agenda del día.'
+                    : 'Las citas restantes ya fueron atendidas o canceladas. Puedes revisar el detalle en la lista.'}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Panel Inferior: Detalle de Selección */}
-        {selectedConsultation && (
+        {/* Panel Inferior: Detalle de Selección (siempre misma tarjeta; vacío si no hay selección) */}
+        {selectedConsultation ? (
           <div className="selected-detail-panel">
             <div className="detail-header-info">
               <div>
@@ -209,11 +240,23 @@ const ConsultasPage = () => {
 
             <div className="detail-actions">
               <button
+                type="button"
                 className="secondary-btn"
                 onClick={() => handleStartConsultation(selectedConsultation)}
               >
                 Ver Expediente Completo
               </button>
+            </div>
+          </div>
+        ) : (
+          <div className="selected-detail-panel selected-detail-panel--empty">
+            <div className="consultas-empty-state">
+              <h3 className="consultas-empty-state__title">Detalle de cita</h3>
+              <p className="consultas-empty-state__text">
+                {agendaIsEmpty
+                  ? 'Cuando agregues citas para hoy, podrás ver aquí motivo, servicios y totales.'
+                  : 'Selecciona una cita en la agenda de la derecha para ver su información completa.'}
+              </p>
             </div>
           </div>
         )}
@@ -223,13 +266,15 @@ const ConsultasPage = () => {
       <div className="consultas-right">
         <div className="consultas-right-header">
           <h3>Agenda del Día</h3>
-          <button
+          <Button
+            type="primary"
+            icon={<PlusCircleOutlined />}
             className="consultas-add-btn"
             onClick={() => setShowCreateModal(true)}
             title="Nueva cita"
           >
-            +
-          </button>
+            Nueva cita
+          </Button>
         </div>
 
         <div className="consultas-list-container">
@@ -254,7 +299,9 @@ const ConsultasPage = () => {
               </div>
             ))
           ) : (
-            <p style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>No hay consultas pendientes.</p>
+            <div className="consultas-list-empty" role="status">
+              No hay consultas pendientes.
+            </div>
           )}
 
           <div className="list-section-title">Consultas Realizadas</div>
@@ -276,7 +323,9 @@ const ConsultasPage = () => {
               </div>
             ))
           ) : (
-            <p style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>Aún no hay consultas completadas.</p>
+            <div className="consultas-list-empty" role="status">
+              Aún no hay consultas completadas.
+            </div>
           )}
         </div>
       </div>

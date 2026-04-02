@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllCharges } from '../../shared/services/patientChargeService';
-import userNot from '../../assets/images/avatars/UserNot.png';
+import userNot from '../../assets/images/icons/Profile Default.svg';
 
 const calculateAge = (fechaNacimiento) => {
   if (!fechaNacimiento) return null;
@@ -67,8 +67,11 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
                 <img
                   src={photoUrl || userNot}
                   alt={patientName}
-                  className="pending-charge-item__avatar"
-                  onError={e => { e.target.src = userNot; }}
+                  className={`pending-charge-item__avatar${photoUrl ? '' : ' profile-default-avatar'}`}
+                  onError={e => {
+                    e.target.src = userNot;
+                    e.target.classList.add('profile-default-avatar');
+                  }}
                 />
                 <div className="pending-charge-item__info">
                   <span className="pending-charge-item__name">

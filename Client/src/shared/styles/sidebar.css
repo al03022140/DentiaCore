@@ -28,7 +28,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: var(--figma-space-lg) 0;
+  padding: var(--figma-space-2xl) 0 var(--figma-space-lg);
 }
 
 .sidebar--mobile .sidebar {
@@ -46,8 +46,9 @@
 .sidebar-wrapper .sidebar .logo {
   display: flex;
   justify-content: center;
+  align-items: center;
   width: 100%;
-  padding: 0 var(--figma-space-lg);
+  padding: var(--figma-space-xl) var(--figma-space-lg) var(--figma-space-lg);
   box-sizing: border-box;
   margin-bottom: var(--figma-space-2xl);
 }
@@ -57,15 +58,21 @@
   max-width: 8rem;
   border-radius: var(--figma-radius-md);
   display: block;
-  aspect-ratio: 1;
   object-fit: contain;
+}
+
+.sidebar-wrapper .sidebar .sidebar-logo--white {
+  width: 85%;
+  max-width: 11rem;
+  height: auto;
+  filter: brightness(0) invert(1);
 }
 
 .sidebar-wrapper .sidebar ul {
   list-style: none;
   padding: 0 var(--figma-space-md);
   width: 100%;
-  margin: 0;
+  margin: 6vh 0 0;
   box-sizing: border-box;
 }
 
@@ -76,7 +83,7 @@
 .sidebar-wrapper .sidebar ul li a {
   text-decoration: none;
   color: var(--text-color);
-  font: var(--font-weight-normal) clamp(0.85rem, 1vw, 1rem) / 1.4 var(--font-family-primary);
+  font: var(--font-weight-normal) clamp(1.15rem, 1.45vw, 1.45rem) / 1.4 var(--font-family-primary);
   display: flex;
   align-items: center;
   padding: 0.6rem 0.875rem;

@@ -1,10 +1,13 @@
 import React from 'react';
 import { useTheme } from '../../../shared/context/ThemeContext';
+import sunIcon from '../../../assets/images/icons/sun.svg';
+import moonIcon from '../../../assets/images/icons/moon.svg';
+import monitorIcon from '../../../assets/images/icons/monitor.svg';
 
 const OPTIONS = [
-  { value: 'light', label: '☀️ Claro', desc: 'Interfaz con fondo blanco' },
-  { value: 'dark', label: '🌙 Oscuro', desc: 'Interfaz con fondo oscuro' },
-  { value: 'system', label: '💻 Sistema', desc: 'Sigue la preferencia del sistema operativo' },
+  { value: 'light', label: 'Claro', icon: sunIcon, desc: 'Interfaz con fondo blanco' },
+  { value: 'dark', label: 'Oscuro', icon: moonIcon, desc: 'Interfaz con fondo oscuro' },
+  { value: 'system', label: 'Sistema', icon: monitorIcon, desc: 'Sigue la preferencia del sistema operativo' },
 ];
 
 const AppearanceSection = () => {
@@ -28,6 +31,7 @@ const AppearanceSection = () => {
               checked={theme === opt.value}
               onChange={() => setTheme(opt.value)}
             />
+            <img src={opt.icon} alt="" width="24" height="24" className="theme-icon" style={{ flexShrink: 0 }} />
             <div>
               <div style={{ fontWeight: 500 }}>{opt.label}</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{opt.desc}</div>

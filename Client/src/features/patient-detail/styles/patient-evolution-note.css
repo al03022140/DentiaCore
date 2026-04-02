@@ -27,6 +27,15 @@
   order: 0;
 }
 
+/* Vista solo historial (expediente impreso / sin formulario) */
+.patient-evolution-note--history-only .patient-evolution-note__header {
+  margin-bottom: 8px;
+}
+
+.patient-evolution-note--history-only .patient-evolution-note__history h3 {
+  margin-top: 0;
+}
+
 .patient-evolution-note__header .Boton_Imprimir {
   margin-left: auto; /* Asegura que el botón se quede a la derecha */
   order: 1; /* Anula el order global (-1) y coloca el botón después del título */

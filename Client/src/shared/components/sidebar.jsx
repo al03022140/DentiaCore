@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import '../styles/sidebar.css';
-import logo from "../../assets/images/logos/logo.png";
+import logo from "../../assets/images/logos/DentiaCore.svg";
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
 import { useSidebar } from '../context/SidebarContext';
@@ -31,7 +31,7 @@ const Sidebar = () => {
         <div className="sidebar">
           <nav className="sidebar">
             <div className="logo">
-              <img src={logo} alt="Logo" className="sidebar-logo" />
+              <img src={logo} alt="DentiaCore" className="sidebar-logo sidebar-logo--white" />
             </div>
             <ul>
               <li>

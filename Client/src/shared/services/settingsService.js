@@ -1,14 +1,29 @@
 import API from './axios-instance';
 
+// Cache para configuración (3 min) — usada en varios modales y secciones
+const SETTINGS_CACHE_TTL_MS = 3 * 60 * 1000;
+let settingsCache = { data: null, ts: 0 };
+
+export const invalidateSettingsCache = () => {
+  settingsCache = { data: null, ts: 0 };
+};
+
 // ── Clinic Settings ──────────────────────────────────────────
 
-export const getSettings = async () => {
+export const getSettings = async (options = {}) => {
+  const { skipCache = false } = options;
+  const now = Date.now();
+  if (!skipCache && settingsCache.data !== null && now - settingsCache.ts < SETTINGS_CACHE_TTL_MS) {
+    return settingsCache.data;
+  }
   const { data } = await API.get('/settings');
+  settingsCache = { data, ts: now };
   return data;
 };
 
 export const updateSettings = async (updates) => {
   const { data } = await API.patch('/settings', updates);
+  invalidateSettingsCache();
   return data;
 };
 

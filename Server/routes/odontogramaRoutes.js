@@ -6,6 +6,7 @@ const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 const {
   verificarOdontogramaInicial,
+  hasInitialOdontogram,
   validarEntradasOdontograma,
   guardarOdontogramaInicial,
   obtenerHistorialInicial,
@@ -48,6 +49,14 @@ const {
 
 // Middleware global para validar paciente
 router.use(checkPatient);
+
+// Comprobación rápida para el motor del canvas (mismo auth que el resto)
+router.get(
+  '/has-initial-odontogram',
+  readLimiter,
+  authorize(['odontogram.read']),
+  hasInitialOdontogram
+);
 
 // Middleware para establecer el directorio de upload
 const setUploadDir = (dir) => (req, res, next) => {

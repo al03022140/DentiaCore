@@ -1275,7 +1275,7 @@ const Medic = ({
                         handleAddItem("medicacion", { nombre: "", dosis: "", frecuencia: "" });
                       }}
                     >
-                      <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Medicación
+                      <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Medicación
                     </button>
                   </div>
 
@@ -1315,7 +1315,7 @@ const Medic = ({
                         handleAddItem("alergias", { sustancia: "", reaccion: "" });
                       }}
                     >
-                      <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Alergia
+                      <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Alergia
                     </button>
                   </div>
         </div>

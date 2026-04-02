@@ -23,6 +23,16 @@ document.writeln("<script type='text/javascript' src='js/odontogramaGenerator.js
 document.writeln("<script type='text/javascript' src='js/collisionHandler.js'></script>");
 */
 
+/** Misma clave que Client/src/shared/services/auth-token.js (dentia_access_token) */
+function dentiaGetAccessToken() {
+    "use strict";
+    try {
+        return localStorage.getItem('dentia_access_token');
+    } catch (e) {
+        return null;
+    }
+}
+
 function Engine(config) {
     "use strict";
     // canvas which is used by the engine
@@ -145,27 +155,31 @@ Engine.prototype.setCanvas = function (canvas) {
 };
 
 /**
- * Helper method to get the real x position of mouse
+ * Helper method to get the real x position of mouse,
+ * scaled from display space to canvas coordinate space.
  * @param {type} event mouse event containing mouse position
- * @returns {Number} the x position of the mouse
+ * @returns {Number} the x position of the mouse in canvas coordinates
  */
 Engine.prototype.getXpos = function (event) {
     "use strict";
     var boundingRect = this.canvas.getBoundingClientRect();
+    var scaleX = this.canvas.width / boundingRect.width;
 
-    return Math.round(event.clientX - (boundingRect.left));
+    return Math.round((event.clientX - boundingRect.left) * scaleX);
 };
 
 /**
- * Helper method to get the real y position of mouse
+ * Helper method to get the real y position of mouse,
+ * scaled from display space to canvas coordinate space.
  * @param {type} event mouse event containing mouse position
- * @returns {Number} the y position of the mouse
+ * @returns {Number} the y position of the mouse in canvas coordinates
  */
 Engine.prototype.getYpos = function (event) {
     "use strict";
     var boundingRect = this.canvas.getBoundingClientRect();
+    var scaleY = this.canvas.height / boundingRect.height;
 
-    return Math.round(event.clientY - (boundingRect.top));
+    return Math.round((event.clientY - boundingRect.top) * scaleY);
 };
 
 /**
@@ -222,9 +236,15 @@ Engine.prototype.init = function () {
 
     // Watch for theme changes and re-detect colors
     var self = this;
-    this._themeObserver = new MutationObserver(function () {
+    this._onDentiaThemeChange = function () {
         self.settings.detectTheme();
-    });
+        try {
+            self.update();
+        } catch (e) { /* engine aún no listo */ }
+    };
+    window.addEventListener('dentia-theme-change', this._onDentiaThemeChange);
+
+    this._themeObserver = new MutationObserver(this._onDentiaThemeChange);
     this._themeObserver.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['data-theme']
@@ -1414,15 +1434,31 @@ Engine.prototype.getOdontogramaData = function() {
  */
 Engine.prototype.checkInitialOdontogramStatus = function() {
     "use strict";
-    
-    // Hacer llamada al servidor para verificar si existe odontograma inicial
-    fetch(`/api/patients/${this.patientId}/has-initial-odontogram`)
-        .then(response => response.json())
-        .then(data => {
-            this.hasSavedInitialOdontogram = data.hasSaved;
+    var self = this;
+    if (!this.patientId) {
+        this.hasSavedInitialOdontogram = false;
+        return;
+    }
+    var token = dentiaGetAccessToken();
+    var headers = { Accept: 'application/json' };
+    if (token) {
+        headers.Authorization = 'Bearer ' + token;
+    }
+    fetch('/api/patients/' + this.patientId + '/has-initial-odontogram', {
+        credentials: 'include',
+        headers: headers
+    })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.json();
         })
-        .catch(error => {
-            console.error("Error checking initial odontogram:", error);
+        .then(function (data) {
+            self.hasSavedInitialOdontogram = !!data.hasSaved;
+        })
+        .catch(function (error) {
+            console.error('Error checking initial odontogram:', error);
         });
 };
 

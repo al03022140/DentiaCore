@@ -36,7 +36,7 @@ const PatientEmergencyContacts = ({ contactos = [] }) => {
             </li>
           ))
         ) : (
-          <li className="no-contacts-message">
+          <li className="no-contacts-message patient-detail__empty-message">
             No hay contactos de emergencia registrados.
           </li>
         )}

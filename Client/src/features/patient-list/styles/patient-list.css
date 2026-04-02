@@ -10,6 +10,11 @@
   --pl-background-color: var(--figma-bg-card);
   --pl-light-background: var(--figma-bg-input);
   --pl-border-color: var(--figma-border-default);
+  /* Ritmo vertical del bloque de tarjetas (sin tocar cada tarjeta) */
+  --pl-grid-row-gap: var(--spacing-sm);
+  --pl-grid-column-gap: var(--figma-space-md);
+  /* Separación del grid completo respecto a búsqueda/barra de acciones (baja el bloque) */
+  --pl-grid-block-margin-top: var(--spacing-xxl);
   font-family: var(--font-family-primary);
   width: 100%;
 }
@@ -18,6 +23,7 @@
   overflow: visible;
   padding: var(--figma-space-lg) var(--figma-space-2xl);
   padding-top: var(--figma-space-xs);
+  padding-bottom: 5.5rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -41,35 +47,44 @@
   min-height: 6rem;
 }
 
+/* 4 columnas × 4 filas = 16 tarjetas por página (ver patientsPerPage en patient-list.jsx) */
 .patient-list-wrapper .patient-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--figma-gap-card-grid);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: var(--pl-grid-row-gap);
+  column-gap: var(--pl-grid-column-gap);
   width: 100%;
+  margin-top: var(--pl-grid-block-margin-top);
   box-sizing: border-box;
   align-content: start;
+  align-items: start;
 }
 
 .patient-list-wrapper .patient-card {
   display: flex;
   align-items: center;
   background-color: var(--pl-background-color);
-  border-radius: var(--figma-radius-lg);
-  padding: var(--figma-space-lg) !important;
+  border-radius: var(--figma-radius-md);
+  padding: var(--figma-space-lg) var(--figma-space-lg) var(--figma-space-lg) var(--figma-space-lg) !important;
   width: 100% !important;
-  height: auto !important;
-  min-height: 80px !important;
+  height: 118px !important;
+  min-height: 118px !important;
+  max-height: 118px !important;
   box-shadow: var(--figma-shadow-card);
   border: 1px solid var(--pl-border-color);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* left-accent via inset box-shadow: no provoca layout shift */
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   box-sizing: border-box;
   gap: var(--figma-space-md);
+  position: relative;
+  overflow: hidden;
 }
 
 .patient-list-wrapper .patient-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--figma-shadow-elevated);
+  box-shadow: var(--figma-shadow-elevated), inset 3px 0 0 var(--color-primary);
+  border-color: rgba(8, 72, 136, 0.22);
 }
 
 .patient-list-wrapper .patient-card:active {
@@ -78,21 +93,25 @@
 
 .patient-list-wrapper .patient-photo {
   flex-shrink: 0;
-  width: var(--figma-avatar-size);
-  height: var(--figma-avatar-size);
+  width: 4rem;
+  height: 4rem;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--figma-radius-full);
   overflow: hidden;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
 }
 
 .patient-list-wrapper .patient-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: var(--figma-radius-full);
-  border: 2px solid var(--pl-border-color);
+  border-radius: 50%;
+  border: none;
+  display: block;
 }
 
 .patient-list-wrapper .patient-info {
@@ -100,15 +119,26 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  justify-content: center;
+  justify-content: space-between;
   text-align: left;
   min-width: 0;
-  gap: 2px;
+  height: 100%;
+  gap: 0;
 }
 
+/* ── ID como badge/pill ── */
 .patient-list-wrapper .patient-id {
-  font: var(--figma-text-small);
-  color: var(--pl-secondary-color);
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  background: rgba(8, 72, 136, 0.08);
+  color: var(--color-primary);
+  border-radius: 99px;
+  padding: 1px 7px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
   white-space: nowrap;
 }
 
@@ -116,26 +146,43 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 5px;
   width: 100%;
+  transform: translateY(-2px);
 }
 
+/* ── Fila inferior con metadatos ── */
 .patient-list-wrapper .patient-bottom {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  padding-top: 4px;
-  gap: var(--figma-space-md);
+  flex-wrap: nowrap;
+  padding-top: 6px;
+  margin-top: 0;
+  border-top: 1px dashed var(--color-border-light);
+  gap: 0 var(--figma-space-md);
   width: 100%;
-  font: var(--figma-text-small-regular);
-  color: var(--pl-secondary-color);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  overflow: hidden;
 }
 
+/* ── Chips de edad y visita ── */
 .patient-list-wrapper .patient-age,
 .patient-list-wrapper .patient-visit {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Icono SVG dentro de los chips */
+.patient-list-wrapper .patient-age svg,
+.patient-list-wrapper .patient-visit svg {
+  flex-shrink: 0;
+  opacity: 0.55;
 }
 
 .patient-list-wrapper .patient-visit {
@@ -158,39 +205,52 @@
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: var(--figma-space-md);
+  bottom: calc(var(--figma-space-xl) + var(--spacing-md));
   z-index: 1200;
   display: flex;
-  gap: 4px;
-  padding: 4px var(--figma-space-xs);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
   background: var(--figma-bg-card);
-  border-radius: var(--figma-radius-sm);
-  box-shadow: var(--figma-shadow-elevated);
-  border: 1px solid var(--figma-border-default);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border-medium);
+  max-width: calc(100vw - 2rem);
 }
 
 .patient-list-wrapper .page-number {
-  padding: var(--figma-space-xs) var(--figma-space-lg);
+  min-width: 2.0rem;
+  height: 2.0rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-xs);
   border: 1px solid var(--figma-border-default);
-  border-radius: var(--figma-radius-sm);
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   background-color: var(--figma-bg-card);
-  transition: all 0.15s ease;
-  font: var(--figma-text-small);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  font: var(--pd-font-action);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .patient-list-wrapper .page-number:hover {
   background-color: var(--figma-bg-neutral);
+  border-color: var(--color-border-medium);
 }
 
 .patient-list-wrapper .page-number.active {
   background-color: var(--pl-primary-color);
   color: var(--figma-text-on-dark);
   border-color: var(--pl-primary-color);
+  font-weight: var(--font-weight-semibold);
 }
 
 .patient-list-wrapper .filter-button {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .patient-list-wrapper .filter-icon {
@@ -201,8 +261,11 @@
 
 .patient-list-wrapper .sort-menu {
   position: absolute;
-  margin-top: 2.5rem;
-  right: 2rem;
+  top: 100%;
+  margin-top: 0.5rem;
+  left: 0;
+  right: auto;
+  min-width: 12.5rem;
   background-color: var(--figma-bg-card);
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-sm);
@@ -217,10 +280,32 @@
 }
 
 .patient-list-wrapper .sort-menu li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
   font: var(--figma-text-caption);
   padding: var(--figma-space-xs) var(--figma-space-lg);
   cursor: pointer;
   transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.patient-list-wrapper .sort-menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-list-wrapper .sort-menu__arrow {
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+.patient-list-wrapper .sort-menu__arrow.sort-menu__arrow--placeholder {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .patient-list-wrapper .sort-menu li:hover {
@@ -231,13 +316,14 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  margin-bottom: var(--figma-space-xs);
+  margin-bottom: var(--figma-space-md);
 }
 
 .patient-list-wrapper .search-input {
-  width: 50%;
-  padding: var(--figma-space-xs) var(--figma-space-lg);
-  font: var(--figma-text-caption);
+  width: min(100%, 52rem);
+  min-height: 2.75rem;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font: var(--pd-font-button-primary);
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-full);
   outline: none;
@@ -267,14 +353,23 @@
 
 .patient-list-wrapper .patient-name-container {
   position: relative;
-  display: inline-block;
+  display: block;
   cursor: pointer;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .patient-list-wrapper .patient-info .patient-name-container {
-  font: var(--figma-text-body) !important;
+  font-family: var(--font-family-primary) !important;
+  font-size: 1.22rem !important;
+  line-height: 1.25 !important;
+  font-weight: var(--font-weight-normal) !important;
   color: var(--figma-text-primary) !important;
   text-align: left !important;
+  letter-spacing: -0.01em !important;
+  margin-top: 0;
 }
 
 .patient-list-wrapper .tooltip {
@@ -304,7 +399,9 @@
   width: 1.75rem;
   height: 1.75rem;
   cursor: pointer;
-  margin: 0 var(--figma-space-xs);
+  margin: 0 var(--spacing-xs);
+  padding: var(--spacing-xs);
+  object-fit: contain;
   transition: opacity 0.2s ease, transform 0.15s ease;
 }
 
@@ -321,55 +418,81 @@
 
 .patient-list-wrapper .actions-container {
   display: flex;
+  flex-direction: row-reverse;
   justify-content: space-between;
   align-items: center;
   width: 100%;
   margin-top: var(--figma-space-md);
+  margin-bottom: var(--figma-space-sm);
   padding: 0;
+  gap: var(--spacing-md);
 }
 
-.patient-list-wrapper .add-patient-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  padding-bottom: var(--figma-space-md);
+/* Misma escala que .back-button / .Boton_Imprimir en patient-detail (min-height 2.4rem, padding coherente) */
+.patient-list-wrapper .add-patient-button.button-primary {
+  min-height: 2.0rem;
+  height: auto;
+  padding: var(--spacing-xs) var(--spacing-md);
+  gap: var(--spacing-xs);
+  font: var(--pd-font-action);
+}
+
+.patient-list-wrapper .add-patient-button .add-patient-button__label {
+  white-space: nowrap;
 }
 
 .patient-list-wrapper .add-patient-button img {
-  width: 2rem;
-  height: 2rem;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  width: 1.0rem;
+  height: 1.0rem;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+  transition: transform 0.2s ease;
 }
 
 .patient-list-wrapper .add-patient-button:hover img {
-  transform: scale(1.1);
-  opacity: 0.8;
+  transform: scale(1.06);
+}
+
+.patient-list-wrapper .actions-container .filter-button {
+  min-height: 2.0rem;
+  height: auto;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--pd-font-action);
 }
 
 .patient-list-wrapper .filter-button-container {
   display: flex;
-  margin-left: auto;
   align-items: center;
+  position: relative;
+}
+
+@media (max-width: 1100px) {
+  .patient-list-wrapper .patient-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
   .patient-list-wrapper .patient-list-container {
     padding: var(--figma-space-md);
+    padding-bottom: 5rem;
   }
   .patient-list-wrapper .search-input {
-    width: 80%;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .patient-list-wrapper .patient-list {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 480px) {
-  .patient-list-wrapper .patient-list {
-    grid-template-columns: 1fr;
-  }
   .patient-list-wrapper .search-input {
-    width: 95%;
+    width: 100%;
+    min-height: 2.5rem;
   }
   .patient-list-wrapper .patient-card {
     padding: var(--figma-space-md) !important;

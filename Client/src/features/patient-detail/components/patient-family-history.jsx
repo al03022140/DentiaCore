@@ -32,7 +32,7 @@ const PatientFamilyHistory = ({ antecedentes = [] }) => {
             </li>
           ))
         ) : (
-          <li className="no-family-history-message">
+          <li className="no-family-history-message patient-detail__empty-message">
             No hay antecedentes heredo familiares registrados.
           </li>
         )}

@@ -1,48 +1,64 @@
 /* Estilos específicos para la información de contacto del paciente */
 /* patient-detail-shared.css se importa centralmente desde patient-detail.css */
 
+.patient-contact-info {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* El contenedor principal ya está definido en patient-detail-shared.css como .patient-detail__section */
 /* Los títulos H2 y H3 ya están definidos en patient-detail-shared.css */
 
-/* Contenedor de información - ahora usando dl */
-.patient-detail__section dl {
+/*
+  Grid: minmax(300px) rompía el layout en columnas estrechas o móvil.
+  min(100%, 15rem) hace que la pista nunca exceda el ancho útil del padre.
+*/
+.patient-contact-info dl {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   gap: 0.8rem;
   margin: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
-/* Cada item individual de contacto (contiene dt y dd) */
-.patient-detail__section dl > div {
-  background-color: var(--color-bg-light);
-  border-radius: 4px;
-  box-shadow: 0 1px 2px var(--color-black-05);
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
+/* Cada fila dl: aspecto en patient-detail-shared; aquí solo contención del texto */
+.patient-contact-info dl > div {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Emails y textos largos sin espacios */
+.patient-contact-info dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 /* Los estilos para dt y dd ya están definidos en patient-detail-shared.css */
 
-/* Mensaje cuando no hay datos */
-.patient-detail__section p:only-child {
+/* Mensaje cuando no hay datos — alineado con .patient-detail__empty-message del shared */
+.patient-contact-info p:only-child {
   font-style: italic;
   color: var(--color-text-muted);
   text-align: center;
   padding: 1rem;
-  background-color: var(--color-bg-light);
-  border-radius: 4px;
+  background-color: var(--color-bg-white);
+  border-radius: 6px;
   box-shadow: 0 1px 2px var(--color-black-05);
 }
 
 /* Estilos específicos para impresión */
 @media print {
-  .patient-detail__section dl {
+  .patient-contact-info dl {
     display: block;
     margin: 0;
   }
   
-  .patient-detail__section dl > div {
+  .patient-contact-info dl > div {
     background-color: transparent !important;
     border-radius: 0;
     box-shadow: none;
@@ -52,11 +68,11 @@
     page-break-inside: avoid;
   }
   
-  .patient-detail__section dl > div:last-child {
+  .patient-contact-info dl > div:last-child {
     border-bottom: none;
   }
   
-  .patient-detail__section p:only-child {
+  .patient-contact-info p:only-child {
     background-color: transparent !important;
     border-radius: 0;
     box-shadow: none;

@@ -6,7 +6,13 @@ import SignatureModal from '../../../shared/components/SignatureModal.jsx';
 import { useAuth } from '../../../app/auth/AuthContext.jsx';
 import '../styles/patient-evolution-note.css';
 
-const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientData }) => {
+const PatientEvolutionNote = ({
+  patientId,
+  initialEvolutionNotes = [],
+  patientData,
+  /** Solo tabla de historial (p. ej. vista de imprimir expediente): sin campos ni guardar */
+  hideForm = false,
+}) => {
   const { user } = useAuth();
   const canSign = user?.role === 'doctor' || user?.role === 'superadmin';
   const [procedimiento, setProcedimiento] = useState('');
@@ -112,58 +118,65 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
   };
 
   return (
-    <section className="patient-detail__section patient-evolution-note">
+    <section
+      className={`patient-detail__section patient-evolution-note${hideForm ? ' patient-evolution-note--history-only' : ''}`}
+    >
       <div className="patient-evolution-note__header">
         <h2>Notas de evolución</h2>
-        <button className="Boton_Imprimir" onClick={handlePrint}>
-          Imprimir
-        </button>
+        {!hideForm && (
+          <button type="button" className="Boton_Imprimir" onClick={handlePrint}>
+            Imprimir
+          </button>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="patient-evolution-note__form">
-        <div className="form-row">
-          <label>Procedimiento</label>
-          <Input.TextArea
-            value={procedimiento}
-            onChange={(e) => setProcedimiento(e.target.value)}
-            placeholder="Describe el procedimiento realizado"
-            rows={3}
-            autoSize={{ minRows: 3, maxRows: 12 }}
-          />
-        </div>
-        <div className="form-row">
-          <label>Observaciones</label>
-          <Input.TextArea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            placeholder="Observaciones adicionales"
-            rows={3}
-            autoSize={{ minRows: 3, maxRows: 12 }}
-          />
-        </div>
-        <div className="form-row">
-          <label>Correcciones</label>
-          <Input.TextArea
-            value={correcciones}
-            onChange={(e) => setCorrecciones(e.target.value)}
-            placeholder="Correcciones o ajustes realizados"
-            rows={2}
-            autoSize={{ minRows: 2, maxRows: 12 }}
-          />
-        </div>
+      {!hideForm && (
+        <div className="patient-evolution-note__form">
+          <div className="form-row">
+            <label>Procedimiento</label>
+            <Input.TextArea
+              value={procedimiento}
+              onChange={(e) => setProcedimiento(e.target.value)}
+              placeholder="Describe el procedimiento realizado"
+              rows={3}
+              autoSize={{ minRows: 3, maxRows: 12 }}
+            />
+          </div>
+          <div className="form-row">
+            <label>Observaciones</label>
+            <Input.TextArea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              placeholder="Observaciones adicionales"
+              rows={3}
+              autoSize={{ minRows: 3, maxRows: 12 }}
+            />
+          </div>
+          <div className="form-row">
+            <label>Correcciones</label>
+            <Input.TextArea
+              value={correcciones}
+              onChange={(e) => setCorrecciones(e.target.value)}
+              placeholder="Correcciones o ajustes realizados"
+              rows={2}
+              autoSize={{ minRows: 2, maxRows: 12 }}
+            />
+          </div>
 
-        <div className="actions">
-          <button
-            className="save-button"
-            onClick={handleSaveClick}
-            disabled={!isFormValid || loading}
-          >
-            {loading ? 'Guardando...' : 'Guardar nota'}
-          </button>
+          <div className="actions">
+            <button
+              type="button"
+              className="save-button"
+              onClick={handleSaveClick}
+              disabled={!isFormValid || loading}
+            >
+              {loading ? 'Guardando...' : 'Guardar nota'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="patient-evolution-note__history">
         <h3>Historial</h3>
@@ -213,22 +226,25 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
         </div>
       </div>
 
-      <Modal
-        title="Confirmar guardado"
-        open={isConfirmVisible}
-        onOk={handleConfirmOk}
-        onCancel={handleConfirmCancel}
-        okText="Confirmar"
-        cancelText="Cancelar"
-      >
-        <p>Para confirmar el guardado de la nota, escribe exactamente: <strong>Confirmar</strong></p>
-        <Input
-          value={confirmationText}
-          onChange={(e) => setConfirmationText(e.target.value)}
-          placeholder="Escribe 'Confirmar'"
-        />
-      </Modal>
+      {!hideForm && (
+        <Modal
+          title="Confirmar guardado"
+          open={isConfirmVisible}
+          onOk={handleConfirmOk}
+          onCancel={handleConfirmCancel}
+          okText="Confirmar"
+          cancelText="Cancelar"
+        >
+          <p>Para confirmar el guardado de la nota, escribe exactamente: <strong>Confirmar</strong></p>
+          <Input
+            value={confirmationText}
+            onChange={(e) => setConfirmationText(e.target.value)}
+            placeholder="Escribe 'Confirmar'"
+          />
+        </Modal>
+      )}
 
+      {!hideForm && (
       <div className="printable-evolution-notes">
         <h1>Notas de Evolución</h1>
         <table>
@@ -277,6 +293,7 @@ const PatientEvolutionNote = ({ patientId, initialEvolutionNotes = [], patientDa
           Fecha de impresión: {new Date().toLocaleDateString()}
         </div>
       </div>
+      )}
 
       {/* Modal de firma electrónica para notas de evolución */}
       <SignatureModal

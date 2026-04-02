@@ -4,6 +4,9 @@
   --patient-heading-color: var(--figma-text-primary);
   --patient-border-radius: var(--figma-radius-lg);
   --patient-box-shadow: var(--figma-shadow-card);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .patient-info-wrapper .patient-info {
@@ -15,6 +18,7 @@
   border: 1px solid var(--figma-border-default);
   box-shadow: var(--patient-box-shadow);
   width: 100%;
+  height: 100%;
   box-sizing: border-box;
   min-height: 72px;
   gap: var(--figma-space-lg);

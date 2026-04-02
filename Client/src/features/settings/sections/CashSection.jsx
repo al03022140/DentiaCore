@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import plusIcon from '../../../assets/images/icons/plus.svg';
-import menosIcon from '../../../assets/images/icons/menos.svg';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
 
 const CashSection = () => {
@@ -102,17 +100,19 @@ const CashSection = () => {
             </span>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <input
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
             placeholder="Nueva categoría"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }}
           />
-          <button type="button" className="settings-btn-secondary" onClick={addCategory}>Agregar</button>
-                  <button type="button" className="settings-btn-secondary" onClick={addCategory}>
-                    <img src={plusIcon} alt="Agregar" width="16" height="16" style={{verticalAlign:'middle',marginRight:4}} /> Agregar
-                  </button>
+          <button type="button" className="settings-btn-secondary settings-btn--with-icon" onClick={addCategory}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Agregar
+          </button>
         </div>
       </div>
 
@@ -144,12 +144,12 @@ const CashSection = () => {
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <input
             value={newServiceName}
             onChange={(e) => setNewServiceName(e.target.value)}
             placeholder="Nombre del servicio"
-            style={{ flex: 2 }}
+            style={{ flex: '2 1 140px' }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
           />
           <input
@@ -159,13 +159,15 @@ const CashSection = () => {
             placeholder="Precio"
             min="0"
             step="0.01"
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 88px' }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
           />
-          <button type="button" className="settings-btn-secondary" onClick={addService}>Agregar</button>
-                  <button type="button" className="settings-btn-secondary" onClick={addService}>
-                    <img src={plusIcon} alt="Agregar" width="16" height="16" style={{verticalAlign:'middle',marginRight:4}} /> Agregar
-                  </button>
+          <button type="button" className="settings-btn-secondary settings-btn--with-icon" onClick={addService}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Agregar
+          </button>
         </div>
       </div>
 

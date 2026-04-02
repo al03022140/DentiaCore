@@ -58,11 +58,15 @@ Settings.prototype.detectTheme = function () {
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     if (isDark) {
-        this.COLOR_BG = "#1e1e1e";
-        this.COLOR_TEXT = "#e0e0e0";
-        this.COLOR_OUTLINE = "#888888";
-        this.COLOR_LABEL = "#aaaaaa";
-        this.COLOR_TEXTBOX_BG = "#2a2a2a";
+        /*
+         * Área de dibujo clínico: fondo blanco para ver dientes y trazos como en papel.
+         * Los botones del motor (Adulto/Niño/Guardar) siguen con tema oscuro abajo.
+         */
+        this.COLOR_BG = "#ffffff";
+        this.COLOR_TEXT = "#000000";
+        this.COLOR_OUTLINE = "#1a1a1a";
+        this.COLOR_LABEL = "#6b6b6b";
+        this.COLOR_TEXTBOX_BG = "#ffffff";
 
         this.COLOR_MENU_BG = "#2a2a2a";
         this.COLOR_MENU_TOP = "#333333";

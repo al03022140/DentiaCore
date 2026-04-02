@@ -17,7 +17,7 @@ const PatientMedicalCards = ({
   // Función auxiliar para renderizar listas en las tarjetas
   const renderList = (items, keyPrefix, renderItem) => {
     if (!items || items.length === 0) {
-      return <li className="no-items-message">No hay {keyPrefix}</li>;
+      return <li className="no-items-message patient-detail__empty-message">No hay {keyPrefix}</li>;
     }
     return items.map((item, index) => renderItem(item, index));
   };

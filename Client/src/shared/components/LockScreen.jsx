@@ -130,7 +130,7 @@ export const LockScreenProvider = ({ children }) => {
           <div className="lock-screen-card">
             <div className="lock-screen-icon">
               {user.nombre === 'Administrador Local'
-                ? <img src={lockBlockedIcon} alt="Administrador Local" style={{ width: 80, height: 80 }} />
+                ? <img src={lockBlockedIcon} alt="Administrador Local" className="theme-icon" style={{ width: 80, height: 80 }} />
                 : <span style={{ fontSize: '4.5rem', lineHeight: 1 }}>🔒</span>}
             </div>
             <h2>Pantalla bloqueada</h2>

@@ -6,12 +6,17 @@ import "../styles/patient-appointments-info.css";
 // Componente para mostrar información de la última y próxima cita
 const PatientAppointmentsInfo = ({ 
   ultimaCita = null,
-  proximaCita = null
+  proximaCita = null,
+  onAddAppointment = null
 }) => {
 
   const renderCita = (cita, titulo) => {
     if (!cita) {
-      return <div className="empty-message"><p>No hay {titulo.toLowerCase()} programada.</p></div>;
+      return (
+        <div className="empty-message">
+          <p className="patient-detail__empty-message">No hay {titulo.toLowerCase()} programada.</p>
+        </div>
+      );
     }
     return (
       <article data-testid={`cita-${titulo.replace(' ', '-').toLowerCase()}`}>
@@ -26,14 +31,38 @@ const PatientAppointmentsInfo = ({
     );
   };
 
+  const noCitas = !ultimaCita && !proximaCita;
+
   return (
     <section 
       className="patient-detail__section" 
       aria-labelledby="citas-title"
     >
-      <h2 id="citas-title">Citas</h2>
-      {renderCita(ultimaCita, 'Última Cita')}
-      {renderCita(proximaCita, 'Próxima Cita')}
+      <div className="patient-appointments-info__header">
+        <h2 id="citas-title">Citas</h2>
+        {onAddAppointment && (
+          <button
+            type="button"
+            className="patient-appointments-info__add-btn"
+            onClick={onAddAppointment}
+            aria-label="Agregar cita"
+            title="Agregar cita"
+          >
+            +
+          </button>
+        )}
+      </div>
+
+      {noCitas ? (
+        <div className="patient-appointments-info__empty-state">
+          <p className="empty-message patient-detail__empty-message">No hay citas programadas.</p>
+        </div>
+      ) : (
+        <>
+          {renderCita(ultimaCita, 'Última Cita')}
+          {renderCita(proximaCita, 'Próxima Cita')}
+        </>
+      )}
     </section>
   );
 };
@@ -49,7 +78,8 @@ PatientAppointmentsInfo.propTypes = {
     fecha_hora: PropTypes.string.isRequired,
     motivo: PropTypes.string,
     estado: PropTypes.string
-  })
+  }),
+  onAddAppointment: PropTypes.func
 };
 
 // Exportar componente memoizado para evitar re-renderizados innecesarios

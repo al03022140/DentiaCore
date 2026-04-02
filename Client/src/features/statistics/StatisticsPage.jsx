@@ -486,68 +486,80 @@ const StatisticsPage = () => {
         aria-dropeffect="move"
         aria-label={`Slot ${slotIndex + 1}, ${metric.title}, Temporalidad ${TEMPORALITY_LABELS[slotData.granularity]}`}
       >
+        <button
+          type="button"
+          className="chart-slot__remove"
+          onClick={() => handleReturnMetric(tabId, slotIndex)}
+          aria-label="Quitar gráfica"
+        >
+          ✕
+        </button>
         <div className="chart-slot__header">
-          <div
-            className="chart-slot__title-block"
-            onBlur={event => {
-              if (!event.currentTarget.contains(event.relatedTarget)) {
-                closeGranularityMenu();
-              }
-            }}
-          >
-            <h4 className="chart-slot__title">{metric.title}</h4>
-            <button
-              type="button"
-              className="chart-slot__granularity"
-              aria-haspopup="listbox"
-              aria-label={`Temporalidad actual ${TEMPORALITY_LABELS[slotData.granularity]}`}
-              aria-expanded={openGranularityMenu === slotKey}
-              onClick={() => toggleGranularityMenu(slotKey)}
-            >
-              <span>{TEMPORALITY_LABELS[slotData.granularity]}</span>
-              <span className="chart-slot__caret" aria-hidden="true">▾</span>
-            </button>
-            <ul
-              className={`chart-slot__granularity-menu ${openGranularityMenu === slotKey ? 'chart-slot__granularity-menu--open' : ''}`}
-              role="listbox"
-            >
-              {metric.temporalities.map(option => (
-                <li key={option}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={slotData.granularity === option}
-                    onClick={() => {
-                      handleGranularityChange(tabId, slotIndex, option);
+          <h4 className="chart-slot__title">{metric.title}</h4>
+          <div className="chart-slot__controls">
+            <div className="chart-slot__title-block">
+              <span className="chart-slot__granularity-label">Temporalidad</span>
+              <div
+                className="chart-slot__granularity-dropdown"
+                onBlur={event => {
+                  const next = event.relatedTarget;
+                  if (next && event.currentTarget.contains(next)) {
+                    return;
+                  }
+                  requestAnimationFrame(() => {
+                    if (!event.currentTarget.contains(document.activeElement)) {
                       closeGranularityMenu();
-                    }}
-                  >
-                    {TEMPORALITY_LABELS[option]}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="chart-slot__actions">
-            <div className="chart-slot__viz-options">
-              {metric.visualizations.map(option => (
+                    }
+                  });
+                }}
+              >
                 <button
-                  key={option}
                   type="button"
-                  className={`viz-chip ${slotData.visualization === option ? 'viz-chip--active' : ''}`}
-                  onClick={() => handleVisualizationChange(tabId, slotIndex, option)}
+                  className="chart-slot__granularity"
+                  aria-haspopup="listbox"
+                  aria-label={`Temporalidad actual ${TEMPORALITY_LABELS[slotData.granularity]}`}
+                  aria-expanded={openGranularityMenu === slotKey}
+                  onClick={() => toggleGranularityMenu(slotKey)}
                 >
-                  {VISUALIZATION_LABELS[option]}
+                  <span>{TEMPORALITY_LABELS[slotData.granularity]}</span>
+                  <span className="chart-slot__caret" aria-hidden="true">▾</span>
                 </button>
-              ))}
+                <ul
+                  className={`chart-slot__granularity-menu ${openGranularityMenu === slotKey ? 'chart-slot__granularity-menu--open' : ''}`}
+                  role="listbox"
+                >
+                  {metric.temporalities.map(option => (
+                    <li key={option}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={slotData.granularity === option}
+                        onClick={() => {
+                          handleGranularityChange(tabId, slotIndex, option);
+                          closeGranularityMenu();
+                        }}
+                      >
+                        {TEMPORALITY_LABELS[option]}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <button
-              type="button"
-              className="chart-slot__remove"
-              onClick={() => handleReturnMetric(tabId, slotIndex)}
-            >
-              ✕
-            </button>
+            <div className="chart-slot__viz-scroll" aria-label="Tipo de gráfica">
+              <div className="chart-slot__viz-options">
+                {metric.visualizations.map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`viz-chip ${slotData.visualization === option ? 'viz-chip--active' : ''}`}
+                    onClick={() => handleVisualizationChange(tabId, slotIndex, option)}
+                  >
+                    {VISUALIZATION_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
         <div className="chart-slot__body">

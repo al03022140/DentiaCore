@@ -1,0 +1,490 @@
+/* Vista de expediente para impresión: barra de acciones solo en pantalla */
+
+.patient-print-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--figma-bg-page, var(--color-bg-light));
+  border: 1px solid var(--color-neutral-175);
+  border-radius: var(--border-radius-md);
+}
+
+.patient-print-toolbar-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.patient-print-meta {
+  font-size: var(--text-caption-md, 13px);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+  max-width: 52rem;
+  line-height: 1.45;
+}
+
+.patient-print-body {
+  padding-bottom: var(--spacing-xxl);
+}
+
+.patient-print-doc-section {
+  margin-top: var(--spacing-xxl);
+}
+
+.patient-print-doc-section:first-of-type {
+  margin-top: var(--spacing-lg);
+}
+
+.patient-print-section-title {
+  font: var(--text-heading-xs, 600 1.125rem/1.3 var(--font-family-primary, inherit));
+  color: var(--color-text-dark);
+  margin: 0 0 var(--spacing-lg) 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 2px solid var(--color-neutral-300);
+}
+
+.patient-print-subsection-title {
+  font: var(--text-body-strong, 600 1rem/1.4 var(--font-family-primary, inherit));
+  color: var(--color-text-medium);
+  margin: var(--spacing-xl) 0 var(--spacing-md) 0;
+}
+
+/* Reducir ruido de UI en esta vista: ocultar botones de acción (no la barra superior) */
+.patient-print-page .patient-detail__body .ant-btn,
+.patient-print-page .patient-detail__body button {
+  display: none !important;
+}
+
+.patient-print-page .patient-print-toolbar .ant-btn,
+.patient-print-page .patient-print-toolbar button {
+  display: inline-flex !important;
+}
+
+.patient-print-page .error-boundary button {
+  display: inline-flex !important;
+}
+
+/* Pie de documento */
+.patient-print-footer {
+  margin-top: var(--spacing-xxl);
+  padding-top: var(--spacing-xl);
+  border-top: 2px solid var(--color-neutral-300);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.patient-print-footer-meta {
+  margin-bottom: var(--spacing-xxl);
+}
+
+.patient-print-footer-line {
+  margin: 0.35rem 0;
+  font-size: 10pt;
+  color: #000;
+}
+
+.patient-print-signatures {
+  display: flex;
+  justify-content: space-between;
+  gap: 3rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+.patient-print-signature-block {
+  flex: 1;
+  min-width: 200px;
+  text-align: center;
+}
+
+.patient-print-signature-line {
+  border-bottom: 1px solid #000;
+  height: 3rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.patient-print-signature-label {
+  font-size: var(--font-size-print-signature-label, 12px);
+  margin: 0 0 0.15rem 0;
+  font-weight: 600;
+  color: #000;
+}
+
+.patient-print-signature-role {
+  font-size: var(--font-size-print-signature-title, 11px);
+  margin: 0;
+  color: #444;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /*
+   * Aislar el documento de impresión para evitar que reglas globales
+   * de otros layouts oculten el contenido en previsualizaciones sucesivas.
+   */
+  body * {
+    visibility: hidden;
+  }
+
+  .patient-print-page,
+  .patient-print-page * {
+    visibility: visible;
+  }
+
+  .patient-print-page {
+    position: relative;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .patient-print-page .patient-detail__content,
+  .patient-print-page .patient-detail__body {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* Bloque principal del paciente: aumentar legibilidad */
+  .patient-print-page .patient-detail__info {
+    gap: 1rem !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.8rem !important;
+    border-bottom: 2px solid #333 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .patient-print-page .patient-detail__photo img {
+    width: 130px !important;
+    height: 130px !important;
+    margin-right: 1rem !important;
+  }
+
+  .patient-print-page .patient-detail__details h1 {
+    font-size: 22pt !important;
+    line-height: 1.2 !important;
+    margin: 0 0 0.6rem 0 !important;
+    color: #000 !important;
+  }
+
+  .patient-print-page .patient-detail__details p,
+  .patient-print-page .patient-detail__details p strong,
+  .patient-print-page .patient-detail__details p span {
+    font-size: 14.5pt !important;
+    line-height: 1.55 !important;
+    color: #000 !important;
+  }
+
+  /* Secciones y subtitulos legibles */
+  .patient-print-page .patient-print-section-title {
+    font-size: 14pt !important;
+    border-bottom: 2px solid #333 !important;
+  }
+
+  .patient-print-page .patient-print-subsection-title {
+    font-size: 12pt !important;
+    color: #111 !important;
+  }
+
+  /* Odontograma: priorizar lectura del canvas y tabla */
+  .patient-print-page .patient-detail_odontograma,
+  .patient-print-page .odontograma-section,
+  .patient-print-page .odontograma-wrapper {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .patient-print-page .odontograma-flex-container,
+  .patient-print-page .odontograma-container {
+    display: block !important;
+    gap: 0 !important;
+    background: #fff !important;
+  }
+
+  .patient-print-page .odontograma-canvas-container,
+  .patient-print-page .odontograma-image-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    background: #fff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .patient-print-page .odontograma-canvas,
+  .patient-print-page .odontograma-image,
+  .patient-print-page canvas[id^="odontograma-canvas"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border: 1px solid #888 !important;
+    background: #fff !important;
+  }
+
+  .patient-print-page .odontograma-table-container {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin-top: 0.65rem !important;
+    border: 1px solid #bbb !important;
+    background: #fff !important;
+  }
+
+  .patient-print-page .odontograma-table th,
+  .patient-print-page .odontograma-table td {
+    font-size: 9.5pt !important;
+    line-height: 1.3 !important;
+    padding: 4px 6px !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+  }
+
+  /* Periodontograma: anular escala ultra-pequena definida globalmente */
+  .patient-print-page .periodontogram-section {
+    page-break-before: always !important;
+    break-before: page !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    margin-top: 0.6rem !important;
+    padding: 0.35rem !important;
+    border: 1px solid #999 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .patient-print-page .periodontogram-section .periodontogram-container,
+  .patient-print-page .periodontogram-section .periodontogram-design {
+    transform: scale(0.92) !important;
+    transform-origin: top left !important;
+    width: 109% !important;
+    max-width: 109% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 32px !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* Arco inferior: columna (orden DOM intacto) + hueco claro entre filas de imágenes */
+  .patient-print-page .periodontogram-section .arch-section.inferior {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    align-content: flex-start !important;
+    gap: 0 !important;
+    position: relative !important;
+    overflow: visible !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior > * {
+    flex: 0 0 auto !important;
+    position: relative !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .lingual-images {
+    margin-top: 0 !important;
+    margin-bottom: 72px !important;
+    padding-bottom: 16px !important;
+    min-height: 128px !important;
+    border-bottom: 1px solid #999 !important;
+    z-index: 2 !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .vestibular-images.vestibular-inferior {
+    margin-top: 32px !important;
+    margin-bottom: 0 !important;
+    padding-top: 12px !important;
+    min-height: 128px !important;
+    clear: both !important;
+    z-index: 3 !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-title {
+    font-size: 13pt !important;
+    margin-bottom: 0.25rem !important;
+    color: #000 !important;
+  }
+
+  .patient-print-page .periodontogram-section .row-label,
+  .patient-print-page .periodontogram-section .data-cell,
+  .patient-print-page .periodontogram-section .data-cell input,
+  .patient-print-page .periodontogram-section .triple-input input {
+    font-size: 9.5pt !important;
+    line-height: 1.2 !important;
+    color: #000 !important;
+  }
+
+  .patient-print-page .periodontogram-section .tooth-image {
+    max-width: 44px !important;
+    width: 44px !important;
+    height: 92px !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+  }
+
+  .patient-print-page .periodontogram-section .image-cell {
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    height: 112px !important;
+    min-height: 112px !important;
+    max-height: 112px !important;
+    padding: 2px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .patient-print-page .periodontogram-section .images-section {
+    display: block !important;
+    position: relative !important;
+    clear: both !important;
+    margin: 0 0 8px 0 !important;
+    padding: 0 !important;
+    /* No partir filas Lingual/Vestibular/Palatino entre páginas */
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .patient-print-page .periodontogram-section .images-row {
+    display: grid !important;
+    position: relative !important;
+    align-items: start !important;
+    z-index: 1 !important;
+    min-height: 116px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .lingual-images,
+  .patient-print-page .periodontogram-section .arch-section.inferior .vestibular-images.vestibular-inferior {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Arco superior: mismas filas de imágenes indivisibles */
+  .patient-print-page .periodontogram-section .arch-section.superior .vestibular-images.vestibular-superior,
+  .patient-print-page .periodontogram-section .arch-section.superior .palatine-images {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .lingual-images .images-row,
+  .patient-print-page .periodontogram-section .arch-section.inferior .vestibular-images .images-row {
+    min-height: 116px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .lingual-images .image-cell {
+    align-self: stretch !important;
+    align-items: flex-end !important;
+    padding-bottom: 10px !important;
+  }
+
+  .patient-print-page .periodontogram-section .arch-section.inferior .vestibular-images .image-cell {
+    align-self: start !important;
+  }
+
+  .patient-print-page .periodontogram-section .tooth-image-container {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 106px !important;
+    min-height: 106px !important;
+    max-height: 106px !important;
+    margin: 0 auto !important;
+    position: relative !important;
+  }
+
+  .patient-print-page .periodontogram-section .tooth-background,
+  .patient-print-page .periodontogram-section .background-image {
+    width: 44px !important;
+    height: 106px !important;
+    object-fit: contain !important;
+    margin: 0 auto !important;
+  }
+
+  .patient-print-page .periodontogram-section .tooth-foreground {
+    width: 44px !important;
+    height: 92px !important;
+    margin: 0 auto !important;
+  }
+
+  .patient-print-page .periodontogram-section .linear-graphics-canvas {
+    width: 44px !important;
+    height: 92px !important;
+    left: 2px !important;
+    top: 0 !important;
+    position: absolute !important;
+  }
+
+  .patient-print-page .periodontogram-section .absence-overlay {
+    width: 44px !important;
+    height: 92px !important;
+    left: 2px !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    position: absolute !important;
+  }
+
+  .patient-print-page .periodontogram-section .linear-graphics-canvas,
+  .patient-print-page .periodontogram-section canvas {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    max-width: 100% !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /*
+   * Las secciones del expediente pueden ocupar varias páginas.
+   * Evitar break-inside en todo un bloque enorme (p. ej. Evaluación dental)
+   * provoca cortes feos en periodontograma; el flujo debe ser auto aquí.
+   */
+  .patient-print-doc-section {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .patient-print-footer {
+    page-break-before: auto;
+    margin-top: 1.5rem;
+  }
+
+  .patient-print-section-title {
+    page-break-after: avoid;
+  }
+}

@@ -12,6 +12,7 @@ import './styles/app.css';
 import PatientList from '../features/patient-list/patient-list';
 import AddPatient from '../features/add-patient/add-patient';
 import PatientDetail from '../features/patient-detail/patient-detail';
+import PatientPrintPage from '../features/patient-detail/PatientPrintPage';
 import ErrorBoundary from '../shared/components/error-boundary';
 import CashPage from '../features/cash/CashPage';
 import ConsultasPage from '../features/consultas/ConsultasPage';
@@ -96,6 +97,7 @@ const App = () => {
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/patient/:patientId/imprimir" element={<PatientPrintPage />} />
           <Route element={<AppLayout />}>
             <Route
               path="/"

@@ -24,14 +24,14 @@
 
 /* Los estilos para dt y dd ya están definidos en patient-detail-shared.css */
 
-/* Mensaje cuando no hay datos */
+/* Mensaje cuando no hay datos — alineado con .patient-detail__empty-message del shared */
 .patient-detail__section p:only-child {
   font-style: italic;
   color: var(--color-text-muted);
   text-align: center;
   padding: 1rem;
-  background-color: var(--color-bg-light);
-  border-radius: 4px;
+  background-color: var(--color-bg-white);
+  border-radius: 6px;
   box-shadow: 0 1px 2px var(--color-black-05);
 }
 

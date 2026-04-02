@@ -18,6 +18,8 @@ export const ThemeProvider = ({ children }) => {
     } else {
       root.setAttribute('data-theme', t);
     }
+    /* Mismo tick que setAttribute: el motor del odontograma repinta sin depender del orden del MutationObserver */
+    window.dispatchEvent(new CustomEvent('dentia-theme-change'));
   }, []);
 
   const setTheme = useCallback(async (newTheme) => {
@@ -35,6 +37,23 @@ export const ThemeProvider = ({ children }) => {
     const handler = () => { if (theme === 'system') applyTheme('system'); };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
+  }, [theme, applyTheme]);
+
+  /* Vista previa e impresión: fondo claro y texto oscuro aunque la UI esté en modo oscuro */
+  useEffect(() => {
+    const beforePrint = () => {
+      document.documentElement.setAttribute('data-theme', 'light');
+      window.dispatchEvent(new CustomEvent('dentia-theme-change'));
+    };
+    const afterPrint = () => {
+      applyTheme(theme);
+    };
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', beforePrint);
+      window.removeEventListener('afterprint', afterPrint);
+    };
   }, [theme, applyTheme]);
 
   const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);

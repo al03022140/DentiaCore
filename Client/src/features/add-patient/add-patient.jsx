@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
-import defaultAvatar from "../../assets/images/avatars/UserNot.png";
+import defaultAvatar from "../../assets/images/icons/Profile Default.svg";
 import "./styles/add-patient.css";
 import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
@@ -20,6 +20,8 @@ import WomenSection from './sections/women-section';
 
 
 const REQUIRED_FIELDS = [
+  { path: ["documento", "tipo"], label: "Tipo de documento" },
+  { path: ["documento", "numero"], label: "Número de documento" },
   { path: ["primer_nombre"], label: "Primer nombre" },
   { path: ["apellido_paterno"], label: "Apellido paterno" },
   { path: ["fecha_nacimiento"], label: "Fecha de nacimiento" },
@@ -1144,7 +1146,11 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
                     />
                   </div>
                 ) : (
-                  <img src={formData.photoURL || defaultAvatar} alt="Avatar del paciente" className="patient-photo" />
+                  <img
+                    src={formData.photoURL || defaultAvatar}
+                    alt="Avatar del paciente"
+                    className={`patient-photo${!formData.photoURL ? ' profile-default-avatar' : ''}`}
+                  />
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
                 {!isCropping && hoverUpload && (

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message, Skeleton } from 'antd';
 import './styles/patient-list.css';
-import userNot from '../../assets/images/avatars/UserNot.png';
+import userNot from '../../assets/images/icons/Profile Default.svg';
 
 // Imágenes
 import filtroIcon from '../../assets/images/icons/filter.svg';
@@ -16,11 +16,27 @@ import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
 import { getAllPatients } from '../../shared/services/api';
 
+/* Icono de edad (silueta de persona) – usa currentColor */
+const AgeIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+);
+
+/* Icono de última visita (calendario) – usa currentColor */
+const VisitIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M3 10h18M8 2v4M16 2v4" />
+  </svg>
+);
+
 const PatientList = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const patientsPerPage = 15;
+  const patientsPerPage = 16;
   const navigate = useNavigate();
 
   // Estados para búsqueda y orden
@@ -192,47 +208,50 @@ const PatientList = () => {
 
         {/* ACCIONES (Agregar Paciente y Ordenar) */}
         <div className="actions-container">
-          <button className="add-patient-button" onClick={() => navigate('/add-patient')}>
-            <img src={addPatientIcon} alt="Agregar Paciente" />
+          <button
+            type="button"
+            className="add-patient-button button-primary"
+            onClick={() => navigate('/add-patient')}
+            aria-label="Agregar paciente"
+          >
+            <img src={addPatientIcon} alt="" aria-hidden className="theme-icon" />
+            <span className="add-patient-button__label">Agregar paciente</span>
           </button>
 
           <div className="filter-button-container">
             <button className="filter-button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              Ordenar <img src={filtroIcon} alt="filtro" className="filter-icon"/>
+              Ordenar <img src={filtroIcon} alt="filtro" className="filter-icon theme-icon" />
             </button>
 
             {isMenuOpen && (
               <div className="sort-menu" ref={menuRef}>
                 <ul>
                   <li onClick={() => handleSortBy('apellido')}>
-                    Apellido (A-Z)
-                    {sortType === 'apellido' && (
-                      <img
-                        src={arrowIcon}
-                        alt="orden"
-                        className={`arrow-icon ${isAscending ? 'asc' : 'desc'}`}
-                      />
-                    )}
+                    <span className="sort-menu__label">Apellido (A-Z)</span>
+                    <img
+                      src={arrowIcon}
+                      alt=""
+                      aria-hidden="true"
+                      className={`arrow-icon sort-menu__arrow ${sortType === 'apellido' ? (isAscending ? 'asc' : 'desc') : 'sort-menu__arrow--placeholder'}`}
+                    />
                   </li>
                   <li onClick={() => handleSortBy('edad')}>
-                    Edad
-                    {sortType === 'edad' && (
-                      <img
-                        src={arrowIcon}
-                        alt="orden"
-                        className={`arrow-icon ${isAscending ? 'asc' : 'desc'}`}
-                      />
-                    )}
+                    <span className="sort-menu__label">Edad</span>
+                    <img
+                      src={arrowIcon}
+                      alt=""
+                      aria-hidden="true"
+                      className={`arrow-icon sort-menu__arrow ${sortType === 'edad' ? (isAscending ? 'asc' : 'desc') : 'sort-menu__arrow--placeholder'}`}
+                    />
                   </li>
                   <li onClick={() => handleSortBy('ultimaVisita')}>
-                    Última Visita
-                    {sortType === 'ultimaVisita' && (
-                      <img
-                        src={arrowIcon}
-                        alt="orden"
-                        className={`arrow-icon ${isAscending ? 'asc' : 'desc'}`}
-                      />
-                    )}
+                    <span className="sort-menu__label">Última Visita</span>
+                    <img
+                      src={arrowIcon}
+                      alt=""
+                      aria-hidden="true"
+                      className={`arrow-icon sort-menu__arrow ${sortType === 'ultimaVisita' ? (isAscending ? 'asc' : 'desc') : 'sort-menu__arrow--placeholder'}`}
+                    />
                   </li>
                 </ul>
               </div>
@@ -261,8 +280,8 @@ const PatientList = () => {
               .filter(Boolean).join(' ');
 
             const patientId = patient.paciente_id || patient._id;
-            const lastVisit = patient.ultimaVisita || "No hay datos";
-            const age = formatAgeYearsOnly(patient.fecha_nacimiento) || "No hay datos";
+            const lastVisit = patient.ultimaVisita || "Sin dato";
+            const age = formatAgeYearsOnly(patient.fecha_nacimiento) || "—";
             const photoURL = patient.photoURL || userNot;
 
             return (
@@ -270,14 +289,23 @@ const PatientList = () => {
                 key={patient._id}
                 className="patient-card"
                 onClick={() => handlePatientClick(patient._id)}
+                title={fullName}
               >
                 <div className="patient-photo">
-                  <img src={photoURL} alt="Foto del paciente" />
+                  <img
+                    src={photoURL}
+                    alt="Foto del paciente"
+                    className={photoURL === userNot ? 'profile-default-avatar' : undefined}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = userNot;
+                      e.target.classList.add('profile-default-avatar');
+                    }}
+                  />
                 </div>
                 <div className="patient-info">
                   <div className="patient-top">
                     <span className="patient-id">{patientId}</span>
-                    
                     {/* Nombre con Tooltip */}
                     <span className="patient-name-container">
                       {formattedName}
@@ -285,8 +313,14 @@ const PatientList = () => {
                     </span>
                   </div>
                   <div className="patient-bottom">
-                    <span className="patient-age">Edad: {age}</span>
-                    <span className="patient-visit">Últ. Visita: {lastVisit}</span>
+                    <span className="patient-age" title="Edad">
+                      <AgeIcon />
+                      {age}
+                    </span>
+                    <span className="patient-visit" title="Última visita">
+                      <VisitIcon />
+                      {lastVisit}
+                    </span>
                   </div>
                 </div>
               </div>

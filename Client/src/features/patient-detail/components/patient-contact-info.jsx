@@ -11,15 +11,15 @@ const PatientContactInfo = ({ contacto = null, email = null }) => {
   // Si no hay datos de contacto, mostrar un mensaje o nada
   if (!contacto) {
     return (
-      <section className="patient-detail__section" aria-labelledby={sectionId}>
+      <section className="patient-detail__section patient-contact-info" aria-labelledby={sectionId}>
         <SectionHeader title="Información de Contacto" id={sectionId} />
-        <p>No hay información de contacto disponible.</p>
+        <p className="patient-detail__empty-message">No hay información de contacto disponible.</p>
       </section>
     );
   }
 
   return (
-    <section className="patient-detail__section" aria-labelledby={sectionId}>
+    <section className="patient-detail__section patient-contact-info" aria-labelledby={sectionId}>
       <SectionHeader title="Información de Contacto" id={sectionId} />
       <dl>
         <div>

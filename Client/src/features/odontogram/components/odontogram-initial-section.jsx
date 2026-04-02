@@ -129,40 +129,81 @@ const OdontogramCanvas = React.memo(({
     engineError = null,
     onRetry = null
 }) => {
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        if (!isFullscreen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsFullscreen(false);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isFullscreen]);
+
     return (
-        <div className="odontograma-canvas-container">
-            {showSpinner && (
-                <>
-                    <div className="loading-overlay"></div>
-                    <div className="loading-spinner">
-                        <p>Guardando...</p>
-                    </div>
-                </>
+        <>
+            {isFullscreen && (
+                <div
+                    className="odontograma-fullscreen-backdrop"
+                    onClick={() => setIsFullscreen(false)}
+                />
             )}
-            {engineError && (
-                <div className="error-container">
-                    <div className="error-message">{engineError}</div>
-                    {onRetry && (
-                        <Button 
-                            type="primary" 
-                            onClick={onRetry} 
-                            className="retry-button"
-                            icon={<span role="img" aria-label="reintentar">🔄</span>}
+            <div className={`odontograma-canvas-container${isFullscreen ? ' odontograma-canvas-fullscreen' : ''}`}>
+                {isFullscreen && (
+                    <div className="odontograma-fullscreen-header">
+                        <h3>Odontograma Inicial</h3>
+                        <button
+                            className="odontograma-fullscreen-close"
+                            onClick={() => setIsFullscreen(false)}
+                            title="Cerrar (Esc)"
                         >
-                            Reintentar inicialización
-                        </Button>
-                    )}
-                </div>
-            )}
-            <canvas 
-                ref={canvasRef} 
-                id="odontograma-canvas" 
-                width="1200" 
-                height="700" 
-                className="odontograma-canvas"
-                aria-label="Canvas de odontograma inicial"
-            />
-        </div>
+                            ✕
+                        </button>
+                    </div>
+                )}
+                {!isFullscreen && (
+                    <button
+                        className="odontograma-expand-btn"
+                        onClick={() => setIsFullscreen(true)}
+                        title="Ampliar odontograma"
+                        aria-label="Ampliar odontograma"
+                    >
+                        ⛶
+                    </button>
+                )}
+                {showSpinner && (
+                    <>
+                        <div className="loading-overlay"></div>
+                        <div className="loading-spinner">
+                            <p>Guardando...</p>
+                        </div>
+                    </>
+                )}
+                {engineError && (
+                    <div className="error-container">
+                        <div className="error-message">{engineError}</div>
+                        {onRetry && (
+                            <Button 
+                                type="primary" 
+                                onClick={onRetry} 
+                                className="retry-button"
+                                icon={<span role="img" aria-label="reintentar">🔄</span>}
+                            >
+                                Reintentar inicialización
+                            </Button>
+                        )}
+                    </div>
+                )}
+                <canvas 
+                    ref={canvasRef} 
+                    id="odontograma-canvas" 
+                    width="1200" 
+                    height="700" 
+                    className="odontograma-canvas"
+                    aria-label="Canvas de odontograma inicial"
+                />
+            </div>
+        </>
     );
 });
 
@@ -274,6 +315,8 @@ const OdontogramInitialSection = ({
     initialImageUrl = null,
     showInitialOdontogramImage = false,
     setShowInitialOdontogramImage,
+    /** 'loading' | 'saved' | 'none' — sincronizado con GET /odontograma-inicial en el padre */
+    initialSnapshotStatus = 'loading',
     onDelete,
     onSaveSuccess,
 
@@ -1344,6 +1387,19 @@ const OdontogramInitialSection = ({
         }));
     }, [initialOdontogramData]);
 
+    const initialStatusLine = useMemo(() => {
+      switch (initialSnapshotStatus) {
+        case 'loading':
+          return 'Comprobando si ya existe un odontograma inicial guardado…';
+        case 'saved':
+          return 'Hay un odontograma inicial guardado. Solo puede consultar la captura y la tabla de datos; el canvas no está disponible para modificaciones.';
+        case 'none':
+          return 'Aún no hay odontograma inicial guardado. Marque los dientes en el canvas y use «Capturar Odontograma» para registrarlo.';
+        default:
+          return '';
+      }
+    }, [initialSnapshotStatus]);
+
     // Columnas de la tabla
     const odontogramColumns = [
         { title: 'Diente', dataIndex: 'diente', key: 'diente', width: 40 },
@@ -1361,26 +1417,26 @@ const OdontogramInitialSection = ({
         }
     }, [setShowInitialOdontogramImage]);
 
-    // Resetear flags al cambiar de paciente
+    // Resetear estado local al cambiar de paciente (el padre vuelve a cargar exists/imageUrl)
     useEffect(() => {
-      console.log('🔄 [OdontogramInitialSection] Reseteando estado por cambio de patientId:', patientId);
       setInitialImageLoadFailed(false);
-      if (setShowInitialOdontogramImage) {
-          setShowInitialOdontogramImage(false);
-      }
       setCurrentImageUrl('');
       setInitialOdontogramData([]);
-    }, [patientId, setShowInitialOdontogramImage]);
-
-    // Removemos los useEffect de monitoreo para evitar renders innecesarios
-    // que pueden estar contribuyendo al parpadeo del odontograma
+    }, [patientId]);
 
     // --- JSX con componentes memoizados ---
     return (
         <section className="patient-detail_odontograma">
           <div className="odontograma-section">
             <div className="odontograma-header1">
-              <h2>Odontograma Inicial</h2>
+              <div className="odontograma-initial-heading-block">
+                <h2>Odontograma Inicial</h2>
+                {initialStatusLine ? (
+                  <p className="odontograma-initial-status-line" role="status">
+                    {initialStatusLine}
+                  </p>
+                ) : null}
+              </div>
               {(estadoInicial === ESTADOS.NO_EXISTE || estadoInicial === ESTADOS.RENDERIZADO) && (
                 <div className="odontograma-controls">
                   <button 
@@ -1465,8 +1521,8 @@ const OdontogramInitialSection = ({
               </div>
             </div>
             {(estadoInicial === ESTADOS.NO_EXISTE || estadoInicial === ESTADOS.RENDERIZADO) && (
-              <div className="tools" style={{marginTop: '1rem'}}>
-                <p style={{color: '#555', fontSize: '0.9em'}}>Seleccione una herramienta y marque los dientes.</p>
+              <div className="tools odontograma-tools-hint-wrap" style={{ marginTop: '1rem' }}>
+                <p className="odontograma-tools-hint">Seleccione una herramienta y marque los dientes.</p>
               </div>
             )}
 
@@ -1540,6 +1596,7 @@ OdontogramInitialSection.propTypes = {
     initialImageUrl: PropTypes.string,
     onDelete: PropTypes.func.isRequired,
     onSaveSuccess: PropTypes.func,
+    initialSnapshotStatus: PropTypes.oneOf(['loading', 'saved', 'none']),
 
     areScriptsReady: PropTypes.bool,
     formatImageUrl: PropTypes.func.isRequired,

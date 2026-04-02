@@ -82,6 +82,24 @@ const verificarOdontogramaInicial = async (req, res, next) => {
   }
 };
 
+/** Comprobación ligera para el motor (canvas): solo indica si ya existe snapshot inicial */
+const hasInitialOdontogram = async (req, res, next) => {
+  try {
+    const patientId = req.patient?.id || req.patient?._id;
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
+      });
+    }
+    const doc = await OdontogramaModel.findOne({ patientId, type: TYPE_INITIAL }).lean();
+    const hasSaved = !!(doc && doc.current);
+    res.json({ hasSaved });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const guardarOdontogramaInicial = async (req, res, next) => {
   console.log('[DEBUG] guardarOdontogramaInicial - Inicio:', {
     hasFile: !!req.file,
@@ -960,6 +978,7 @@ module.exports = {
   TYPE_INITIAL,
   TYPE_CLINIC,
   verificarOdontogramaInicial,
+  hasInitialOdontogram,
   validarEntradasOdontograma,
   guardarOdontogramaInicial,
   obtenerHistorialInicial,
