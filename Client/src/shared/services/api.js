@@ -10,22 +10,27 @@ export const invalidatePatientsCache = () => {
   patientsCache = { data: null, ts: 0 };
 };
 
-// Interceptor para manejar errores de forma global
+// Interceptor para manejar errores de forma global.
+// IMPORTANTE: preservamos `response`, `request` y `config` del AxiosError original
+// para que los consumidores (LockScreen, etc.) puedan inspeccionar status code y body.
 api.interceptors.response.use(
     response => response,
     error => {
         const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
         console.error(`❌ Error API: ${errorMessage}`, error);
-        
-        // Preservar propiedades importantes del error original para manejo de timeouts y cancelaciones
+
         const enhancedError = {
             message: errorMessage,
             status: error.response?.status,
-            name: error.name, // Preservar name (AbortError, CanceledError, etc.)
-            code: error.code, // Preservar code (ERR_CANCELED, ECONNABORTED, etc.)
+            name: error.name,
+            code: error.code,
+            response: error.response,
+            request: error.request,
+            config: error.config,
+            isAxiosError: error.isAxiosError,
             originalError: error
         };
-        
+
         return Promise.reject(enhancedError);
     }
 );
