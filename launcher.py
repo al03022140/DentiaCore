@@ -84,12 +84,30 @@ class DentiaCoreLauncher:
         self.root.minsize(540, 780)
         self.root.configure(bg=self.colors['bg_light'])
         self.root.resizable(False, True)
-        
+
+        # Cargar icono de ventana (taskbar / dock)
+        self._load_icon()
+
         # Centrar ventana
         self.center_window()
-        
+
         # Configurar cierre de ventana
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def _load_icon(self):
+        """Asigna el icono de la app a la ventana. PNG funciona en Mac/Win/Linux con Tk 8.6+."""
+        try:
+            project_dir = Path(__file__).parent
+            for candidate in (
+                project_dir / 'Client' / 'public' / 'android-chrome-192x192.png',
+                project_dir / 'Client' / 'public' / 'android-chrome-512x512.png',
+            ):
+                if candidate.is_file():
+                    self._app_icon = tk.PhotoImage(file=str(candidate))
+                    self.root.iconphoto(True, self._app_icon)
+                    break
+        except Exception:
+            pass
         
     def center_window(self):
         """Centrar la ventana en la pantalla"""
@@ -221,38 +239,110 @@ class DentiaCoreLauncher:
             bg=parent.cget('bg'), anchor='w',
         )
 
+    def _create_status_badge(self, parent, width=130, height=26):
+        """Crea un badge tipo pill (Canvas con rectángulo redondeado)."""
+        canvas = tk.Canvas(
+            parent, width=width, height=height,
+            bg=parent.cget('bg'), highlightthickness=0, bd=0,
+        )
+        canvas._badge_width = width
+        canvas._badge_height = height
+        canvas._badge_radius = height // 2
+        return canvas
+
+    def _update_status_badge(self, canvas, text, bg_color, fg_color='white'):
+        """Actualiza el contenido de un badge creado con _create_status_badge."""
+        try:
+            canvas.delete('all')
+            w, h, r = canvas._badge_width, canvas._badge_height, canvas._badge_radius
+            self._draw_rounded_rect(
+                canvas, 1, 1, w - 1, h - 1, r,
+                fill=bg_color, outline=bg_color,
+            )
+            canvas.create_text(
+                w // 2, h // 2,
+                text=text, font=('Montserrat', 9, 'bold'), fill=fg_color,
+            )
+        except tk.TclError:
+            pass
+
+    def _start_spinner(self, widget, base_text):
+        """Inicia un spinner animado en un widget tipo Button mientras opera asíncronamente."""
+        if not hasattr(self, '_spinner_jobs'):
+            self._spinner_jobs = {}
+        self._stop_spinner(widget)
+        frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        state = {'idx': 0}
+
+        def tick():
+            try:
+                widget.config(text=f'{frames[state["idx"] % len(frames)]}  {base_text}')
+            except tk.TclError:
+                return
+            state['idx'] += 1
+            self._spinner_jobs[widget] = self.root.after(90, tick)
+
+        tick()
+
+    def _stop_spinner(self, widget):
+        """Detiene un spinner previamente iniciado en el widget."""
+        if not hasattr(self, '_spinner_jobs'):
+            return
+        job = self._spinner_jobs.pop(widget, None)
+        if job:
+            try:
+                self.root.after_cancel(job)
+            except tk.TclError:
+                pass
+
     # ── Layout principal ──────────────────────────────────────────
 
     def create_widgets(self):
         """Crear todos los widgets de la interfaz — Design System DentiaCore"""
         C = self.colors  # alias
 
-        # Scrollable main area
         outer = tk.Frame(self.root, bg=C['bg_light'])
         outer.pack(fill='both', expand=True)
 
-        main_frame = tk.Frame(outer, bg=C['bg_light'], padx=28, pady=24)
-        main_frame.pack(fill='both', expand=True)
+        # ── Brand header strip (full width, color corporativo) ──
+        brand_bar = tk.Frame(outer, bg=C['primary'], height=82)
+        brand_bar.pack(fill='x', side='top')
+        brand_bar.pack_propagate(False)
 
-        # ── Header ──
-        header = tk.Frame(main_frame, bg=C['bg_light'])
-        header.pack(fill='x', pady=(0, 20))
+        brand_accent = tk.Frame(outer, bg=C['primary_light'], height=3)
+        brand_accent.pack(fill='x', side='top')
+
+        brand_inner = tk.Frame(brand_bar, bg=C['primary'])
+        brand_inner.pack(fill='both', expand=True, padx=24, pady=14)
 
         tk.Label(
-            header, text='🦷', font=('Segoe UI Emoji', 28),
-            bg=C['bg_light'],
-        ).pack(side='left', padx=(0, 10))
+            brand_inner, text='🦷', font=('Segoe UI Emoji', 30),
+            bg=C['primary'], fg='white',
+        ).pack(side='left', padx=(0, 12))
 
-        title_block = tk.Frame(header, bg=C['bg_light'])
+        title_block = tk.Frame(brand_inner, bg=C['primary'])
         title_block.pack(side='left')
         tk.Label(
             title_block, text='DentiaCore',
-            font=('Montserrat', 22, 'bold'), fg=C['primary'], bg=C['bg_light'],
+            font=('Montserrat', 20, 'bold'), fg='white', bg=C['primary'],
         ).pack(anchor='w')
         tk.Label(
-            title_block, text='Application Launcher',
-            font=('Montserrat', 10), fg=C['text_muted'], bg=C['bg_light'],
+            title_block, text='Sistema de Gestión Dental',
+            font=('Montserrat', 10), fg='#cfe1f5', bg=C['primary'],
         ).pack(anchor='w')
+
+        # Version chip a la derecha del brand bar
+        version_chip = tk.Frame(brand_inner, bg='white')
+        version_chip.pack(side='right')
+        tk.Label(
+            version_chip, text=' v1.0 ',
+            font=('Montserrat', 9, 'bold'), fg=C['primary'], bg='white',
+            padx=4, pady=2,
+        ).pack(padx=2, pady=2)
+
+        # Área principal con padding
+        main_frame = tk.Frame(outer, bg=C['bg_light'], padx=28, pady=20)
+        main_frame.pack(fill='both', expand=True)
 
         # ── Card: Estado de Servicios ──
         status_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
@@ -266,20 +356,27 @@ class DentiaCoreLauncher:
         sep = tk.Frame(status_card, height=1, bg=C['border_light'])
         sep.pack(fill='x', padx=16, pady=(0, 8))
 
-        status_row = tk.Frame(status_card, bg=C['bg_card'])
-        status_row.pack(fill='x', padx=16, pady=(0, 6))
+        # Server row: label izq + badge der
+        srv_row = tk.Frame(status_card, bg=C['bg_card'])
+        srv_row.pack(fill='x', padx=16, pady=4)
+        tk.Label(
+            srv_row, text='Servidor backend',
+            font=('Montserrat', 10), fg=C['text_primary'], bg=C['bg_card'],
+        ).pack(side='left')
+        self.server_status = self._create_status_badge(srv_row)
+        self.server_status.pack(side='right')
+        self._update_status_badge(self.server_status, 'DETENIDO', C['text_light'])
 
-        self.server_status = tk.Label(
-            status_row, text='● Servidor: Detenido',
-            font=('Montserrat', 10), fg=C['danger'], bg=C['bg_card'], anchor='w',
-        )
-        self.server_status.pack(anchor='w', pady=2)
-
-        self.client_status = tk.Label(
-            status_row, text='● Frontend: Detenido',
-            font=('Montserrat', 10), fg=C['danger'], bg=C['bg_card'], anchor='w',
-        )
-        self.client_status.pack(anchor='w', pady=(2, 4))
+        # Frontend row
+        fe_row = tk.Frame(status_card, bg=C['bg_card'])
+        fe_row.pack(fill='x', padx=16, pady=4)
+        tk.Label(
+            fe_row, text='Frontend (cliente)',
+            font=('Montserrat', 10), fg=C['text_primary'], bg=C['bg_card'],
+        ).pack(side='left')
+        self.client_status = self._create_status_badge(fe_row)
+        self.client_status.pack(side='right')
+        self._update_status_badge(self.client_status, 'DETENIDO', C['text_light'])
 
         # ── Card: Modo de despliegue ──
         mode_card = tk.Frame(main_frame, bg=C['bg_card'], bd=0,
@@ -327,7 +424,7 @@ class DentiaCoreLauncher:
         btns_frame.pack(fill='x', pady=(0, 10))
 
         self.start_all_btn = self._make_styled_button(
-            btns_frame, text='🚀  Iniciar Aplicación Completa',
+            btns_frame, text='▶   Iniciar Aplicación Completa',
             bg=C['primary'], hover_bg=C['primary_hover'],
             font_spec=('Montserrat', 12, 'bold'), pady=13,
             command=self.start_all,
@@ -335,7 +432,7 @@ class DentiaCoreLauncher:
         self.start_all_btn.pack(fill='x', pady=(0, 8))
 
         self.stop_all_btn = self._make_styled_button(
-            btns_frame, text='⏹  Detener Todo',
+            btns_frame, text='■   Detener Todo',
             bg=C['danger'], hover_bg=C['danger_hover'],
             font_spec=('Montserrat', 12, 'bold'), pady=13,
             command=self.stop_all,
@@ -358,7 +455,7 @@ class DentiaCoreLauncher:
         grid_frame.pack(padx=16, pady=(0, 8))
 
         self.server_btn = self._make_styled_button(
-            grid_frame, text='🖥  Servidor',
+            grid_frame, text='▶   Servidor',
             bg=C['primary_light'], hover_bg=C['primary'],
             font_spec=('Montserrat', 10, 'bold'), padx=18, pady=9,
             command=self.toggle_server,
@@ -366,7 +463,7 @@ class DentiaCoreLauncher:
         self.server_btn.grid(row=0, column=0, padx=(0, 8), sticky='ew')
 
         self.client_btn = self._make_styled_button(
-            grid_frame, text='🌐  Frontend',
+            grid_frame, text='▶   Frontend',
             bg=C['primary_light'], hover_bg=C['primary'],
             font_spec=('Montserrat', 10, 'bold'), padx=18, pady=9,
             command=self.toggle_client,
@@ -391,16 +488,16 @@ class DentiaCoreLauncher:
         qbtns = tk.Frame(quick_card, bg=C['bg_card'])
         qbtns.pack(padx=16, pady=(0, 8))
 
-        self._make_outline_button(qbtns, '🌍  Abrir App', command=self.open_app).grid(
+        self._make_outline_button(qbtns, '↗   Abrir en navegador', command=self.open_app).grid(
             row=0, column=0, padx=(0, 6))
-        self._make_outline_button(qbtns, '🗑  Limpiar Pacientes', command=self.clear_patients).grid(
+        self._make_outline_button(qbtns, '✕   Limpiar pacientes', command=self.clear_patients).grid(
             row=0, column=1, padx=6)
-        self._make_outline_button(qbtns, '📁  Abrir Carpeta', command=self.open_folder).grid(
+        self._make_outline_button(qbtns, '⊕   Abrir carpeta', command=self.open_folder).grid(
             row=0, column=2, padx=(6, 0))
 
         # ── Footer ──
         tk.Label(
-            main_frame, text='DentiaCore © 2025 — Sistema de Gestión Dental',
+            main_frame, text='DentiaCore  ·  v1.0  ·  © 2026 Sistema de Gestión Dental',
             font=('Montserrat', 8), fg=C['text_light'], bg=C['bg_light'],
         ).pack(pady=(12, 0))
 
@@ -411,7 +508,8 @@ class DentiaCoreLauncher:
     def start_all(self):
         """Iniciar servidor y frontend"""
         if not self.is_server_running and not self.is_client_running:
-            self.start_all_btn.config(state='disabled', text="⏳ Iniciando...")
+            self.start_all_btn.config(state='disabled')
+            self._start_spinner(self.start_all_btn, 'Iniciando...')
             threading.Thread(target=self._start_all_thread, daemon=True).start()
         
     def _start_all_thread(self):
@@ -549,7 +647,8 @@ class DentiaCoreLauncher:
             
     def stop_all(self):
         """Detener todos los servicios"""
-        self.stop_all_btn.config(state='disabled', text="⏳ Deteniendo...")
+        self.stop_all_btn.config(state='disabled')
+        self._start_spinner(self.stop_all_btn, 'Deteniendo...')
         threading.Thread(target=self._stop_all_thread, daemon=True).start()
         
     def _stop_all_thread(self):
@@ -1247,7 +1346,8 @@ class DentiaCoreLauncher:
         if dist_index.exists() and not force_build:
             return
         try:
-            self.root.after(0, lambda: self.start_all_btn.config(text='⏳ Construyendo Frontend...', state='disabled'))
+            self.root.after(0, lambda: (self.start_all_btn.config(state='disabled'),
+                                          self._start_spinner(self.start_all_btn, 'Construyendo frontend...')))
             subprocess.run(
                 ['npm', 'run', 'build'],
                 shell=(sys.platform == 'win32'),
@@ -1966,41 +2066,48 @@ class DentiaCoreLauncher:
         C = self.colors
         current_mode = self.mode_var.get()
 
-        # Indicadores de estado
+        # Detener spinners (el estado final reemplaza el texto animado)
+        self._stop_spinner(self.start_all_btn)
+        self._stop_spinner(self.stop_all_btn)
+
+        # Estado del servidor (badge + botón individual)
         if self.is_server_running:
-            self.server_status.config(text='● Servidor: Ejecutándose', fg=C['success'])
-            self.server_btn.config(text='⏹  Detener Servidor')
+            self._update_status_badge(self.server_status, 'EN LÍNEA', C['success'])
+            self.server_btn.config(text='■   Detener Servidor')
             self.server_btn._orig_bg = C['danger']
             self.server_btn.config(bg=C['danger'])
         else:
-            self.server_status.config(text='● Servidor: Detenido', fg=C['danger'])
-            self.server_btn.config(text='▶  Iniciar Servidor')
+            self._update_status_badge(self.server_status, 'DETENIDO', C['text_light'])
+            self.server_btn.config(text='▶   Iniciar Servidor')
             self.server_btn._orig_bg = C['primary_light']
             self.server_btn.config(bg=C['primary_light'])
-            
+
+        # Estado del frontend según modo
         if current_mode == 'lan':
-            status_text = '● Frontend servido por backend' if self.is_server_running else '● Frontend: Dependiente del servidor'
-            self.client_status.config(text=status_text, fg=C['success'] if self.is_server_running else C['danger'])
-            self.client_btn.config(text='🌐  Modo LAN', state='disabled')
+            if self.is_server_running:
+                self._update_status_badge(self.client_status, 'SERVIDO POR API', C['success'])
+            else:
+                self._update_status_badge(self.client_status, 'ESPERA SERVIDOR', C['warning'])
+            self.client_btn.config(text='Modo LAN activo', state='disabled')
             self.client_btn._orig_bg = C['primary_light']
             self.client_btn.config(bg=C['primary_light'])
         elif self.is_client_running:
-            self.client_status.config(text='● Frontend: Ejecutándose', fg=C['success'])
-            self.client_btn.config(text='⏹  Detener Frontend', state='normal')
+            self._update_status_badge(self.client_status, 'EN LÍNEA', C['success'])
+            self.client_btn.config(text='■   Detener Frontend', state='normal')
             self.client_btn._orig_bg = C['danger']
             self.client_btn.config(bg=C['danger'])
         else:
-            self.client_status.config(text='● Frontend: Detenido', fg=C['danger'])
-            self.client_btn.config(text='▶  Iniciar Frontend', state='normal')
+            self._update_status_badge(self.client_status, 'DETENIDO', C['text_light'])
+            self.client_btn.config(text='▶   Iniciar Frontend', state='normal')
             self.client_btn._orig_bg = C['primary_light']
             self.client_btn.config(bg=C['primary_light'])
-            
+
         # Botones principales
         all_running = self.is_server_running and (self.is_client_running or current_mode == 'lan')
         if all_running:
             self.start_all_btn.config(
                 state='disabled',
-                text='✅  Aplicación Ejecutándose',
+                text='✓   Aplicación Ejecutándose',
             )
             self.start_all_btn._orig_bg = C['success']
             self.start_all_btn.config(bg=C['success'])
@@ -2008,11 +2115,11 @@ class DentiaCoreLauncher:
         else:
             self.start_all_btn.config(
                 state='normal',
-                text='🚀  Iniciar Aplicación Completa',
+                text='▶   Iniciar Aplicación Completa',
             )
             self.start_all_btn._orig_bg = C['primary']
             self.start_all_btn.config(bg=C['primary'])
-            self.stop_all_btn.config(state='normal', text='⏹  Detener Todo')
+            self.stop_all_btn.config(state='normal', text='■   Detener Todo')
             
     def on_closing(self):
         """Manejar el cierre de la aplicación"""
