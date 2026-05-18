@@ -89,10 +89,21 @@ if ! command -v node &> /dev/null; then
         fi
     fi
     print_ok "Node.js instalado"
-else
-    NODE_VERSION=$(node -v)
-    print_ok "Node.js detectado: $NODE_VERSION"
 fi
+
+# Validate Node.js version (Vite 6 + dependencias requieren >= 18)
+NODE_VERSION=$(node -v 2>/dev/null || echo "")
+NODE_MAJOR=$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f1)
+if [ -z "$NODE_MAJOR" ] || ! [ "$NODE_MAJOR" -ge 18 ] 2>/dev/null; then
+    print_err "Node.js v18 o superior es requerido (detectado: ${NODE_VERSION:-ninguno})"
+    if [ "$OS_TYPE" = "mac" ]; then
+        print_err "Actualiza con: brew upgrade node  (o brew install node@20)"
+    else
+        print_err "Sigue: https://nodejs.org/en/download/package-manager"
+    fi
+    exit 1
+fi
+print_ok "Node.js validado: $NODE_VERSION"
 
 # Check npm
 if ! command -v npm &> /dev/null; then
@@ -132,6 +143,22 @@ else
     MONGO_VERSION=$(mongod --version 2>/dev/null | head -1 || echo "versión desconocida")
     print_ok "MongoDB detectado: $MONGO_VERSION"
 fi
+
+# Validate MongoDB es realmente invocable después de la instalación
+if ! command -v mongod &> /dev/null; then
+    print_err "mongod no quedó disponible en PATH tras la instalación."
+    if [ "$OS_TYPE" = "mac" ]; then
+        print_err "Intenta: brew link mongodb-community  — o reinicia tu terminal y vuelve a correr el instalador."
+    else
+        print_err "Instala manualmente desde https://www.mongodb.com/docs/manual/installation/"
+    fi
+    exit 1
+fi
+if ! mongod --version > /dev/null 2>&1; then
+    print_err "mongod existe pero no responde a 'mongod --version'. Revisa la instalación."
+    exit 1
+fi
+print_ok "MongoDB validado correctamente"
 
 # Create DB directories
 print_step "Creando directorios de base de datos..."
