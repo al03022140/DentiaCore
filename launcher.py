@@ -1306,6 +1306,46 @@ class DentiaCoreLauncher:
             webbrowser.open(url)
         except Exception as e:
             print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}")
+
+    def _mongo_service_failure_dialog(self):
+        """
+        Muestra dialog cuando el servicio Windows MongoDB existe pero no responde.
+        Lee el log de mongod (en <repo>/DB/logs/mongod.log, donde el servicio escribe).
+        """
+        log_paths = [
+            self.db_dir / 'logs' / 'mongod.log',
+            self.db_dir / 'logs' / 'mongod-launcher.log',
+        ]
+        log_content = ''
+        used_log = None
+        for lp in log_paths:
+            try:
+                if lp.exists():
+                    content = self._tail_file(str(lp), lines=25) or ''
+                    if content.strip():
+                        log_content = content
+                        used_log = lp
+                        break
+            except Exception:
+                continue
+        if not log_content.strip():
+            log_content = '(no se encontró log de mongod — revisa DB\\logs\\)'
+
+        msg = (
+            'El servicio Windows "MongoDB" existe pero no responde en el puerto 27017.\n\n'
+            'Soluciones rápidas (en orden):\n'
+            '  1. Abre cmd como administrador y corre:\n'
+            '     net stop MongoDB\n'
+            '     net start MongoDB\n\n'
+            '  2. Si sigue fallando, mata procesos zombi:\n'
+            '     taskkill /F /IM mongod.exe\n'
+            '     net start MongoDB\n\n'
+            '  3. Como último recurso, reinstala con EJECUTAR_INSTALADOR.bat\n\n'
+            f'Log consultado: {used_log or "(ninguno)"}\n\n'
+            f'Últimas líneas:\n{"-" * 50}\n{log_content[:1800]}'
+        )
+        self.root.after(0, lambda: messagebox.showerror('MongoDB Service no responde', msg))
+        return False
             
     def clear_patients(self):
         """Limpiar todos los pacientes"""
@@ -1407,53 +1447,106 @@ class DentiaCoreLauncher:
         except Exception:
             return False
 
+    def _windows_mongo_service_exists(self):
+        """¿Está instalado el servicio de Windows 'MongoDB'? (lo crea install.ps1)"""
+        try:
+            r = subprocess.run(
+                ['sc', 'query', 'MongoDB'],
+                shell=True, capture_output=True, text=True, timeout=5,
+            )
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    def _windows_mongo_service_status(self):
+        """Devuelve el estado del servicio Windows 'MongoDB' o None si no existe."""
+        try:
+            r = subprocess.run(
+                ['sc', 'query', 'MongoDB'],
+                shell=True, capture_output=True, text=True, timeout=5,
+            )
+            if r.returncode != 0:
+                return None
+            for line in (r.stdout or '').splitlines():
+                line = line.strip()
+                if line.upper().startswith('STATE'):
+                    # ej: "STATE              : 4  RUNNING"
+                    upper = line.upper()
+                    if 'RUNNING' in upper: return 'RUNNING'
+                    if 'STOPPED' in upper: return 'STOPPED'
+                    if 'START_PENDING' in upper: return 'START_PENDING'
+                    if 'STOP_PENDING' in upper: return 'STOP_PENDING'
+                    return 'OTHER'
+            return 'OTHER'
+        except Exception:
+            return None
+
     def _ensure_mongo_running_win(self):
         """
         Flujo robusto para arrancar MongoDB en Windows:
-        1) Si el puerto 27017 ya responde, MongoDB está corriendo (existente / servicio)
-        2) Si hay mongod.exe en tasklist, esperamos a que abra el puerto
-        3) Buscamos el binario y lo arrancamos sin abrir ventana, con --logpath a un archivo
-        4) Esperamos al puerto y, si falla, mostramos las últimas líneas del log para
-           que el usuario sepa exactamente qué falló (puerto ocupado, DB lock, etc.)
-        5) Si no se encontró el binario, probamos `net start MongoDB` (servicio) antes de rendirnos
+        1) Puerto 27017 abierto → usar lo que sea esté corriendo
+        2) Servicio Windows "MongoDB" instalado (lo crea install.ps1) → `net start MongoDB`
+        3) Proceso mongod.exe vivo → esperar puerto
+        4) Buscar binario y arrancar manual con --logpath (sin ventana)
+        Cualquier fallo muestra dialog con últimas líneas del log para diagnóstico.
         """
-        # 1) Puerto ya escuchando — probablemente mongod externo o servicio
+        # 1) Puerto ya escuchando
         if self._is_port_listening('127.0.0.1', 27017):
-            print("✅ Puerto 27017 ya está escuchando (MongoDB existente)")
+            print("✅ Puerto 27017 ya está escuchando")
             return self._wait_for_mongo_ready(timeout=10)
 
-        # 2) Proceso vivo pero puerto todavía no abierto — esperar
+        # 2) ¿Servicio Windows 'MongoDB' instalado? (caso típico tras correr install.ps1)
+        #    Hay que usar el SERVICIO en vez de arrancar mongod manualmente — si
+        #    arrancamos uno nuevo apuntando al mismo --dbpath habrá DB lock.
+        service_status = self._windows_mongo_service_status()
+        if service_status is not None:
+            print(f"ℹ️ Servicio Windows 'MongoDB' detectado (status={service_status})")
+            if service_status == 'RUNNING':
+                if self._wait_for_mongo_ready(timeout=15):
+                    return True
+                print("⚠️ Servicio reporta RUNNING pero no responde en 27017")
+            else:
+                # Arrancar el servicio
+                print("🔄 Arrancando servicio MongoDB con net start...")
+                try:
+                    r = subprocess.run(
+                        ['net', 'start', 'MongoDB'],
+                        shell=True, capture_output=True, text=True, timeout=30, check=False,
+                    )
+                    out = (r.stdout or '').strip() or (r.stderr or '').strip()
+                    if out:
+                        print(f"   net start: {out}")
+                except subprocess.TimeoutExpired:
+                    print("⚠️ net start MongoDB tomó >30s")
+                except Exception as e:
+                    print(f"⚠️ net start MongoDB falló: {e}")
+
+                if self._wait_for_mongo_ready(timeout=20):
+                    return True
+
+            # Servicio existe pero no responde — leer su log y reportar
+            return self._mongo_service_failure_dialog()
+
+        # 3) Proceso vivo sin servicio (raro pero posible)
         if self._is_mongod_process_running_win():
-            print("✅ Proceso mongod.exe detectado, esperando puerto 27017...")
+            print("✅ Proceso mongod.exe detectado (sin servicio), esperando puerto...")
             if self._wait_for_mongo_ready(timeout=30):
                 return True
-            print("⚠️ El proceso mongod existe pero no responde en el puerto. Reintentando arranque limpio…")
+            print("⚠️ Proceso mongod existe pero puerto no responde — reintentando arranque limpio")
 
-        # 3) Buscar binario
+        # 4) No hay servicio ni proceso — buscar binario y arrancar manual
         exe_path = self._find_mongod_exe()
         if not exe_path:
-            # 3b) Antes de rendirnos, intentar el servicio de Windows
-            print("ℹ️ mongod no encontrado, intentando servicio MongoDB de Windows…")
-            try:
-                subprocess.run(
-                    ['net', 'start', 'MongoDB'],
-                    shell=True, capture_output=True, text=True, timeout=15, check=False,
-                )
-                time.sleep(2)
-                if self._is_port_listening('127.0.0.1', 27017):
-                    return self._wait_for_mongo_ready(timeout=20)
-            except Exception as e:
-                print(f"⚠️ net start MongoDB falló: {e}")
-
             self.root.after(0, lambda: messagebox.showerror(
                 'MongoDB no encontrado',
-                'No se encontró mongod.exe en ningún lugar conocido.\n\n'
+                'No se encontró mongod.exe ni un servicio MongoDB instalado.\n\n'
                 'Soluciones (en orden):\n'
-                '  1. Verifica que exista: tools\\mongo\\bin\\mongod.exe\n'
-                '     (debería venir con el repo)\n\n'
-                '  2. O instala MongoDB Community Server:\n'
+                '  1. Corre el instalador como administrador:\n'
+                '     EJECUTAR_INSTALADOR.bat (registra el servicio Windows)\n\n'
+                '  2. O verifica que exista: tools\\mongo\\bin\\mongod.exe\n\n'
+                '  3. O instala MongoDB Community Server:\n'
                 '     https://www.mongodb.com/try/download/community\n\n'
-                '  3. Después cierra y vuelve a abrir el launcher.'
+                'Después cierra y vuelve a abrir el launcher.'
             ))
             return False
 
