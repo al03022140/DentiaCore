@@ -9,19 +9,21 @@ const MovementsList = ({ refreshTrigger }) => {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchMovements = async () => {
-    try {
-      const data = await getLastMovements();
-      setMovements(data);
-    } catch (error) {
-      console.error('Error fetching movements:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchMovements();
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getLastMovements();
+        if (cancelled) return;
+        setMovements(data);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error fetching movements:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [refreshTrigger]);
 
   return (

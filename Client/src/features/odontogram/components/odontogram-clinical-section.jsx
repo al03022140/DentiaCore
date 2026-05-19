@@ -99,16 +99,17 @@ const OdontogramClinicalSection = ({
            // Si se quiere re-memoizar cuando el engine cambia, se añadiría engineManagerRef.current.instance a las deps,
            // pero eso es más complejo con refs. Por ahora, se asume que el engine no cambia tan seguido como para necesitarlo.
 
-    // NUEVO: Función para cargar el historial clínico
+    // Función para cargar el historial clínico — la versión "callable" se
+    // expone por si algún handler de Save/Delete quiere recargar. El efecto
+    // que la dispara al montar usa su propia closure con `cancelled` para
+    // no setState tras unmount.
     const loadClinicalHistory = useCallback(async () => {
         if (!patientId) return;
-        
         setLoadingHistory(true);
         try {
             const odontogramaService = await import('../api/odontograma-service.js');
             const history = await odontogramaService.default.getClinicalOdontogramHistory(patientId);
-            // Ordenar historial: más recientes primero (descendente por fecha)
-            const sortedHistory = Array.isArray(history) ? 
+            const sortedHistory = Array.isArray(history) ?
                 history.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)) : [];
             setClinicalHistory(sortedHistory);
         } catch (error) {
@@ -119,10 +120,32 @@ const OdontogramClinicalSection = ({
         }
     }, [patientId]);
 
-    // NUEVO: Cargar historial al montar el componente
+    // Carga inicial: guard con `cancelled` para evitar setState tras unmount
+    // y para minimizar el impacto del doble-mount de StrictMode (la segunda
+    // resolución no toca el state si el primer cleanup ya corrió).
     useEffect(() => {
-        loadClinicalHistory();
-    }, [loadClinicalHistory]);
+        if (!patientId) return;
+        let cancelled = false;
+        (async () => {
+            setLoadingHistory(true);
+            try {
+                const odontogramaService = await import('../api/odontograma-service.js');
+                if (cancelled) return;
+                const history = await odontogramaService.default.getClinicalOdontogramHistory(patientId);
+                if (cancelled) return;
+                const sortedHistory = Array.isArray(history) ?
+                    history.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)) : [];
+                setClinicalHistory(sortedHistory);
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Error al cargar historial clínico:', error);
+                setClinicalHistory([]);
+            } finally {
+                if (!cancelled) setLoadingHistory(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [patientId]);
 
     // --- Funciones ---
 

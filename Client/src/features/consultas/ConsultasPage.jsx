@@ -61,7 +61,23 @@ const ConsultasPage = () => {
     }
   }, []);
 
-  useEffect(() => { loadAgenda(); }, [loadAgenda]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const appointments = await getTodayAppointments();
+        if (cancelled) return;
+        setAgenda(Array.isArray(appointments) ? appointments : []);
+      } catch {
+        if (cancelled) return;
+        setAgenda([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Determine next patient & default selection
   useEffect(() => {

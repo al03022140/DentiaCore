@@ -46,23 +46,27 @@ const PatientList = () => {
   const [sortType, setSortType] = useState(null);
   const [isAscending, setIsAscending] = useState(true);
 
-  // Carga de pacientes
+  // Carga de pacientes (guard cancelled para no hacer setState tras unmount
+  // o en StrictMode al re-disparar el effect).
   useEffect(() => {
-    const fetchPatients = async () => {
+    let cancelled = false;
+    (async () => {
       try {
         setLoading(true);
         const response = await getAllPatients();
+        if (cancelled) return;
         const patientsArray = response?.patients ?? response ?? [];
         setPatients(Array.isArray(patientsArray) ? patientsArray : []);
       } catch (error) {
+        if (cancelled) return;
         console.error("Error al obtener pacientes:", error);
         message.error(`Error al cargar pacientes: ${error.message || 'Error desconocido'}`);
         setPatients([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-    fetchPatients();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Cerrar menú al hacer clic fuera

@@ -37,7 +37,24 @@ const PatientChargesCard = ({ patientId }) => {
     }
   }, [patientId]);
 
-  useEffect(() => { loadCharges(); }, [loadCharges]);
+  useEffect(() => {
+    if (!patientId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await getChargesByPatient(patientId);
+        if (cancelled) return;
+        setCharges(data);
+      } catch {
+        if (cancelled) return;
+        // silent — empty state will show
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [patientId]);
 
   // Group charges by date
   const groupedCharges = charges.reduce((groups, charge) => {

@@ -428,14 +428,7 @@
   gap: var(--spacing-md);
 }
 
-/* Misma escala que .back-button / .Boton_Imprimir en patient-detail (min-height 2.4rem, padding coherente) */
-.patient-list-wrapper .add-patient-button.button-primary {
-  min-height: 2.0rem;
-  height: auto;
-  padding: var(--spacing-xs) var(--spacing-md);
-  gap: var(--spacing-xs);
-  font: var(--pd-font-action);
-}
+/* .add-patient-button.button-primary hereda el visual global. */
 
 .patient-list-wrapper .add-patient-button .add-patient-button__label {
   white-space: nowrap;
@@ -453,12 +446,7 @@
   transform: scale(1.06);
 }
 
-.patient-list-wrapper .actions-container .filter-button {
-  min-height: 2.0rem;
-  height: auto;
-  padding: var(--spacing-xs) var(--spacing-md);
-  font: var(--pd-font-action);
-}
+/* .filter-button hereda el visual global. */
 
 .patient-list-wrapper .filter-button-container {
   display: flex;

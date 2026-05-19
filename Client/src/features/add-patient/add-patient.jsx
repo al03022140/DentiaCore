@@ -82,6 +82,36 @@ const trimStringsDeep = (value) => {
   return value;
 };
 
+// Paths a campos cuyo tipo en el schema es Date o Number. Como los inputs
+// HTML siempre devuelven string (los `date` vacíos retornan ""), Mongoose
+// arroja CastError al intentar guardar "" en un Date/Number. Convertimos a
+// `null` antes de serializar para que el schema use su default.
+const EMPTY_TO_NULL_PATHS = [
+  ['encuesta_medica', 'informacion_general', 'ultimo_examen_medico', 'fecha'],
+  ['encuesta_medica', 'embarazo', 'semanas_gestacion'],
+  ['informacion_femenina', 'fecha_ultimo_parto'],
+  ['informacion_femenina', 'fecha_ultima_menstruacion'],
+  ['habitos_higiene', 'fecha_ultima_visita_odontologo']
+];
+
+const normalizeEmptyDateAndNumber = (data) => {
+  const cloned = JSON.parse(JSON.stringify(data));
+  for (const path of EMPTY_TO_NULL_PATHS) {
+    let cursor = cloned;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (cursor == null || typeof cursor !== 'object') { cursor = null; break; }
+      cursor = cursor[path[i]];
+    }
+    if (cursor && typeof cursor === 'object') {
+      const key = path[path.length - 1];
+      if (cursor[key] === '' || cursor[key] === undefined) {
+        cursor[key] = null;
+      }
+    }
+  }
+  return cloned;
+};
+
 class PatientValidationError extends Error {
   constructor(message, details) {
     super(message);
@@ -156,6 +186,11 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
   const ctx = canvas.getContext("2d");
+
+  // Fondo blanco: JPEG no soporta transparencia, así que sin esto los PNG
+  // transparentes salen con fondo negro al convertir.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, pixelCrop.width, pixelCrop.height);
 
   // Dibuja la imagen recortada en el canvas
   ctx.drawImage(
@@ -460,6 +495,15 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   // re-renderice); el state se conserva para refrescar el botón.
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  // En el flujo modal, el padre puede desmontar este componente dentro de
+  // `onSave()`. El `finally` del submit corre después y haría setState sobre
+  // un componente desmontado (warning de React). Trackeamos el mount status
+  // para skipear setState cuando ya no estamos.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
   // Pasos que el usuario intentó dejar (con campos faltantes) o que se
   // marcaron como erróneos al intentar guardar. Sólo estos muestran la equis
   // roja para no abrumar al usuario con errores antes de tocar la sección.
@@ -548,7 +592,19 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
             mordida_cruzada: false,
             traslape_horizontal_mm: "",
             traslape_vertical_mm: "",
-            mordida_abierta: false
+            // Misma estructura que el state inicial del create. Antes era
+            // `false` (boolean) y reventaba al togglear el checkbox: el
+            // handler hace spread sobre el valor existente esperando un
+            // objeto, y sobre un boolean genera basura tipo {0:'f',1:'a',...}.
+            mordida_abierta: {
+              presente: false,
+              medidas: {
+                anterior_mm: "",
+                posterior_mm: "",
+                derecha_mm: "",
+                izquierda_mm: ""
+              }
+            }
           }
         },
         encuesta_medica: patientToEdit.encuesta_medica || {
@@ -906,7 +962,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       await handleSavePatient();
     } finally {
       isSubmittingRef.current = false;
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -917,7 +975,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
     // Trim recursivo de strings antes de validar y enviar — evita que campos
     // required acepten "   " en cliente y rebotan luego en el backend.
-    const patientData = trimStringsDeep(formData);
+    // Y convierte cadenas vacías a null para campos Date/Number del schema:
+    // Mongoose castea "" a CastError en esos tipos, lo que tumba el save.
+    const patientData = normalizeEmptyDateAndNumber(trimStringsDeep(formData));
 
     const missingFields = validateRequiredFields(patientData);
     if (missingFields.length > 0) {
@@ -1168,6 +1228,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       />
       <DentalEvaluation
         formData={formData}
+        setFormData={setFormData}
         handleNestedChange={handleNestedChange}
         handleDoubleNestedChange={handleDoubleNestedChange}
         handleTripleNestedChange={handleTripleNestedChange}
@@ -1303,7 +1364,25 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
             responsive
           />
 
-          <form className="add-patient-form" onSubmit={handleSubmit}>
+          <form
+            className="add-patient-form"
+            onSubmit={handleSubmit}
+            onKeyDown={(e) => {
+              // Bloquea Enter como submit accidental excepto en el último
+              // paso. En pasos intermedios, el `REQUIRED_FIELDS` puede estar
+              // satisfecho (paso 0 y 1) y Enter dispararía el guardado con
+              // las secciones médicas / hábitos en blanco, sin que el usuario
+              // se dé cuenta.
+              // Excepciones: textarea (Enter es para nueva línea) y botones
+              // (Enter activa el botón enfocado, ese es comportamiento OK).
+              if (e.key !== 'Enter') return;
+              const tag = e.target.tagName;
+              if (tag === 'TEXTAREA' || tag === 'BUTTON') return;
+              if (!isLastStep) {
+                e.preventDefault();
+              }
+            }}
+          >
             {stepSections[currentStep]}
 
             <div className="actions-container wizard-actions">

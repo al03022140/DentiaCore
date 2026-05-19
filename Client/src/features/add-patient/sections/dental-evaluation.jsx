@@ -1,4 +1,25 @@
-const DentalEvaluation = ({ formData, handleNestedChange, handleDoubleNestedChange, handleTripleNestedChange }) => {
+// Helper: mergea `patch` (objeto parcial) en el sub-objeto del path dado,
+// SIEMPRE leyendo del state más reciente (setFormData funcional). Evita
+// stale-closure bugs cuando dos onChange consecutivos modifican distintas
+// keys del mismo sub-objeto (p.ej. lateral_derecho y lateral_izquierdo, o
+// los 4 inputs de mordida_abierta.medidas): si el segundo onChange leía
+// `formData.x.y` desde la closure, sobreescribía el cambio del primero.
+const mergeAtPath = (setFormData, path, patch) => {
+  setFormData((prev) => {
+    const next = { ...prev };
+    let cursor = next;
+    for (let i = 0; i < path.length - 1; i++) {
+      const key = path[i];
+      cursor[key] = { ...(cursor[key] || {}) };
+      cursor = cursor[key];
+    }
+    const leafKey = path[path.length - 1];
+    cursor[leafKey] = { ...(cursor[leafKey] || {}), ...patch };
+    return next;
+  });
+};
+
+const DentalEvaluation = ({ formData, setFormData, handleNestedChange, handleDoubleNestedChange, handleTripleNestedChange }) => {
   return (
     <section className="form-section">
       <h2>Evaluación Dental y Oclusal</h2>
@@ -137,15 +158,13 @@ const DentalEvaluation = ({ formData, handleNestedChange, handleDoubleNestedChan
           
           <div className="form-group">
             <label>Lateral derecho:</label>
-            <select 
+            <select
               value={formData.evaluacion_dental_oclusal?.evaluacion_atm?.movilidad_mandibular?.lateralidad?.lateral_derecho || ""}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_atm', 'movilidad_mandibular', 'lateralidad', {
-                  ...formData.evaluacion_dental_oclusal?.evaluacion_atm?.movilidad_mandibular?.lateralidad,
-                  lateral_derecho: newValue
-                });
-              }}
+              onChange={(e) => mergeAtPath(
+                setFormData,
+                ['evaluacion_dental_oclusal', 'evaluacion_atm', 'movilidad_mandibular', 'lateralidad'],
+                { lateral_derecho: e.target.value }
+              )}
             >
               <option value="">Seleccionar...</option>
               <option value="normal">Normal</option>
@@ -153,18 +172,16 @@ const DentalEvaluation = ({ formData, handleNestedChange, handleDoubleNestedChan
               <option value="limitado">Limitado</option>
             </select>
           </div>
-          
+
           <div className="form-group">
             <label>Lateral izquierdo:</label>
-            <select 
+            <select
               value={formData.evaluacion_dental_oclusal?.evaluacion_atm?.movilidad_mandibular?.lateralidad?.lateral_izquierdo || ""}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_atm', 'movilidad_mandibular', 'lateralidad', {
-                  ...formData.evaluacion_dental_oclusal?.evaluacion_atm?.movilidad_mandibular?.lateralidad,
-                  lateral_izquierdo: newValue
-                });
-              }}
+              onChange={(e) => mergeAtPath(
+                setFormData,
+                ['evaluacion_dental_oclusal', 'evaluacion_atm', 'movilidad_mandibular', 'lateralidad'],
+                { lateral_izquierdo: e.target.value }
+              )}
             >
               <option value="">Seleccionar...</option>
               <option value="normal">Normal</option>
@@ -299,64 +316,56 @@ const DentalEvaluation = ({ formData, handleNestedChange, handleDoubleNestedChan
             <>
               <div className="form-group">
                 <label>Ant. (mm):</label>
-                <input 
+                <input
                   type="text"
                   value={formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas?.anterior_mm || ""}
-                  onChange={(e) => {
-                    const newMedidas = {
-                      ...formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas,
-                      anterior_mm: e.target.value
-                    };
-                    handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas', newMedidas);
-                  }}
+                  onChange={(e) => mergeAtPath(
+                    setFormData,
+                    ['evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas'],
+                    { anterior_mm: e.target.value }
+                  )}
                   placeholder="mm"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Post. (mm):</label>
-                <input 
+                <input
                   type="text"
                   value={formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas?.posterior_mm || ""}
-                  onChange={(e) => {
-                    const newMedidas = {
-                      ...formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas,
-                      posterior_mm: e.target.value
-                    };
-                    handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas', newMedidas);
-                  }}
+                  onChange={(e) => mergeAtPath(
+                    setFormData,
+                    ['evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas'],
+                    { posterior_mm: e.target.value }
+                  )}
                   placeholder="mm"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Der. (mm):</label>
-                <input 
+                <input
                   type="text"
                   value={formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas?.derecha_mm || ""}
-                  onChange={(e) => {
-                    const newMedidas = {
-                      ...formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas,
-                      derecha_mm: e.target.value
-                    };
-                    handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas', newMedidas);
-                  }}
+                  onChange={(e) => mergeAtPath(
+                    setFormData,
+                    ['evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas'],
+                    { derecha_mm: e.target.value }
+                  )}
                   placeholder="mm"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Izq. (mm):</label>
-                <input 
+                <input
                   type="text"
                   value={formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas?.izquierda_mm || ""}
-                  onChange={(e) => {
-                    const newMedidas = {
-                      ...formData.evaluacion_dental_oclusal?.evaluacion_oclusal?.mordida_abierta?.medidas,
-                      izquierda_mm: e.target.value
-                    };
-                    handleTripleNestedChange('evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas', newMedidas);
-                  }}
+                  onChange={(e) => mergeAtPath(
+                    setFormData,
+                    ['evaluacion_dental_oclusal', 'evaluacion_oclusal', 'mordida_abierta', 'medidas'],
+                    { izquierda_mm: e.target.value }
+                  )}
                   placeholder="mm"
                 />
               </div>

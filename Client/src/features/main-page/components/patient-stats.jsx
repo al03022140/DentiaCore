@@ -53,7 +53,39 @@ const PatientStats = () => {
         }
     }, []);
 
-    useEffect(() => { fetchStats(selectedKey); }, [selectedKey, fetchStats]);
+    // Fetch con AbortController para cancelar la request anterior cuando el
+    // usuario cambia rápido de selectedKey (race condition: si la primera
+    // tarda más en responder, sobreescribe los datos de la segunda).
+    useEffect(() => {
+        const controller = new AbortController();
+        let cancelled = false;
+        (async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const now = new Date();
+                const from = new Date(now.getFullYear(), 0, 1).toISOString();
+                const to = now.toISOString();
+                const { data } = await API.get(`/stats/${selectedKey}`, {
+                    params: { from, to, group: 'month' },
+                    signal: controller.signal,
+                });
+                if (cancelled) return;
+                setChartData(data);
+            } catch (err) {
+                if (cancelled || controller.signal.aborted) return;
+                console.error('Error fetching stats:', err);
+                setError('No se pudieron cargar las estadísticas');
+                setChartData(null);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [selectedKey]);
 
     // Close menu on outside click
     useEffect(() => {

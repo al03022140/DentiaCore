@@ -25,9 +25,9 @@ const msg = (text) => ({
 });
 
 /**
- * Key generator that combines IP + authenticated user id (when available).
- * This prevents a single authenticated user from burning through the
- * per-IP allowance of other users behind the same NAT.
+ * Key generator que combina IP + user id autenticado.
+ * Importante en clínicas donde varios usuarios comparten una IP pública
+ * (NAT): sin esto un usuario podría agotar el cap de los demás.
  */
 const keyByIpAndUser = (req) => {
   const ip = req.ip;
@@ -35,16 +35,26 @@ const keyByIpAndUser = (req) => {
   return `${ip}_${userId}`;
 };
 
+/**
+ * Skip total de todos los rate limiters en development. StrictMode dispara
+ * cada useEffect dos veces, vite-hot-reload reinicia componentes y los
+ * dev-tools (Network tab, react-query refetch on focus) generan tráfico
+ * que en pocas horas agota el cap de 15 min y bloquea al desarrollador.
+ * En producción el limiter funciona normal.
+ */
+const skipInDev = (req) => process.env.NODE_ENV !== 'production';
+
 /* ─── 1. Global API limiter ────────────────────────────────────── */
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  max: 300,                  // 300 requests per window per IP
+  max: 1000,                 // por usuario+IP (no por IP-sola)
   message: msg('Demasiadas solicitudes. Intente nuevamente en 15 minutos.'),
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip health-check so monitoring tools are never blocked
-  skip: (req) => req.path === '/api/health',
+  keyGenerator: keyByIpAndUser,
+  // Skip health-check (monitoreo) y todo el tráfico de development.
+  skip: (req) => req.path === '/api/health' || skipInDev(req),
 });
 
 /* ─── 2. Strict auth limiter (login, password reset) ───────────── */
@@ -72,22 +82,24 @@ const accountCreationLimiter = rateLimit({
 
 const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  max: 120,
   message: msg('Demasiadas operaciones de escritura. Intente nuevamente en 15 minutos.'),
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method === 'GET',
+  keyGenerator: keyByIpAndUser,
+  skip: (req) => req.method === 'GET' || skipInDev(req),
 });
 
 /* ─── 5. Generic read limiter ──────────────────────────────────── */
 
 const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 600,
   message: msg('Demasiadas consultas. Intente nuevamente en 15 minutos.'),
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method !== 'GET',
+  keyGenerator: keyByIpAndUser,
+  skip: (req) => req.method !== 'GET' || skipInDev(req),
 });
 
 /* ─── 6. OAuth limiter ─────────────────────────────────────────── */

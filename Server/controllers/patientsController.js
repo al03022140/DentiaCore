@@ -572,6 +572,41 @@ exports.updatePatient = async (req, res) => {
         // Foto: ruta servible. Sólo `photoURL` existe en el schema.
         if (uploadedFile) {
             safeUpdate.photoURL = `/uploads/pacientes/${req.params.id}/profile-pic/${uploadedFile.filename}`;
+        } else if (
+            Object.prototype.hasOwnProperty.call(updateData, 'photoURL') &&
+            updateData.photoURL === ''
+        ) {
+            // El cliente envió `photoURL: ""` explícitamente para BORRAR la foto.
+            // photoURL no está en UPDATE_ALLOWED_FIELDS para impedir
+            // mass-assignment (un cliente no debería poder setear un path
+            // arbitrario), así que el clear se maneja aquí: limpiamos el campo
+            // del documento y borramos el archivo físico para no dejar
+            // huérfanos en disco. Cualquier otro valor de `photoURL` que venga
+            // en el payload se ignora silenciosamente.
+            try {
+                const current = await Patient.findOne(
+                    { _id: req.params.id, deletedAt: null }
+                ).select('photoURL').lean();
+                if (current?.photoURL && current.photoURL.startsWith('/uploads/pacientes/')) {
+                    const filename = path.basename(current.photoURL);
+                    if (filename) {
+                        const fileToDelete = resolveUploadsPath(
+                            'pacientes',
+                            String(req.params.id),
+                            'profile-pic',
+                            filename
+                        );
+                        if (await fs.pathExists(fileToDelete)) {
+                            await fs.remove(fileToDelete);
+                        }
+                    }
+                }
+            } catch (delErr) {
+                // No bloqueamos el clear de la BD si el archivo no se pudo
+                // borrar (puede que ya no exista). Sólo loggeamos.
+                console.error('Error eliminando archivo de foto al limpiar photoURL:', delErr);
+            }
+            safeUpdate.photoURL = '';
         }
 
         // Aplanar a notación con puntos para no reemplazar subdocumentos completos

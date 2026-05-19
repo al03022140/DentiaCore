@@ -13,27 +13,14 @@
   top: 0;
   z-index: 100;
   flex-shrink: 0;
-  overflow: hidden;
-  /* Opacity transition para suavizar el fade. La height NO transiciona —
-     ver explicacion en la regla de auto-hide debajo. */
-  transition: opacity 0.18s ease, border-color 0.18s ease;
 }
 
-/* Auto-hide del header SÓLO en la página de detalle de paciente. La página
-   marca <body data-pd-app-header-hidden="true"> al scrollear hacia abajo
-   (ver patient-detail.jsx); el header colapsa su altura a 0 y, como el
-   contenedor `.main` es flex column con `.content` flex:1, `.content` ocupa
-   la altura liberada.
-   IMPORTANTE: la `height` NO se transiciona (snap instantaneo). Si lo
-   hiciera, `position: sticky` de la barra de pestañas no se re-pinta
-   durante la animacion (sticky solo recalcula con eventos de scroll), y
-   queda un hueco visible entre la barra y el tope del viewport mientras
-   dura la transicion. Snap evita el hueco. */
-body[data-pd-app-header-hidden="true"] .header {
-  height: 0;
-  border-bottom-color: transparent;
-  opacity: 0;
-  pointer-events: none;
+/* En la pagina de detalle de paciente el header global se queda en su
+   posicion natural (no sticky) para que se vaya hacia arriba con el scroll
+   y no ocupe pantalla. El contenedor scrolleable pasa a ser `.main` (ver
+   override en app.css condicionado al mismo body flag). */
+body[data-pd-page="true"] .header {
+  position: static;
 }
 
 .header h1,
@@ -56,21 +43,8 @@ body[data-pd-app-header-hidden="true"] .header {
   flex-shrink: 0;
 }
 
-.lock-button {
-  background: var(--figma-bg-input);
-  border: 1px solid var(--figma-border-default);
-  border-radius: var(--figma-radius-sm);
-  padding: var(--figma-badge-padding);
-  cursor: pointer;
-  font: var(--figma-text-small);
-  color: var(--figma-text-secondary);
-  transition: background var(--figma-transition-fast), border-color var(--figma-transition-fast);
-}
-
-.lock-button:hover {
-  background: var(--figma-bg-neutral);
-  border-color: var(--figma-text-secondary);
-}
+/* .lock-button hereda visual del sistema global (mismo molde que .logout-button)
+   con su variante de color propia — ver shared/styles/index.css. */
 
 .hamburger-button {
   display: flex;

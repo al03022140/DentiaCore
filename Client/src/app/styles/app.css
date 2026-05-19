@@ -24,6 +24,25 @@
   overflow-x: hidden;
 }
 
+/* En la pagina de detalle de paciente movemos el scroll de `.content` a
+   `.main` para que el header global (sibling de .content, position:static
+   solo aqui — ver header.css) se vaya hacia arriba con el scroll en vez de
+   quedar fijo ocupando espacio. La barra de pestañas (position:sticky)
+   sigue funcionando porque sticky busca el siguiente ancestro scrolleable,
+   que ahora es `.main`.
+   `overflow-x: hidden` va sobre `.main` (no sobre `.content`) — meter cualquier
+   overflow no-visible en .content lo convierte en ancestro scrolleable y
+   ancla los sticky ahí, perdiendo el efecto deseado. */
+body[data-pd-page="true"] .main {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+body[data-pd-page="true"] .content {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
 .home {
   display: grid;
   grid-template-columns: 1.2fr 1fr;

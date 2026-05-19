@@ -78,7 +78,11 @@ code {
   font-family: var(--font-family-mono);
 }
 
-/* Botones globales (variantes reutilizables) */
+/* Botones globales (variantes reutilizables).
+   Visual unificado en toda la app: Montserrat 500 / 0.9rem, padding compacto,
+   border-radius 6px, border 2px, hover con translateY + sombra coloreada.
+   Cada variante de abajo define sólo --btn-bg / --btn-text / --btn-shadow-hover
+   con sus colores específicos; el resto del look viene de aquí. */
 .button-primary,
 .button-secondary,
 .save-button,
@@ -91,6 +95,7 @@ code {
 .back-to-list-button,
 .delete-patient-btn,
 .logout-button,
+.lock-button,
 .patient-list-wrapper .filter-button {
   --btn-bg: var(--figma-bg-card);
   --btn-text: var(--figma-text-primary);
@@ -100,40 +105,47 @@ code {
   --btn-disabled-bg: var(--figma-bg-input);
   --btn-disabled-text: var(--figma-text-secondary);
   --btn-disabled-border: var(--figma-border-default);
-  --btn-padding: var(--figma-btn-padding);
-  --btn-radius: var(--figma-radius-sm);
-  --btn-font: var(--figma-text-label);
+  --btn-padding: 0.5rem 1.25rem;
+  --btn-radius: 6px;
+  --btn-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--figma-gap-inline);
+  gap: 8px;
   padding: var(--btn-padding);
-  border: 1px solid var(--btn-border);
+  border: 2px solid var(--btn-border);
   border-radius: var(--btn-radius);
   background-color: var(--btn-bg);
   color: var(--btn-text);
-  font: var(--btn-font);
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif);
+  font-weight: 500;
+  font-size: 0.9rem;
+  line-height: 1;
+  height: auto;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.15s ease, border-color 0.2s ease, transform 0.15s ease;
+  transition: all 0.2s ease;
   text-decoration: none;
-  height: var(--figma-btn-height);
+  text-align: center;
 }
 
-.button-primary:hover,
-.button-secondary:hover,
-.save-button:hover,
-.confirm-button:hover,
-.cancel-button:hover,
-.upload-button:hover,
-.crop-button:hover,
-.retry-button:hover,
-.back-button:hover,
-.back-to-list-button:hover,
-.delete-patient-btn:hover,
-.logout-button:hover,
-.patient-list-wrapper .filter-button:hover {
+.button-primary:hover:not(:disabled):not([disabled]),
+.button-secondary:hover:not(:disabled):not([disabled]),
+.save-button:hover:not(:disabled):not([disabled]),
+.confirm-button:hover:not(:disabled):not([disabled]),
+.cancel-button:hover:not(:disabled):not([disabled]),
+.upload-button:hover:not(:disabled):not([disabled]),
+.crop-button:hover:not(:disabled):not([disabled]),
+.retry-button:hover:not(:disabled):not([disabled]),
+.back-button:hover:not(:disabled):not([disabled]),
+.back-to-list-button:hover:not(:disabled):not([disabled]),
+.delete-patient-btn:hover:not(:disabled):not([disabled]),
+.logout-button:hover:not(:disabled):not([disabled]),
+.lock-button:hover:not(:disabled):not([disabled]),
+.patient-list-wrapper .filter-button:hover:not(:disabled):not([disabled]) {
   background-color: var(--btn-hover-bg);
   color: var(--btn-hover-text, var(--btn-text));
+  transform: translateY(-1px);
+  box-shadow: var(--btn-shadow-hover);
 }
 
 .button-primary:disabled,
@@ -160,15 +172,28 @@ code {
 .delete-patient-btn[disabled],
 .logout-button:disabled,
 .logout-button[disabled],
+.lock-button:disabled,
+.lock-button[disabled],
 .patient-list-wrapper .filter-button:disabled,
 .patient-list-wrapper .filter-button[disabled] {
   background-color: var(--btn-disabled-bg);
   color: var(--btn-disabled-text);
   border-color: var(--btn-disabled-border);
   cursor: not-allowed;
-  opacity: 0.75;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
 }
 
+/* Variantes — sólo color, el visual sale del bloque base. */
+
+/* Primarios azules: button-primary, save-button, retry-button, back-button,
+   back-to-list-button.
+   IMPORTANTE: --btn-text usa `#fff` literal (no var(--figma-text-on-dark)).
+   Esa variable se invierte en dark mode y dejaba el texto NEGRO sobre el
+   azul → el botón se veía "negro" en oscuro. Como el fondo del botón sigue
+   siendo azul en ambos temas, el texto debe quedar blanco en ambos. Mismo
+   patrón para las variantes verde/rojo/secondary-hover. */
 .button-primary,
 .save-button,
 .retry-button,
@@ -176,103 +201,83 @@ code {
 .back-to-list-button {
   --btn-bg: var(--color-primary);
   --btn-hover-bg: var(--color-primary-hover);
-  --btn-text: var(--figma-text-on-dark);
+  --btn-text: #fff;
   --btn-border: transparent;
+  --btn-shadow-hover: 0 4px 8px rgba(8, 72, 136, 0.3);
   --btn-disabled-bg: var(--figma-bg-neutral);
   --btn-disabled-text: var(--figma-text-secondary);
   --btn-disabled-border: transparent;
 }
 
-.button-primary {
-  --btn-font: var(--pd-font-button-primary);
-}
-
+/* Outline azul (white-bg). El hover mantiene el "fill" hacia el primario más
+   el translateY + sombra del base. */
 .button-secondary {
   --btn-bg: var(--figma-bg-card);
   --btn-border: var(--color-primary);
   --btn-text: var(--color-primary);
   --btn-hover-bg: var(--color-primary);
-  --btn-hover-text: var(--figma-text-on-dark);
-  --btn-font: var(--figma-text-label);
+  --btn-hover-text: #fff;
+  --btn-shadow-hover: 0 4px 8px rgba(8, 72, 136, 0.3);
 }
 
 .save-button {
-  --btn-padding: var(--button-padding-lg);
-  --btn-font: var(--pd-font-button-primary);
   --btn-disabled-bg: var(--color-background-disabled);
   --btn-disabled-text: var(--color-text-disabled);
   --btn-disabled-border: transparent;
 }
 
-.confirm-button {
-  --btn-bg: var(--color-green-350);
-  --btn-hover-bg: var(--color-green-650);
-  --btn-text: var(--color-bg-white);
-  --btn-border: transparent;
-  --btn-font: var(--text-label);
-}
-
-.cancel-button {
-  --btn-bg: var(--color-red-350);
-  --btn-hover-bg: var(--color-red-450);
-  --btn-text: var(--color-bg-white);
-  --btn-border: transparent;
-  --btn-font: var(--text-label);
-}
-
+/* Verde (acción positiva): confirmar, subir, recortar. */
+.confirm-button,
 .upload-button,
 .crop-button {
   --btn-bg: var(--color-green-700);
   --btn-hover-bg: var(--color-green-600);
-  --btn-text: var(--color-bg-white);
+  --btn-text: #fff;
   --btn-border: transparent;
-  --btn-font: var(--text-label);
+  --btn-shadow-hover: 0 4px 8px rgba(34, 124, 52, 0.3);
 }
 
-.retry-button {
-  --btn-font: var(--pd-font-retry-button);
-}
-
-.back-button {
-  --btn-font: var(--pd-font-back-button);
-}
-
-.back-to-list-button {
-  --btn-font: var(--pd-font-back-to-list);
+/* Rojo (acción destructiva o de cancelación). */
+.cancel-button {
+  --btn-bg: var(--color-red-350);
+  --btn-hover-bg: var(--color-red-450);
+  --btn-text: #fff;
+  --btn-border: transparent;
+  --btn-shadow-hover: 0 4px 8px rgba(170, 40, 40, 0.3);
 }
 
 .delete-patient-btn {
   --btn-bg: var(--color-red-550);
   --btn-hover-bg: var(--color-red-600);
-  --btn-text: var(--color-bg-white);
+  --btn-text: #fff;
   --btn-border: transparent;
+  --btn-shadow-hover: 0 4px 8px rgba(170, 40, 40, 0.3);
   --btn-disabled-bg: var(--color-red-200);
-  --btn-disabled-text: var(--color-bg-white);
+  --btn-disabled-text: #fff;
   --btn-disabled-border: transparent;
-  --btn-font: var(--text-label-strong);
-  --btn-radius: var(--border-radius-md);
+}
+
+/* Outline neutro (chip-like): logout, lock, filter. Comparten visual con
+   button-secondary pero en gris en vez de azul. */
+.logout-button,
+.lock-button,
+.patient-list-wrapper .filter-button {
+  --btn-bg: var(--figma-bg-card);
+  --btn-border: var(--figma-border-default);
+  --btn-text: var(--figma-text-primary);
+  --btn-hover-bg: var(--figma-bg-neutral);
+  --btn-hover-text: var(--figma-text-primary);
 }
 
 .logout-button {
   --btn-bg: transparent;
-  --btn-border: var(--figma-border-default);
-  --btn-text: var(--figma-text-primary);
-  --btn-hover-bg: var(--figma-bg-neutral);
-  --btn-hover-text: var(--figma-text-primary);
-  --btn-padding: var(--figma-badge-padding);
-  --btn-radius: var(--figma-radius-sm);
-  --btn-font: var(--figma-text-small);
 }
 
-.patient-list-wrapper .filter-button {
+/* Bloquear: mismo molde que logout pero con un tinte propio (bg de input
+   ligeramente grisáceo + texto secundario) para diferenciarse visualmente. */
+.lock-button {
   --btn-bg: var(--figma-bg-input);
-  --btn-border: var(--figma-border-default);
-  --btn-text: var(--figma-text-primary);
-  --btn-hover-bg: var(--figma-bg-neutral);
-  --btn-hover-text: var(--figma-text-primary);
-  --btn-padding: var(--figma-btn-padding);
-  --btn-radius: var(--figma-radius-sm);
-  --btn-font: var(--figma-text-small);
+  --btn-text: var(--figma-text-secondary);
 }
 
 /* Botones tipo .btn (periodontogram) */

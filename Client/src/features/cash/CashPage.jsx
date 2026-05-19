@@ -28,7 +28,22 @@ const CashPage = () => {
   };
 
   useEffect(() => {
-    checkStatus();
+    let cancelled = false;
+    (async () => {
+      try {
+        const { isOpen } = await getSessionStatus();
+        if (cancelled) return;
+        setIsBoxOpen(isOpen);
+        setShowOpenModal(!isOpen);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error checking session:', error);
+        message.error('Error al verificar estado de caja');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const handleOpenSuccess = () => {

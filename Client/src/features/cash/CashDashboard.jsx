@@ -12,18 +12,20 @@ const CashDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchBalance = async () => {
+    let cancelled = false;
+    (async () => {
       try {
         const data = await getMonthlyBalance();
+        if (cancelled) return;
         setBalance(data);
       } catch (error) {
+        if (cancelled) return;
         console.error('Error loading balance:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    fetchBalance();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const getDisplayAmount = () => {

@@ -10,30 +10,40 @@ const router = express.Router({ mergeParams: true });
 // helmet() ya se aplica a nivel de app — no duplicar en sub-router
 
 
+// Bypass total en dev (StrictMode + hot-reload agotan el cap en minutos).
+const skipInDev = (req) => process.env.NODE_ENV !== 'production';
+const keyByIpAndUser = (req) => {
+  const ip = req.ip;
+  const userId = req.user?._id || req.user?.id || '';
+  return `${ip}_${userId}`;
+};
+
 // Rate limiting para operaciones de escritura
 const writeRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  max: 120,
   message: {
     success: false,
     message: 'Demasiadas operaciones de escritura. Intente nuevamente en 15 minutos.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method === 'GET'
+  keyGenerator: keyByIpAndUser,
+  skip: (req) => req.method === 'GET' || skipInDev(req)
 });
 
 // Rate limiting para operaciones de lectura
 const readRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 600,
   message: {
     success: false,
     message: 'Demasiadas consultas. Intente nuevamente en 15 minutos.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method !== 'GET'
+  keyGenerator: keyByIpAndUser,
+  skip: (req) => req.method !== 'GET' || skipInDev(req)
 });
 
 

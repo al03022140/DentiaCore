@@ -36,22 +36,14 @@
   margin-top: 0;
 }
 
+/* En el header de la nota de evolución sólo ajustamos posición; el visual
+   (verde + Montserrat 500 + padding capture-button) se hereda de .Boton_Imprimir
+   global para mantener coherencia con el botón "Imprimir Formato" del
+   patient-detail. */
 .patient-evolution-note__header .Boton_Imprimir {
-  margin-left: auto; /* Asegura que el botón se quede a la derecha */
+  margin-left: auto;
   order: 1; /* Anula el order global (-1) y coloca el botón después del título */
   flex-shrink: 0;
-  background-color: var(--color-blue-500);
-  color: var(--color-bg-white);
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: var(--font-weight-semibold);
-  transition: background-color 0.3s;
-}
-
-.patient-evolution-note__header .Boton_Imprimir:hover {
-  background-color: var(--color-blue-400);
 }
 
 /* Form layout: horizontal fields */

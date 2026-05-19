@@ -25,7 +25,22 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
     }
   }, []);
 
-  useEffect(() => { fetchCharges(); }, [fetchCharges, refreshTrigger]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getAllCharges(true);
+        if (cancelled) return;
+        setCharges(Array.isArray(data) ? data : []);
+      } catch {
+        if (cancelled) return;
+        setCharges([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshTrigger]);
 
   const goToPatient = (patientId) => {
     if (patientId) navigate(`/patient/${patientId}`);

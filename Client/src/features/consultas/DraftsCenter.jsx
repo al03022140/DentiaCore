@@ -47,8 +47,23 @@ const DraftsCenter = () => {
   }, []);
 
   useEffect(() => {
-    if (canSign) fetchDrafts();
-  }, [canSign, fetchDrafts]);
+    if (!canSign) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await API.get('/drafts');
+        if (cancelled) return;
+        setDrafts(res.data?.drafts || []);
+      } catch {
+        if (cancelled) return;
+        setError('Error al cargar borradores');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canSign]);
 
   // Cuando se cargan los drafts, decidir si mostrar la notificación
   useEffect(() => {

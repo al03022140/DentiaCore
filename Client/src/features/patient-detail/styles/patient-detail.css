@@ -215,46 +215,9 @@
   box-shadow: 0 0 0 3px var(--color-blue-500-25);
 }
 
-/* Botón primario del odontograma — mismo azul profundo que el botón "Guardar"
-   del periodontograma (.button-primary → var(--color-primary)) para mantener
-   coherencia visual entre ambos features. */
-.capture-button,
-.odontogram-save-button {
-  background: var(--color-primary) !important;
-  color: #fff !important;
-  border: 2px solid transparent !important;
-  padding: 0.75rem 1.5rem !important;
-  border-radius: 6px !important;
-  font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
-  font-weight: 500 !important;
-  font-size: 0.9rem !important;
-  line-height: 1 !important;
-  cursor: pointer;
-  transition: all 0.2s ease !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  text-decoration: none;
-  text-align: center;
-  margin: var(--spacing-xs) 2px;
-  box-shadow: none;
-}
-
-.capture-button:hover:not(:disabled),
-.odontogram-save-button:hover:not(:disabled) {
-  background: var(--color-primary-hover) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.3);
-}
-
-.capture-button:disabled,
-.odontogram-save-button:disabled {
-  background: var(--color-neutral-900) !important;
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
+/* Los primarios (Regresar, Editar, Capturar odontograma, Guardar perio) y
+   secundarios (Limpiar, Visualizacion) ahora salen del sistema global en
+   shared/styles/index.css. Aquí ya no hace falta override. */
 
 .odontograma-status {
   display: flex;
@@ -546,13 +509,15 @@
 
 /* Botón toggle "Ver registro" — outline azul profundo (mismo --color-primary
    que el botón "Guardar" del periodontograma). Mismo TAMAÑO que .capture-button
-   / .save-complete-button (idéntico padding y font-size) pero con jerarquía
-   visual secundaria. */
+   / .odontogram-save-button (idéntico padding, border-width y font) pero con
+   jerarquía visual secundaria. La altura sale natural del padding+contenido,
+   por eso no fijamos `height` — así queda exactamente alineado con los
+   primarios sin tener que sincronizar variables. */
 .odontograma-toggle-table-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1.25rem;
   border: 2px solid var(--color-primary);
   border-radius: 6px;
   background: var(--color-bg-white);
@@ -564,10 +529,6 @@
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
-  /* Igualar altura visual con .capture-button / .odontogram-save-button (que
-     heredan height: var(--figma-btn-height) de .button-primary, en content-box
-     por defecto) para que "Ver registro" y "Guardar" queden alineados. */
-  height: var(--figma-btn-height);
 }
 
 .odontograma-toggle-table-btn:hover {
@@ -770,30 +731,8 @@
   gap: var(--spacing-md);
 }
 
-.patient-detail__header-actions .Boton_Editar,
-.patient-detail__header-actions .Boton_Imprimir {
-  min-height: 2.0rem;
-  display: inline-flex;
-  align-items: center;
-}
-
-.back-button {
-  /* Mantiene altura consistente con los demás botones */
-  min-height: 2.0rem;
-  height: auto; /* override global height */
-  padding: var(--spacing-xs) var(--spacing-md);
-  font: var(--pd-font-action);
-  display: inline-flex;
-  align-items: center;
-}
-
-/* Botón Editar (combina con button-primary global) */
-.patient-detail__header-actions .Boton_Editar.button-primary {
-  height: auto; /* override global height */
-  min-height: 2.0rem;
-  padding: var(--spacing-xs) var(--spacing-md);
-  font: var(--pd-font-action);
-}
+/* .back-button y .Boton_Editar.button-primary heredan el visual global
+   (Montserrat 500, padding 0.5rem 1.25rem, hover translateY). */
 
 /* =========================
   ESTADOS: CARGA / ERROR / SIN DATOS
@@ -868,19 +807,17 @@
   /* CRITICAL: Ant Design aplica `overflow: hidden` al .ant-tabs por defecto.
      Eso convierte a .ant-tabs en el ancestro scrolleable mas cercano del
      .ant-tabs-nav (sticky), y como .ant-tabs no scrollea visiblemente, el
-     nav se queda anclado a su posicion natural relativa a .ant-tabs en vez
-     de flotar arriba en .content. Forzando overflow: visible aqui hacemos
-     que sticky busque a .content como ancestro scrolleable y la barra
-     flote correctamente al tope. */
+     nav se queda anclado a su posicion natural en vez de pinearse al tope.
+     Forzando overflow: visible aqui hacemos que sticky busque al siguiente
+     ancestro scrolleable real (`.main` en pd-page; ver app.css). */
   overflow: visible !important;
 }
 
-/* La barra de pestañas SIEMPRE queda visible flotando: se pega al tope del
-   contenedor scrolleable (.content de app.css, overflow-y:auto). Como
-   .content arranca justo debajo del header global, top:0 alinea la barra
-   exactamente con el borde inferior del header. Cuando el header colapsa al
-   scrollear (height:0 vía body[data-pd-app-header-hidden]), .content sube
-   con él y la barra de pestañas queda pegada al tope absoluto del viewport. */
+/* La barra de pestañas se pega al tope del contenedor scrolleable. En
+   patient-detail ese contenedor es `.main` (overflow-y:auto sobre body
+   pd-page; ver app.css). Como el header global tiene position:static aqui,
+   primero se va hacia arriba con el scroll y luego la barra de pestañas
+   queda pegada al tope absoluto de `.main`. */
 .patient-detail-tabs .ant-tabs-nav {
   margin-bottom: var(--spacing-xl);
   position: sticky;
@@ -1000,40 +937,74 @@
   IMPRESIÓN
   ========================= */
 
-/* Botón Imprimir - usado en patient-detail__header-actions */
+/* Botón Imprimir - usado en patient-detail__header-actions y en el header
+   de la nota de evolución. Mismo visual que .capture-button (Montserrat 500,
+   padding 0.75rem 1.5rem, border-radius 6px, hover con translateY + sombra)
+   pero en verde para distinguirlo de las acciones primarias azules. */
 .Boton_Imprimir {
-  background-color: var(--color-green-700);
-  color: var(--color-bg-white);
-  border: none;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
+  background: var(--color-green-700) !important;
+  color: #fff !important;
+  border: 2px solid transparent !important;
+  padding: 0.5rem 1.25rem !important;
+  border-radius: 6px !important;
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+  height: auto !important;
+  margin: 0 !important;
   cursor: pointer;
-  font: var(--pd-font-action);
-  transition: background-color var(--transition-medium);
-  order: -1;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-decoration: none;
+  text-align: center;
   white-space: nowrap;
-  min-width: max-content;
-  min-height: 2.0rem;
-}
-
-.Boton_Imprimir:hover {
-  background-color: var(--color-green-600);
-}
-
-.Boton_Imprimir_Simple {
-  background-color: var(--color-blue-400);
-  color: var(--color-bg-white);
-  border: none;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-  font: var(--pd-font-action);
-  transition: background-color var(--transition-medium);
   order: -1;
 }
 
-.Boton_Imprimir_Simple:hover {
-  background-color: var(--color-blue-600);
+.Boton_Imprimir:hover:not(:disabled) {
+  background: var(--color-green-600) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(34, 124, 52, 0.3);
+}
+
+.Boton_Imprimir:disabled {
+  background: var(--color-neutral-900) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Variante azul del Imprimir (mismo visual que .Boton_Imprimir verde pero
+   en azul). */
+.Boton_Imprimir_Simple {
+  background: var(--color-blue-400) !important;
+  color: #fff !important;
+  border: 2px solid transparent !important;
+  padding: 0.5rem 1.25rem !important;
+  border-radius: 6px !important;
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+  height: auto !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-decoration: none;
+  text-align: center;
+  order: -1;
+}
+
+.Boton_Imprimir_Simple:hover:not(:disabled) {
+  background: var(--color-blue-600) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.3);
 }
 
 /* Acciones inferiores del Patient Detail */
@@ -1045,23 +1016,33 @@
   padding: var(--spacing-lg) 0;
 }
 
-/* Botón de eliminar paciente con estilo equivalente al de imprimir (rojo), no fijo */
+/* Botón eliminar paciente — mismo visual que .Boton_Imprimir pero en rojo. */
 .Boton_Eliminar {
-  background-color: var(--color-red-550);
-  color: var(--color-bg-white);
-  border: none;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
+  background: var(--color-red-550) !important;
+  color: #fff !important;
+  border: 2px solid transparent !important;
+  padding: 0.5rem 1.25rem !important;
+  border-radius: 6px !important;
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+  height: auto !important;
   cursor: pointer;
-  font: var(--pd-font-action);
-  transition: background-color var(--transition-medium);
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-decoration: none;
+  text-align: center;
   white-space: nowrap;
   min-width: max-content;
-  min-height: 2.0rem;
 }
 
-.Boton_Eliminar:hover {
-  background-color: var(--color-red-600);
+.Boton_Eliminar:hover:not(:disabled) {
+  background: var(--color-red-600) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(170, 40, 40, 0.3);
 }
 
 /* Sección de aceptación del paciente - solo visible en impresión */

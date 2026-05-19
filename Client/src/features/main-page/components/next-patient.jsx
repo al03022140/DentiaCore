@@ -7,28 +7,26 @@ const NextPatient = () => {
   const [nextPatient, setNextPatient] = useState(null);
 
   useEffect(() => {
-    const fetchNextPatient = async () => {
+    let cancelled = false;
+    (async () => {
       try {
         const appointments = await getTodayAppointments();
+        if (cancelled) return;
         const now = new Date();
-
         if (!Array.isArray(appointments)) {
           setNextPatient(null);
           return;
         }
-
-        // Find first upcoming appointment that isn't cancelled/past
         const upcoming = appointments
           .filter(apt => apt.estado !== 'Cancelada' && apt.estado !== 'Pasada' && new Date(apt.fecha_hora) > now)
           .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))[0];
-
         setNextPatient(upcoming || null);
       } catch (error) {
+        if (cancelled) return;
         console.error('Error al obtener citas:', error);
       }
-    };
-
-    fetchNextPatient();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (!nextPatient) {

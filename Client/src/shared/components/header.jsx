@@ -61,7 +61,7 @@ const Header = () => {
       <div className="header-actions">
         <button className="lock-button" onClick={() => lock('manual')} title="Bloquear pantalla">
           {user?.nombre === 'Administrador Local'
-            ? <img src={lockBlockedIcon} alt="Administrador Local" width="20" height="20" className="theme-icon" style={{ verticalAlign: 'middle' }} />
+            ? <img src={lockBlockedIcon} alt="Administrador Local" width="14" height="14" className="theme-icon" style={{ verticalAlign: 'middle' }} />
             : '🔒'} Bloquear
         </button>
         <button className="logout-button" onClick={handleLogout} title="Cerrar sesión">Cerrar sesión</button>

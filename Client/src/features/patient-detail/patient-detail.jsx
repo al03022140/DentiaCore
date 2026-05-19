@@ -150,100 +150,15 @@ const PatientDetail = () => {
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
 
-  // Auto-hide del header GLOBAL de la app (.header con "Buenos días, ...") al
-  // scrollear hacia abajo dentro de la página del paciente, y la barra de
-  // pestañas (selector de secciones) queda flotando arriba en su lugar.
-  // El header del paciente (Regresar/Editar) sí hace scroll normal con el
-  // contenido — no se queda flotando.
-  //
-  // Se marca `<body data-pd-app-header-hidden="true">` para que header.css
-  // aplique el translate sólo aquí (no en otras páginas). Se limpia al
-  // desmontar.
-  const [isAppHeaderHidden, setIsAppHeaderHidden] = useState(false);
-
+  // Marca <body data-pd-page="true"> para que header.css quite el sticky del
+  // header global SOLO en esta pagina (el header se queda en su posicion
+  // natural y no flota sobre el contenido).
   useEffect(() => {
-    const TOP_THRESHOLD = 80;
-    // Umbrales de delta ACUMULADO en una direccion antes de toggle. Acumular
-    // permite que scroll lento (trackpad por inercia, 1-2px por frame) sume
-    // hasta el umbral y dispare, mientras filtra micro-jitter / rubber-band
-    // bouncing al final de la pagina que se gatillaba con cada pixel.
-    const DOWN_THRESHOLD = 40; // bajar 40px acumulados -> esconder
-    const UP_THRESHOLD = 40;   // subir 40px acumulados -> mostrar
-
-    let lastY = 0;
-    let accumDown = 0;
-    let accumUp = 0;
-    let ticking = false;
-    let initialized = false;
-
-    const readY = (eventTarget) => {
-      if (!eventTarget || eventTarget === window || eventTarget === document) {
-        return window.scrollY || document.documentElement.scrollTop || 0;
-      }
-      return eventTarget.scrollTop ?? 0;
-    };
-
-    const onScroll = (e) => {
-      // El scroll real ocurre en `.content` (overflow-y:auto). Filtramos para
-      // ignorar scroll de sub-scrollables (dropdowns, modales) que dispararían
-      // el handler con scrollTop sin relación al header.
-      const t = e.target;
-      const isMain = t === window || t === document ||
-        (t && t.classList && t.classList.contains('content'));
-      if (!isMain) return;
-      if (ticking) return;
-      ticking = true;
-      window.requestAnimationFrame(() => {
-        const y = readY(t);
-        if (!initialized) {
-          // Primera lectura: sincroniza lastY con la posicion real para
-          // evitar un disparo espurio en el primer scroll.
-          lastY = y;
-          initialized = true;
-          ticking = false;
-          return;
-        }
-        const dy = y - lastY;
-
-        if (y <= TOP_THRESHOLD) {
-          // Cerca del tope: header siempre visible, resetea acumuladores.
-          setIsAppHeaderHidden(false);
-          accumDown = 0;
-          accumUp = 0;
-        } else if (dy > 0) {
-          // Bajando: acumula y resetea el opuesto.
-          accumDown += dy;
-          accumUp = 0;
-          if (accumDown > DOWN_THRESHOLD) {
-            setIsAppHeaderHidden(true);
-            accumDown = 0;
-          }
-        } else if (dy < 0) {
-          // Subiendo: acumula y resetea el opuesto.
-          accumUp += -dy;
-          accumDown = 0;
-          if (accumUp > UP_THRESHOLD) {
-            setIsAppHeaderHidden(false);
-            accumUp = 0;
-          }
-        }
-        lastY = y;
-        ticking = false;
-      });
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-    return () => window.removeEventListener('scroll', onScroll, { capture: true });
-  }, []);
-
-  useEffect(() => {
-    document.body.dataset.pdAppHeaderHidden = isAppHeaderHidden ? 'true' : 'false';
     document.body.dataset.pdPage = 'true';
     return () => {
-      delete document.body.dataset.pdAppHeaderHidden;
       delete document.body.dataset.pdPage;
     };
-  }, [isAppHeaderHidden]);
+  }, []);
 
   const formatImageUrl = useCallback((url) => {
     if (!url) return '';
@@ -457,23 +372,29 @@ const PatientDetail = () => {
     retryInitialization
   } = useOdontogramSetup(patientId, fetchPatientData, checkInitialOdontogram, loadScriptsSequentially);
 
-  const loadClinicalOdontogramState = useCallback(async () => {
-    try {
-      const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      const clinicalState = await odontogramaService.default.getClinicalOdontogramState(patientId);
-      setClinicalOdontogramData(clinicalState.datos || []);
-      setClinicalOdontogramExists(clinicalState.exists || false);
-    } catch {
-      setClinicalOdontogramData([]);
-      setClinicalOdontogramExists(false);
-    }
-  }, [patientId]);
-
+  // Carga el estado clínico al cambiar de paciente. Independiente de
+  // `patientData` (sólo necesita patientId) — antes dependíamos del objeto
+  // patientData y se re-disparaba cada vez que cambiaba de referencia, que
+  // era constantemente.
   useEffect(() => {
-    if (patientData && patientId) {
-      loadClinicalOdontogramState();
-    }
-  }, [patientData, patientId, loadClinicalOdontogramState]);
+    if (!patientId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const odontogramaService = await import('../odontogram/api/odontograma-service.js');
+        if (cancelled) return;
+        const clinicalState = await odontogramaService.default.getClinicalOdontogramState(patientId);
+        if (cancelled) return;
+        setClinicalOdontogramData(clinicalState.datos || []);
+        setClinicalOdontogramExists(clinicalState.exists || false);
+      } catch {
+        if (cancelled) return;
+        setClinicalOdontogramData([]);
+        setClinicalOdontogramExists(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [patientId]);
 
   if (loading) return <Loading />;
   if (error) return <ErrorFallback msg={error} onRetry={fetchPatientData} />;
@@ -597,9 +518,7 @@ const PatientDetail = () => {
   ];
 
   return (
-    <div
-      className={`patient-detail${isAppHeaderHidden ? ' patient-detail--app-header-hidden' : ''}`}
-    >
+    <div className="patient-detail">
       <div className="patient-detail__header">
         <button className="back-button" onClick={() => navigate("/pacientes")}>
           ← Regresar

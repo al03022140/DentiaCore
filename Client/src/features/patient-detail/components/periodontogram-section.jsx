@@ -293,9 +293,26 @@ const PeriodontogramSection = ({ patientId }) => {
     }
   }, [patientId, sortVersionsDesc, createEmptyPeriodontogram, handleError, convertBackendDataToFrontend]);
 
+  // Cargamos el periodontograma SOLO al cambiar de paciente. Antes la dep
+  // era `loadPeriodontogram` (useCallback con 5 deps que recreaba la fn en
+  // cada render), y el efecto re-disparaba GET /versions + GET /data una y
+  // otra vez. Ignoramos la regla de exhaustive-deps porque las funciones
+  // internas no se necesitan recargar — sólo el patientId define qué cargar.
+  // El flag `cancelled` evita setState tras unmount en StrictMode.
   useEffect(() => {
-    loadPeriodontogram();
-  }, [loadPeriodontogram]);
+    let cancelled = false;
+    const run = async () => {
+      // Wrapper que ignora setStates si el componente desmonta a la mitad.
+      const guardedLoad = () => {
+        if (cancelled) return;
+        return loadPeriodontogram();
+      };
+      await guardedLoad();
+    };
+    run();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]);
 
   /* ---------------------- ACTUALIZAR DIENTE ---------------------- */
   const handleToothUpdate = useCallback((toothNumber, field, value, side = null, index = null) => {
