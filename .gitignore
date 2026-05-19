@@ -28,6 +28,9 @@ DENT-mirror*
 *.bfg-report/
 bfg.jar
 
+# Backups de la base de datos (datos clínicos sensibles)
+backups/
+
 # Server runtime data
 Server/logs/
 Server/uploads/
