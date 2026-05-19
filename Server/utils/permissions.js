@@ -152,29 +152,32 @@ const mergePermissions = (basePermissions = [], extraPermissions = []) => {
 
 /**
  * Calcula los permisos efectivos del usuario:
- * 1. Permisos base del rol (ROLE_PERMISSIONS)
- * 2. + Overrides de rol desde ClinicSettings.rolePermissionOverrides
- * 3. + Overrides individuales del usuario (user.permissions)
+ * 1. Si existe un override de rol en ClinicSettings.rolePermissionOverrides
+ *    para este rol → ese array es AUTORITATIVO (reemplaza la base de
+ *    ROLE_PERMISSIONS). Esto permite que el admin pueda tanto agregar
+ *    como QUITAR permisos del rol desde la UI de "Cuentas y Permisos".
+ * 2. Si no existe override → se usan los permisos base del rol.
+ * 3. + Overrides individuales del usuario (user.permissions) — siempre
+ *    aditivos sobre el conjunto del rol.
  *
  * @param {Object} user - documento de usuario
- * @param {Object} [roleOverrides] - Map/Object de rolePermissionOverrides de ClinicSettings
+ * @param {Object|Map} [roleOverrides] - rolePermissionOverrides de ClinicSettings
  */
 const getEffectivePermissions = (user, roleOverrides) => {
   if (!user) return [];
   const role = normalizeRole(user.rol || user.role);
-  const basePermissions = getPermissionsForRole(role);
 
-  // Aplicar overrides de rol configurados por admin en ClinicSettings
-  let roleOverridePerms = [];
+  // ¿Tiene override autoritativo? Aceptamos array vacío como "todo desactivado".
+  let override = null;
   if (roleOverrides) {
-    const overrides = roleOverrides instanceof Map
+    const raw = roleOverrides instanceof Map
       ? roleOverrides.get(role)
       : roleOverrides[role];
-    if (Array.isArray(overrides)) roleOverridePerms = overrides;
+    if (Array.isArray(raw)) override = raw;
   }
 
-  const withRoleOverrides = mergePermissions(basePermissions, roleOverridePerms);
-  return mergePermissions(withRoleOverrides, user.permissions || []);
+  const rolePermissions = override !== null ? override : getPermissionsForRole(role);
+  return mergePermissions(rolePermissions, user.permissions || []);
 };
 
 /**

@@ -111,12 +111,14 @@ const odontogramaService = {
    * @param {Array} entries - Array de entradas { tooth, damage, surface, note }
    * @returns {Promise<{exists: boolean, datos: Array, history: Array}>}
    */
-  async saveInitialOdontogram(patientId, entries) {
+  async saveInitialOdontogram(patientId, entries, options = {}) {
     try {
       const normalized = Array.isArray(entries) ? entries.map(mapToBackend) : [];
+      const body = { entries: normalized };
+      if (options.appointmentId) body.appointmentId = options.appointmentId;
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial`,
-        { entries: normalized },
+        body,
         { timeout: DEFAULT_TIMEOUT }
       );
       return data;
@@ -162,7 +164,7 @@ const odontogramaService = {
    * @param {Array} entries - Entradas a añadir
    * @returns {Promise<{message: string, total_historial: number}>}
    */
-  async addInitialOdontogramHistory(patientId, entries) {
+  async addInitialOdontogramHistory(patientId, entries, options = {}) {
     try {
       if (!Array.isArray(entries)) {
         throw new Error('Se esperaba un array de entradas para el historial');
@@ -175,9 +177,11 @@ const odontogramaService = {
       // Normalizar entries para asegurar que sea un array
       const normalizedEntries = Array.isArray(entries) ? entries : [];
       const payload = normalizedEntries.map(mapToBackend);
+      const body = { entries: payload };
+      if (options.appointmentId) body.appointmentId = options.appointmentId;
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial/history`,
-        { entries: payload },
+        body,
         { timeout: DEFAULT_TIMEOUT }
       );
       return data;
@@ -193,14 +197,16 @@ const odontogramaService = {
    * @param {Array} entryData - Array de entradas del estado actual
    * @returns {Promise<{exists: boolean, datos: Array, history: Array}>}
    */
-  async saveClinicalOdontogramState(patientId, entryData) {
+  async saveClinicalOdontogramState(patientId, entryData, options = {}) {
     try {
       // Normalizar entryData para asegurar que sea un array
       const normalizedEntryData = Array.isArray(entryData) ? entryData : [];
       const entries = normalizedEntryData.map(mapToBackend);
+      const body = { entries };
+      if (options.appointmentId) body.appointmentId = options.appointmentId;
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-clinico`,
-        { entries },
+        body,
         { timeout: DEFAULT_TIMEOUT }
       );
       return {

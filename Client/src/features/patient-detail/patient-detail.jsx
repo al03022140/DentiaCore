@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { AppointmentProvider } from "../../shared/contexts/AppointmentContext.jsx";
 import { Tabs, Modal, Input, message, Skeleton } from 'antd';
 import "./styles/patient-detail.css";
 import userNot from "../../assets/images/icons/Profile Default.svg";
@@ -22,6 +23,7 @@ import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx'
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientChargesCard from './components/patient-charges-card.jsx';
+import PatientAttachments from './components/patient-attachments.jsx';
 import CreateAppointmentModal from '../consultas/components/CreateAppointmentModal';
 
 import { getPatientById } from '../../shared/services/api.js';
@@ -132,6 +134,10 @@ const PatientDetail = () => {
   const canvas2Ref = useRef(null);
   const { patientId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Cita activa pasada en la URL desde "INICIAR CONSULTA AHORA" (consultas).
+  // Si está presente, todo lo que se guarde en este expediente quedará ligado.
+  const currentAppointmentId = searchParams.get('appointmentId') || null;
 
   const [patientData, setPatientData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -307,14 +313,18 @@ const PatientDetail = () => {
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      const result = await odontogramaService.default.saveClinicalOdontogramState(patientId, entryData);
+      const result = await odontogramaService.default.saveClinicalOdontogramState(
+        patientId,
+        entryData,
+        currentAppointmentId ? { appointmentId: currentAppointmentId } : {}
+      );
       setClinicalOdontogramData(result.datos || entryData || []);
       setClinicalOdontogramExists(result.exists ?? true);
     } catch (err) {
       console.error('Error al guardar odontograma clínico:', err);
       message.error('Error al guardar el odontograma clínico');
     }
-  }, [patientId]);
+  }, [patientId, currentAppointmentId]);
 
   const handleDeleteClinicalCanvasState = useCallback(async () => {
     try {
@@ -515,9 +525,20 @@ const PatientDetail = () => {
         </>
       ),
     },
+    {
+      key: 'attachments',
+      label: 'Adjuntos',
+      children: (
+        <>
+          <h2 className="print-section-title">Adjuntos</h2>
+          <PatientAttachments patientId={patientId} />
+        </>
+      ),
+    },
   ];
 
   return (
+    <AppointmentProvider appointmentId={currentAppointmentId}>
     <div className="patient-detail">
       <div className="patient-detail__header">
         <button className="back-button" onClick={() => navigate("/pacientes")}>
@@ -614,6 +635,7 @@ const PatientDetail = () => {
         />
       </Modal>
     </div>
+    </AppointmentProvider>
   );
 };
 

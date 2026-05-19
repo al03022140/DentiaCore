@@ -119,6 +119,45 @@ exports.getAllPatients = async (req, res) => {
     }
 };
 
+// GET /patients/search?q=algo — búsqueda ligera para autocompletes.
+// Match insensible a mayúsculas/acentos en primer_nombre, otros_nombres,
+// apellido_paterno, apellido_materno y paciente_id.
+exports.searchPatients = async (req, res) => {
+    try {
+        const q = String(req.query.q || '').trim();
+        if (q.length < 2) {
+            return res.status(200).json({ patients: [] });
+        }
+        const limit = Math.min(parseInt(req.query.limit, 10) || 10, 30);
+
+        const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(escaped, 'i');
+
+        const patients = await Patient.find({
+            deletedAt: null,
+            $or: [
+                { primer_nombre: re },
+                { otros_nombres: re },
+                { apellido_paterno: re },
+                { apellido_materno: re },
+                { paciente_id: re }
+            ]
+        })
+        .select('primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento sexo paciente_id')
+        .limit(limit)
+        .lean();
+
+        const sanitized = req.filterClinicalData
+            ? patients.map(p => sanitizePatientForBasicRead(p))
+            : patients;
+
+        res.status(200).json({ patients: sanitized });
+    } catch (error) {
+        console.error('❌ Error en searchPatients:', error);
+        res.status(500).json({ message: 'Error al buscar pacientes', error: error.message });
+    }
+};
+
 
 exports.getPatientById = async (req, res) => {
     try {
@@ -144,7 +183,8 @@ exports.getPatientById = async (req, res) => {
 
       // 📌 MEJORA: Obtener citas del modelo Appointment independiente
       // (Campo 'citas' eliminado del modelo Patient por redundancia)
-      const citas = await Appointment.find({ paciente_id: patient._id })
+      // Filtra soft-deleted para no mostrar citas zombies en el expediente.
+      const citas = await Appointment.find({ paciente_id: patient._id, deletedAt: null })
         .sort({ fecha_hora: 1 })
         .exec();
   
@@ -770,6 +810,9 @@ exports.addEvolutionNote = async (req, res) => {
 
     // Preparar la nueva nota de evolución
     const now = new Date();
+    const appointmentId = mongoose.Types.ObjectId.isValid(evolutionNote.appointmentId || req.body.appointmentId)
+      ? (evolutionNote.appointmentId || req.body.appointmentId)
+      : null;
     const newEvolutionNote = {
       numero_procedimiento,
       procedimiento: (evolutionNote.procedimiento || '').trim(),
@@ -783,6 +826,7 @@ exports.addEvolutionNote = async (req, res) => {
         hour: '2-digit',
         minute: '2-digit'
       }),
+      appointmentId,
       creadoPor: req.user?.id || null,
       estadoRegistro,
       capturaExtemporanea: req.body._capturaExtemporanea || undefined
@@ -854,6 +898,9 @@ exports.addTreatmentPlan = async (req, res) => {
         }
 
         // Preparar el nuevo plan de tratamiento
+        const appointmentId = mongoose.Types.ObjectId.isValid(treatmentPlan.appointmentId || req.body.appointmentId)
+            ? (treatmentPlan.appointmentId || req.body.appointmentId)
+            : null;
         const newTreatmentPlan = {
             texto: treatmentPlan.texto.trim(),
             fecha: treatmentPlan.fecha ? new Date(treatmentPlan.fecha) : new Date(),
@@ -864,6 +911,7 @@ exports.addTreatmentPlan = async (req, res) => {
                 hour: '2-digit',
                 minute: '2-digit'
             }),
+            appointmentId,
             creadoPor: req.user?.id || null,
             estadoRegistro,
             capturaExtemporanea: req.body._capturaExtemporanea || undefined

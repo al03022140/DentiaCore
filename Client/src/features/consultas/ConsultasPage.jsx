@@ -1,10 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from 'antd';
-import { PlusCircleOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Modal, Input, message } from 'antd';
+import {
+  PlusCircleOutlined,
+  LeftOutlined,
+  RightOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
+  PlayCircleOutlined,
+  EditOutlined,
+  CloseCircleOutlined,
+  StopOutlined,
+  MoreOutlined,
+  CheckOutlined
+} from '@ant-design/icons';
 import './styles/consultas-page.css';
 import userNot from '../../assets/images/icons/Profile Default.svg';
-import { getTodayAppointments } from '../../shared/services/appointment-service';
+import {
+  getAppointmentsByRange,
+  updateAppointmentStatus,
+  deleteAppointment,
+  invalidateTodayAppointmentsCache,
+  getAppointmentActivity
+} from '../../shared/services/appointment-service';
 import CreateAppointmentModal from './components/CreateAppointmentModal';
 
 const formatTime = (dateStr) => {
@@ -35,10 +53,53 @@ const getPatientImage = (apt) => {
 };
 
 const statusMap = {
-  Pendiente: 'waiting',
-  Confirmada: 'confirmed',
-  Cancelada: 'cancelled',
-  Pasada: 'completed'
+  Pendiente:  { cssClass: 'waiting',     label: 'Pendiente' },
+  Confirmada: { cssClass: 'confirmed',   label: 'Confirmada' },
+  EnCurso:    { cssClass: 'in-progress', label: 'En curso' },
+  Pasada:     { cssClass: 'completed',   label: 'Terminada' },
+  NoShow:     { cssClass: 'no-show',     label: 'No asistió' },
+  Cancelada:  { cssClass: 'cancelled',   label: 'Cancelada' }
+};
+
+const formatHistorialDate = (dateStr) => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// Acciones disponibles según el estado actual
+const ACTIONS_BY_STATE = {
+  Pendiente:  ['confirmar', 'iniciar', 'cancelar', 'noShow', 'editar'],
+  Confirmada: ['iniciar', 'atendida', 'cancelar', 'noShow', 'editar'],
+  EnCurso:    ['atendida', 'cancelar'],
+  Pasada:     [],
+  NoShow:     [],
+  Cancelada:  []
+};
+
+const startOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+const endOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+};
+const dateLabel = (d) => {
+  const today = startOfDay(new Date());
+  const target = startOfDay(d);
+  const diff = Math.round((target - today) / (24 * 60 * 60 * 1000));
+  if (diff === 0) return 'Hoy';
+  if (diff === -1) return 'Ayer';
+  if (diff === 1) return 'Mañana';
+  return target.toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long' });
 };
 
 const ConsultasPage = () => {
@@ -48,12 +109,26 @@ const ConsultasPage = () => {
   const [agenda, setAgenda] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [busyId, setBusyId] = useState(null);
+  // Actividad clínica de la cita seleccionada (sólo cuando es estado cerrado o EnCurso)
+  const [activity, setActivity] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  // Modal "Terminar consulta" — requiere escribir "confirmo"
+  const [endingAppointment, setEndingAppointment] = useState(null);
+  const [endConfirmText, setEndConfirmText] = useState('');
+  const [endingInFlight, setEndingInFlight] = useState(false);
 
-  const loadAgenda = useCallback(async () => {
+  const loadAgenda = useCallback(async (date) => {
     try {
       setLoading(true);
-      const appointments = await getTodayAppointments();
-      setAgenda(Array.isArray(appointments) ? appointments : []);
+      const data = await getAppointmentsByRange({
+        from: startOfDay(date).toISOString(),
+        to: endOfDay(date).toISOString()
+      });
+      const arr = Array.isArray(data) ? data : (data?.items || []);
+      setAgenda(arr);
     } catch {
       setAgenda([]);
     } finally {
@@ -61,60 +136,216 @@ const ConsultasPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const appointments = await getTodayAppointments();
-        if (cancelled) return;
-        setAgenda(Array.isArray(appointments) ? appointments : []);
-      } catch {
-        if (cancelled) return;
-        setAgenda([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { loadAgenda(currentDate); }, [currentDate, loadAgenda]);
 
   // Determine next patient & default selection
   useEffect(() => {
     const now = new Date();
+    const isToday = startOfDay(currentDate).getTime() === startOfDay(now).getTime();
+
     const upcoming = agenda.filter(a =>
-      a.estado !== 'Cancelada' && a.estado !== 'Pasada' && new Date(a.fecha_hora) >= now
+      !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado) &&
+      (!isToday || new Date(a.fecha_hora) >= now || a.estado === 'EnCurso')
     );
-    const completed = agenda.filter(a => a.estado === 'Pasada' || a.estado === 'Cancelada');
+    const closed = agenda.filter(a => ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado));
 
     if (upcoming.length > 0) {
       setNextPatient(upcoming[0]);
-      setSelectedConsultation(upcoming[0]);
-    } else if (completed.length > 0) {
+      setSelectedConsultation(prev => prev && agenda.find(a => a._id === prev._id) ? prev : upcoming[0]);
+    } else if (closed.length > 0) {
       setNextPatient(null);
-      setSelectedConsultation(completed[0]);
+      setSelectedConsultation(prev => prev && agenda.find(a => a._id === prev._id) ? prev : closed[0]);
     } else {
       setNextPatient(null);
       setSelectedConsultation(null);
     }
-  }, [agenda]);
+  }, [agenda, currentDate]);
 
   const handleSelectConsultation = (consultation) => {
     setSelectedConsultation(consultation);
   };
 
-  const handleStartConsultation = (apt) => {
+  // Cargar actividad clínica cuando la cita seleccionada está en estado cerrado o EnCurso
+  useEffect(() => {
+    if (!selectedConsultation) {
+      setActivity(null);
+      return;
+    }
+    const showActivity = ['EnCurso', 'Pasada', 'NoShow', 'Cancelada'].includes(selectedConsultation.estado);
+    if (!showActivity) {
+      setActivity(null);
+      return;
+    }
+    let cancelled = false;
+    setActivityLoading(true);
+    (async () => {
+      try {
+        const data = await getAppointmentActivity(selectedConsultation._id);
+        if (cancelled) return;
+        setActivity(data);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('Error al cargar actividad de la cita:', err);
+        setActivity(null);
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedConsultation?._id, selectedConsultation?.estado]);
+
+  const handleStartConsultation = async (apt) => {
     const patientId = apt.paciente_id?._id || apt.paciente_id;
-    if (patientId) navigate(`/patient/${patientId}`);
+    if (!patientId) return;
+    // Si está Pendiente o Confirmada, marcar EnCurso antes de navegar.
+    if (apt.estado === 'Pendiente' || apt.estado === 'Confirmada') {
+      try {
+        await updateAppointmentStatus(apt._id, { estado: 'EnCurso' });
+      } catch (err) {
+        // No bloqueamos la navegación si falla — sólo aviso
+        console.warn('No se pudo marcar EnCurso:', err);
+      }
+    }
+    navigate(`/patient/${patientId}?appointmentId=${encodeURIComponent(apt._id)}`);
+  };
+
+  const runStatusChange = async (apt, estado, opts = {}) => {
+    const { confirmTitle, requireReason, reasonPrompt } = opts;
+    let motivo = null;
+    if (requireReason) {
+      motivo = window.prompt(reasonPrompt || 'Motivo:');
+      if (!motivo || motivo.trim().length < 3) return;
+    } else if (confirmTitle) {
+      const ok = window.confirm(confirmTitle);
+      if (!ok) return;
+    }
+    setBusyId(apt._id);
+    try {
+      await updateAppointmentStatus(apt._id, { estado, motivo: motivo ? motivo.trim() : undefined });
+      message.success(`Cita marcada como ${statusMap[estado]?.label || estado}`);
+      invalidateTodayAppointmentsCache();
+      await loadAgenda(currentDate);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'No se pudo cambiar el estado');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const openEndConsultation = (apt) => {
+    setEndingAppointment(apt);
+    setEndConfirmText('');
+  };
+
+  const closeEndConsultation = () => {
+    if (endingInFlight) return;
+    setEndingAppointment(null);
+    setEndConfirmText('');
+  };
+
+  const handleEndConsultation = async () => {
+    if (!endingAppointment) return;
+    if (endConfirmText.trim().toLowerCase() !== 'confirmo') return;
+    setEndingInFlight(true);
+    try {
+      await updateAppointmentStatus(endingAppointment._id, {
+        estado: 'Pasada',
+        motivo: 'Consulta finalizada por el doctor'
+      });
+      message.success('Consulta terminada');
+      invalidateTodayAppointmentsCache();
+      setEndingAppointment(null);
+      setEndConfirmText('');
+      await loadAgenda(currentDate);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'No se pudo terminar la consulta');
+    } finally {
+      setEndingInFlight(false);
+    }
+  };
+
+  const handleDelete = async (apt) => {
+    const motivo = window.prompt('Motivo de la eliminación (mínimo 5 caracteres):');
+    if (!motivo || motivo.trim().length < 5) return;
+    setBusyId(apt._id);
+    try {
+      await deleteAppointment(apt._id, motivo.trim());
+      message.success('Cita eliminada');
+      await loadAgenda(currentDate);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'No se pudo eliminar la cita');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleEdit = (apt) => {
+    setEditingAppointment(apt);
+  };
+
+  const buildActionItems = (apt) => {
+    const allowed = ACTIONS_BY_STATE[apt.estado] || [];
+    const items = [];
+    if (allowed.includes('confirmar')) items.push({
+      key: 'confirmar',
+      icon: <CheckOutlined />,
+      label: 'Confirmar cita',
+      onClick: () => runStatusChange(apt, 'Confirmada')
+    });
+    if (allowed.includes('iniciar')) items.push({
+      key: 'iniciar',
+      icon: <PlayCircleOutlined />,
+      label: 'Iniciar consulta',
+      onClick: () => handleStartConsultation(apt)
+    });
+    if (allowed.includes('atendida')) items.push({
+      key: 'atendida',
+      icon: <CheckCircleOutlined />,
+      label: 'Marcar terminada',
+      onClick: () => runStatusChange(apt, 'Pasada', { confirmTitle: '¿Marcar esta cita como terminada?' })
+    });
+    if (allowed.includes('editar')) items.push({
+      key: 'editar',
+      icon: <EditOutlined />,
+      label: 'Editar / reagendar',
+      onClick: () => handleEdit(apt)
+    });
+    if (allowed.length > 0) items.push({ type: 'divider' });
+    if (allowed.includes('noShow')) items.push({
+      key: 'noShow',
+      icon: <StopOutlined />,
+      label: 'No se presentó',
+      danger: true,
+      onClick: () => runStatusChange(apt, 'NoShow', { requireReason: true, reasonPrompt: 'Motivo del no-show:' })
+    });
+    if (allowed.includes('cancelar')) items.push({
+      key: 'cancelar',
+      icon: <CloseCircleOutlined />,
+      label: 'Cancelar cita',
+      danger: true,
+      onClick: () => runStatusChange(apt, 'Cancelada', { requireReason: true, reasonPrompt: 'Motivo de cancelación:' })
+    });
+    items.push({
+      key: 'eliminar',
+      icon: <CloseCircleOutlined />,
+      label: 'Eliminar (soft)',
+      danger: true,
+      onClick: () => handleDelete(apt)
+    });
+    return items;
   };
 
   const now = new Date();
-  const upcomingConsultations = agenda.filter(a =>
-    a.estado !== 'Cancelada' && a.estado !== 'Pasada' && new Date(a.fecha_hora) >= now
-  );
-  const completedConsultations = agenda.filter(a =>
-    a.estado === 'Pasada' || a.estado === 'Cancelada'
-  );
+  const isToday = startOfDay(currentDate).getTime() === startOfDay(now).getTime();
+
+  const upcomingConsultations = useMemo(() => agenda.filter(a =>
+    !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado) &&
+    (!isToday || new Date(a.fecha_hora) >= now || a.estado === 'EnCurso')
+  ), [agenda, isToday]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const completedConsultations = useMemo(() => agenda.filter(a =>
+    ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado)
+  ), [agenda]);
 
   const agendaIsEmpty = !loading && agenda.length === 0;
 
@@ -131,6 +362,12 @@ const ConsultasPage = () => {
         ))}
       </ul>
     );
+  };
+
+  const stepDate = (deltaDays) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + deltaDays);
+    setCurrentDate(d);
   };
 
   return (
@@ -156,10 +393,12 @@ const ConsultasPage = () => {
                 }}
               />
               <div className="next-patient-info">
-                <span className="next-patient-time">Siguiente: {formatTime(nextPatient.fecha_hora)} hrs</span>
+                <span className="next-patient-time">
+                  {nextPatient.estado === 'EnCurso' ? 'En curso' : 'Siguiente'}: {formatTime(nextPatient.fecha_hora)} hrs
+                </span>
                 <h2>{getPatientName(nextPatient)}</h2>
-                <span className={`badge-status ${statusMap[nextPatient.estado] || 'waiting'}`}>
-                  {nextPatient.estado}
+                <span className={`badge-status ${statusMap[nextPatient.estado]?.cssClass || 'waiting'}`}>
+                  {statusMap[nextPatient.estado]?.label || nextPatient.estado}
                 </span>
               </div>
             </div>
@@ -176,13 +415,38 @@ const ConsultasPage = () => {
               </div>
             )}
 
-            <button
-              type="button"
-              className="start-consultation-btn"
-              onClick={() => handleStartConsultation(nextPatient)}
-            >
-              INICIAR CONSULTA AHORA
-            </button>
+            <div className="next-patient-actions">
+              {(nextPatient.estado === 'Pendiente' || nextPatient.estado === 'Confirmada' || nextPatient.estado === 'EnCurso') && (
+                <button
+                  type="button"
+                  className="start-consultation-btn"
+                  onClick={() => handleStartConsultation(nextPatient)}
+                  disabled={busyId === nextPatient._id}
+                >
+                  {nextPatient.estado === 'EnCurso' ? 'CONTINUAR CONSULTA' : 'INICIAR CONSULTA AHORA'}
+                </button>
+              )}
+              {nextPatient.estado === 'EnCurso' && (
+                <button
+                  type="button"
+                  className="end-consultation-btn"
+                  onClick={() => openEndConsultation(nextPatient)}
+                  disabled={busyId === nextPatient._id}
+                >
+                  Terminar consulta
+                </button>
+              )}
+              {nextPatient.estado === 'Pendiente' && (
+                <button
+                  type="button"
+                  className="confirm-appointment-btn"
+                  onClick={() => runStatusChange(nextPatient, 'Confirmada')}
+                  disabled={busyId === nextPatient._id}
+                >
+                  Confirmar
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="next-patient-card next-patient-card--empty">
@@ -198,20 +462,20 @@ const ConsultasPage = () => {
                 </span>
                 <h2>
                   {agendaIsEmpty
-                    ? 'No hay citas para hoy'
-                    : 'No hay más pacientes pendientes hoy'}
+                    ? `No hay citas para ${dateLabel(currentDate).toLowerCase()}`
+                    : 'No hay más pacientes pendientes'}
                 </h2>
                 <p className="next-patient-empty-caption">
                   {agendaIsEmpty
-                    ? 'Crea una cita con «Nueva cita» en la agenda del día.'
-                    : 'Las citas restantes ya fueron atendidas o canceladas. Puedes revisar el detalle en la lista.'}
+                    ? 'Crea una cita con «Nueva cita» en la agenda.'
+                    : 'Las citas restantes ya fueron atendidas o canceladas.'}
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Panel Inferior: Detalle de Selección (siempre misma tarjeta; vacío si no hay selección) */}
+        {/* Panel Inferior: Detalle de Selección */}
         {selectedConsultation ? (
           <div className="selected-detail-panel">
             <div className="detail-header-info">
@@ -221,6 +485,9 @@ const ConsultasPage = () => {
               </div>
               <div className="patient-tags">
                 <span>{calculateAge(selectedConsultation.paciente_id?.fecha_nacimiento)} años</span>
+                {selectedConsultation.duracion && (
+                  <span className="patient-tags__duration">{selectedConsultation.duracion} min</span>
+                )}
               </div>
             </div>
 
@@ -257,11 +524,186 @@ const ConsultasPage = () => {
               </div>
             )}
 
+            {Array.isArray(selectedConsultation.estadoHistorial) && selectedConsultation.estadoHistorial.length > 1 && (
+              <div className="timeline-section">
+                <h4>Historial de estado</h4>
+                <ul className="estado-historial-list">
+                  {selectedConsultation.estadoHistorial.slice().reverse().map((h, idx) => (
+                    <li key={idx}>
+                      <strong>{statusMap[h.hacia]?.label || h.hacia}</strong>
+                      <span>{formatHistorialDate(h.cambiadoEn)}</span>
+                      {h.motivo && <em>"{h.motivo}"</em>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Actividad clínica registrada durante la cita (sólo cierre / curso) */}
+            {['EnCurso', 'Pasada', 'NoShow', 'Cancelada'].includes(selectedConsultation.estado) && (
+              <div className="timeline-section consulta-activity">
+                <h4>Lo registrado en la consulta</h4>
+                {activityLoading ? (
+                  <p className="consultas-inline-empty">Cargando actividad…</p>
+                ) : !activity || (
+                    activity.counts &&
+                    !activity.counts.evolutionNotes &&
+                    !activity.counts.treatmentPlans &&
+                    !activity.counts.odontogramaSnapshots &&
+                    !activity.counts.periodontogramSnapshots &&
+                    !activity.counts.exams &&
+                    !activity.counts.charge &&
+                    !activity.counts.directMovements
+                  ) ? (
+                  <p className="consultas-inline-empty">Sin registros vinculados a esta cita.</p>
+                ) : (
+                  <div className="consulta-activity__grid">
+                    {activity.evolutionNotes?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Notas de evolución <span className="consulta-activity__count">{activity.evolutionNotes.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.evolutionNotes.map(n => (
+                            <li key={n._id}>
+                              <strong>#{n.numero_procedimiento}</strong>
+                              {n.procedimiento && <span>{n.procedimiento}</span>}
+                              {n.observaciones && <em>{n.observaciones}</em>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.treatmentPlans?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Planes de tratamiento <span className="consulta-activity__count">{activity.treatmentPlans.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.treatmentPlans.map(p => (
+                            <li key={p._id}>
+                              <span>{p.texto}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.odontogramaSnapshots?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Odontograma <span className="consulta-activity__count">{activity.odontogramaSnapshots.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.odontogramaSnapshots.map(s => (
+                            <li key={s._id}>
+                              <strong>{s.type === 'initial' ? 'Inicial' : 'Clínico'}</strong>
+                              <span>{(s.datos || []).length} hallazgos</span>
+                              <em>{new Date(s.savedAt).toLocaleString('es-MX', { hour: '2-digit', minute: '2-digit' })}</em>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.periodontogramSnapshots?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Periodontograma <span className="consulta-activity__count">{activity.periodontogramSnapshots.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.periodontogramSnapshots.map(s => (
+                            <li key={s._id}>
+                              <strong>{s.versionName}</strong>
+                              {s.statistics && (
+                                <span>
+                                  Sangrado {Math.round(s.statistics.bleedingPercentage || 0)}% · Placa {Math.round(s.statistics.plaquePercentage || 0)}%
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.exams?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Exámenes <span className="consulta-activity__count">{activity.exams.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.exams.map(e => (
+                            <li key={e._id}>
+                              <strong>{e.tipo_examen}</strong>
+                              <span>{e.estado}</span>
+                              {e.observaciones && <em>{e.observaciones}</em>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.charge && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Cobro
+                          {activity.charge.saldoPendiente > 0 ? (
+                            <span className="consulta-activity__count consulta-activity__count--warn">Pendiente</span>
+                          ) : (
+                            <span className="consulta-activity__count consulta-activity__count--ok">Pagado</span>
+                          )}
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {(activity.charge.items || []).map((it, idx) => (
+                            <li key={idx}>
+                              <strong>{it.nombre}{it.cantidad > 1 ? ` ×${it.cantidad}` : ''}</strong>
+                              <span>${(it.subtotal || 0).toLocaleString('es-MX')}</span>
+                            </li>
+                          ))}
+                          <li className="consulta-activity__total">
+                            <strong>Total</strong>
+                            <span>${(activity.charge.total || 0).toLocaleString('es-MX')}</span>
+                          </li>
+                          {activity.charge.saldoPendiente > 0 && (
+                            <li className="consulta-activity__total">
+                              <strong>Saldo pendiente</strong>
+                              <span>${activity.charge.saldoPendiente.toLocaleString('es-MX')}</span>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activity.directMovements?.length > 0 && (
+                      <div className="consulta-activity__group">
+                        <div className="consulta-activity__group-title">
+                          Movimientos de caja <span className="consulta-activity__count">{activity.directMovements.length}</span>
+                        </div>
+                        <ul className="consulta-activity__list">
+                          {activity.directMovements.map(m => (
+                            <li key={m._id}>
+                              <strong>{m.type === 'INCOME' ? '+' : '−'}${(m.amount || 0).toLocaleString('es-MX')}</strong>
+                              <span>{m.concept}</span>
+                              <em>{m.paymentMethod === 'CASH' ? 'Efectivo' : 'Digital'}</em>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="detail-actions">
               <button
                 type="button"
                 className="secondary-btn"
-                onClick={() => handleStartConsultation(selectedConsultation)}
+                onClick={() => {
+                  const patientId = selectedConsultation.paciente_id?._id || selectedConsultation.paciente_id;
+                  if (patientId) navigate(`/patient/${patientId}`);
+                }}
               >
                 Ver Expediente Completo
               </button>
@@ -273,8 +715,8 @@ const ConsultasPage = () => {
               <h3 className="consultas-empty-state__title">Detalle de cita</h3>
               <p className="consultas-empty-state__text">
                 {agendaIsEmpty
-                  ? 'Cuando agregues citas para hoy, podrás ver aquí motivo, servicios y totales.'
-                  : 'Selecciona una cita en la agenda de la derecha para ver su información completa.'}
+                  ? 'Cuando agregues citas, podrás ver aquí motivo, servicios y totales.'
+                  : 'Selecciona una cita para ver su información completa.'}
               </p>
             </div>
           </div>
@@ -284,7 +726,37 @@ const ConsultasPage = () => {
       {/* --- COLUMNA DERECHA --- */}
       <div className="consultas-right">
         <div className="consultas-right-header">
-          <h3>Agenda del Día</h3>
+          <div className="consultas-right-header__title">
+            <h3>Agenda</h3>
+            <div className="consultas-date-stepper">
+              <button
+                type="button"
+                className="consultas-date-stepper__btn"
+                onClick={() => stepDate(-1)}
+                title="Día anterior"
+                aria-label="Día anterior"
+              >
+                <LeftOutlined />
+              </button>
+              <button
+                type="button"
+                className="consultas-date-stepper__label"
+                onClick={() => setCurrentDate(new Date())}
+                title="Volver a hoy"
+              >
+                <CalendarOutlined /> {dateLabel(currentDate)}
+              </button>
+              <button
+                type="button"
+                className="consultas-date-stepper__btn"
+                onClick={() => stepDate(1)}
+                title="Día siguiente"
+                aria-label="Día siguiente"
+              >
+                <RightOutlined />
+              </button>
+            </div>
+          </div>
           <Button
             type="primary"
             icon={<PlusCircleOutlined />}
@@ -299,24 +771,51 @@ const ConsultasPage = () => {
         <div className="consultas-list-container">
           <div className="list-section-title">Próximas Consultas</div>
           {upcomingConsultations.length > 0 ? (
-            upcomingConsultations.map(apt => (
-              <div
-                key={apt._id}
-                className={`consultation-item ${selectedConsultation?._id === apt._id ? 'active' : ''}`}
-                onClick={() => handleSelectConsultation(apt)}
-              >
-                <div className="consultation-time-box">
-                  <span className="time-hour">{formatTime(apt.fecha_hora)}</span>
+            upcomingConsultations.map(apt => {
+              const total = apt.totalEstimado || 0;
+              const itemCount = apt.items?.length || 0;
+              const actionItems = buildActionItems(apt);
+              return (
+                <div
+                  key={apt._id}
+                  className={`consultation-item ${selectedConsultation?._id === apt._id ? 'active' : ''} ${apt.estado === 'EnCurso' ? 'in-progress' : ''}`}
+                  onClick={() => handleSelectConsultation(apt)}
+                >
+                  <div className="consultation-time-box">
+                    <span className="time-hour">{formatTime(apt.fecha_hora)}</span>
+                    {apt.duracion && <span className="time-duration">{apt.duracion}m</span>}
+                  </div>
+                  <div className="consultation-info">
+                    <span className="consultation-patient-name">{getPatientName(apt)}</span>
+                    <span className="consultation-reason">{apt.motivo}</span>
+                    {(itemCount > 0 || total > 0) && (
+                      <span className="consultation-summary">
+                        {itemCount > 0 && <span>{itemCount} {itemCount === 1 ? 'servicio' : 'servicios'}</span>}
+                        {total > 0 && <span> · ${total.toLocaleString('es-MX')}</span>}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`consultation-status badge-status ${statusMap[apt.estado]?.cssClass || 'waiting'}`}>
+                    {statusMap[apt.estado]?.label || apt.estado}
+                  </div>
+                  <Dropdown
+                    menu={{ items: actionItems }}
+                    trigger={['click']}
+                    placement="bottomRight"
+                  >
+                    <button
+                      type="button"
+                      className="consultation-actions-btn"
+                      onClick={(e) => e.stopPropagation()}
+                      disabled={busyId === apt._id}
+                      aria-label="Acciones de la cita"
+                    >
+                      <MoreOutlined />
+                    </button>
+                  </Dropdown>
                 </div>
-                <div className="consultation-info">
-                  <span className="consultation-patient-name">{getPatientName(apt)}</span>
-                  <span className="consultation-reason">{apt.motivo}</span>
-                </div>
-                <div className={`consultation-status badge-status ${statusMap[apt.estado] || 'waiting'}`}>
-                  {apt.estado}
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="consultas-list-empty" role="status">
               No hay consultas pendientes.
@@ -328,7 +827,7 @@ const ConsultasPage = () => {
             completedConsultations.map(apt => (
               <div
                 key={apt._id}
-                className="consultation-item completed"
+                className={`consultation-item completed ${selectedConsultation?._id === apt._id ? 'active' : ''}`}
                 onClick={() => handleSelectConsultation(apt)}
               >
                 <div className="consultation-time-box">
@@ -338,7 +837,9 @@ const ConsultasPage = () => {
                   <span className="consultation-patient-name">{getPatientName(apt)}</span>
                   <span className="consultation-reason">{apt.motivo}</span>
                 </div>
-                <div className="consultation-status">{apt.estado}</div>
+                <div className={`consultation-status badge-status ${statusMap[apt.estado]?.cssClass || 'completed'}`}>
+                  {statusMap[apt.estado]?.label || apt.estado}
+                </div>
               </div>
             ))
           ) : (
@@ -352,8 +853,54 @@ const ConsultasPage = () => {
       <CreateAppointmentModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={loadAgenda}
+        onCreated={() => loadAgenda(currentDate)}
       />
+
+      <CreateAppointmentModal
+        visible={!!editingAppointment}
+        appointment={editingAppointment}
+        onClose={() => setEditingAppointment(null)}
+        onCreated={() => loadAgenda(currentDate)}
+      />
+
+      <Modal
+        title="Terminar consulta"
+        open={!!endingAppointment}
+        onCancel={closeEndConsultation}
+        onOk={handleEndConsultation}
+        okText="Terminar"
+        cancelText="Cancelar"
+        confirmLoading={endingInFlight}
+        okButtonProps={{
+          disabled: endConfirmText.trim().toLowerCase() !== 'confirmo' || endingInFlight
+        }}
+        destroyOnClose
+        maskClosable={!endingInFlight}
+      >
+        {endingAppointment && (
+          <div className="end-consultation-modal">
+            <p className="end-consultation-modal__hint">
+              Estás por cerrar la consulta de{' '}
+              <strong>{getPatientName(endingAppointment)}</strong>. Esta acción marca la cita como{' '}
+              <strong>atendida</strong> y queda registrada con todo lo que agregaste durante la sesión.
+            </p>
+            <p className="end-consultation-modal__instruction">
+              Escribe <strong>confirmo</strong> para terminar:
+            </p>
+            <Input
+              value={endConfirmText}
+              onChange={(e) => setEndConfirmText(e.target.value)}
+              placeholder="confirmo"
+              autoFocus
+              onPressEnter={() => {
+                if (endConfirmText.trim().toLowerCase() === 'confirmo' && !endingInFlight) {
+                  handleEndConsultation();
+                }
+              }}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

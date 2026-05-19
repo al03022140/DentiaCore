@@ -1,16 +1,29 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import API from '../services/axios-instance';
+import { getSettings } from '../services/settingsService';
 import './styles/lock-screen.css';
 import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
 
 const LockScreenContext = createContext(null);
 
-const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos (roles.MD §9.3)
-const CHECK_INTERVAL_MS = 30 * 1000;         // comprobar cada 30s
+// Default fallback si no se puede leer el setting (en minutos).
+const DEFAULT_INACTIVITY_MIN = 15;
+const INACTIVITY_MIN_BOUND = 1;
+const INACTIVITY_MAX_BOUND = 120;
+const CHECK_INTERVAL_MS = 30 * 1000; // comprobar cada 30s
+// Evento que dispara SecuritySection al guardar — permite recargar el timeout
+// sin obligar al usuario a refrescar la página.
+export const SETTINGS_UPDATED_EVENT = 'dentiacore:settings-updated';
 // Debe coincidir con MAX_PIN_ATTEMPTS del backend (authController.js).
 // El backend es la fuente de verdad: envía `intentosRestantes` en cada 401.
 const MAX_PIN_ATTEMPTS = 5;
+
+const clampInactivity = (minutes) => {
+  const n = Number(minutes);
+  if (!Number.isFinite(n)) return DEFAULT_INACTIVITY_MIN;
+  return Math.min(INACTIVITY_MAX_BOUND, Math.max(INACTIVITY_MIN_BOUND, n));
+};
 
 export const LockScreenProvider = ({ children }) => {
   const { user, logout } = useAuth();
@@ -20,6 +33,20 @@ export const LockScreenProvider = ({ children }) => {
   const [attempts, setAttempts] = useState(0);
   const lastActivityRef = useRef(Date.now());
   const checkIntervalRef = useRef(null);
+  // Timeout configurable desde Configuración → Seguridad (en ms).
+  // Se inicializa con default y se sobreescribe al cargar settings.
+  const inactivityTimeoutMsRef = useRef(DEFAULT_INACTIVITY_MIN * 60 * 1000);
+
+  // Carga el setting del servidor; si falla mantiene el valor previo.
+  const loadInactivityTimeout = useCallback(async () => {
+    try {
+      const settings = await getSettings();
+      const min = clampInactivity(settings?.inactivityTimeout);
+      inactivityTimeoutMsRef.current = min * 60 * 1000;
+    } catch {
+      // mantener default / valor anterior
+    }
+  }, []);
 
   // Registrar actividad del usuario
   const registerActivity = useCallback(() => {
@@ -125,6 +152,28 @@ export const LockScreenProvider = ({ children }) => {
     }
   }, [attempts, logout]);
 
+  // Cargar el timeout cuando el usuario inicia sesión.
+  useEffect(() => {
+    if (user) loadInactivityTimeout();
+  }, [user, loadInactivityTimeout]);
+
+  // Reaccionar a cambios desde Configuración sin necesidad de recargar.
+  useEffect(() => {
+    if (!user) return;
+    const handler = (ev) => {
+      const detail = ev?.detail || {};
+      if (detail.inactivityTimeout !== undefined) {
+        const min = clampInactivity(detail.inactivityTimeout);
+        inactivityTimeoutMsRef.current = min * 60 * 1000;
+        lastActivityRef.current = Date.now(); // resetear contador con el nuevo valor
+      } else {
+        loadInactivityTimeout();
+      }
+    };
+    window.addEventListener(SETTINGS_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, handler);
+  }, [user, loadInactivityTimeout]);
+
   // Monitorear inactividad
   useEffect(() => {
     if (!user || isLocked) return;
@@ -134,7 +183,7 @@ export const LockScreenProvider = ({ children }) => {
 
     checkIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - lastActivityRef.current;
-      if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+      if (elapsed >= inactivityTimeoutMsRef.current) {
         lock('auto');
       }
     }, CHECK_INTERVAL_MS);

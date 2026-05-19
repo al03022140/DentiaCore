@@ -3,10 +3,12 @@ import PropTypes from 'prop-types';
 import { Modal, Input, message } from 'antd';
 import SectionHeader from './section-header';
 import API from '../../../shared/services/axios-instance.js';
+import { useCurrentAppointment } from '../../../shared/contexts/AppointmentContext.jsx';
 import '../styles/patient-treatment-plan.css';
 
 // Componente para mostrar y editar la sección de Tratamiento a realizar
 const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
+  const { appointmentId } = useCurrentAppointment();
   const [treatmentPlan, setTreatmentPlan] = useState('');
   const [savedTreatmentPlans, setSavedTreatmentPlans] = useState(initialTreatmentPlan || []);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +59,8 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        confirmar: 'confirmar'
+        confirmar: 'confirmar',
+        ...(appointmentId ? { appointmentId } : {}),
       };
 
       // Llamada a la API para guardar el plan de tratamiento

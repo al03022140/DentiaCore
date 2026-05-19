@@ -21,6 +21,7 @@ const withValidation = (rules) => [
 ];
 
 router.get('/balance/monthly', readLimiter, authorize(['cash.read']), cashController.getMonthlyBalance);
+router.get('/session/balance', readLimiter, authorize(['cash.read']), cashController.getSessionBalance);
 router.get('/session/status', readLimiter, authorize(['cash.read']), cashController.getSessionStatus);
 router.post(
 	'/session/open',
@@ -60,5 +61,33 @@ router.post(
 	cashController.addMovement
 );
 router.get('/movements', readLimiter, authorize(['cash.read']), cashController.getLastMovements);
+router.put(
+	'/movements/:id',
+	writeLimiter,
+	authorize(['cash.manage']),
+	withValidation([
+		body('amount')
+			.optional()
+			.isFloat({ gt: 0 }).withMessage('El monto debe ser un número mayor a 0')
+			.toFloat(),
+		body('paymentMethod')
+			.optional()
+			.isIn(['CASH', 'DIGITAL']).withMessage('Método de pago debe ser CASH o DIGITAL'),
+		body('concept')
+			.optional()
+			.isString().withMessage('Concepto debe ser texto')
+			.trim()
+			.notEmpty().withMessage('Concepto no puede estar vacío'),
+		body('patientId')
+			.optional({ nullable: true })
+			.custom(v => v === null || /^[a-f\d]{24}$/i.test(String(v)))
+			.withMessage('patientId debe ser un ObjectId válido o null'),
+		body('reason')
+			.isString().withMessage('Motivo debe ser texto')
+			.trim()
+			.isLength({ min: 3 }).withMessage('Motivo es obligatorio (mínimo 3 caracteres)')
+	]),
+	cashController.updateMovement
+);
 
 module.exports = router;

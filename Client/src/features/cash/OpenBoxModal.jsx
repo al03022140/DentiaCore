@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Modal, InputNumber, Typography, Button, message } from 'antd';
+import { Modal, InputNumber, Button, message } from 'antd';
 import { openBox } from '../../shared/services/cashService';
-
-const { Title, Text } = Typography;
 
 const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
   const [amount, setAmount] = useState(0);
@@ -24,7 +22,7 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
   return (
     <Modal
       open={visible}
-      title={<Title level={3}>Apertura de Caja</Title>}
+      title="Apertura de Caja"
       footer={[
         <Button key="submit" type="primary" loading={loading} onClick={handleOpen} size="large" block>
           Abrir Caja
@@ -35,20 +33,20 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
       maskClosable={true}
       centered
     >
-      <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <Text>Ingrese el monto inicial en efectivo para cambio:</Text>
-        <div style={{ marginTop: '15px' }}>
-          <InputNumber
-            style={{ width: '100%' }}
-            size="large"
-            prefix="$"
-            min={0}
-            value={amount}
-            onChange={setAmount}
-            formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={value => value.replace(/\$\s?|(,*)/g, '')}
-          />
-        </div>
+      <div className="open-box-modal__body">
+        <p className="open-box-modal__hint">
+          Ingrese el monto inicial en efectivo para cambio:
+        </p>
+        <InputNumber
+          className="open-box-modal__input"
+          size="large"
+          prefix="$"
+          min={0}
+          value={amount}
+          onChange={setAmount}
+          formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          parser={value => value.replace(/\$\s?|(,*)/g, '')}
+        />
       </div>
     </Modal>
   );

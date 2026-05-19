@@ -25,6 +25,13 @@ const PeriodontogramHistorySchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  // Cita en la que se generó esta versión (opcional, auditoría / línea de tiempo)
+  appointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Appointment',
+    default: null,
+    index: true
+  },
   versionName: {
     type: String,
     required: true,

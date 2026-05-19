@@ -8,17 +8,40 @@ const CONFIRM_PHRASE = 'CONFIRMO';
 // GET /patient-charges  — todos los cobros (filtrable por pendingOnly)
 exports.getAllCharges = async (req, res) => {
   try {
-    const query = {};
+    const query = { cancelado: { $ne: true } };
     if (req.query.pendingOnly === 'true') {
       query.saldoPendiente = { $gt: 0 };
     }
     const charges = await PatientCharge.find(query)
       .sort({ fecha: -1 })
       .limit(100)
-      .populate('patientId', 'nombre apellidos foto fecha_nacimiento')
-      .populate('appointmentId', 'fecha_hora motivo estado')
-      .populate('creadoPor', 'nombre');
-    res.json(charges);
+      .populate('patientId', 'primer_nombre apellido_paterno otros_nombres apellido_materno photoURL fecha_nacimiento')
+      .populate('appointmentId', 'fecha_hora motivo estado deletedAt')
+      .populate('creadoPor', 'nombre')
+      .lean();
+
+    // Filtrar cobros cuyo appointment fue soft-deleted o cancelado y el cobro
+    // no está confirmado — son huérfanos que el frontend no debe mostrar.
+    const filtered = charges.filter(c => {
+      if (!c.appointmentId) return true;
+      if (c.confirmado) return true;
+      if (c.appointmentId.deletedAt) return false;
+      if (c.appointmentId.estado === 'Cancelada') return false;
+      return true;
+    });
+
+    // Si pidieron pendingOnly, priorizar por fecha de la cita asc (más antiguo
+    // primero) y luego por fecha de creación. Sin cita → al final.
+    if (req.query.pendingOnly === 'true') {
+      filtered.sort((a, b) => {
+        const da = a.appointmentId?.fecha_hora ? new Date(a.appointmentId.fecha_hora).getTime() : Infinity;
+        const db = b.appointmentId?.fecha_hora ? new Date(b.appointmentId.fecha_hora).getTime() : Infinity;
+        if (da !== db) return da - db;
+        return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+      });
+    }
+
+    res.json(filtered);
   } catch (error) {
     console.error('Error al obtener cobros:', error);
     res.status(500).json({ message: 'Error al obtener cobros' });
@@ -145,16 +168,19 @@ exports.addPayment = async (req, res) => {
       return res.status(400).json({ message: 'Debe abrir la caja antes de registrar pagos' });
     }
 
-    // Crear CashMovement
-    const conceptItems = charge.items.map(i => i.nombre).join(', ');
+    // Concepto compacto: primer ítem + " +N" si hay más. El detalle completo
+    // queda en el cobro mismo.
+    const firstItem = charge.items[0]?.nombre || 'Servicios';
+    const extra = charge.items.length > 1 ? ` +${charge.items.length - 1}` : '';
     const movement = new CashMovement({
       amount,
       type: 'INCOME',
       paymentMethod,
-      concept: `Pago cobro paciente — ${conceptItems}`,
+      concept: `Pago cobro · ${firstItem}${extra}`,
       date: new Date(),
       patientId: charge.patientId,
       boxSessionId: activeSession._id,
+      linkedChargeId: charge._id,
       creadoPor: req.user?.id || null
     });
     await movement.save();

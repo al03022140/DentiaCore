@@ -1,54 +1,96 @@
 /* ========================================
    Settings Page — DentiaCore
+   Normalizado al sistema de diseño v1
+   (basado en patient-detail__section)
    ======================================== */
 
-/* Mismo fondo que .dashboard / .content para que el scroll y los sticky no contrasten (claro y oscuro) */
-.settings-page {
+.settings-page,
+.settings-section {
   width: 100%;
   margin: 0;
-  --settings-pad-x: var(--spacing-lg);
-  padding: 0 var(--settings-pad-x);
+  padding: 0;
   height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   background: var(--figma-bg-page, var(--color-bg-light));
+  font-family: var(--font-family-primary);
+  box-sizing: border-box;
 }
 
-.settings-page::-webkit-scrollbar {
+.settings-page::-webkit-scrollbar,
+.settings-section::-webkit-scrollbar {
   display: none;
 }
 
-/* Franja sticky a todo el ancho del área de scroll (evita huecos sin gris al lado del título) */
-.settings-title-strip {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* ── Card grande única — mismos tokens que las cards de home
+       (patient-stats-container: padding figma-space-2xl, radius lg, sombra figma) ─── */
+
+.settings-card {
+  background-color: var(--figma-bg-card, var(--color-bg-white));
+  border-radius: var(--figma-radius-lg, var(--border-radius-lg));
+  padding: var(--figma-space-2xl);
+  margin-bottom: var(--figma-space-2xl);
+  box-shadow: var(--figma-shadow-card, 0 4px 14px rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--figma-border-default, var(--color-border-medium));
+  width: 100%;
   box-sizing: border-box;
-  width: calc(100% + 2 * var(--settings-pad-x));
-  max-width: none;
-  margin-left: calc(-1 * var(--settings-pad-x));
-  margin-right: calc(-1 * var(--settings-pad-x));
-  padding-left: var(--settings-pad-x);
-  padding-right: var(--settings-pad-x);
-  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
-.settings-title {
-  max-width: 720px;
-  font: var(--text-heading-lg);
+/* ── Títulos h2 estilo patient-detail (con subrayado azul claro) ─────── */
+
+.settings-title,
+.settings-section-title {
+  font: var(--pd-font-section-h2);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-lg) 0;
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-primary-light);
+  letter-spacing: -0.02em;
+}
+
+/* ── Botón Volver: outline secundario del design system ──────────────── */
+
+.settings-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
   color: var(--color-primary);
-  margin: 0;
-  padding: var(--spacing-xl) 0 1rem;
-  border-bottom: none;
+  background: var(--color-bg-white);
+  border: 2px solid var(--color-primary);
+  cursor: pointer;
+  padding: 0.45rem 1rem;
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-fast);
+  margin-bottom: var(--spacing-lg);
 }
 
-/* ── Settings List ────────────────────── */
+.settings-back-btn:hover {
+  background: var(--color-primary);
+  color: var(--color-bg-white);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.30);
+}
+
+.settings-back-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-blue-500-08);
+}
+
+/* ── Cuerpo de sección individual (dentro de la card) ────────────────── */
+
+.settings-section-body {
+  width: 100%;
+}
+
+/* ── Settings List ───────────────────────────────────────────────────── */
 
 .settings-list {
   display: flex;
   flex-direction: column;
-  max-width: 720px;
+  width: 100%;
 }
 
 .settings-row {
@@ -59,15 +101,27 @@
   background: none;
   border: none;
   border-bottom: 1px solid var(--color-border-light);
+  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
   text-align: left;
   width: 100%;
   font-family: var(--font-family-primary);
 }
 
+.settings-row:last-child {
+  border-bottom: none;
+}
+
 .settings-row:hover {
   background-color: var(--color-blue-500-08);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.settings-row:focus-visible {
+  outline: none;
+  box-shadow: inset 3px 0 0 var(--color-primary),
+              0 0 0 3px var(--color-blue-500-08);
 }
 
 .settings-row-icon {
@@ -89,6 +143,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .settings-row-name {
@@ -107,7 +162,11 @@
 
 .settings-row-badge {
   font: var(--text-caption-sm);
-  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  background: var(--color-blue-500-08);
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
   white-space: nowrap;
 }
 
@@ -115,78 +174,12 @@
   font-size: 1.3rem;
   color: var(--color-text-muted);
   flex-shrink: 0;
+  transition: transform 0.2s, color 0.2s;
 }
 
-/* ── Settings Section ─────────────────── */
-
-.settings-section {
-  width: 100%;
-  margin: 0;
-  --settings-pad-x: var(--spacing-lg);
-  padding: 0 var(--settings-pad-x);
-  height: 100%;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  background: var(--figma-bg-page, var(--color-bg-light));
-}
-
-.settings-section::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-section-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-sizing: border-box;
-  width: calc(100% + 2 * var(--settings-pad-x));
-  max-width: none;
-  margin-left: calc(-1 * var(--settings-pad-x));
-  margin-right: calc(-1 * var(--settings-pad-x));
-  padding-left: var(--settings-pad-x);
-  padding-right: var(--settings-pad-x);
-  background: var(--figma-bg-page, var(--color-bg-light));
-}
-
-.settings-section-header-inner {
-  max-width: 720px;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-xl) 0 1rem;
-  margin: 0;
-}
-
-.settings-back-btn {
-  font: var(--text-body-sm);
+.settings-row:hover .settings-row-arrow {
   color: var(--color-primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-md);
-  transition: var(--transition-fast);
-}
-
-.settings-back-btn:hover {
-  background: var(--color-blue-500-08);
-}
-
-.settings-section-title {
-  font: var(--text-heading-md);
-  color: var(--color-text-primary);
-  margin: 0;
-}
-
-.settings-section-body {
-  max-width: 720px;
-  background: var(--color-bg-white);
-  border: var(--card-border);
-  border-radius: var(--card-border-radius);
-  box-shadow: var(--card-shadow);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-xl);
+  transform: translateX(2px);
 }
 
 /* ── Form Elements ────────────────────── */
@@ -401,6 +394,231 @@
   transform: translateX(20px);
 }
 
+/* ========================================
+   Cuentas y Permisos — Disclosures por rol
+   ======================================== */
+
+.perm-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+}
+
+.perm-roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--figma-space-md);
+}
+
+.perm-role {
+  background: var(--color-bg-white);
+  border: 1px solid var(--figma-border-default, var(--color-border-light));
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.perm-role:hover {
+  border-color: var(--color-primary-light);
+}
+
+.perm-role--open {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 14px rgba(8, 72, 136, 0.08);
+}
+
+.perm-role-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-family-primary);
+  transition: background 0.2s;
+}
+
+.perm-role-header:hover {
+  background: var(--color-blue-500-08);
+}
+
+.perm-role-header:focus-visible {
+  outline: none;
+  background: var(--color-blue-500-08);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.perm-role-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.perm-role-name {
+  font-size: 1.15rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  text-transform: capitalize;
+  line-height: 1.3;
+}
+
+.perm-role-desc {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.perm-role-count {
+  flex-shrink: 0;
+  font: var(--text-caption-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  background: var(--color-blue-500-08);
+  padding: 0.2rem 0.7rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.perm-role-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: transform 0.2s, color 0.2s;
+}
+
+.perm-role--open .perm-role-chevron {
+  transform: rotate(90deg);
+  color: var(--color-primary);
+}
+
+.perm-role-body {
+  padding: 0 var(--spacing-xl) var(--spacing-xl);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.perm-group {
+  margin-top: var(--spacing-lg);
+}
+
+.perm-group:first-of-type {
+  margin-top: var(--spacing-md);
+}
+
+.perm-group-title {
+  font: var(--text-caption-sm);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-blue-500-08);
+}
+
+.perm-user-hint {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.perm-user-hint strong {
+  color: var(--color-primary);
+  text-transform: capitalize;
+}
+
+.perm-role-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.perm-toggle-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.perm-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.perm-toggle:last-child {
+  border-bottom: none;
+}
+
+.perm-toggle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.perm-toggle-title {
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.perm-toggle-desc {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+/* ── Tab Por Usuario: misma lista de toggles ── */
+
+.perm-user {
+  margin-top: var(--spacing-lg);
+}
+
+.perm-user-title {
+  font: var(--pd-font-section-h3);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 600px) {
+  .perm-role-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    flex-wrap: wrap;
+  }
+
+  .perm-role-body {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+  }
+
+  .perm-role-count {
+    order: 3;
+  }
+
+  .perm-toggle {
+    gap: var(--spacing-md);
+  }
+}
+
 /* ── Signature Pad ────────────────────── */
 
 .signature-container {
@@ -505,17 +723,28 @@
   color: var(--color-danger);
 }
 
-/* ── Responsive ───────────────────────── */
+/* ── Responsive — escala alineada con .patient-stats-container (home) ──── */
+
+@media (max-width: 1024px) {
+  .settings-card {
+    padding: var(--figma-space-lg);
+  }
+}
 
 @media (max-width: 768px) {
-  .settings-page,
-  .settings-section {
-    --settings-pad-x: var(--spacing-md);
-    padding: var(--spacing-lg) var(--settings-pad-x);
+  .settings-title,
+  .settings-section-title {
+    font-size: var(--pd-font-section-h2-size-sm);
   }
 
+  .settings-row {
+    padding: 0.85rem 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
   .settings-card {
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--figma-space-md);
   }
 }
 
@@ -779,7 +1008,7 @@
   .trace-pagination,
   .trace-footer button,
   .settings-back-btn,
-  .settings-section-header {
+  .settings-section-title {
     display: none !important;
   }
 

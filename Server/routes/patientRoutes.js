@@ -186,6 +186,9 @@ router
 
 router.post('/batch', writeLimiter, authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
 
+// Búsqueda server-side de pacientes — para inputs con debounce.
+router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), patientCtrl.searchPatients);
+
 // ── Rutas de paciente específico ─────────────────────────────────
 router
   .route('/:id')

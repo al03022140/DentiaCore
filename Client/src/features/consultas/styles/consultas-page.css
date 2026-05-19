@@ -1,4 +1,20 @@
-/* Force content layout to single column for this page */
+/* ==============================================================
+   Consultas — Sistema de diseño DentiaCore v1
+   Fuente canónica: figma-tokens.css + paleta #084888.
+   Alineado con patient-detail · sidebar · home · caja.
+   ============================================================== */
+
+/* Tinte de marca local (Pill primaria · hover · focus glow)
+   El proyecto sólo trae tintes Bootstrap-blue en variables.css; estos van con
+   el azul DentiaCore real (#084888). */
+.consultas-page {
+  --consultas-brand-tint: rgba(8, 72, 136, 0.08);
+  --consultas-brand-tint-strong: rgba(8, 72, 136, 0.14);
+  --consultas-brand-glow: rgba(8, 72, 136, 0.10);
+  --consultas-brand-cta-shadow: 0 4px 8px rgba(8, 72, 136, 0.30);
+}
+
+/* Forzar layout de página a una sola columna (sin el panel derecho del layout) */
 .content:has(.consultas-page) {
   grid-template-columns: 1fr;
   overflow-x: hidden;
@@ -13,114 +29,60 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  font: var(--pd-font-base);
+  font: var(--figma-text-body-regular);
+  color: var(--figma-text-primary);
   background-color: transparent;
   overflow: hidden;
   overflow-x: hidden;
 }
 
-/* --- COLUMNA IZQUIERDA --- */
+/* ── COLUMNA IZQUIERDA ── */
 .consultas-left {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   height: 100%;
-  overflow-y: hidden; /* Changed from hidden to auto in previous tool but maybe let's stick to hidden and scroll children? */
-  /* Wait, if the user sees scrolling, it's either the full page or the panel */
-  /* Cash page uses height: 100% on columns */
-  padding-right: 0rem; /* Remove padding right that might add width if box-sizing is off (it is on now) */
+  overflow-y: hidden;
   min-width: 0;
 }
 
-/* Panel Detalle Seleccionado */
-.selected-detail-panel {
-  background-color: var(--color-bg-white);
-  border-radius: var(--card-border-radius);
-  padding: 1.25rem;
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
-  box-sizing: border-box;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* Misma tarjeta que con cita seleccionada; contenido centrado al estilo otras páginas */
-.selected-detail-panel--empty {
-  align-items: center;
-  justify-content: center;
-}
-
-.consultas-empty-state {
-  text-align: center;
-  padding: 1.5rem 1.25rem;
-  max-width: 22rem;
-}
-
-.consultas-empty-state__title {
-  margin: 0 0 0.65rem;
-  font: var(--text-heading-sm);
-  color: var(--color-primary);
-}
-
-.consultas-empty-state__text {
-  margin: 0;
-  font: var(--pd-font-section-body);
-  color: var(--color-text-muted);
-  font-style: italic;
-  line-height: 1.5;
-}
-
-.consultas-list-empty {
-  margin: 0 0 0.75rem;
-  padding: 1rem 1.25rem;
-  background: var(--color-bg-light);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--border-radius-md);
-  font: var(--pd-font-body-sm);
-  font-style: italic;
-  font-weight: 400;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.consultas-inline-empty {
-  margin: 0;
-  font: var(--pd-font-body-sm);
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* --- COLUMNA DERECHA --- */
+/* ── COLUMNA DERECHA (panel agenda) ── */
 .consultas-right {
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg-white);
-  border-radius: var(--card-border-radius);
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg); /* 14px */
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
   box-sizing: border-box;
   padding: 1.25rem;
   overflow: hidden;
   height: 100%;
-  margin-top: 0;
   min-width: 0;
+  transition:
+    box-shadow var(--figma-transition-fast),
+    border-color var(--figma-transition-fast);
 }
 
-/* Panel Siguiente Paciente (Highlight) */
+/* ── Card: Próximo paciente / Hero ── */
 .next-patient-card {
-  background-color: var(--color-bg-white);
-  border-radius: var(--card-border-radius);
-  padding: 1rem 1.5rem;
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg); /* 14px */
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
+  padding: 1.1rem 1.25rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
   flex-shrink: 0;
+  transition:
+    box-shadow var(--figma-transition-fast),
+    border-color var(--figma-transition-fast);
+}
+
+.next-patient-card:hover {
+  box-shadow: var(--figma-shadow-elevated);
 }
 
 .next-patient-card--loading {
@@ -132,324 +94,975 @@
 .consultas-card-loading-text {
   margin: 0;
   text-align: center;
-  font: var(--pd-font-section-body);
-  color: var(--color-text-muted);
+  font: var(--figma-text-body-regular);
+  color: var(--figma-text-secondary);
 }
 
 .next-patient-card--empty .next-patient-header {
   align-items: flex-start;
 }
 
-.next-patient-avatar--placeholder {
-  opacity: 0.85;
+.next-patient-card--empty .next-patient-info h2 {
+  font-family: var(--font-family-primary);
+  font-size: 1.125rem; /* 18px — H2 atenuado para empty state */
+  font-weight: var(--font-weight-medium);
+  color: var(--figma-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .next-patient-empty-caption {
-  margin: 0.35rem 0 0;
-  font: var(--pd-font-body-sm);
-  color: var(--color-text-muted);
+  margin: 0.3rem 0 0;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem; /* 13px */
+  color: var(--figma-text-secondary);
   line-height: 1.45;
   max-width: 36ch;
 }
 
-.next-patient-card--empty .next-patient-info h2 {
-  font: var(--text-heading-xxs);
-  color: var(--color-primary);
+.next-patient-avatar--placeholder {
+  opacity: 0.8;
 }
 
 .next-patient-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .next-patient-avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+  width: 64px;   /* spec: avatar de patient card */
+  height: 64px;
+  border-radius: var(--figma-radius-full); /* 9999px */
   object-fit: cover;
-  border: 2px solid var(--color-border-light);
+  flex-shrink: 0;
+  background: var(--figma-bg-input);
 }
 
 .next-patient-info {
   flex: 1;
+  min-width: 0;
 }
 
 .next-patient-info h2 {
-  font: var(--text-heading-xxs);
-  color: var(--color-primary);
-  margin: 0 0 0.25rem 0;
+  font-family: var(--font-family-primary);
+  font-size: 1.25rem; /* 20px — H2 */
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary); /* Acento #084888 */
+  letter-spacing: -0.01em;
+  margin: 0 0 0.2rem 0;
+  line-height: 1.3;
 }
 
 .next-patient-time {
-  font: var(--pd-font-body-md);
-  color: var(--color-text-secondary);
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem; /* 14px label */
+  font-weight: var(--font-weight-medium);
+  color: var(--figma-text-secondary);
   display: block;
+  letter-spacing: -0.005em;
 }
 
+/* ── Badges de estado (pill full-rounded) ── */
 .badge-status {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  font: var(--text-overline);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--figma-radius-full); /* 9999px */
+  font-family: var(--font-family-primary);
+  font-size: 0.6875rem; /* 11px — caption micro */
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-top: 0.5rem;
+  margin-top: 0.45rem;
+  line-height: 1.4;
 }
 
 .badge-status.confirmed {
-  background-color: var(--color-success-100);
-  color: var(--color-success);
+  background: rgba(76, 175, 80, 0.12);
+  color: var(--color-green-800);
 }
 
 .badge-status.waiting {
-  background-color: var(--color-yellow-100);
-  color: var(--color-yellow-700);
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--color-warning);
 }
 
+.badge-status.in-progress {
+  background: var(--consultas-brand-tint);
+  color: var(--color-primary);
+}
+
+.badge-status.no-show {
+  background: rgba(229, 62, 62, 0.12);
+  color: var(--color-red-550);
+}
+
+.badge-status.completed {
+  background: var(--figma-bg-neutral-alt);
+  color: var(--figma-text-secondary);
+}
+
+.badge-status.cancelled {
+  background: var(--figma-bg-input);
+  color: var(--figma-text-secondary);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.8;
+}
+
+/* ── Bloque "motivo / procedimiento" ── */
 .next-patient-reason {
-  background: var(--color-bg-section);
-  padding: 1rem;
-  border-radius: var(--border-radius-md);
-  font: var(--pd-font-section-body);
-  color: var(--color-text-secondary);
+  background: var(--figma-bg-input);
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--figma-radius-sm); /* 8px */
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem; /* 14px body */
+  color: var(--figma-text-secondary);
+  line-height: 1.5;
 }
 
 .next-patient-reason strong {
   display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-text-primary);
+  margin-bottom: 0.2rem;
+  color: var(--figma-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.75rem; /* 12px label */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
+/* ── CTA primaria: INICIAR CONSULTA ── */
 .start-consultation-btn {
-  background-color: var(--color-primary);
-  color: var(--color-bg-white);
+  background-color: var(--color-primary); /* #084888 */
+  color: var(--figma-text-on-dark);
   border: none;
-  padding: 1rem;
-  border-radius: var(--border-radius-md);
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--figma-radius-md); /* 10px — botón hero */
   cursor: pointer;
-  font: var(--pd-font-label-md);
-  transition: var(--transition-medium);
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem; /* 14px label */
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition:
+    transform var(--figma-transition-fast),
+    box-shadow var(--figma-transition-fast),
+    background-color var(--figma-transition-fast);
   width: 100%;
-  text-align: center;
-  margin-top: 0.5rem;
-  box-shadow: 0 4px 6px var(--color-black-10);
+  margin-top: 0.35rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
-.start-consultation-btn:hover {
+.start-consultation-btn:hover:not(:disabled) {
   background-color: var(--color-primary-hover);
   transform: translateY(-1px);
+  box-shadow: var(--consultas-brand-cta-shadow);
 }
 
+.start-consultation-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.next-patient-actions {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 0.4rem;
+}
+
+.next-patient-actions .start-consultation-btn {
+  margin-top: 0;
+  flex: 1;
+}
+
+/* Botón "Confirmar" (secundario outline azul) */
+.confirm-appointment-btn {
+  background: var(--figma-bg-card);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary); /* spec: outline 2px botones secundarios */
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--figma-radius-md);
+  cursor: pointer;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--figma-transition-fast);
+  letter-spacing: 0.01em;
+}
+
+.confirm-appointment-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--consultas-brand-cta-shadow);
+}
+
+.confirm-appointment-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Botón "Terminar consulta" — outline blanco con borde azul DentiaCore
+   (spec: botón secundario 2px solid #084888 sobre fondo blanco). */
+.end-consultation-btn {
+  background: var(--figma-bg-card);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--figma-radius-md);
+  cursor: pointer;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.01em;
+  transition: all var(--figma-transition-fast);
+  flex-shrink: 0;
+}
+
+.end-consultation-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--consultas-brand-cta-shadow);
+}
+
+.end-consultation-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Modal "Terminar consulta" */
+.end-consultation-modal__hint {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  color: var(--figma-text-secondary);
+  line-height: 1.5;
+}
+
+.end-consultation-modal__hint strong {
+  color: var(--figma-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.end-consultation-modal__instruction {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.end-consultation-modal__instruction strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+}
+
+/* ── Panel detalle ── */
+.selected-detail-panel {
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
+  padding: 1.25rem;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  transition: box-shadow var(--figma-transition-fast);
+}
+
+.selected-detail-panel:hover {
+  box-shadow: var(--figma-shadow-elevated);
+}
+
+.selected-detail-panel--empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.consultas-empty-state {
+  text-align: center;
+  padding: 1.25rem 1rem;
+  max-width: 22rem;
+}
+
+.consultas-empty-state__title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-family-primary);
+  font-size: 1.125rem; /* 18px */
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
+}
+
+.consultas-empty-state__text {
+  margin: 0;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  color: var(--figma-text-secondary);
+  line-height: 1.5;
+}
+
+.consultas-list-empty {
+  margin: 0 0 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--figma-bg-input);
+  border-radius: var(--figma-radius-sm);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-secondary);
+  text-align: center;
+}
+
+.consultas-inline-empty {
+  margin: 0;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-secondary);
+}
+
+/* Header del detalle */
 .detail-header-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border-light);
-  padding-bottom: 1rem;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--figma-border-default);
+  padding-bottom: 0.85rem;
+}
+
+.detail-header-info h3 {
+  margin: 0;
+  font-family: var(--font-family-primary);
+  font-size: 1.125rem; /* 18px H2-light */
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
+}
+
+.detail-header-info small {
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  color: var(--figma-text-secondary);
+  display: block;
+  margin-top: 0.15rem;
+}
+
+/* Tags (edad, duración) — pill tinte de marca */
+.patient-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
 .patient-tags span {
-  background-color: var(--color-yellow-100);
-  color: var(--color-yellow-700);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font: var(--text-caption-sm);
-  margin-right: 0.5rem;
+  background: var(--consultas-brand-tint);
+  color: var(--color-primary);
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--figma-radius-full);
+  font-family: var(--font-family-primary);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.patient-tags__duration {
+  /* Hereda del .patient-tags span — clase legacy mantenida por si se usa en JSX */
+  background: var(--consultas-brand-tint) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Secciones del timeline */
+.timeline-section {
+  margin-bottom: 1rem;
+}
+
+.timeline-section:last-of-type {
+  margin-bottom: 0;
 }
 
 .timeline-section h4 {
-  color: var(--color-primary);
-  margin-top: 0;
-  margin-bottom: 1rem;
-  font: var(--text-subtitle-md);
-  border-bottom: 2px solid var(--color-bg-section);
-  padding-bottom: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-family-primary);
+  font-size: 1rem; /* 16px H3 */
+  font-weight: var(--font-weight-medium);
+  color: var(--figma-text-primary);
+  letter-spacing: -0.005em;
 }
 
-.timeline-container {
-  margin-bottom: 1.5rem;
+.timeline-section p {
+  margin: 0;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  color: var(--figma-text-secondary);
+  line-height: 1.5;
 }
 
-.timeline-item {
-  border-left: 2px solid var(--color-primary-light);
-  padding-left: 1rem;
-  padding-bottom: 1rem;
-  position: relative;
-}
-
-.timeline-item:last-child {
-  border-left: 2px solid transparent;
-}
-
-.timeline-item::before {
-  content: '';
-  width: 10px;
-  height: 10px;
-  background: var(--color-primary);
-  border-radius: 50%;
-  position: absolute;
-  left: -6px;
-  top: 2px;
-}
-
-.timeline-date {
-  font: var(--text-caption-xs);
-  color: var(--color-text-muted);
-  margin-bottom: 0.25rem;
-}
-
-.timeline-content {
-  font: var(--pd-font-section-body);
-  color: var(--color-text-secondary);
-}
-
+/* Lista de servicios — items sutiles con tinte de marca */
 .plan-today-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .plan-today-list li {
-  background-color: var(--color-bg-section);
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: var(--border-radius-sm);
-  border-left: 4px solid var(--color-warning);
-  font: var(--pd-font-section-body);
+  background: var(--figma-bg-input);
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--figma-radius-sm);
+  border-left: 3px solid var(--color-primary);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
+/* Acciones del detalle */
 .detail-actions {
   margin-top: auto;
   text-align: right;
-  padding-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--figma-border-default);
 }
 
 .secondary-btn {
-  background: transparent;
+  background: var(--figma-bg-card);
   color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  padding: 0.5rem 1rem;
-  border-radius: var(--border-radius-md);
+  border: 2px solid var(--color-primary); /* spec: outline 2px secondario */
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--figma-radius-md); /* 6-8px → uso 10px botón compacto consistente */
   cursor: pointer;
-  font: var(--pd-font-label-md);
-  transition: all 0.2s;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--figma-transition-fast);
 }
 
 .secondary-btn:hover {
-  background: var(--color-bg-section);
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--consultas-brand-cta-shadow);
 }
 
+/* ── Header del panel agenda ── */
 .consultas-right h3 {
-  color: var(--color-text-primary);
-  font: var(--text-heading-sm);
-  margin-top: 0;
-  margin-bottom: 0;
+  margin: 0;
+  font-family: var(--font-family-primary);
+  font-size: 1.25rem; /* 20px H2 */
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
 }
 
 .consultas-right-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--figma-border-default);
 }
 
-/* Mismo estilo que caja (ActionsPanel): botón con PlusCircleOutlined */
+.consultas-right-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Date stepper (← Hoy →) ── */
+.consultas-date-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--figma-bg-input);
+  border-radius: var(--figma-radius-full);
+  padding: 0.2rem;
+  border: 1px solid var(--figma-border-default);
+}
+
+.consultas-date-stepper__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--figma-radius-full);
+  border: none;
+  background: transparent;
+  color: var(--figma-text-secondary);
+  cursor: pointer;
+  transition: background var(--figma-transition-fast), color var(--figma-transition-fast);
+}
+
+.consultas-date-stepper__btn:hover {
+  background: var(--figma-bg-card);
+  color: var(--color-primary);
+}
+
+.consultas-date-stepper__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.85rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--figma-radius-full);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  cursor: pointer;
+  text-transform: capitalize;
+  letter-spacing: -0.005em;
+  transition: background var(--figma-transition-fast);
+}
+
+.consultas-date-stepper__label:hover {
+  background: var(--figma-bg-card);
+}
+
+/* ── CTA "Nueva cita" — primaria azul DentiaCore ── */
 .consultas-add-btn {
   display: inline-flex !important;
   align-items: center;
   gap: 0.35rem;
-  background-color: var(--color-success) !important;
-  border-color: var(--color-success) !important;
-  font: var(--text-label-strong) !important;
-  box-shadow: 0 0.125rem 0.25rem var(--color-black-10) !important;
-  transition: all 0.15s ease !important;
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  border-radius: var(--figma-radius-sm) !important; /* 8px botón */
+  padding: 0.4rem 0.9rem !important;
+  height: auto !important;
+  font-family: var(--font-family-primary) !important;
+  font-size: 0.8125rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10) !important;
+  transition: all var(--figma-transition-fast) !important;
 }
 
 .consultas-add-btn:hover {
-  background-color: var(--color-green-600) !important;
-  border-color: var(--color-green-600) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 0.35rem 0.75rem var(--color-black-15) !important;
+  background-color: var(--color-primary-hover) !important;
+  border-color: var(--color-primary-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--consultas-brand-cta-shadow) !important;
 }
 
 .consultas-add-btn .anticon {
-  font-size: 1.1em;
+  font-size: 1em;
 }
 
+/* ── Listado de consultas ── */
 .consultas-list-container {
   overflow-y: auto;
   flex: 1;
-  padding-right: 0.5rem;
+  padding-right: 0.35rem;
+}
+
+.consultas-list-container::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+}
+
+.consultas-list-container::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: var(--scrollbar-radius);
+}
+
+.consultas-list-container::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
 }
 
 .list-section-title {
-  font: var(--text-overline);
-  color: var(--color-text-secondary);
-  margin: 1.5rem 0 0.5rem 0;
+  font-family: var(--font-family-primary);
+  font-size: 0.6875rem; /* 11px overline */
+  font-weight: var(--font-weight-semibold);
+  color: var(--figma-text-secondary);
+  margin: 1.1rem 0 0.55rem 0;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .list-section-title:first-child {
   margin-top: 0;
 }
 
+/* ── Consultation item card ── */
 .consultation-item {
   display: flex;
   align-items: center;
-  padding: 1rem 1.25rem;
-  background-color: var(--color-bg-white);
-  border-bottom: 1px solid var(--color-border-light);
-  border-radius: 1.25rem;
-  box-shadow: var(--shadow-light);
+  position: relative;
+  padding: 0.75rem 0.95rem;
+  background: var(--figma-bg-card);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-md); /* 10px list item */
+  box-shadow: var(--figma-shadow-card);
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.12s ease;
-  margin-bottom: 0.75rem;
+  transition:
+    transform var(--figma-transition-fast),
+    box-shadow var(--figma-transition-fast),
+    border-color var(--figma-transition-fast),
+    background var(--figma-transition-fast);
+  margin-bottom: 0.55rem;
+  overflow: hidden;
 }
 
 .consultation-item:hover {
-  background-color: var(--color-bg-section);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  box-shadow: var(--figma-shadow-elevated);
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary), var(--figma-shadow-elevated);
 }
 
 .consultation-item.active {
-  background-color: var(--color-blue-500-15);
-  border-left: 4px solid var(--color-primary);
+  background: var(--consultas-brand-tint);
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary), var(--figma-shadow-card);
 }
 
+/* Cita "EnCurso" — borde lateral + pulso suave */
+.consultation-item.in-progress {
+  background: var(--consultas-brand-tint);
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary), var(--figma-shadow-card);
+}
+
+.consultation-item.in-progress::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(8, 72, 136, 0.30);
+  animation: consulta-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes consulta-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(8, 72, 136, 0.30); }
+  70%  { box-shadow: 0 0 0 6px rgba(8, 72, 136, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(8, 72, 136, 0); }
+}
+
+.consultation-item.completed {
+  opacity: 0.92;
+}
+
+/* Hora (columna izquierda del item) */
 .consultation-time-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 70px;
+  min-width: 60px;
   color: var(--color-primary);
-  font: var(--pd-font-label-md);
-  font-weight: var(--font-weight-medium);
-  margin-right: 1rem;
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-semibold);
+  margin-right: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .time-hour {
-  font: var(--pd-font-body-md);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.time-duration {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--figma-text-secondary);
+  margin-top: 0.15rem;
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0.02em;
 }
 
 .time-ampm {
-  font: var(--text-caption-xs);
-  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  color: var(--figma-text-secondary);
 }
 
 .consultation-info {
   flex: 1;
+  min-width: 0;
 }
 
 .consultation-patient-name {
-  font: var(--pd-font-section-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  margin-bottom: 0.25rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.9375rem; /* 15px body */
+  font-weight: var(--font-weight-semibold);
+  color: var(--figma-text-primary);
+  margin-bottom: 0.15rem;
   display: block;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .consultation-reason {
-  font: var(--pd-font-body-sm);
-  color: var(--color-text-secondary);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-secondary);
+  display: block;
+  line-height: 1.4;
+}
+
+.consultation-summary {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.7rem;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+/* Badge dentro del item (estado a la derecha) */
+.consultation-status {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Dropdown trigger (3 puntos) */
+.consultation-actions-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  border-radius: var(--figma-radius-full);
+  color: var(--figma-text-secondary);
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: background var(--figma-transition-fast), color var(--figma-transition-fast);
+}
+
+.consultation-actions-btn:hover:not(:disabled) {
+  background: var(--consultas-brand-tint);
+  color: var(--color-primary);
+}
+
+.consultation-actions-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Historial de estado ── */
+.estado-historial-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.estado-historial-list li {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.85rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed var(--figma-border-default);
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  color: var(--figma-text-secondary);
+}
+
+.estado-historial-list li:last-child {
+  border-bottom: none;
+}
+
+.estado-historial-list strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.estado-historial-list span {
+  font-variant-numeric: tabular-nums;
+  color: var(--figma-text-secondary);
+}
+
+.estado-historial-list em {
+  grid-column: 1 / -1;
+  font-style: italic;
+  color: var(--figma-text-secondary);
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+}
+
+/* ── Actividad de la consulta (citas en EnCurso/Pasada/NoShow/Cancelada) ── */
+.consulta-activity__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.consulta-activity__group {
+  background: var(--figma-bg-input);
+  border-radius: var(--figma-radius-md); /* 10px */
+  padding: 0.7rem 0.85rem;
+  border-left: 3px solid var(--color-primary);
+}
+
+.consulta-activity__group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.consulta-activity__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.4rem;
+  background: var(--consultas-brand-tint);
+  color: var(--color-primary);
+  border-radius: var(--figma-radius-full);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.consulta-activity__count--ok {
+  background: rgba(76, 175, 80, 0.14);
+  color: var(--color-green-800);
+}
+
+.consulta-activity__count--warn {
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--color-warning);
+}
+
+.consulta-activity__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.consulta-activity__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+  align-items: baseline;
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  color: var(--figma-text-primary);
+  padding: 0.35rem 0.5rem;
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-sm); /* 8px */
+  border: 1px solid var(--figma-border-default);
+}
+
+.consulta-activity__list li strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.005em;
+}
+
+.consulta-activity__list li span {
+  color: var(--figma-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.consulta-activity__list li em {
+  flex-basis: 100%;
+  font-style: italic;
+  color: var(--figma-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.consulta-activity__total {
+  background: var(--consultas-brand-tint) !important;
+  border-color: var(--color-primary) !important;
+  margin-top: 0.2rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.consulta-activity__total strong,
+.consulta-activity__total span {
+  color: var(--color-primary) !important;
+  font-size: 0.8125rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .consultas-page {
+    grid-template-columns: 1fr;
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .consultas-left,
+  .consultas-right {
+    height: auto;
+  }
+
+  .consultas-right {
+    min-height: 24rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .consultas-page {
+    gap: 1rem;
+    padding: 0.5rem;
+  }
+
+  .consultas-right,
+  .next-patient-card,
+  .selected-detail-panel {
+    padding: 1rem;
+  }
+
+  .next-patient-avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .next-patient-info h2 {
+    font-size: 1.0625rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .next-patient-actions {
+    flex-direction: column;
+  }
+
+  .consultation-item {
+    flex-wrap: wrap;
+    gap: 0.5rem 0;
+  }
+
+  .consultation-time-box {
+    min-width: auto;
+    flex-direction: row;
+    gap: 0.4rem;
+    margin-right: 0.5rem;
+  }
 }

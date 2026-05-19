@@ -78,7 +78,7 @@ const CashPage = () => {
       <OpenBoxModal visible={showOpenModal} onOpenSuccess={handleOpenSuccess} onCancel={handleDismissModal} />
 
       <div className="cash-page">
-        {/* Fila superior ~40%: izq. Ganancias/Estado, der. Acciones operativas */}
+        {/* Fila superior ~40%: izq. Balance/Estado, der. Acciones operativas */}
         <div className="cash-card cash-dashboard-card">
           <CashDashboard key={refreshTrigger} />
         </div>
@@ -93,7 +93,7 @@ const CashPage = () => {
 
         {/* Fila inferior ~60%: izq. Últimos movimientos, der. Cobros de citas */}
         <div className="cash-card cash-movements-card">
-          <MovementsList refreshTrigger={refreshTrigger} />
+          <MovementsList refreshTrigger={refreshTrigger} onMovementUpdated={handleMovementAdded} />
         </div>
         <PendingChargesPanel refreshTrigger={refreshTrigger} />
       </div>

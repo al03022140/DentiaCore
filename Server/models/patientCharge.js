@@ -37,12 +37,20 @@ const patientChargeSchema = new mongoose.Schema({
   totalPagado: { type: Number, default: 0, min: 0 },
   saldoPendiente: { type: Number, default: 0, min: 0 },
   confirmado: { type: Boolean, default: false },
+  // Cancelación lógica — preserva la fila para auditoría
+  cancelado: { type: Boolean, default: false, index: true },
+  canceladoEn: { type: Date, default: null },
+  canceladoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  canceladoMotivo: { type: String, default: null, trim: true },
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
     default: null
   }
 }, { timestamps: true });
+
+// Acelera el reverse-lookup CashMovement → PatientCharge
+patientChargeSchema.index({ 'pagos.cashMovementId': 1 });
 
 // Recalcular totales de pago antes de guardar
 patientChargeSchema.pre('save', function (next) {

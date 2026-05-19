@@ -1,17 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { createAppointment } from '../../../shared/services/appointment-service';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  createAppointment,
+  updateAppointment,
+  searchPatients
+} from '../../../shared/services/appointment-service';
 import { getSettings } from '../../../shared/services/settingsService';
 import API from '../../../shared/services/axios-instance';
-import { getAllPatients } from '../../../shared/services/api';
 import userNot from '../../../assets/images/icons/Profile Default.svg';
 import './CreateAppointmentModal.css';
 
-const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = null }) => {
+const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
+
+const CreateAppointmentModal = ({
+  visible,
+  onClose,
+  onCreated,
+  fixedPatient = null,
+  appointment = null
+}) => {
+  const isEditing = !!appointment;
+
   // Patient search
   const [patientQuery, setPatientQuery] = useState('');
   const [patientResults, setPatientResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [allPatients, setAllPatients] = useState([]);
+  const searchTimer = useRef(null);
 
   // Doctor
   const [doctors, setDoctors] = useState([]);
@@ -19,6 +33,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
 
   // Appointment fields
   const [fechaHora, setFechaHora] = useState('');
+  const [duracion, setDuracion] = useState(30);
   const [motivo, setMotivo] = useState('');
   const [comentario, setComentario] = useState('');
 
@@ -29,69 +44,100 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // `min` para el input datetime-local: ahora mismo en hora local, formato YYYY-MM-DDTHH:mm.
+  // `min` para datetime-local — para creación. En edición permitimos
+  // mantener la fecha original aunque sea pasada (mostrar histórico).
   const nowLocalISO = (() => {
     const d = new Date();
     const offset = d.getTimezoneOffset() * 60_000;
     return new Date(d.getTime() - offset).toISOString().slice(0, 16);
   })();
 
-  // Load doctors, service catalog & patients when modal opens
+  // Convierte un Date a YYYY-MM-DDTHH:mm en hora local (para el input).
+  const toLocalInput = (date) => {
+    const d = new Date(date);
+    const offset = d.getTimezoneOffset() * 60_000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  };
+
+  // Load doctors & service catalog when modal opens
   useEffect(() => {
     if (!visible) return;
     const loadData = async () => {
       try {
-        const [usersRes, settings, patientsRes] = await Promise.all([
+        const [usersRes, settings] = await Promise.all([
           API.get('/users').then(r => r.data).catch(() => []),
-          getSettings().catch(() => ({})),
-          getAllPatients().catch(() => ({}))
+          getSettings().catch(() => ({}))
         ]);
         const usersList = Array.isArray(usersRes) ? usersRes : (usersRes.users || []);
         setDoctors(usersList.filter(u => u.rol === 'doctor' || u.rol === 'superadmin' || u.rol === 'administrador'));
         setServiceCatalog(settings.serviceCatalog || []);
-        const patientsList = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.patients ?? patientsRes ?? []);
-        setAllPatients(patientsList);
+        if (settings.defaultAppointmentDuration && !appointment) {
+          setDuracion(settings.defaultAppointmentDuration);
+        }
       } catch {
         setDoctors([]);
         setServiceCatalog([]);
-        setAllPatients([]);
       }
     };
     loadData();
-  }, [visible]);
+  }, [visible, appointment]);
 
-  // Reset state when modal opens
+  // Reset / preload state when modal opens
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+
+    if (appointment) {
+      // Modo edición: precargar desde la cita
+      setSelectedPatient(appointment.paciente_id || null);
+      setPatientQuery('');
+      setPatientResults([]);
+      setSelectedDoctor(appointment.doctor_id?._id || appointment.doctor_id || '');
+      setFechaHora(toLocalInput(appointment.fecha_hora));
+      setDuracion(appointment.duracion || 30);
+      setMotivo(appointment.motivo || '');
+      setComentario(appointment.comentarioProcedimiento || '');
+      setItems((appointment.items || []).map(i => ({
+        nombre: i.nombre,
+        cantidad: i.cantidad,
+        precioUnitario: i.precioUnitario
+      })));
+    } else {
+      // Modo creación
       setSelectedPatient(fixedPatient || null);
       setPatientQuery('');
       setPatientResults([]);
       setSelectedDoctor('');
       setFechaHora('');
+      setDuracion(30);
       setMotivo('');
       setComentario('');
       setItems([]);
-      setError('');
-      setSaving(false);
     }
-  }, [visible, fixedPatient]);
+    setError('');
+    setSaving(false);
+  }, [visible, fixedPatient, appointment]);
 
-  // Filter patients locally (instant, no extra API calls)
+  // Server-side patient search con debounce 250ms
   useEffect(() => {
-    if (!patientQuery || patientQuery.length < 2) {
+    if (selectedPatient || !patientQuery || patientQuery.length < 2) {
       setPatientResults([]);
+      setSearching(false);
       return;
     }
-    const q = patientQuery.toLowerCase().trim();
-    const filtered = allPatients.filter(p => {
-      const haystack = [
-        p.primer_nombre, p.otros_nombres,
-        p.apellido_paterno, p.apellido_materno
-      ].filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(q);
-    }).slice(0, 8);
-    setPatientResults(filtered);
-  }, [patientQuery, allPatients]);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await searchPatients(patientQuery, { limit: 8 });
+        setPatientResults(res);
+      } catch {
+        setPatientResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(searchTimer.current);
+  }, [patientQuery, selectedPatient]);
 
   const getPatientFullName = (p) => {
     if (!p) return '';
@@ -136,7 +182,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
     return sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0);
   }, 0);
 
-  // Helper: read Google access token stored by the calendar widget
+  // ── Google Calendar helpers (sólo en create por ahora) ──
   const getGoogleToken = () => {
     try {
       const raw = localStorage.getItem('accessToken');
@@ -150,15 +196,14 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
     }
   };
 
-  // Try to refresh an expired Google token
   const refreshGoogleToken = async () => {
     try {
       const raw = localStorage.getItem('accessToken');
       if (!raw || !raw.startsWith('{')) return null;
       const parsed = JSON.parse(raw);
       if (!parsed.refreshToken) return null;
-      const API = import.meta.env.VITE_API_URL || 'http://localhost:5002';
-      const res = await fetch(`${API}/api/google/refresh-token`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+      const res = await fetch(`${API_URL}/api/google/refresh-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: parsed.refreshToken }),
@@ -173,7 +218,19 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
     } catch { return null; }
   };
 
-  const handleCreate = async () => {
+  const syncToGoogle = async (gcalEvent) => {
+    let googleToken = getGoogleToken();
+    if (!googleToken) googleToken = await refreshGoogleToken();
+    if (!googleToken) return;
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+    fetch(`${API_URL}/api/google/calendar/events`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(gcalEvent),
+    }).catch(() => {});
+  };
+
+  const handleSave = async () => {
     setError('');
     if (!selectedPatient) return setError('Seleccione un paciente');
     if (!selectedDoctor) return setError('Seleccione un doctor');
@@ -182,10 +239,11 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
 
     setSaving(true);
     try {
-      await createAppointment({
+      const payload = {
         paciente_id: selectedPatient._id,
         doctor_id: selectedDoctor,
         fecha_hora: new Date(fechaHora).toISOString(),
+        duracion: Number(duracion) || 30,
         motivo: motivo.trim(),
         observaciones: '',
         comentarioProcedimiento: comentario.trim() || undefined,
@@ -193,20 +251,23 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
           nombre: i.nombre,
           cantidad: Number(i.cantidad),
           precioUnitario: Number(i.precioUnitario)
-        })) : undefined
-      });
+        })) : []
+      };
 
-      // Sync to Google Calendar if the user is authenticated with Google
-      let googleToken = getGoogleToken();
-      if (!googleToken) googleToken = await refreshGoogleToken();
-      if (googleToken) {
+      if (isEditing) {
+        await updateAppointment(appointment._id, payload);
+      } else {
+        await createAppointment(payload);
+
+        // Sólo sincronizamos a GCal en creación. El update bidireccional
+        // requiere guardar el googleEventId; queda como mejora futura.
         const patientName = getPatientFullName(selectedPatient);
         const doctorObj = doctors.find(d => d._id === selectedDoctor);
         const doctorName = doctorObj ? doctorObj.nombre : '';
         const start = new Date(fechaHora);
-        const end = new Date(start.getTime() + 60 * 60 * 1000); // default 1h duration
+        const end = new Date(start.getTime() + (Number(duracion) || 30) * 60_000);
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const gcalEvent = {
+        await syncToGoogle({
           summary: `Cita: ${patientName}${doctorName ? ` — Dr. ${doctorName}` : ''}`,
           description: [
             `Motivo: ${motivo.trim()}`,
@@ -215,19 +276,22 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
           start: { dateTime: start.toISOString(), timeZone },
           end: { dateTime: end.toISOString(), timeZone },
           calendarId: localStorage.getItem('google_selected_calendar') || 'primary',
-        };
-        // Fire-and-forget: don't block the UI if GCal sync fails
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5002'}/api/google/calendar/events`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(gcalEvent),
-        }).catch(() => {});
+        });
       }
 
       onCreated?.();
       onClose();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Error al crear la cita');
+      // Si vino conflicto (409), informar de la cita en conflicto
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      if (status === 409 && data?.conflict) {
+        const c = data.conflict;
+        const when = new Date(c.fecha_hora).toLocaleString('es-MX');
+        setError(`Conflicto: ${when} (${c.duracion} min) — ${c.motivo || 'otra cita'}`);
+      } else {
+        setError(data?.message || err?.message || 'Error al guardar la cita');
+      }
     } finally {
       setSaving(false);
     }
@@ -239,7 +303,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
     <div className="cam-overlay" onClick={onClose}>
       <div className="cam-modal" onClick={e => e.stopPropagation()}>
         <div className="cam-header">
-          <h2>Nueva Cita</h2>
+          <h2>{isEditing ? 'Editar Cita' : 'Nueva Cita'}</h2>
           <button className="cam-close-btn" onClick={onClose}>&times;</button>
         </div>
 
@@ -248,7 +312,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
           <div className="cam-section">
             <label className="cam-label">Paciente</label>
             {selectedPatient ? (
-              <div className={`cam-patient-card ${fixedPatient ? 'cam-patient-card--fixed' : ''}`}>
+              <div className={`cam-patient-card ${(fixedPatient || isEditing) ? 'cam-patient-card--fixed' : ''}`}>
                 <img
                   src={(selectedPatient.photoURL || selectedPatient.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${encodeURIComponent(selectedPatient.photoURL || selectedPatient.foto)}` : userNot}
                   alt={getPatientFullName(selectedPatient)}
@@ -262,7 +326,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
                   <strong>{getPatientFullName(selectedPatient)}</strong>
                   <span>{calculateAge(selectedPatient.fecha_nacimiento)} años</span>
                 </div>
-                {!fixedPatient && (
+                {!fixedPatient && !isEditing && (
                   <button className="cam-remove-btn" onClick={() => setSelectedPatient(null)}>&times;</button>
                 )}
               </div>
@@ -275,7 +339,10 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
                   value={patientQuery}
                   onChange={e => setPatientQuery(e.target.value)}
                 />
-                {patientQuery.length >= 2 && patientResults.length === 0 && <span className="cam-searching">Sin resultados</span>}
+                {searching && <span className="cam-searching">Buscando…</span>}
+                {!searching && patientQuery.length >= 2 && patientResults.length === 0 && (
+                  <span className="cam-searching">Sin resultados</span>
+                )}
                 {patientResults.length > 0 && (
                   <ul className="cam-search-results">
                     {patientResults.map(p => (
@@ -312,16 +379,30 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
             </select>
           </div>
 
-          {/* ── Fecha y Hora ── */}
-          <div className="cam-section">
-            <label className="cam-label">Fecha y Hora</label>
-            <input
-              type="datetime-local"
-              className="cam-input"
-              min={nowLocalISO}
-              value={fechaHora}
-              onChange={e => setFechaHora(e.target.value)}
-            />
+          {/* ── Fecha, Hora y Duración ── */}
+          <div className="cam-section cam-section--row">
+            <div className="cam-section cam-section--grow">
+              <label className="cam-label">Fecha y Hora</label>
+              <input
+                type="datetime-local"
+                className="cam-input"
+                min={isEditing ? undefined : nowLocalISO}
+                value={fechaHora}
+                onChange={e => setFechaHora(e.target.value)}
+              />
+            </div>
+            <div className="cam-section">
+              <label className="cam-label">Duración</label>
+              <select
+                className="cam-input"
+                value={duracion}
+                onChange={e => setDuracion(Number(e.target.value))}
+              >
+                {DURATION_PRESETS.map(d => (
+                  <option key={d} value={d}>{d} min</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* ── Motivo ── */}
@@ -429,8 +510,10 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
           <button className="cam-btn cam-btn--secondary" onClick={onClose} disabled={saving}>
             Cancelar
           </button>
-          <button className="cam-btn cam-btn--primary" onClick={handleCreate} disabled={saving}>
-            {saving ? 'Creando...' : 'Crear Cita'}
+          <button className="cam-btn cam-btn--primary" onClick={handleSave} disabled={saving}>
+            {saving
+              ? (isEditing ? 'Guardando...' : 'Creando...')
+              : (isEditing ? 'Guardar cambios' : 'Crear Cita')}
           </button>
         </div>
       </div>

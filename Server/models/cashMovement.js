@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
 
+// Audit trail de ediciones. `changes` guarda únicamente los campos modificados
+// con la forma { field: { from, to } } — al reproducir la cadena se reconstruye
+// el estado original (la "from" de la primera edición es el valor inicial).
+const cashMovementEditSchema = new mongoose.Schema({
+  editedAt: { type: Date, default: Date.now, required: true },
+  editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  reason: { type: String, required: true, trim: true, minlength: 3 },
+  changes: { type: mongoose.Schema.Types.Mixed, required: true }
+}, { _id: true });
+
 const cashMovementSchema = new mongoose.Schema({
   amount: {
     type: Number,
@@ -32,6 +42,15 @@ const cashMovementSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BoxSession'
   },
+  // Back-reference al cobro del paciente. Cuando viene de PatientCharge.addPayment
+  // queda ligado para impedir ediciones que rompan la integridad del cobro.
+  linkedChargeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PatientCharge',
+    default: null
+  },
+  // Historial de ediciones — sólo se anexa, nunca se modifica
+  edits: { type: [cashMovementEditSchema], default: [] },
   // Usuario que registró el movimiento
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -46,5 +65,10 @@ const cashMovementSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Índices para las queries calientes: balance/sesión, listado y por paciente
+cashMovementSchema.index({ boxSessionId: 1 });
+cashMovementSchema.index({ date: -1 });
+cashMovementSchema.index({ patientId: 1, date: -1 });
 
 module.exports = mongoose.model('CashMovement', cashMovementSchema);

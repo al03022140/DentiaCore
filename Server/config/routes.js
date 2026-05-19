@@ -13,6 +13,7 @@ const googleRoutes = require('../routes/googleRoutes');
 const settingsRoutes = require('../routes/settingsRoutes');
 const noteTemplateRoutes = require('../routes/noteTemplateRoutes');
 const patientChargeRoutes = require('../routes/patientChargeRoutes');
+const attachmentRoutes = require('../routes/attachmentRoutes');
 const auditRoutes = require('../routes/auditRoutes');
 const signingRoutes = require('../routes/signingRoutes');
 const authenticate = require('../middlewares/authenticate');
@@ -73,6 +74,9 @@ const configureRoutes = () => {
   router.use(validarCapturaExtemporanea);
 
   // Montar rutas protegidas - las subrutas se manejan dentro
+  // attachmentRoutes va ANTES de patientRoutes para que /:id/attachments
+  // tenga prioridad sobre los handlers genéricos /:id de patientRoutes.
+  router.use('/patients', attachmentRoutes);
   router.use('/patients', patientRoutes);
   router.use('/periodontograms', periodontogramRoutes);
   router.use('/cash', cashRoutes);

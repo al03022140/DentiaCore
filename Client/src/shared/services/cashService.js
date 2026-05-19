@@ -10,6 +10,11 @@ export const getMonthlyBalance = async () => {
   }
 };
 
+export const getSessionBalance = async () => {
+  const response = await API.get('/cash/session/balance');
+  return response.data;
+};
+
 export const getSessionStatus = async () => {
   const response = await API.get('/cash/session/status');
   return response.data;
@@ -32,5 +37,10 @@ export const addMovement = async (movementData) => {
 
 export const getLastMovements = async () => {
   const response = await API.get('/cash/movements');
+  return response.data;
+};
+
+export const updateMovement = async (movementId, payload) => {
+  const response = await API.put(`/cash/movements/${encodeURIComponent(movementId)}`, payload);
   return response.data;
 };

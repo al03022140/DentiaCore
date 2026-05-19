@@ -258,7 +258,14 @@ const PeriodontogramSchema = new mongoose.Schema({
     index: true,
     unique: true // Un periodontograma por paciente
   },
-  
+  // Cita en la que se generó/modificó el periodontograma (opcional, auditoría)
+  appointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Appointment',
+    default: null,
+    index: true
+  },
+
   // Datos iniciales del periodontograma
   initial: {
     // Metadatos de la sesión

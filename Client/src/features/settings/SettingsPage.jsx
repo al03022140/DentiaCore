@@ -91,30 +91,30 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-page">
-      <div className="settings-title-strip">
-        <h2 className="settings-title">Configuración</h2>
-      </div>
-      <div className="settings-list">
-        {visibleSections.map((s) => (
-          <button
-            key={s.id}
-            className="settings-row"
-            onClick={() => navigate(`/configuracion/${s.id}`)}
-          >
-            <span className="settings-row-icon">{s.icon}</span>
-            <span className="settings-row-info">
-              <span className="settings-row-name">{s.name}</span>
-              <span className="settings-row-desc">{s.desc}</span>
-            </span>
-            {s.roles && (
-              <span className="settings-row-badge">
-                {s.roles.includes('doctor') && !s.roles.includes('administrador') ? 'Doctor' : 'Admin'}
+      <section className="settings-card" aria-labelledby="settings-page-title">
+        <h2 id="settings-page-title" className="settings-title">Configuración</h2>
+        <div className="settings-list">
+          {visibleSections.map((s) => (
+            <button
+              key={s.id}
+              className="settings-row"
+              onClick={() => navigate(`/configuracion/${s.id}`)}
+            >
+              <span className="settings-row-icon">{s.icon}</span>
+              <span className="settings-row-info">
+                <span className="settings-row-name">{s.name}</span>
+                <span className="settings-row-desc">{s.desc}</span>
               </span>
-            )}
-            <span className="settings-row-arrow">›</span>
-          </button>
-        ))}
-      </div>
+              {s.roles && (
+                <span className="settings-row-badge">
+                  {s.roles.includes('doctor') && !s.roles.includes('administrador') ? 'Doctor' : 'Admin'}
+                </span>
+              )}
+              <span className="settings-row-arrow">›</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

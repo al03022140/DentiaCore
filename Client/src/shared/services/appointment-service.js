@@ -41,3 +41,41 @@ export const deleteAppointment = async (id, motivo) => {
   invalidateTodayAppointmentsCache();
   return data;
 };
+
+// PATCH /appointments/:id/status — transición ligera con audit
+export const updateAppointmentStatus = async (id, { estado, motivo } = {}) => {
+  const { data } = await API.patch(
+    `/appointments/${encodeURIComponent(id)}/status`,
+    { estado, motivo }
+  );
+  invalidateTodayAppointmentsCache();
+  return data;
+};
+
+// GET /appointments con filtros (rango, doctor, estado)
+export const getAppointmentsByRange = async ({ from, to, doctorId, estado, limit, offset } = {}) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from instanceof Date ? from.toISOString() : from);
+  if (to) params.set('to', to instanceof Date ? to.toISOString() : to);
+  if (doctorId) params.set('doctor_id', doctorId);
+  if (estado) params.set('estado', estado);
+  if (limit) params.set('limit', String(limit));
+  if (offset) params.set('offset', String(offset));
+  const qs = params.toString();
+  const { data } = await API.get(`/appointments${qs ? `?${qs}` : ''}`);
+  return data;
+};
+
+// GET /patients/search?q=
+export const searchPatients = async (q, { limit = 10 } = {}) => {
+  if (!q || q.length < 2) return [];
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const { data } = await API.get(`/patients/search?${params}`);
+  return data?.patients || [];
+};
+
+// GET /appointments/:id/activity — toda la actividad clínica + cobro ligada a una cita
+export const getAppointmentActivity = async (appointmentId) => {
+  const { data } = await API.get(`/appointments/${encodeURIComponent(appointmentId)}/activity`);
+  return data;
+};

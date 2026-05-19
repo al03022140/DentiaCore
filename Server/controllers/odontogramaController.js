@@ -4,6 +4,7 @@ const {
   UnsupportedMediaTypeError,
   normalizeEntry
 } = require('../helpers/odontograma');
+const mongoose = require('mongoose');
 const OdontogramaModel = require('../models/odontograma');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 
@@ -150,7 +151,16 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       fecha: savedAt
     }));
 
-    const snapshot = { imageUrl: '', datos, savedAt };
+    const appointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
+      ? req.body.appointmentId
+      : null;
+    const snapshot = {
+      imageUrl: '',
+      datos,
+      savedAt,
+      appointmentId,
+      savedBy: req.user?.id || null
+    };
 
     // Asistente con sólo `odontogram.write.draft` → guarda como BORRADOR.
     const userPerms = getEffectivePermissions(req.user);
@@ -324,10 +334,15 @@ const agregarHistorialInicial = async (req, res, next) => {
       note: e.note,
       fecha: savedAt
     }));
+    const snapshotAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
+      ? req.body.appointmentId
+      : null;
     const snapshot = {
       imageUrl: odontograma.current.imageUrl,
       datos: entries,
-      savedAt
+      savedAt,
+      appointmentId: snapshotAppointmentId,
+      savedBy: req.user?.id || null
     };
 
     const updated = await OdontogramaModel.findOneAndUpdate(
@@ -481,10 +496,15 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             };
         });
 
+        const clinicAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
+            ? req.body.appointmentId
+            : null;
         const snapshot = {
             datos: entries,
             imageUrl: '',
-            savedAt
+            savedAt,
+            appointmentId: clinicAppointmentId,
+            savedBy: req.user?.id || null
         };
 
         const patientId = req.patient?.id || req.patient?._id;

@@ -230,14 +230,22 @@ exports.createInitialPeriodontogram = async (req, res) => {
       const validUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
       const newPeriodontogram = await Periodontogram.createInitial(id, validUserId);
 
+      const reqAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
+        ? req.body.appointmentId
+        : null;
       await PeriodontogramHistory.create({
         patient: newPeriodontogram.patient,
         periodontogram: newPeriodontogram._id,
         versionName: newPeriodontogram.current.versionName,
         teeth: mapTeethToPlain(newPeriodontogram.current.teeth),
         statistics: statisticsToPlain(newPeriodontogram.current.statistics),
+        appointmentId: reqAppointmentId,
         createdBy: validUserId
       });
+      if (reqAppointmentId) {
+        newPeriodontogram.appointmentId = reqAppointmentId;
+        await newPeriodontogram.save();
+      }
       
 
       
@@ -680,6 +688,9 @@ exports.savePeriodontogramData = [
       const plainTeethPreSave = mapTeethToPlain(periodontogram.current.teeth);
       const plainStatisticsPreSave = statisticsToPlain(periodontogram.current.statistics);
 
+      const saveAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
+        ? req.body.appointmentId
+        : null;
       try {
         await PeriodontogramHistory.create({
           patient: periodontogram.patient,
@@ -687,8 +698,12 @@ exports.savePeriodontogramData = [
           versionName,
           teeth: plainTeethPreSave,
           statistics: plainStatisticsPreSave,
+          appointmentId: saveAppointmentId,
           createdBy: validUserId
         });
+        if (saveAppointmentId) {
+          periodontogram.appointmentId = saveAppointmentId;
+        }
       } catch (historyError) {
         // E11000 = versionName duplicado en historial
         if (historyError.code === 11000) {

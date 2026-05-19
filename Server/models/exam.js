@@ -11,6 +11,13 @@ const examSchema = new mongoose.Schema({
         ref: 'Usuario', // 🔹 Relacionado con el doctor que lo solicitó
         required: true
     },
+    // Cita en la que se generó este registro (opcional, para auditoría)
+    appointmentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Appointment',
+        default: null,
+        index: true
+    },
     tipo_examen: {
         type: String,
         enum: ["Radiografía", "Tomografía", "Resonancia", "Ultrasonido", "Análisis de sangre", "Otro"],

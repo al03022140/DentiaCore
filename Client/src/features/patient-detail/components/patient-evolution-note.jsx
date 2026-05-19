@@ -4,6 +4,7 @@ import API from '../../../shared/services/axios-instance.js';
 import SignatureBadge from '../../../shared/components/SignatureBadge.jsx';
 import SignatureModal from '../../../shared/components/SignatureModal.jsx';
 import { useAuth } from '../../../app/auth/AuthContext.jsx';
+import { useCurrentAppointment } from '../../../shared/contexts/AppointmentContext.jsx';
 import '../styles/patient-evolution-note.css';
 
 const PatientEvolutionNote = ({
@@ -14,6 +15,7 @@ const PatientEvolutionNote = ({
   hideForm = false,
 }) => {
   const { user } = useAuth();
+  const { appointmentId } = useCurrentAppointment();
   const canSign = user?.role === 'doctor' || user?.role === 'superadmin';
   const [procedimiento, setProcedimiento] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -63,6 +65,7 @@ const PatientEvolutionNote = ({
         procedimiento: procedimiento.trim(),
         observaciones: observaciones.trim(),
         correcciones: correcciones.trim(),
+        ...(appointmentId ? { appointmentId } : {}),
       };
       const response = await API.post(`/patients/${patientId}/evolution-note`, { evolutionNote });
       const payload = response?.data;

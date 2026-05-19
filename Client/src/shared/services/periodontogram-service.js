@@ -228,16 +228,20 @@ class PeriodontogramService {
     }
   }
 
-  static async saveData(patientId, periodontogramData) {
+  static async saveData(patientId, periodontogramData, options = {}) {
     try {
       console.log('💾 Guardando datos JSON del periodontograma:', {
         patientId,
         versionName: periodontogramData?.versionName
       });
 
+      const body = options.appointmentId
+        ? { ...periodontogramData, appointmentId: options.appointmentId }
+        : periodontogramData;
+
       const response = await API.put(
         `/patients/${patientId}/periodontogram/data`,
-        periodontogramData,
+        body,
         {
           timeout: DEFAULT_TIMEOUT
         }

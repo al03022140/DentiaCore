@@ -468,6 +468,8 @@ const PatientSchema = new mongoose.Schema({
             type: String,
             required: false
         },
+        // Cita en la que se generó (opcional, auditoría / línea de tiempo)
+        appointmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment', default: null, index: true },
         // ── Campos de auditoría (roles.MD §4.7, §5) ──────────────────
         estadoRegistro: {
             type: String,
@@ -502,6 +504,8 @@ const PatientSchema = new mongoose.Schema({
         correcciones: { type: String, default: "", trim: true },
         fecha: { type: Date, required: true, default: Date.now },
         fechaFormateada: { type: String, required: false },
+        // Cita en la que se generó (opcional, auditoría / línea de tiempo)
+        appointmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment', default: null, index: true },
         // ── Campos de auditoría (roles.MD §4.7, §5) ──────────────────
         estadoRegistro: {
             type: String,

@@ -68,6 +68,9 @@ const historyEntrySchema = new Schema({
   // imageUrl es opcional: el inicial guarda PNG del canvas, el clínico no tiene imagen.
   imageUrl: { type: String, default: '' },
   savedAt:  { type: Date, default: () => new Date() },
+  // Cita en la que se generó este snapshot (opcional, auditoría / línea de tiempo)
+  appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointment', default: null, index: true },
+  savedBy: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
   deleteReason: { type: String, default: null }
@@ -130,12 +133,17 @@ const historyEntrySchema = new Schema({
  */
 const odontogramaSchema = new Schema({
   patientId: { type: Types.ObjectId, ref: 'Patient', required: true, index: true },
+  // Cita en la que se generó/modificó el odontograma (opcional, auditoría)
+  appointmentId: { type: Types.ObjectId, ref: 'Appointment', default: null, index: true },
   type:      { type: String, enum: ['initial', 'clinic'], required: true }, // Coincide con TYPE_INITIAL y TYPE_CLINIC
   current: {
     // imageUrl es opcional: el inicial guarda PNG del canvas, el clínico no tiene imagen.
     imageUrl: { type: String, default: '' },
     datos:    { type: [entrySchema], default: [] }, // Unificado a 'datos'
-    savedAt:  { type: Date, default: () => new Date() }
+    savedAt:  { type: Date, default: () => new Date() },
+    // Cita en la que se actualizó por última vez (opcional)
+    appointmentId: { type: Types.ObjectId, ref: 'Appointment', default: null },
+    savedBy: { type: Types.ObjectId, ref: 'Usuario', default: null }
   },
   history: { type: [historyEntrySchema], default: [] },
 

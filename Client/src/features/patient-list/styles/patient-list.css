@@ -19,11 +19,11 @@
   width: 100%;
 }
 
+/* Padding horizontal = 0 — .content (24px) ya provee el margen exterior,
+   igual que .home y .settings-page (evitar el "doble padding"). */
 .patient-list-wrapper .patient-list-container {
   overflow: visible;
-  padding: var(--figma-space-lg) var(--figma-space-2xl);
-  padding-top: var(--figma-space-xs);
-  padding-bottom: 5.5rem;
+  padding: var(--figma-space-xs) 0 5.5rem 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -462,8 +462,7 @@
 
 @media (max-width: 768px) {
   .patient-list-wrapper .patient-list-container {
-    padding: var(--figma-space-md);
-    padding-bottom: 5rem;
+    padding: var(--figma-space-xs) 0 5rem 0;
   }
   .patient-list-wrapper .search-input {
     width: 100%;

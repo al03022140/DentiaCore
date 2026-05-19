@@ -1,18 +1,25 @@
-/* Centro de Firmas Pendientes — Notificación flotante — roles.MD §9.4 */
+/* ==============================================================
+   DraftsCenter — Sistema de diseño DentiaCore v1
+   Notificación flotante para firmas pendientes (roles.MD §9.4).
+   ============================================================== */
 
-/* ── Notificación flotante ── */
 .drafts-notification {
+  --drafts-brand-tint: rgba(8, 72, 136, 0.08);
+  --drafts-brand-cta-shadow: 0 4px 8px rgba(8, 72, 136, 0.30);
+
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9000;
   width: 380px;
   max-width: calc(100vw - 2rem);
-  background: var(--color-bg-white, #fff);
-  border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--color-border-light, #e8e8e8);
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg); /* 14px */
+  box-shadow: var(--figma-shadow-elevated);
+  border: 1px solid var(--figma-border-default);
   overflow: hidden;
+  font-family: var(--font-family-primary);
+  color: var(--figma-text-primary);
   animation: drafts-slide-in 0.3s ease-out;
 }
 
@@ -21,187 +28,253 @@
   to   { transform: translateX(0);    opacity: 1; }
 }
 
+/* ── Header ── */
 .drafts-notification-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.9rem;
   cursor: pointer;
   gap: 0.75rem;
   user-select: none;
+  transition: background var(--figma-transition-fast);
+}
+
+.drafts-notification-header:hover {
+  background: var(--drafts-brand-tint);
 }
 
 .drafts-notification-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--color-text-primary, #2c3e50);
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--figma-text-primary);
+  min-width: 0;
+}
+
+.drafts-notification-title strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .drafts-notif-icon {
-  font-size: 1.2rem;
-  color: var(--color-warning, #f39c12);
+  font-size: 1.1rem;
+  color: var(--color-warning);
+  flex-shrink: 0;
 }
 
 .drafts-notif-icon--ok {
-  color: var(--color-success, #27ae60);
+  color: var(--color-green-700);
 }
 
 .drafts-notification-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-shrink: 0;
 }
 
 .drafts-btn-batch-mini {
-  background: var(--color-primary, #084888);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
   border: none;
-  border-radius: 5px;
-  padding: 0.3rem 0.65rem;
-  font-size: 0.78rem;
+  border-radius: var(--figma-radius-sm);
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   white-space: nowrap;
+  transition: all var(--figma-transition-fast);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .drafts-btn-batch-mini:hover:not(:disabled) {
-  background: var(--color-primary-hover, #025db8);
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--drafts-brand-cta-shadow);
 }
 
 .drafts-notification-close {
-  background: none;
+  background: transparent;
   border: none;
-  font-size: 1.3rem;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--figma-radius-full);
+  font-size: 1.1rem;
   line-height: 1;
-  color: var(--color-text-muted, #7f8c8d);
+  color: var(--figma-text-secondary);
   cursor: pointer;
-  padding: 0 0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background var(--figma-transition-fast), color var(--figma-transition-fast);
 }
 
 .drafts-notification-close:hover {
-  color: var(--color-danger, #e74c3c);
+  background: rgba(229, 62, 62, 0.10);
+  color: var(--color-red-550);
 }
 
 /* ── Cuerpo expandible ── */
 .drafts-notification-body {
-  border-top: 1px solid var(--color-border-light, #e8e8e8);
-  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--figma-border-default);
+  padding: 0.75rem 0.9rem 0.9rem;
   max-height: 50vh;
   overflow-y: auto;
+  background: var(--figma-bg-page);
 }
 
-/* ── Mensajes ── */
+/* ── Mensajes (success / error) ── */
 .drafts-success {
-  background: var(--color-success-100);
-  color: var(--color-success, #27ae60);
-  padding: 0.4rem 1rem;
-  font-size: 0.85rem;
+  background: rgba(76, 175, 80, 0.10);
+  color: var(--color-green-800);
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  border-top: 1px solid var(--figma-border-default);
 }
 
 .drafts-error {
-  background: var(--color-danger-100);
-  color: var(--color-danger, #e74c3c);
-  padding: 0.4rem 1rem;
-  font-size: 0.85rem;
+  background: rgba(229, 62, 62, 0.08);
+  color: var(--color-red-600);
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  border-top: 1px solid var(--figma-border-default);
 }
 
-/* ── Botón firmar todas (dentro del body) ── */
+/* ── Botón "Firmar todas" dentro del body ── */
 .drafts-btn-batch {
-  background: var(--color-primary, #084888);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
   border: none;
-  border-radius: 6px;
-  padding: 0.45rem 0.9rem;
+  border-radius: var(--figma-radius-sm);
+  padding: 0.5rem 1rem;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
   width: 100%;
   margin-bottom: 0.75rem;
-  transition: background 0.2s;
+  transition:
+    background var(--figma-transition-fast),
+    transform var(--figma-transition-fast),
+    box-shadow var(--figma-transition-fast);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .drafts-btn-batch:hover:not(:disabled) {
-  background: var(--color-primary-hover, #025db8);
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--drafts-brand-cta-shadow);
 }
 
 /* ── Lista de borradores ── */
 .drafts-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.55rem;
 }
 
 .draft-card {
-  background: var(--color-bg-light, #f9fafb);
-  border: 1px solid var(--color-border-light, #e8e8e8);
-  border-left: 3px solid var(--color-warning, #f39c12);
-  border-radius: 6px;
+  background: var(--figma-bg-card);
+  border: 1px solid var(--figma-border-default);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--figma-radius-md); /* 10px list item */
   padding: 0.6rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
+  transition: box-shadow var(--figma-transition-fast);
+}
+
+.draft-card:hover {
+  box-shadow: var(--figma-shadow-card);
 }
 
 .draft-card-type {
-  background: var(--color-blue-500-12);
-  color: var(--color-primary, #084888);
-  padding: 0.15rem 0.5rem;
-  border-radius: 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  background: var(--drafts-brand-tint);
+  color: var(--color-primary);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--figma-radius-full);
+  font-family: var(--font-family-primary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
   align-self: flex-start;
 }
 
 .draft-card-info {
-  font-size: 0.82rem;
-  color: var(--color-text-primary, #2c3e50);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-primary);
+  line-height: 1.4;
 }
 
 .draft-card-label {
-  color: var(--color-text-muted, #7f8c8d);
-  font-size: 0.75rem;
+  color: var(--figma-text-secondary);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
 }
 
 .draft-card-date {
-  color: var(--color-text-muted, #7f8c8d);
-  font-size: 0.75rem;
+  color: var(--figma-text-secondary);
+  font-family: var(--font-family-primary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .draft-card-actions {
   display: flex;
   gap: 0.4rem;
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
 }
 
+/* Firmar — verde saturado (estado OK / confirmación) */
 .drafts-btn-sign {
-  background: var(--color-success, #27ae60);
-  color: #fff;
+  background: var(--color-green-700);
+  color: var(--figma-text-on-dark);
   border: none;
-  border-radius: 5px;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.78rem;
+  border-radius: var(--figma-radius-sm);
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all var(--figma-transition-fast);
 }
 
 .drafts-btn-sign:hover:not(:disabled) {
   background: var(--color-green-600);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(76, 175, 80, 0.30);
 }
 
+/* Rechazar — outline rojo */
 .drafts-btn-reject {
   background: transparent;
-  color: var(--color-danger, #e74c3c);
-  border: 1px solid var(--color-danger, #e74c3c);
-  border-radius: 5px;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.78rem;
+  color: var(--color-red-550);
+  border: 1.5px solid var(--color-red-550);
+  border-radius: var(--figma-radius-sm);
+  padding: 0.25rem 0.7rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--figma-transition-fast);
 }
 
 .drafts-btn-reject:hover:not(:disabled) {
-  background: var(--color-danger-100);
+  background: var(--color-red-550);
+  color: var(--figma-text-on-dark);
+  transform: translateY(-1px);
 }
 
 /* ── PIN Modal ── */
@@ -212,87 +285,124 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.40);
+  backdrop-filter: blur(2px);
+  animation: drafts-pin-overlay-in 0.2s ease;
+}
+
+@keyframes drafts-pin-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .drafts-pin-modal {
-  background: var(--color-bg-white, #fff);
-  border-radius: 12px;
-  padding: 2rem;
+  background: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg);
+  padding: 1.75rem 1.5rem 1.5rem;
   width: 340px;
   max-width: 90vw;
   text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--figma-shadow-elevated);
+  font-family: var(--font-family-primary);
+  animation: drafts-pin-modal-in 0.2s ease;
+}
+
+@keyframes drafts-pin-modal-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .drafts-pin-modal h3 {
-  margin: 0 0 0.25rem;
-  color: var(--color-text-primary, #2c3e50);
+  margin: 0 0 0.35rem;
+  font-family: var(--font-family-primary);
+  font-size: 1.125rem; /* 18px */
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
 }
 
 .drafts-pin-modal p {
-  color: var(--color-text-muted, #7f8c8d);
-  font-size: 0.9rem;
+  color: var(--figma-text-secondary);
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
   margin: 0 0 1rem;
+  line-height: 1.45;
 }
 
 .drafts-pin-input {
   text-align: center;
-  font-size: 1.75rem;
+  font-family: var(--font-family-primary);
+  font-size: 1.65rem;
   letter-spacing: 0.75rem;
-  padding: 0.5rem;
-  border: 2px solid var(--color-border-light, #e8e8e8);
-  border-radius: 8px;
+  padding: 0.55rem;
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
   outline: none;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.2s;
+  transition: border-color var(--figma-transition-fast), box-shadow var(--figma-transition-fast);
 }
 
 .drafts-pin-input:focus {
-  border-color: var(--color-primary, #084888);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(8, 72, 136, 0.10);
 }
 
 .drafts-pin-error {
-  color: var(--color-danger, #e74c3c);
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
+  color: var(--color-red-550);
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  margin: 0.55rem 0 0;
 }
 
 .drafts-pin-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.65rem;
   margin-top: 1rem;
 }
 
 .drafts-btn-cancel {
   flex: 1;
-  background: transparent;
-  border: 1px solid var(--color-border-medium, #ccc);
-  border-radius: 8px;
-  padding: 0.6rem;
+  background: var(--figma-bg-card);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
+  padding: 0.55rem;
   cursor: pointer;
-  color: var(--color-text-secondary, #555);
-  font-size: 0.95rem;
+  color: var(--figma-text-secondary);
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--figma-transition-fast);
+}
+
+.drafts-btn-cancel:hover {
+  background: var(--figma-bg-input);
+  color: var(--figma-text-primary);
 }
 
 .drafts-btn-confirm {
   flex: 1;
-  background: var(--color-primary, #084888);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--figma-text-on-dark);
   border: none;
-  border-radius: 8px;
-  padding: 0.6rem;
+  border-radius: var(--figma-radius-sm);
+  padding: 0.55rem;
   cursor: pointer;
-  font-size: 0.95rem;
-  transition: background 0.2s;
+  font-family: var(--font-family-primary);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--figma-transition-fast);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
 .drafts-btn-confirm:hover:not(:disabled) {
-  background: var(--color-primary-hover, #025db8);
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.30);
 }
 
 .drafts-btn-confirm:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
 }

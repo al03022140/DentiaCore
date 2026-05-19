@@ -64,11 +64,15 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
           {charges.map((charge) => {
             const patient = charge.patientId;
             const patientName = patient
-              ? `${patient.nombre || ''} ${patient.apellidos || ''}`.trim()
+              ? [patient.primer_nombre, patient.otros_nombres, patient.apellido_paterno, patient.apellido_materno]
+                  .filter(Boolean)
+                  .join(' ')
+                  .trim() || 'Paciente sin nombre'
               : 'Paciente desconocido';
             const age = patient ? calculateAge(patient.fecha_nacimiento) : null;
-            const photoUrl = patient?.foto
-              ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${patient.foto}`
+            const photo = patient?.photoURL || patient?.foto;
+            const photoUrl = photo
+              ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${encodeURIComponent(photo)}`
               : null;
             const appt = charge.appointmentId;
 

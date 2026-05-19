@@ -16,6 +16,7 @@ const Periodontogram = require('../models/periodontogram');
 const Exam = require('../models/exam');
 const Usuario = require('../models/users');
 const auditLogger = require('../middlewares/auditLogger');
+const { normalizeRole, isAdminRole } = require('../utils/permissions');
 
 // Mapa de modelos clínicos que soportan borradores
 const DRAFT_MODELS = {
@@ -37,9 +38,23 @@ function resolveModel(resourceType) {
 const listDrafts = async (req, res) => {
   try {
     const drafts = [];
+    const role = normalizeRole(req.user?.role);
+    const isAdmin = isAdminRole(role);
+    const userId = req.user?.id || null;
 
     for (const [type, { model, fieldName }] of Object.entries(DRAFT_MODELS)) {
       const filter = { [fieldName]: 'BORRADOR' };
+      // Soft-delete: omitir documentos eliminados si el modelo lo soporta.
+      const schemaPaths = model.schema?.paths || {};
+      if (schemaPaths.deletedAt) filter.deletedAt = null;
+
+      // Filtrar por doctor para usuarios no-administradores: sólo los borradores
+      // creados por el doctor autenticado (sus pacientes asignados).
+      // El admin/superadmin ve todos.
+      if (!isAdmin && userId) {
+        filter.creadoPor = userId;
+      }
+
       const docs = await model.find(filter)
         .sort({ createdAt: -1 })
         .limit(100)
@@ -50,6 +65,7 @@ const listDrafts = async (req, res) => {
           _id: doc._id,
           resourceType: type,
           patientId: doc.patientId || doc.paciente_id || doc.patient || null,
+          appointmentId: doc.appointmentId || null,
           creadoPor: doc.creadoPor || null,
           createdAt: doc.createdAt,
           resumen: doc.nombre || doc.type || type,

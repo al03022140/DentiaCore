@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
+import { SETTINGS_UPDATED_EVENT } from '../../../shared/components/LockScreen';
 
 const SecuritySection = () => {
   const [inactivityTimeout, setInactivityTimeout] = useState(15);
@@ -25,11 +26,14 @@ const SecuritySection = () => {
     setSaving(true);
     setMsg(null);
     try {
-      await updateSettings({
+      const payload = {
         inactivityTimeout: Number(inactivityTimeout),
         maxLoginAttempts: Number(maxLoginAttempts),
         lockDuration: Number(lockDuration),
-      });
+      };
+      await updateSettings(payload);
+      // Avisar al LockScreen para que aplique el nuevo timeout sin recargar
+      window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: payload }));
       setMsg({ type: 'success', text: 'Configuración de seguridad actualizada' });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });
@@ -44,9 +48,12 @@ const SecuritySection = () => {
     <form onSubmit={handleSave}>
       {msg && <div className={`settings-message ${msg.type}`}>{msg.text}</div>}
       <div className="settings-form-group">
-        <label>Tiempo de inactividad antes de bloqueo (minutos)</label>
+        <label>Tiempo antes de cerrar sesión por inactividad (minutos)</label>
         <input type="number" min={1} max={120} value={inactivityTimeout} onChange={(e) => setInactivityTimeout(e.target.value)} />
-        <span className="hint">Se bloqueará la sesión tras este tiempo sin actividad</span>
+        <span className="hint">
+          Tras este tiempo sin mouse, teclado ni scroll se bloqueará la sesión y se pedirá el PIN.
+          Tras {maxLoginAttempts} intentos fallidos de PIN se cierra sesión por completo.
+        </span>
       </div>
       <div className="settings-form-group">
         <label>Intentos máximos de inicio de sesión</label>
