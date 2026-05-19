@@ -865,6 +865,14 @@
   ========================= */
 .patient-detail-tabs {
   margin-top: var(--spacing-lg);
+  /* CRITICAL: Ant Design aplica `overflow: hidden` al .ant-tabs por defecto.
+     Eso convierte a .ant-tabs en el ancestro scrolleable mas cercano del
+     .ant-tabs-nav (sticky), y como .ant-tabs no scrollea visiblemente, el
+     nav se queda anclado a su posicion natural relativa a .ant-tabs en vez
+     de flotar arriba en .content. Forzando overflow: visible aqui hacemos
+     que sticky busque a .content como ancestro scrolleable y la barra
+     flote correctamente al tope. */
+  overflow: visible !important;
 }
 
 /* La barra de pestañas SIEMPRE queda visible flotando: se pega al tope del
@@ -883,15 +891,17 @@
   padding-bottom: var(--spacing-md);
 }
 
-/* Escudo de color: cubre laterales y el pequeño gap inferior sin tocar
-   el contenido que hay encima (no sube del borde superior de la barra) */
+/* Escudo de color: cubre laterales y un poco hacia abajo (gap del margin).
+   NO extiende hacia arriba: cubrir arriba afectaria al contenido cuando la
+   barra aun no esta pinned (PatientInfoHeader quedaria tapado). El hueco
+   superior se resuelve haciendo snap del header global (sin transition)
+   para que sticky no quede desincronizado — ver header.css. */
 .patient-detail-tabs .ant-tabs-nav::before {
   content: '';
   position: absolute;
   top: 0;
   left: -9999px;
   right: -9999px;
-  /* Extiende unos píxeles más abajo del borde para tapar el gap del margin */
   bottom: -12px;
   background: var(--figma-bg-page, var(--color-bg-light));
   z-index: -1;

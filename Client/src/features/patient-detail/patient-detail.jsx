@@ -163,10 +163,18 @@ const PatientDetail = () => {
 
   useEffect(() => {
     const TOP_THRESHOLD = 80;
-    const DELTA = 6;
+    // Umbrales de delta ACUMULADO en una direccion antes de toggle. Acumular
+    // permite que scroll lento (trackpad por inercia, 1-2px por frame) sume
+    // hasta el umbral y dispare, mientras filtra micro-jitter / rubber-band
+    // bouncing al final de la pagina que se gatillaba con cada pixel.
+    const DOWN_THRESHOLD = 40; // bajar 40px acumulados -> esconder
+    const UP_THRESHOLD = 40;   // subir 40px acumulados -> mostrar
 
-    let lastY = window.scrollY || 0;
+    let lastY = 0;
+    let accumDown = 0;
+    let accumUp = 0;
     let ticking = false;
+    let initialized = false;
 
     const readY = (eventTarget) => {
       if (!eventTarget || eventTarget === window || eventTarget === document) {
@@ -187,12 +195,37 @@ const PatientDetail = () => {
       ticking = true;
       window.requestAnimationFrame(() => {
         const y = readY(t);
+        if (!initialized) {
+          // Primera lectura: sincroniza lastY con la posicion real para
+          // evitar un disparo espurio en el primer scroll.
+          lastY = y;
+          initialized = true;
+          ticking = false;
+          return;
+        }
+        const dy = y - lastY;
+
         if (y <= TOP_THRESHOLD) {
+          // Cerca del tope: header siempre visible, resetea acumuladores.
           setIsAppHeaderHidden(false);
-        } else if (y - lastY > DELTA) {
-          setIsAppHeaderHidden(true);
-        } else if (lastY - y > DELTA) {
-          setIsAppHeaderHidden(false);
+          accumDown = 0;
+          accumUp = 0;
+        } else if (dy > 0) {
+          // Bajando: acumula y resetea el opuesto.
+          accumDown += dy;
+          accumUp = 0;
+          if (accumDown > DOWN_THRESHOLD) {
+            setIsAppHeaderHidden(true);
+            accumDown = 0;
+          }
+        } else if (dy < 0) {
+          // Subiendo: acumula y resetea el opuesto.
+          accumUp += -dy;
+          accumDown = 0;
+          if (accumUp > UP_THRESHOLD) {
+            setIsAppHeaderHidden(false);
+            accumUp = 0;
+          }
         }
         lastY = y;
         ticking = false;

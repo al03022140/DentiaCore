@@ -14,16 +14,21 @@
   z-index: 100;
   flex-shrink: 0;
   overflow: hidden;
-  transition: height 0.25s ease, border-color 0.25s ease, opacity 0.2s ease;
+  /* Opacity transition para suavizar el fade. La height NO transiciona —
+     ver explicacion en la regla de auto-hide debajo. */
+  transition: opacity 0.18s ease, border-color 0.18s ease;
 }
 
 /* Auto-hide del header SÓLO en la página de detalle de paciente. La página
    marca <body data-pd-app-header-hidden="true"> al scrollear hacia abajo
    (ver patient-detail.jsx); el header colapsa su altura a 0 y, como el
    contenedor `.main` es flex column con `.content` flex:1, `.content` ocupa
-   la altura liberada. La barra de pestañas (sticky top:0 dentro de
-   `.content`) sube con él. Sin los atributos del body el header se
-   comporta normal en el resto de la app. */
+   la altura liberada.
+   IMPORTANTE: la `height` NO se transiciona (snap instantaneo). Si lo
+   hiciera, `position: sticky` de la barra de pestañas no se re-pinta
+   durante la animacion (sticky solo recalcula con eventos de scroll), y
+   queda un hueco visible entre la barra y el tope del viewport mientras
+   dura la transicion. Snap evita el hueco. */
 body[data-pd-app-header-hidden="true"] .header {
   height: 0;
   border-bottom-color: transparent;
