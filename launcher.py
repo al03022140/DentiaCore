@@ -559,6 +559,9 @@ class DentiaCoreLauncher:
                 target_url = env.get('PUBLIC_URL', 'http://localhost:5002')
                 self.is_server_running = self._wait_for_server_ready(target_url, timeout=30)
                 self.is_client_running = False
+                if self.is_server_running:
+                    # En LAN, el server sirve el cliente buildeado en el mismo puerto
+                    self.root.after(500, lambda: self._auto_open_browser(target_url))
                 if not self.is_server_running:
                     self.root.after(0, lambda: messagebox.showerror(
                         "Servidor no disponible",
@@ -606,6 +609,8 @@ class DentiaCoreLauncher:
                     time.sleep(5)
                     self.is_client_running = True
                     print("✅ Aplicación iniciada correctamente")
+                    # Auto-abrir el browser para que el usuario no tenga que clickear
+                    self.root.after(500, lambda: self._auto_open_browser('http://localhost:5173'))
                 else:
                     self.is_client_running = False
                     # Si el servidor no inicia, mostrar error específico
@@ -1293,6 +1298,14 @@ class DentiaCoreLauncher:
             return
 
         webbrowser.open(target_url)
+
+    def _auto_open_browser(self, url):
+        """Auto-abre el browser tras un arranque exitoso. Silencioso si falla."""
+        try:
+            print(f"🌐 Abriendo navegador en {url}")
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}")
             
     def clear_patients(self):
         """Limpiar todos los pacientes"""
@@ -1369,140 +1382,154 @@ class DentiaCoreLauncher:
                 print("⚠️ Se detectó proceso mongod pero no respondió en 27017. Reintentando arranque...")
             return self._ensure_mongo_running_unix()
 
-        # Para Windows
-        if sys.platform == 'win32':
+        # Para Windows — flujo refactorizado para diagnóstico claro
+        return self._ensure_mongo_running_win()
+
+    def _is_port_listening(self, host='127.0.0.1', port=27017, timeout=2):
+        """Verifica rápidamente si alguien está escuchando en host:port."""
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (socket.timeout, OSError):
+            return False
+
+    def _is_mongod_process_running_win(self):
+        """Verifica si hay un proceso mongod.exe vivo (Windows)."""
+        try:
+            check = subprocess.run(
+                ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return 'mongod.exe' in (check.stdout or '')
+        except Exception:
+            return False
+
+    def _ensure_mongo_running_win(self):
+        """
+        Flujo robusto para arrancar MongoDB en Windows:
+        1) Si el puerto 27017 ya responde, MongoDB está corriendo (existente / servicio)
+        2) Si hay mongod.exe en tasklist, esperamos a que abra el puerto
+        3) Buscamos el binario y lo arrancamos sin abrir ventana, con --logpath a un archivo
+        4) Esperamos al puerto y, si falla, mostramos las últimas líneas del log para
+           que el usuario sepa exactamente qué falló (puerto ocupado, DB lock, etc.)
+        5) Si no se encontró el binario, probamos `net start MongoDB` (servicio) antes de rendirnos
+        """
+        # 1) Puerto ya escuchando — probablemente mongod externo o servicio
+        if self._is_port_listening('127.0.0.1', 27017):
+            print("✅ Puerto 27017 ya está escuchando (MongoDB existente)")
+            return self._wait_for_mongo_ready(timeout=10)
+
+        # 2) Proceso vivo pero puerto todavía no abierto — esperar
+        if self._is_mongod_process_running_win():
+            print("✅ Proceso mongod.exe detectado, esperando puerto 27017...")
+            if self._wait_for_mongo_ready(timeout=30):
+                return True
+            print("⚠️ El proceso mongod existe pero no responde en el puerto. Reintentando arranque limpio…")
+
+        # 3) Buscar binario
+        exe_path = self._find_mongod_exe()
+        if not exe_path:
+            # 3b) Antes de rendirnos, intentar el servicio de Windows
+            print("ℹ️ mongod no encontrado, intentando servicio MongoDB de Windows…")
             try:
-                check = subprocess.run(
-                    ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
-                    shell=True,
-                    capture_output=True,
-                    text=True
+                subprocess.run(
+                    ['net', 'start', 'MongoDB'],
+                    shell=True, capture_output=True, text=True, timeout=15, check=False,
                 )
-                if 'mongod.exe' in (check.stdout or ''):
-                    print("✅ MongoDB proceso detectado, esperando puerto 27017...")
-                    return self._wait_for_mongo_ready()
-                else:
-                    # 1) Intentar primero mongod local del proyecto
-                    try:
-                        exe_path = self._find_mongod_exe()
-                        version = self._get_mongod_version(exe_path)
-                        print(f"🔎 mongod detectado: {exe_path or 'PATH'} (versión {version or 'desconocida'})")
-                        cfg = self.project_dir / 'mongod.cfg'
-                        db_dir = self.project_dir / 'DB'
-                        import os
-                        use_shell = os.environ.get('MONGO_TERMINAL', 'powershell')
-                        started = self._launch_mongod_in_terminal(exe_path, use_shell, cfg, db_dir)
-                        if started:
-                            print("🔄 mongo lanzado en terminal, esperando puerto 27017...")
-                            return self._wait_for_mongo_ready()
-                    except Exception as e:
-                        print(f'⚠️ No se pudo abrir terminal para mongod: {e}')
-
-                    # 2) Si la terminal no pudo abrir o mongod no arrancó, intentar arranque silencioso
-                    try:
-                        exe_path = self._find_mongod_exe()
-                        version = self._get_mongod_version(exe_path)
-                        print(f"🔎 Intento silencioso con mongod: {exe_path or 'PATH'} (versión {version or 'desconocida'})")
-                        cfg = self.project_dir / 'mongod.cfg'
-                        db_dir = self.project_dir / 'DB'
-                        try:
-                            db_dir.mkdir(exist_ok=True)
-                            (db_dir / 'logs').mkdir(exist_ok=True)
-                        except Exception:
-                            pass
-                        if exe_path:
-                            cmd = [exe_path]
-                            shell_flag = False
-                        else:
-                            cmd = ['mongod']
-                            shell_flag = True
-
-                        # Siempre forzar el dbpath al iniciar mongod para este proyecto.
-                        # Si existe un fichero de config, lo usamos también pero
-                        # especificamos --dbpath para asegurarnos de apuntar a la carpeta `DB`.
-                        if cfg.exists():
-                            cmd += ['--config', str(cfg)]
-                        # Añadir siempre dbpath para forzar uso de la carpeta local DB
-                        cmd += ['--dbpath', str(db_dir)]
-                        # --- CORRECCIÓN: forzar bind_ip para permitir conexiones LAN si arrancamos mongod manualmente
-                        cmd += ['--bind_ip', '0.0.0.0']
-                        self.mongo_process = subprocess.Popen(
-                            cmd,
-                            cwd=str(self.project_dir),
-                            shell=shell_flag,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL
-                        )
-                        if sys.platform == 'win32':
-                            try:
-                                # Attempt to create new console if supported
-                                self.mongo_process = subprocess.Popen(
-                                    cmd,
-                                    cwd=str(self.project_dir),
-                                    shell=shell_flag,
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL,
-                                    creationflags=subprocess.CREATE_NEW_CONSOLE
-                                )
-                            except (OSError, Exception):
-                                # Fallback: start without new console
-                                self.mongo_process = subprocess.Popen(
-                                    cmd,
-                                    cwd=str(self.project_dir),
-                                    shell=shell_flag,
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL
-                                )
-                        time.sleep(2)
-                        check2 = subprocess.run(
-                            ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
-                            shell=True,
-                            capture_output=True,
-                            text=True
-                        )
-                        if 'mongod.exe' in (check2.stdout or ''):
-                            print('✅ MongoDB iniciado en modo local (mongod), esperando puerto 27017...')
-                            return self._wait_for_mongo_ready()
-                    except Exception as e:
-                        print(f'⚠️ No se pudo iniciar mongod manualmente: {e}')
-
-                    # 3) Fallback: intentar iniciar el servicio de MongoDB si está instalado
-                    try:
-                        proc = subprocess.run(
-                            ['net', 'start', 'MongoDB'],
-                            shell=True,
-                            capture_output=True,
-                            text=True,
-                            check=False
-                        )
-                        time.sleep(2)
-                        check_service = subprocess.run(
-                            ['tasklist', '/FI', 'IMAGENAME eq mongod.exe'],
-                            shell=True,
-                            capture_output=True,
-                            text=True
-                        )
-                        if 'mongod.exe' in (check_service.stdout or ''):
-                            print("✅ Servicio MongoDB iniciado, esperando puerto 27017...")
-                            return self._wait_for_mongo_ready()
-                        else:
-                            print("ℹ️ No se pudo iniciar el servicio MongoDB")
-                    except Exception:
-                        pass
-
-                    # Si no se pudo iniciar, mostrar advertencia
-                    self.root.after(0, lambda: messagebox.showwarning(
-                        'MongoDB', 
-                        'MongoDB no está ejecutándose.\n\n'
-                        'Alternativas:\n'
-                        '• Ejecuta "mongod --dbpath ./DB" en el directorio del proyecto, o\n'
-                        '• Inicia el servicio global desde services.msc o con "net start MongoDB"'
-                    ))
-                    return False
+                time.sleep(2)
+                if self._is_port_listening('127.0.0.1', 27017):
+                    return self._wait_for_mongo_ready(timeout=20)
             except Exception as e:
-                print(f"⚠️ Error verificando MongoDB: {e}")
-                return False
-        return True
+                print(f"⚠️ net start MongoDB falló: {e}")
+
+            self.root.after(0, lambda: messagebox.showerror(
+                'MongoDB no encontrado',
+                'No se encontró mongod.exe en ningún lugar conocido.\n\n'
+                'Soluciones (en orden):\n'
+                '  1. Verifica que exista: tools\\mongo\\bin\\mongod.exe\n'
+                '     (debería venir con el repo)\n\n'
+                '  2. O instala MongoDB Community Server:\n'
+                '     https://www.mongodb.com/try/download/community\n\n'
+                '  3. Después cierra y vuelve a abrir el launcher.'
+            ))
+            return False
+
+        print(f"🔎 mongod localizado: {exe_path}")
+        version = self._get_mongod_version(exe_path)
+        if version:
+            print(f"   versión: {version}")
+
+        # 4) Preparar carpetas y log
+        try:
+            self.db_dir.mkdir(exist_ok=True)
+            (self.db_dir / 'logs').mkdir(exist_ok=True)
+        except Exception as e:
+            print(f"⚠️ No se pudo crear carpeta DB/logs: {e}")
+
+        log_file = self.db_dir / 'logs' / 'mongod-launcher.log'
+
+        cmd = [
+            str(exe_path),
+            '--dbpath', str(self.db_dir),
+            '--bind_ip', '127.0.0.1',
+            '--logpath', str(log_file),
+            '--logappend',
+        ]
+        print(f"🔄 Lanzando mongod (silencioso, log → {log_file})")
+
+        try:
+            # CREATE_NO_WINDOW = 0x08000000 — no abre consola visible.
+            # stdout/stderr a DEVNULL porque ya escribimos a --logpath.
+            self.mongo_process = subprocess.Popen(
+                cmd,
+                cwd=str(self.project_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=0x08000000,
+            )
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror(
+                'Error al arrancar MongoDB',
+                f'No se pudo ejecutar mongod.exe:\n\n{e}\n\nPath:\n{exe_path}'
+            ))
+            return False
+
+        # 5) Esperar puerto abierto
+        if self._wait_for_mongo_ready(timeout=30):
+            print(f"✅ MongoDB listo (PID {self.mongo_process.pid})")
+            return True
+
+        # 6) Falló — leer log para diagnóstico
+        log_content = ''
+        try:
+            if log_file.exists():
+                log_content = self._tail_file(str(log_file), lines=25) or ''
+        except Exception:
+            pass
+        if not log_content.strip():
+            log_content = '(log vacío o no se pudo leer — revisa permisos)'
+
+        # Diagnóstico común: si el proceso terminó solo, leer su exit code
+        rc = None
+        try:
+            if self.mongo_process and self.mongo_process.poll() is not None:
+                rc = self.mongo_process.returncode
+        except Exception:
+            pass
+
+        msg = (
+            f'mongod.exe se ejecutó pero no respondió en el puerto 27017 en 30 segundos.\n\n'
+            f'Path usado:    {exe_path}\n'
+            f'DB folder:     {self.db_dir}\n'
+            f'Log:           {log_file}\n'
+            f'Exit code:     {rc if rc is not None else "(aún corriendo)"}\n\n'
+            f'Últimas líneas del log:\n{"-" * 50}\n{log_content[:1800]}'
+        )
+        self.root.after(0, lambda: messagebox.showerror('MongoDB no respondió', msg))
+        return False
 
     def _wait_for_mongo_ready(self, host='127.0.0.1', port=27017, timeout=30):
         """Espera activa a que MongoDB acepte conexiones TCP en el puerto indicado.
