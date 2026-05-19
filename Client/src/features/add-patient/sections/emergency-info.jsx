@@ -62,7 +62,7 @@ const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
         }
         className="action-button"
       >
-        <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Contacto
+        <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Contacto
       </button>
     </section>
   );

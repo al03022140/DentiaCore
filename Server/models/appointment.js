@@ -13,15 +13,12 @@ const appointmentSchema = new mongoose.Schema({
     },
     fecha_hora: {
         type: Date,
-        required: true,
-        validate: {
-            validator: function (value) {
-                // Solo validar en documentos nuevos o cuando fecha_hora es modificada
-                if (!this.isNew && !this.isModified('fecha_hora')) return true;
-                return value > new Date();
-            },
-            message: "No se pueden programar citas en el pasado."
-        }
+        required: true
+        // NOTA: la validación "no en el pasado" se hace explícitamente en
+        // createAppointment. Aquí no se valida porque `findOneAndUpdate` con
+        // `runValidators: true` ejecuta el validator con `this` = query, no
+        // documento, y bloquearía updates legítimos a citas pasadas
+        // (p. ej. marcar como "Cancelada" o "Pasada").
     },
     estado: {
         type: String,

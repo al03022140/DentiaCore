@@ -8,7 +8,9 @@ const LockScreenContext = createContext(null);
 
 const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos (roles.MD §9.3)
 const CHECK_INTERVAL_MS = 30 * 1000;         // comprobar cada 30s
-const MAX_PIN_ATTEMPTS = 3;
+// Debe coincidir con MAX_PIN_ATTEMPTS del backend (authController.js).
+// El backend es la fuente de verdad: envía `intentosRestantes` en cada 401.
+const MAX_PIN_ATTEMPTS = 5;
 
 export const LockScreenProvider = ({ children }) => {
   const { user, logout } = useAuth();
@@ -45,6 +47,32 @@ export const LockScreenProvider = ({ children }) => {
       return false;
     }
 
+    // Procesa un intento fallido y actualiza el mensaje con los intentos restantes.
+    // Si el backend nos envió `intentosRestantes` lo usamos; si no, calculamos local.
+    const handleWrongPin = (remainingFromServer) => {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      setPinInput('');
+
+      const remaining = typeof remainingFromServer === 'number'
+        ? remainingFromServer
+        : Math.max(0, MAX_PIN_ATTEMPTS - newAttempts);
+
+      if (remaining <= 0) {
+        setError('Demasiados intentos fallidos. Cerrando sesión...');
+        sessionStorage.removeItem('dentiacore_locked');
+        setTimeout(() => logout(), 1500);
+        return false;
+      }
+
+      setError(
+        remaining === 1
+          ? 'PIN incorrecto. Te queda 1 intento antes de cerrar sesión.'
+          : `PIN incorrecto. Te quedan ${remaining} intentos antes de cerrar sesión.`
+      );
+      return false;
+    };
+
     try {
       const res = await API.post('/auth/verify-pin', { pin });
       if (res.data?.valid) {
@@ -62,30 +90,39 @@ export const LockScreenProvider = ({ children }) => {
         }
         return true;
       }
+      // 200 sin valid:true es inesperado; tratar como intento fallido.
+      return handleWrongPin(undefined);
     } catch (err) {
-      // Si el servidor responde con valid:false es PIN incorrecto → contabilizar intento.
-      // Cualquier otro error (red, refresh fallido, etc.) no penaliza los intentos.
-      const isWrongPin = err?.response?.data?.valid === false;
-      if (!isWrongPin) {
-        setError('Error de conexión. Intente de nuevo.');
+      // Sin response → error real de red (servidor caído, timeout, sin internet).
+      if (!err?.response) {
+        setError('No se pudo conectar con el servidor. Verifique su red.');
         setPinInput('');
         return false;
       }
-    }
 
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
-    setPinInput('');
+      const status = err.response.status;
+      const data = err.response.data || {};
 
-    if (newAttempts >= MAX_PIN_ATTEMPTS) {
-      setError('Demasiados intentos fallidos. Cerrando sesión...');
-      sessionStorage.removeItem('dentiacore_locked');
-      setTimeout(() => logout(), 1500);
+      // 423 = PIN bloqueado por exceder intentos en backend.
+      if (status === 423 || data.locked) {
+        setError(data.message || 'PIN bloqueado por demasiados intentos. Cerrando sesión...');
+        sessionStorage.removeItem('dentiacore_locked');
+        setTimeout(() => logout(), 1800);
+        return false;
+      }
+
+      // PIN incorrecto: backend devuelve 400/401 con valid:false e intentosRestantes.
+      if ((status === 400 || status === 401) && data.valid === false) {
+        return handleWrongPin(data.intentosRestantes);
+      }
+
+      // Cualquier otro error (5xx, 401 sin valid:false por sesión expirada y refresh
+      // fallido, etc.). No contar como intento de PIN.
+      setError('No se pudo verificar el PIN. Inicie sesión nuevamente.');
+      setPinInput('');
+      setTimeout(() => logout(), 1800);
       return false;
     }
-
-    setError(`PIN incorrecto (${newAttempts}/${MAX_PIN_ATTEMPTS})`);
-    return false;
   }, [attempts, logout]);
 
   // Monitorear inactividad
@@ -130,7 +167,7 @@ export const LockScreenProvider = ({ children }) => {
           <div className="lock-screen-card">
             <div className="lock-screen-icon">
               {user.nombre === 'Administrador Local'
-                ? <img src={lockBlockedIcon} alt="Administrador Local" style={{ width: 80, height: 80 }} />
+                ? <img src={lockBlockedIcon} alt="Administrador Local" className="theme-icon" style={{ width: 80, height: 80 }} />
                 : <span style={{ fontSize: '4.5rem', lineHeight: 1 }}>🔒</span>}
             </div>
             <h2>Pantalla bloqueada</h2>

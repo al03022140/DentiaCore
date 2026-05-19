@@ -92,12 +92,20 @@ function validateEntries(entries) {
  * @returns {Object}
  */
 function normalizeEntry(entry) {
-  return {
+  const out = {
     tooth:   entry.tooth   ?? entry.diente   ?? '',
     damage:  entry.damage  ?? entry.tipo     ?? '',
     surface: entry.surface ?? entry.superficie ?? '0',
     note:    entry.note    ?? entry.nota     ?? ''
   };
+  // Exponer `fecha` cuando exista en el documento persistido. El cliente la usa para
+  // mostrar la fecha real de cada fila (no la de "hoy"). El servidor es quien la fija
+  // al guardar; aquí sólo la propagamos al frontend.
+  const fecha = entry.fecha ?? entry.date;
+  if (fecha) {
+    out.fecha = fecha instanceof Date ? fecha.toISOString() : String(fecha);
+  }
+  return out;
 }
 
 /**

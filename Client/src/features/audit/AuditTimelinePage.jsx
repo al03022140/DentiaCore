@@ -9,18 +9,18 @@ import trazability2Icon from '../../assets/images/icons/trazability 2.svg';
 
 // Iconos por tipo de evento
 const EVENT_ICONS = {
-  creacion_registro:      <img src={plusIcon} alt="+" width="18" height="18" />,
-  modificacion_registro:  <img src={pencilIcon} alt="editar" width="18" height="18" />,
+  creacion_registro:      <img src={plusIcon} alt="+" width="18" height="18" className="theme-icon" />,
+  modificacion_registro:  <img src={pencilIcon} alt="editar" width="18" height="18" className="theme-icon" />,
   soft_delete:            '🗑️',
   firma_electronica:      '✍️',
   firma_lote:             '📝',
-  acceso_expediente:      <img src={eyeIcon} alt="ver" width="18" height="18" />,
+  acceso_expediente:      <img src={eyeIcon} alt="ver" width="18" height="18" className="theme-icon" />,
   captura_extemporanea:   '⏰',
   addendum:               '📎',
   borrador_creado:        '📄',
-  borrador_aprobado:      <img src={checkCircle2Icon} alt="aprobado" width="18" height="18" />,
+  borrador_aprobado:      <img src={checkCircle2Icon} alt="aprobado" width="18" height="18" className="theme-icon" />,
   borrador_rechazado:     '❌',
-  plantilla_usada:        <img src={trazability2Icon} alt="plantilla" width="18" height="18" />,
+  plantilla_usada:        <img src={trazability2Icon} alt="plantilla" width="18" height="18" className="theme-icon" />,
 };
 
 const EVENT_COLORS = {

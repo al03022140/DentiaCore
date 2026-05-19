@@ -1,26 +1,29 @@
-/* Vista de pacientes: permitir scroll natural del documento y usar todo el ancho. */
 .content:has(.patient-list-wrapper) {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
 }
 
 .patient-list-wrapper {
-  /* Variables locales consumidas en este archivo */
-  --pl-primary-color: var(--color-blue-750);
-  --pl-secondary-color: var(--color-neutral-680);
-  --pl-light-text-color: var(--color-text-dark);
-  --pl-background-color: var(--color-bg-white);
-  --pl-light-background: var(--color-neutral-150);
-  --pl-border-color: var(--color-border-light);
-  font-family: var(--pl-font-family);
+  --pl-primary-color: var(--color-primary);
+  --pl-secondary-color: var(--figma-text-secondary);
+  --pl-light-text-color: var(--figma-text-primary);
+  --pl-background-color: var(--figma-bg-card);
+  --pl-light-background: var(--figma-bg-input);
+  --pl-border-color: var(--figma-border-default);
+  /* Ritmo vertical del bloque de tarjetas (sin tocar cada tarjeta) */
+  --pl-grid-row-gap: var(--spacing-sm);
+  --pl-grid-column-gap: var(--figma-space-md);
+  /* Separación del grid completo respecto a búsqueda/barra de acciones (baja el bloque) */
+  --pl-grid-block-margin-top: var(--spacing-xxl);
+  font-family: var(--font-family-primary);
+  width: 100%;
 }
-/* Contenedor principal */
+
 .patient-list-wrapper .patient-list-container {
-  /* Permitir scroll interno sin empujar las tarjetas al fondo. */
   overflow: visible;
-  padding: 1rem;
-  padding-top: 0.5rem;
-  padding-left: 0rem;
-  text-align: center;
+  padding: var(--figma-space-lg) var(--figma-space-2xl);
+  padding-top: var(--figma-space-xs);
+  padding-bottom: 5.5rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -30,12 +33,11 @@
   width: 100%;
 }
 
-/* Mensaje si no hay pacientes */
 .patient-list-wrapper .no-patients-msg {
-  font: var(--text-fluid-pl-empty);
-  color: var(--pl-light-text-color);
-  margin: 2.5rem 0 2.5rem 0;
-  padding: 1.5rem 0.5rem;
+  font: var(--figma-text-body);
+  color: var(--pl-secondary-color);
+  margin: var(--figma-space-2xl) 0;
+  padding: var(--figma-space-2xl);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -43,129 +45,151 @@
   text-align: center;
   width: 100%;
   min-height: 6rem;
-  background: none;
-  border: none;
 }
 
-/* Grid de pacientes */
+/* 4 columnas × 4 filas = 16 tarjetas por página (ver patientsPerPage en patient-list.jsx) */
 .patient-list-wrapper .patient-list {
   display: grid;
-  /* Configuración específica: 5 columnas horizontalmente */
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: var(--pl-grid-row-gap);
+  column-gap: var(--pl-grid-column-gap);
   width: 100%;
-  max-width: 100%;
+  margin-top: var(--pl-grid-block-margin-top);
   box-sizing: border-box;
-  overflow: visible;
-  /* Alinear el contenido al inicio para que las tarjetas queden arriba */
   align-content: start;
-  justify-items: stretch;
+  align-items: start;
 }
 
-/* Tarjeta de paciente */
 .patient-list-wrapper .patient-card {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
   background-color: var(--pl-background-color);
-  border-radius: var(--card-border-radius);
-  padding-top: 0rem !important;
-  padding-bottom: 0rem !important;
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
-  /* Ajuste de dimensiones para el grid de 5x3 */
-  width: 18rem !important;
-  height: 10rem !important;
-  min-height: 120px !important;
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
+  border-radius: var(--figma-radius-md);
+  padding: var(--figma-space-lg) var(--figma-space-lg) var(--figma-space-lg) var(--figma-space-lg) !important;
+  width: 100% !important;
+  height: 118px !important;
+  min-height: 118px !important;
+  max-height: 118px !important;
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--pl-border-color);
   cursor: pointer;
-  transition: all 0.3s ease;
+  /* left-accent via inset box-shadow: no provoca layout shift */
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   box-sizing: border-box;
+  gap: var(--figma-space-md);
+  position: relative;
+  overflow: hidden;
 }
 
-.patient-list-wrapper .patient-card:hover,
-.patient-list-wrapper .patient-card:focus {
-  transform: translateY(-0.3125rem);
-  box-shadow: var(--card-shadow);
-  outline: none;
+.patient-list-wrapper .patient-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--figma-shadow-elevated), inset 3px 0 0 var(--color-primary);
+  border-color: rgba(8, 72, 136, 0.22);
 }
+
 .patient-list-wrapper .patient-card:active {
   transform: translateY(0);
-  box-shadow: var(--card-shadow);
 }
 
-/* Foto del paciente */
 .patient-list-wrapper .patient-photo {
   flex-shrink: 0;
-  width: 4.375rem;
-  height: 4.375rem;
-  object-fit: cover;
+  width: 4rem;
+  height: 4rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--figma-radius-full);
   overflow: hidden;
-  margin-right: 1rem;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
 }
+
 .patient-list-wrapper .patient-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
-  border: 0.125rem solid var(--pl-border-color);
+  border: none;
+  display: block;
 }
 
-/* Información del paciente */
 .patient-list-wrapper .patient-info {
-  padding: 0.8rem;
-  padding-right: 0rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  justify-content: center;
+  justify-content: space-between;
   text-align: left;
   min-width: 0;
+  height: 100%;
+  gap: 0;
 }
+
+/* ── ID como badge/pill ── */
 .patient-list-wrapper .patient-id {
-  font: var(--text-fluid-pl-id);
-  color: var(--pl-secondary-color);
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  background: rgba(8, 72, 136, 0.08);
+  color: var(--color-primary);
+  border-radius: 99px;
+  padding: 1px 7px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
   white-space: nowrap;
-  text-align: left;
 }
 
 .patient-list-wrapper .patient-top {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: 0.2rem;
+  gap: 5px;
   width: 100%;
+  transform: translateY(-2px);
 }
 
+/* ── Fila inferior con metadatos ── */
 .patient-list-wrapper .patient-bottom {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding-top: 0.5rem;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  padding-top: 6px;
+  margin-top: 0;
+  border-top: 1px dashed var(--color-border-light);
+  gap: 0 var(--figma-space-md);
   width: 100%;
-  font: var(--text-fluid-pl-meta);
-  color: var(--pl-secondary-color);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  overflow: hidden;
 }
 
-/* Ajuste individual */
+/* ── Chips de edad y visita ── */
 .patient-list-wrapper .patient-age,
 .patient-list-wrapper .patient-visit {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 5px;
+  white-space: nowrap;
+  min-width: 0;
 }
+
+/* Icono SVG dentro de los chips */
+.patient-list-wrapper .patient-age svg,
+.patient-list-wrapper .patient-visit svg {
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
 .patient-list-wrapper .patient-visit {
   position: relative;
-  padding-left: 1.2rem;
+  padding-left: var(--figma-space-md);
 }
+
 .patient-list-wrapper .patient-visit::before {
   content: '';
   position: absolute;
@@ -175,284 +199,302 @@
   height: 60%;
   width: 1px;
   background: var(--color-border-medium);
-  margin-right: 0.8rem;
 }
 
-/* Paginación */
 .patient-list-wrapper .pagination {
-  /* Fijar la paginación siempre en la parte más baja posible de la ventana
-     sin afectar el flujo del contenido. */
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 8px; /* lo más bajo posible */
+  bottom: calc(var(--figma-space-xl) + var(--spacing-md));
   z-index: 1200;
   display: flex;
-  gap: 0.3125rem;
-  padding: 0.25rem 0.5rem;
-  background: transparent;
-  pointer-events: auto;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--figma-bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border-medium);
+  max-width: calc(100vw - 2rem);
 }
+
 .patient-list-wrapper .page-number {
-  padding: 0.625rem 1.25rem;
-  border: 0.0625rem solid var(--pl-border-color);
-  border-radius: 0.5rem;
+  min-width: 2.0rem;
+  height: 2.0rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--border-radius-md);
   cursor: pointer;
-  background-color: var(--pl-light-background);
-  transition: all 0.2s ease;
-  font: var(--text-fluid-pl-pagination);
+  background-color: var(--figma-bg-card);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  font: var(--pd-font-action);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
-.patient-list-wrapper .page-number:hover,
-.patient-list-wrapper .page-number:focus {
-  background-color: var(--color-neutral-175);
-  transform: translateY(-0.0625rem);
-  outline: none;
+
+.patient-list-wrapper .page-number:hover {
+  background-color: var(--figma-bg-neutral);
+  border-color: var(--color-border-medium);
 }
+
 .patient-list-wrapper .page-number.active {
   background-color: var(--pl-primary-color);
-  color: var(--color-bg-white);
+  color: var(--figma-text-on-dark);
   border-color: var(--pl-primary-color);
+  font-weight: var(--font-weight-semibold);
 }
 
 .patient-list-wrapper .filter-button {
-  margin-left: auto;
+  margin-left: 0;
 }
+
 .patient-list-wrapper .filter-icon {
   width: 1rem;
   height: 1rem;
   margin-left: 0.5rem;
 }
 
-/* Menú de ordenamiento (dropdown) */
 .patient-list-wrapper .sort-menu {
   position: absolute;
-  margin-top: 2.5rem;
-  right: 2rem;
-  background-color: var(--color-bg-white);
-  border: 1px solid var(--pl-border-color);
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px var(--color-black-10);
+  top: 100%;
+  margin-top: 0.5rem;
+  left: 0;
+  right: auto;
+  min-width: 12.5rem;
+  background-color: var(--figma-bg-card);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
+  box-shadow: var(--figma-shadow-elevated);
   z-index: 999;
 }
+
 .patient-list-wrapper .sort-menu ul {
   list-style: none;
   margin: 0;
-  padding: 0.5rem 0;
-}
-.patient-list-wrapper .sort-menu li {
-  font: var(--text-fluid-pl-filter);
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.patient-list-wrapper .sort-menu li:hover {
-  background-color: var(--pl-light-background);
+  padding: var(--figma-space-xs) 0;
 }
 
-/* Contenedor de la barra de búsqueda */
+.patient-list-wrapper .sort-menu li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  font: var(--figma-text-caption);
+  padding: var(--figma-space-xs) var(--figma-space-lg);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.patient-list-wrapper .sort-menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-list-wrapper .sort-menu__arrow {
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+.patient-list-wrapper .sort-menu__arrow.sort-menu__arrow--placeholder {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.patient-list-wrapper .sort-menu li:hover {
+  background-color: var(--figma-bg-input);
+}
+
 .patient-list-wrapper .search-container {
   width: 100%;
   display: flex;
   justify-content: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--figma-space-md);
 }
 
-/* Barra de búsqueda estilizada */
 .patient-list-wrapper .search-input {
-  width: 50%;
-  padding: 0.8rem 1rem;
-  font: var(--text-fluid-pl-filter);
-  border: 2px solid var(--pl-border-color);
-  border-radius: 2rem;
+  width: min(100%, 52rem);
+  min-height: 2.75rem;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font: var(--pd-font-button-primary);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-full);
   outline: none;
-  transition: all 0.3s ease-in-out;
-  box-shadow: 0 3px 8px var(--color-black-10);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--figma-bg-card);
 }
+
 .patient-list-wrapper .search-input:focus {
   border-color: var(--pl-primary-color);
-  box-shadow: 0 4px 12px var(--color-blue-750-30);
+  box-shadow: 0 0 0 3px rgba(8, 72, 136, 0.1);
 }
 
 .patient-list-wrapper .arrow-icon {
   width: 1rem;
   height: 1rem;
   margin-left: 0.5rem;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-  opacity: 1;
+  transition: transform 0.2s ease;
 }
+
 .patient-list-wrapper .arrow-icon.asc {
   transform: rotate(0deg);
 }
+
 .patient-list-wrapper .arrow-icon.desc {
   transform: rotate(180deg);
 }
 
-/* Contenedor para el nombre del paciente */
 .patient-list-wrapper .patient-name-container {
   position: relative;
-  display: inline-block;
+  display: block;
   cursor: pointer;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .patient-list-wrapper .patient-info .patient-name-container {
-  font: var(--text-fluid-pl-name) !important;
-  color: var(--color-text-black) !important;
+  font-family: var(--font-family-primary) !important;
+  font-size: 1.22rem !important;
+  line-height: 1.25 !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--figma-text-primary) !important;
   text-align: left !important;
+  letter-spacing: -0.01em !important;
+  margin-top: 0;
 }
 
-
-/* Tooltip oculto por defecto */
 .patient-list-wrapper .tooltip {
   visibility: hidden;
-  background-color: var(--color-black-80);
-  color: var(--color-bg-white);
+  background-color: var(--figma-color-dark);
+  color: var(--figma-text-on-dark);
   text-align: center;
-  padding: 5px 10px;
-  border-radius: 5px;
+  padding: 4px var(--figma-space-xs);
+  border-radius: var(--figma-radius-sm);
   position: absolute;
   bottom: 120%;
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font: var(--text-fluid-pl-tooltip);
+  font: var(--figma-text-small-regular);
   opacity: 0;
-  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+  transition: opacity 0.2s ease;
   z-index: 1000;
 }
+
 .patient-list-wrapper .patient-name-container:hover .tooltip {
   visibility: visible;
   opacity: 1;
 }
 
-/* Estilos de las flechas de paginación */
 .patient-list-wrapper .pagination-arrow {
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   cursor: pointer;
-  margin: 0 1rem;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  margin: 0 var(--spacing-xs);
+  padding: var(--spacing-xs);
+  object-fit: contain;
+  transition: opacity 0.2s ease, transform 0.15s ease;
 }
-.patient-list-wrapper .pagination-arrow.left {
-  transform: rotate(0deg);
-}
-.patient-list-wrapper .pagination-arrow.right {
-  transform: rotate(0deg);
-}
+
 .patient-list-wrapper .pagination-arrow:hover {
   opacity: 0.7;
   transform: scale(1.1);
 }
+
 .patient-list-wrapper .pagination-arrow.disabled {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* Contenedor de acciones (Botón Agregar y Ordenar) */
 .patient-list-wrapper .actions-container {
   display: flex;
+  flex-direction: row-reverse;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  max-width: 1200px;
-  margin-top: 1rem;
-  padding: 0 1rem;
-  min-width: 100%;
-}
-
-/* Botón de agregar paciente (Izquierda) */
-.patient-list-wrapper .add-patient-button {
-  background: none;
-  border: none;
-  cursor: pointer;
+  margin-top: var(--figma-space-md);
+  margin-bottom: var(--figma-space-sm);
   padding: 0;
-  display: flex;
-  align-items: center;
-  padding-bottom: 1rem;
-}
-.patient-list-wrapper .add-patient-button img {
-  width: 2rem;
-  height: 2rem;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-.patient-list-wrapper .add-patient-button:hover img {
-  transform: scale(1.1);
-  opacity: 0.8;
+  gap: var(--spacing-md);
 }
 
-/* Botón de ordenar (Derecha) */
+/* Misma escala que .back-button / .Boton_Imprimir en patient-detail (min-height 2.4rem, padding coherente) */
+.patient-list-wrapper .add-patient-button.button-primary {
+  min-height: 2.0rem;
+  height: auto;
+  padding: var(--spacing-xs) var(--spacing-md);
+  gap: var(--spacing-xs);
+  font: var(--pd-font-action);
+}
+
+.patient-list-wrapper .add-patient-button .add-patient-button__label {
+  white-space: nowrap;
+}
+
+.patient-list-wrapper .add-patient-button img {
+  width: 1.0rem;
+  height: 1.0rem;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+  transition: transform 0.2s ease;
+}
+
+.patient-list-wrapper .add-patient-button:hover img {
+  transform: scale(1.06);
+}
+
+.patient-list-wrapper .actions-container .filter-button {
+  min-height: 2.0rem;
+  height: auto;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--pd-font-action);
+}
+
 .patient-list-wrapper .filter-button-container {
   display: flex;
-  margin-left: auto;
   align-items: center;
+  position: relative;
 }
 
-/* Adaptaciones responsivas */
-
-/* ≤1400px: 4 columnas */
-@media (max-width: 1400px) {
+@media (max-width: 1100px) {
   .patient-list-wrapper .patient-list {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .patient-list-wrapper .patient-card {
-    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* ≤1200px: 3 columnas */
-@media (max-width: 1200px) {
-  .patient-list-wrapper .patient-list {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .patient-list-wrapper .patient-card {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 100px !important;
+@media (max-width: 768px) {
+  .patient-list-wrapper .patient-list-container {
+    padding: var(--figma-space-md);
+    padding-bottom: 5rem;
   }
   .patient-list-wrapper .search-input {
-    width: 65%;
+    width: 100%;
+    max-width: none;
   }
 }
 
-/* ≤900px: 2 columnas */
-@media (max-width: 900px) {
-  .patient-list-wrapper .patient-list {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .patient-list-wrapper .patient-card {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 90px !important;
-  }
-  .patient-list-wrapper .patient-photo img {
-    width: 3.5rem;
-    height: 3.5rem;
-  }
-  .patient-list-wrapper .search-input {
-    width: 80%;
-  }
-}
-
-/* ≤600px: 1 columna */
 @media (max-width: 600px) {
   .patient-list-wrapper .patient-list {
     grid-template-columns: 1fr;
   }
-  .patient-list-wrapper .patient-card {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 80px !important;
-    padding: 0.75rem !important;
-  }
-  .patient-list-wrapper .patient-photo img {
-    width: 3rem;
-    height: 3rem;
-  }
+}
+
+@media (max-width: 480px) {
   .patient-list-wrapper .search-input {
-    width: 95%;
+    width: 100%;
+    min-height: 2.5rem;
   }
-  .patient-list-wrapper .patient-age,
-  .patient-list-wrapper .patient-visit {
-    font: var(--text-fluid-pl-meta);
+  .patient-list-wrapper .patient-card {
+    padding: var(--figma-space-md) !important;
   }
 }

@@ -4,101 +4,171 @@
   align-items: center;
   justify-content: center;
   overflow: visible;
-  background: var(--color-bg-light);
   padding: var(--spacing-xxl);
   font-family: var(--font-family-primary);
   color: var(--color-text-primary);
+  background: linear-gradient(
+    165deg,
+    var(--color-sidebar-hover) 0%,
+    var(--sidebar-bg) 42%,
+    var(--color-sidebar-active) 100%
+  );
+  position: relative;
+}
+
+.login-page__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-page__brand {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: -1.5rem;
+  margin-bottom: var(--figma-space-xl);
+}
+
+/* Mismo tratamiento que .sidebar-logo--white en el sidebar */
+.login-page__logo {
+  width: 85%;
+  max-width: 11rem;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.login-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 120% 80% at 50% -20%,
+    rgba(255, 255, 255, 0.12) 0%,
+    transparent 55%
+  );
+  pointer-events: none;
 }
 
 .login-card {
   width: 100%;
-  max-width: 460px;
   background: var(--color-bg-white);
   border-radius: var(--card-border-radius);
-  padding: 2rem;
-  border: var(--card-border);
-  box-shadow: var(--card-shadow);
+  padding: var(--figma-space-2xl) var(--figma-space-xl) var(--figma-space-xl);
+  border: 1px solid var(--color-black-08);
+  box-shadow:
+    0 4px 6px var(--color-black-08),
+    0 24px 48px var(--color-black-15);
 }
 
 .login-card h1 {
-  margin-bottom: var(--spacing-sm);
+  margin: 0 0 var(--spacing-xs);
   font-size: var(--font-size-xl);
-  color: var(--color-primary);
+  color: var(--sidebar-bg);
   font-weight: var(--font-weight-bold);
+  text-align: center;
+  letter-spacing: -0.02em;
 }
 
-.login-card p {
-  margin-bottom: var(--spacing-xl);
+.login-card__subtitle {
+  margin: 0 0 var(--figma-space-xl);
   color: var(--color-text-secondary);
   font-size: var(--font-size-base);
+  text-align: center;
+  line-height: 1.45;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--figma-space-md);
 }
 
 .login-form label {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+  font-size: 0.9rem;
 }
 
-.login-form input {
-  padding: 0.75rem 0.9rem;
+/* Campo con borde único (email y contraseña) */
+.login-input-shell {
+  display: flex;
+  align-items: stretch;
   border-radius: var(--border-radius-md);
   border: 1px solid var(--color-border-medium);
   background: var(--color-bg-white);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 2.75rem;
+}
+
+.login-input-shell:focus-within {
+  outline: none;
+  border-color: var(--color-sidebar-hover);
+  box-shadow: 0 0 0 3px var(--color-blue-500-15);
+}
+
+.login-input-shell__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: var(--border-radius-md);
+  background: transparent;
   font-size: 0.95rem;
   font-family: var(--font-family-primary);
   color: var(--color-text-primary);
 }
 
-.login-form input::placeholder {
+.login-input-shell__input::placeholder {
   color: var(--color-text-light);
 }
 
-.login-form input:focus {
+.login-input-shell__input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-blue-500-20);
 }
 
-/* Password wrapper with toggle button */
-.password-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
+/* Ojo integrado en la misma caja que el placeholder / texto */
+.login-input-shell--password .login-input-shell__input {
+  padding-right: 0.35rem;
 }
 
-.password-wrapper input {
-  padding-right: 3.2rem; /* espacio para el botón */
-}
-
-.password-toggle {
-  position: absolute;
-  right: 0.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1.1rem;
-  padding: 0.35rem;
+.login-input-shell__suffix {
+  flex-shrink: 0;
+  align-self: stretch;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 2.75rem;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
-.password-toggle svg {
+.login-input-shell__suffix:hover {
+  color: var(--sidebar-bg);
+  background: var(--color-blue-500-08);
+}
+
+.login-input-shell__suffix:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-sidebar-hover);
+}
+
+.login-input-shell__suffix svg {
   display: block;
   width: 20px;
   height: 20px;
-  color: var(--color-text-secondary);
-}
-
-.password-toggle:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-blue-500-15);
-  border-radius: 6px;
 }
 
 .login-error {
@@ -110,26 +180,29 @@
   border: 1px solid var(--color-red-250);
 }
 
-.login-form button {
-  margin-top: var(--spacing-sm);
+.login-form .login-submit {
+  margin-top: var(--spacing-xs);
   padding: 0.85rem 1rem;
-  background: var(--color-primary);
+  background: var(--sidebar-bg);
   border: none;
   border-radius: var(--border-radius-md);
   color: var(--color-bg-white);
   font-weight: var(--font-weight-bold);
+  font-size: 1rem;
   cursor: pointer;
-  transition: var(--transition-medium);
-  box-shadow: 0 4px 6px var(--color-black-10);
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 51, 102, 0.35);
 }
 
-.login-form button:disabled {
+.login-form .login-submit:disabled {
   background: var(--color-slate-600);
   cursor: not-allowed;
   box-shadow: none;
+  transform: none;
 }
 
-.login-form button:not(:disabled):hover {
-  background: var(--color-primary-hover);
+.login-form .login-submit:not(:disabled):hover {
+  background: var(--color-sidebar-hover);
   transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 51, 102, 0.4);
 }

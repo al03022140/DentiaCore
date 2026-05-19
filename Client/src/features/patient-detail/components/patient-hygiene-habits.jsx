@@ -10,7 +10,7 @@ const PatientHygieneHabits = ({ habitos_higiene = null }) => {
     return (
       <section className="patient-detail__section" aria-labelledby={sectionId}>
         <h2 id={sectionId}>Hábitos de Higiene Bucodental</h2>
-        <p className="no-items-message">No hay información de hábitos de higiene disponible.</p>
+        <p className="no-items-message patient-detail__empty-message">No hay información de hábitos de higiene disponible.</p>
       </section>
     );
   }

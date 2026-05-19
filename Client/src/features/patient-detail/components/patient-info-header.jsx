@@ -28,7 +28,7 @@ class ErrorBoundary extends React.Component {
 }
 
 // Componente para mostrar la cabecera de información del paciente
-const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, handleEditClick, handlePrintClick, userNot }) => {
+const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, userNot }) => {
   // Asegurarse que patient no sea null o undefined antes de acceder a sus propiedades
   if (!patient) {
     return null; // O mostrar un placeholder/loading si se prefiere
@@ -40,7 +40,7 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, han
     apellido_paterno, apellido_materno, _id,
     paciente_id, sexo, fecha_nacimiento,
     estado_civil, nacionalidad, lugar_nacimiento,
-    ocupacion, escolaridad, situacion_laboral
+    ocupacion, escolaridad, situacion_laboral, createdAt
   } = patient;
 
   return (
@@ -54,9 +54,11 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, han
           <img 
             src={photoURL || userNot} 
             alt={`Foto de ${primer_nombre} ${apellido_paterno}`}
+            className={!photoURL ? 'profile-default-avatar' : undefined}
             onError={(e) => { 
               e.target.onerror = null; // Prevenir bucles infinitos
-              e.target.src = userNot; 
+              e.target.src = userNot;
+              e.target.classList.add('profile-default-avatar');
             }}
           />
         </div>
@@ -66,6 +68,10 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, han
           </h1>
           <p><strong>ID BD:</strong> <span>{_id}</span></p>
           <p><strong>ID Paciente:</strong> <span>{paciente_id}</span></p>
+          <p>
+            <strong>Fecha en que se agrega el paciente:</strong>{" "}
+            <span>{createdAt ? formatDate(createdAt) : 'N/A'}</span>
+          </p>
           <p><strong>Edad:</strong> <span>{formatAge(fecha_nacimiento)}</span></p>
           <p><strong>Sexo:</strong> <span>{sexo}</span></p>
           <p>
@@ -111,22 +117,6 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, han
             </p>
           )}
         </div>
-        <div className="patient-detail__actions">
-          <button 
-            className="Boton_Editar button-primary" 
-            onClick={handleEditClick}
-            aria-label="Editar datos del paciente"
-          >
-            Editar
-          </button>
-          <button 
-            className="Boton_Imprimir" 
-            onClick={handlePrintClick}
-            aria-label="Imprimir datos del paciente con formato especial"
-          >
-            Imprimir Formato
-          </button>
-        </div>
       </section>
     </ErrorBoundary>
   );
@@ -147,6 +137,7 @@ PatientInfoHeader.propTypes = {
     nacionalidad: PropTypes.string,
     lugar_nacimiento: PropTypes.string,
     ocupacion: PropTypes.string,
+    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)])
   }).isRequired,
   proximaCita: PropTypes.shape({
     fecha_hora: PropTypes.string.isRequired,
@@ -158,8 +149,6 @@ PatientInfoHeader.propTypes = {
     motivo: PropTypes.string,
     estado: PropTypes.string
   }),
-  handleEditClick: PropTypes.func.isRequired,
-  handlePrintClick: PropTypes.func.isRequired,
   userNot: PropTypes.string.isRequired
 };
 

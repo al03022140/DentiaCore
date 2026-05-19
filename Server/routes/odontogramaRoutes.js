@@ -6,11 +6,11 @@ const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 const {
   verificarOdontogramaInicial,
+  hasInitialOdontogram,
   validarEntradasOdontograma,
   guardarOdontogramaInicial,
   obtenerHistorialInicial,
   agregarHistorialInicial,
-  deleteInitialOdontogram,
   verificarOdontogramaClinico,
   obtenerHistorialClinico,
   saveClinicalHistoryEntries,
@@ -20,12 +20,10 @@ const {
   manejarError
 } = require('../controllers/odontogramaController');
 
-const {
-  _uploadMulter,
-  uploadPng,
-  handleMulterError,
-  cleanupOnError
-} = require('../middlewares/uploadImage');
+// NOTA: el odontograma inicial ya NO sube imágenes. Antes guardaba un PNG del canvas
+// junto con los datos; ahora sólo persiste las entradas (tooth/damage/surface/note/fecha)
+// y el frontend renderiza el canvas read-only desde esos datos. Por eso ya no se
+// importa el middleware de upload aquí.
 
 /**
  * Base URL: /api/patients/:id/
@@ -49,13 +47,18 @@ const {
 // Middleware global para validar paciente
 router.use(checkPatient);
 
-// Middleware para establecer el directorio de upload
-const setUploadDir = (dir) => (req, res, next) => {
-  req.uploadDir = dir;
-  next();
-};
+// Comprobación rápida para el motor del canvas (mismo auth que el resto)
+router.get(
+  '/has-initial-odontogram',
+  readLimiter,
+  authorize(['odontogram.read']),
+  hasInitialOdontogram
+);
 
 // --- Odontograma Inicial ---
+// El POST acepta JSON { entries: [...] }. Ya no recibe FormData con PNG.
+// NO existe DELETE: el odontograma inicial es de captura única e inmutable
+// (una sola vez por paciente, sin opción de archivar ni re-crear).
 router
   .route('/odontograma-inicial')
   .get(readLimiter, authorize(['odontogram.read']), verificarOdontogramaInicial)
@@ -63,16 +66,9 @@ router
     writeLimiter,
     requireClinicalRole,
     authorize(['odontogram.create', 'odontogram.write.draft']),
-    setUploadDir('odontograma-inicial'),
-    uploadPng.single('odontograma'),
-    handleMulterError,
     validarEntradasOdontograma,
     guardarOdontogramaInicial
-  )
-  .delete(writeLimiter, authorize(['odontogram.delete']), deleteInitialOdontogram);
-
-// Error handler para limpiar archivos subidos si falla el guardado
-router.use('/odontograma-inicial', cleanupOnError);
+  );
 
 // Historial del odontograma inicial
 router

@@ -1,0 +1,23 @@
+/* Refuerzo para impresión: fondos claros en papel y en vista previa.
+   El tema activo se fuerza a claro en beforeprint (ThemeContext). */
+
+@media print {
+  html {
+    color-scheme: only light !important;
+  }
+
+  body,
+  #root {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Garantizar que el canvas del odontograma clínico tenga fondo blanco
+     independientemente del tema activo al momento de la captura */
+  canvas[id^="odontograma-canvas"] {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

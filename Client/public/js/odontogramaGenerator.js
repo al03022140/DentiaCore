@@ -22,13 +22,70 @@ function OdontogramaGenerator() {
     // variable for how many teeths are in array
     this.arrayCount = 0;
     this.seperator = 210;
-    this.imgWidth = 40;
+    this.imgWidth = 50;
     this.imgHeight = 90;
     this.engine = null;
     this.settings = null;
     this.constants = null;
 
 }
+
+// Mapeo FDI permanente -> nombre de archivo del periodontograma.
+// Los assets en /images/Periodontogram/tooth/ usan posiciones 1..17 saltando el 9
+// (esa "posición vacía" separa visualmente los cuadrantes en el periodontograma).
+OdontogramaGenerator.prototype.getToothImagePath = function (fdi) {
+    "use strict";
+    var permanentUpper = {
+        18: 1, 17: 2, 16: 3, 15: 4, 14: 5, 13: 6, 12: 7, 11: 8,
+        21: 10, 22: 11, 23: 12, 24: 13, 25: 14, 26: 15, 27: 16, 28: 17
+    };
+    var permanentLower = {
+        48: 1, 47: 2, 46: 3, 45: 4, 44: 5, 43: 6, 42: 7, 41: 8,
+        31: 10, 32: 11, 33: 12, 34: 13, 35: 14, 36: 15, 37: 16, 38: 17
+    };
+    if (permanentUpper[fdi]) {
+        return "/images/Periodontogram/tooth/up" + permanentUpper[fdi] + ".png";
+    }
+    if (permanentLower[fdi]) {
+        return "/images/Periodontogram/tooth/down" + permanentLower[fdi] + ".png";
+    }
+    // Fallback: dentición temporal mantiene los assets actuales
+    var section = (fdi >= 51 && fdi <= 65) ? "sup" : "inf";
+    return "/images/dentadura-" + section + "-" + fdi + ".png";
+};
+
+// Mapeo FDI permanente -> imagen de IMPLANTE del periodontograma. Se usa cuando el
+// diente tiene aplicado el damage IMPLANTE (id=6) para reemplazar visualmente la
+// pieza dental por la representación de implante. Retorna null para temporales.
+OdontogramaGenerator.prototype.getImplantImagePath = function (fdi) {
+    "use strict";
+    var permanentUpper = {
+        18: 1, 17: 2, 16: 3, 15: 4, 14: 5, 13: 6, 12: 7, 11: 8,
+        21: 10, 22: 11, 23: 12, 24: 13, 25: 14, 26: 15, 27: 16, 28: 17
+    };
+    var permanentLower = {
+        48: 1, 47: 2, 46: 3, 45: 4, 44: 5, 43: 6, 42: 7, 41: 8,
+        31: 10, 32: 11, 33: 12, 34: 13, 35: 14, 36: 15, 37: 16, 38: 17
+    };
+    if (permanentUpper[fdi]) {
+        return "/images/Periodontogram/implant/up" + permanentUpper[fdi] + ".png";
+    }
+    if (permanentLower[fdi]) {
+        return "/images/Periodontogram/implant/down" + permanentLower[fdi] + ".png";
+    }
+    return null;
+};
+
+// Helper para precargar la imagen de implante asociada a un Tooth.
+// Se invoca tras asignar tooth.image en cada loop de prepareOdontograma*.
+OdontogramaGenerator.prototype.attachImplantImage = function (tooth, fdi) {
+    "use strict";
+    var path = this.getImplantImagePath(fdi);
+    if (!path) return;
+    var img = new Image();
+    img.src = path;
+    tooth.implantImage = img;
+};
 
 /**
  * Method to set reference to the engine which uses this 
@@ -91,16 +148,17 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
     var self = this;
     this.arrayCount = 0;
 
-    // center the ondotograma horizontal
-    var width = canvas.width;
+    // center the ondotograma horizontal — usar dimensiones LÓGICAS (canvas físico
+    // puede estar escalado por DPR, pero el layout va en coords lógicas)
+    var width = canvas._logicalWidth || canvas.width;
     var odontWidth = 16 * this.imgWidth;
     var start = (width - odontWidth) / 2;
-    
+
     // start of first tooth
     var x = start;
 
     // center vertial
-    var height = canvas.height;
+    var height = canvas._logicalHeight || canvas.height;
     var odontHeight = 2 * 80;
     var base = (height - odontHeight) / 2 + yOffset;
     
@@ -127,15 +185,16 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
         };
         
         image.onerror = function () {
-            console.error("Error al cargar imagen: /images/dentadura-sup-" + i + ".png");
+            console.error("Error al cargar imagen: " + this.src);
             // Actualizar contador incluso si hay error para que el engine pueda iniciar
             self.updateLoad();
         };
 
-        image.src = "/images/dentadura-sup-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
         
         tooth.setDimens(x,
                         base, 
@@ -203,15 +262,16 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
         };
         
         image.onerror = function () {
-            console.error("Error al cargar imagen: /images/dentadura-sup-" + i + ".png");
+            console.error("Error al cargar imagen: " + this.src);
             // Actualizar contador incluso si hay error para que el engine pueda iniciar
             self.updateLoad();
         };
 
-        image.src = "/images/dentadura-sup-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
         
         tooth.setDimens(x, 
                         base,
@@ -275,15 +335,16 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
         };
         
         image.onerror = function () {
-            console.error("Error al cargar imagen: /images/dentadura-inf-" + i + ".png");
+            console.error("Error al cargar imagen: " + this.src);
             // Actualizar contador incluso si hay error para que el engine pueda iniciar
             self.updateLoad();
         };
 
-        image.src = "/images/dentadura-inf-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
 
         tooth.setDimens(x,
                         base + this.seperator,
@@ -350,15 +411,16 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
         };
         
         image.onerror = function () {
-            console.error("Error al cargar imagen: /images/dentadura-inf-" + i + ".png");
+            console.error("Error al cargar imagen: " + this.src);
             // Actualizar contador incluso si hay error para que el engine pueda iniciar
             self.updateLoad();
         };
 
-        image.src = "/images/dentadura-inf-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
         tooth.setDimens(x,
                         base + this.seperator,
                         this.imgWidth,
@@ -407,11 +469,12 @@ OdontogramaGenerator.prototype.prepareOdontogramaAdult = function (odontograma,
  */
 OdontogramaGenerator.prototype.prepareOdontogramaChild = function (odontograma,
 spaces, canvas) {
-    "use strict"; 
+    "use strict";
+    var self = this;
     this.arrayCount = 0;
 
-    // center odontograma horizontal
-    var width = canvas.width;
+    // center odontograma horizontal — usar dimensiones LÓGICAS
+    var width = canvas._logicalWidth || canvas.width;
     var odontWidth = 10 * this.imgWidth;
     var start = (width - odontWidth) / 2;
 
@@ -419,7 +482,7 @@ spaces, canvas) {
     var x = start;
 
     // center odontograma vertical
-    var height = canvas.height;
+    var height = canvas._logicalHeight || canvas.height;
     var odontHeight = 2 * 80;
     var base = (height - odontHeight) / 2;
 
@@ -439,10 +502,11 @@ spaces, canvas) {
 
         var image = new Image();
 
-        image.src = "/images/dentadura-sup-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
 
         tooth.setDimens(x,
                         base,
@@ -503,10 +567,11 @@ spaces, canvas) {
 
         var image = new Image;
 
-        image.src = "/images/dentadura-sup-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
 
         tooth.setDimens(x,
                         base,
@@ -568,10 +633,11 @@ spaces, canvas) {
 
         var image = new Image();
 
-        image.src = "/images/dentadura-inf-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
 
         tooth.setDimens(x,
                         base + this.seperator,
@@ -632,10 +698,11 @@ spaces, canvas) {
 
         var image = new Image();
 
-        image.src = "/images/dentadura-inf-" + i + ".png";
+        image.src = self.getToothImagePath(i);
 
         tooth.id = i;
         tooth.image = image;
+        self.attachImplantImage(tooth, i);
         tooth.setDimens(x,
                         base + this.seperator,
                         this.imgWidth,

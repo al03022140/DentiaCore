@@ -2,18 +2,36 @@
    Settings Page — DentiaCore
    ======================================== */
 
+/* Mismo fondo que .dashboard / .content para que el scroll y los sticky no contrasten (claro y oscuro) */
 .settings-page {
   width: 100%;
   margin: 0;
-  padding: 0 var(--spacing-lg);
+  --settings-pad-x: var(--spacing-lg);
+  padding: 0 var(--settings-pad-x);
   height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
 .settings-page::-webkit-scrollbar {
   display: none;
+}
+
+/* Franja sticky a todo el ancho del área de scroll (evita huecos sin gris al lado del título) */
+.settings-title-strip {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  width: calc(100% + 2 * var(--settings-pad-x));
+  max-width: none;
+  margin-left: calc(-1 * var(--settings-pad-x));
+  margin-right: calc(-1 * var(--settings-pad-x));
+  padding-left: var(--settings-pad-x);
+  padding-right: var(--settings-pad-x);
+  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
 .settings-title {
@@ -23,10 +41,6 @@
   margin: 0;
   padding: var(--spacing-xl) 0 1rem;
   border-bottom: none;
-  position: sticky;
-  top: 0;
-  background: var(--color-bg-light);
-  z-index: 10;
 }
 
 /* ── Settings List ────────────────────── */
@@ -53,14 +67,22 @@
 }
 
 .settings-row:hover {
-  background-color: var(--color-bg-section);
+  background-color: var(--color-blue-500-08);
 }
 
 .settings-row-icon {
-  font-size: 1.5rem;
+  font-size: 2rem;
   flex-shrink: 0;
-  width: 2.2rem;
+  width: 3.25rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-row-icon img {
+  width: 36px;
+  height: 36px;
 }
 
 .settings-row-info {
@@ -100,11 +122,13 @@
 .settings-section {
   width: 100%;
   margin: 0;
-  padding: 0 var(--spacing-lg);
+  --settings-pad-x: var(--spacing-lg);
+  padding: 0 var(--settings-pad-x);
   height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  background: var(--figma-bg-page, var(--color-bg-light));
 }
 
 .settings-section::-webkit-scrollbar {
@@ -112,16 +136,26 @@
 }
 
 .settings-section-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  width: calc(100% + 2 * var(--settings-pad-x));
+  max-width: none;
+  margin-left: calc(-1 * var(--settings-pad-x));
+  margin-right: calc(-1 * var(--settings-pad-x));
+  padding-left: var(--settings-pad-x);
+  padding-right: var(--settings-pad-x);
+  background: var(--figma-bg-page, var(--color-bg-light));
+}
+
+.settings-section-header-inner {
   max-width: 720px;
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl) 0 1rem;
   margin: 0;
-  position: sticky;
-  top: 0;
-  background: var(--color-bg-light);
-  z-index: 10;
 }
 
 .settings-back-btn {
@@ -232,6 +266,19 @@
 
 .settings-btn-secondary:hover {
   background: var(--color-blue-500-08);
+}
+
+.settings-btn--with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.settings-btn--with-icon svg {
+  flex-shrink: 0;
 }
 
 .settings-btn-danger {
@@ -463,7 +510,8 @@
 @media (max-width: 768px) {
   .settings-page,
   .settings-section {
-    padding: var(--spacing-lg) var(--spacing-md);
+    --settings-pad-x: var(--spacing-md);
+    padding: var(--spacing-lg) var(--settings-pad-x);
   }
 
   .settings-card {
@@ -555,7 +603,7 @@
 }
 
 .trace-patient-option:hover {
-  background: var(--color-bg-section);
+  background: var(--color-blue-500-08);
 }
 
 /* ── Results ── */
@@ -657,7 +705,7 @@
 }
 
 .trace-entry:hover {
-  background: var(--color-bg-section);
+  background: var(--color-blue-500-08);
 }
 
 .trace-time {

@@ -23,8 +23,8 @@ exports.getTodayAppointments = async (req, res) => {
             deletedAt: null,
             fecha_hora: { $gte: startOfDay, $lte: endOfDay }
         })
-            .populate('paciente_id', 'nombre apellidos foto fecha_nacimiento sexo')
-            .populate('doctor_id', 'nombre apellidos')
+            .populate('paciente_id', 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento sexo')
+            .populate('doctor_id', 'nombre')
             .sort({ fecha_hora: 1 });
 
         res.status(200).json(appointments);
@@ -47,8 +47,19 @@ exports.getAppointmentById = async (req, res) => {
 
 // 🔹 Crear una nueva cita
 exports.createAppointment = async (req, res) => {
+    let newAppointment = null;
     try {
-        const { paciente_id, doctor_id, fecha_hora, estado, motivo, observaciones, comentarioProcedimiento, items } = req.body;
+        // `estado` se ignora del cliente: el modelo lo deja en "Pendiente" y el
+        // pre-save lo transiciona a "Pasada" cuando aplica.
+        const { paciente_id, doctor_id, fecha_hora, motivo, observaciones, comentarioProcedimiento, items } = req.body;
+
+        const fecha = new Date(fecha_hora);
+        if (Number.isNaN(fecha.getTime())) {
+            return res.status(400).json({ message: "Fecha y hora inválidas." });
+        }
+        if (fecha <= new Date()) {
+            return res.status(400).json({ message: "No se pueden programar citas en el pasado." });
+        }
 
         // Procesar items si vienen
         let processedItems = [];
@@ -71,11 +82,10 @@ exports.createAppointment = async (req, res) => {
             }
         }
 
-        const newAppointment = new Appointment({
+        newAppointment = new Appointment({
             paciente_id,
             doctor_id,
-            fecha_hora,
-            estado,
+            fecha_hora: fecha,
             motivo,
             observaciones,
             comentarioProcedimiento,
@@ -85,23 +95,30 @@ exports.createAppointment = async (req, res) => {
         });
         await newAppointment.save();
 
-        // Auto-crear cobro en caja si hay items
+        // Auto-crear cobro en caja si hay items. Si falla, rollback la cita
+        // para no dejar registros huérfanos (no usamos transacción porque
+        // Mongo standalone no la soporta).
         if (processedItems.length > 0) {
-            const charge = new PatientCharge({
-                patientId: paciente_id,
-                appointmentId: newAppointment._id,
-                fecha: fecha_hora || new Date(),
-                items: processedItems,
-                total: totalEstimado,
-                confirmado: false,
-                creadoPor: req.user?.id || null
-            });
-            await charge.save();
+            try {
+                const charge = new PatientCharge({
+                    patientId: paciente_id,
+                    appointmentId: newAppointment._id,
+                    fecha: fecha,
+                    items: processedItems,
+                    total: totalEstimado,
+                    confirmado: false,
+                    creadoPor: req.user?.id || null
+                });
+                await charge.save();
+            } catch (chargeErr) {
+                await Appointment.deleteOne({ _id: newAppointment._id });
+                throw chargeErr;
+            }
         }
 
         const populated = await Appointment.findById(newAppointment._id)
-            .populate('paciente_id', 'nombre apellidos foto fecha_nacimiento sexo')
-            .populate('doctor_id', 'nombre apellidos');
+            .populate('paciente_id', 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento sexo')
+            .populate('doctor_id', 'nombre');
 
         res.status(201).json({
             message: "Cita creada correctamente",

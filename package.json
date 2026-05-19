@@ -12,7 +12,8 @@
     "start": "npm run kill-port && npm run kill-client-port && concurrently \"npm run mongod\" \"npm run client\" \"npm run server\"",
     "test:server": "npm --prefix Server run test",
     "test:client": "npm --prefix Client run test",
-    "test": "npm run test:server && npm run test:client"
+    "test": "npm run test:server && npm run test:client",
+    "seed:demo-patients": "node scripts/seed-demo-patients.js"
   },
   "keywords": [],
   "author": "",

@@ -1,6 +1,8 @@
 .audit-timeline {
   padding: 1rem;
   max-width: 800px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .audit-timeline__title {
@@ -12,7 +14,7 @@
 .audit-timeline__error {
   color: var(--color-danger, #e53e3e);
   padding: 0.75rem;
-  background: #fff5f5;
+  background: var(--color-red-100, #fff5f5);
   border-radius: 6px;
   margin-bottom: 1rem;
 }
@@ -67,6 +69,7 @@
   border: 1px solid var(--color-border-medium, #e2e8f0);
   border-radius: 8px;
   padding: 0.6rem 0.85rem;
+  min-width: 0;
 }
 
 .audit-timeline__header {
@@ -132,13 +135,13 @@
 }
 
 .audit-timeline__diff--antes {
-  background: #fff5f5;
-  border: 1px solid #feb2b2;
+  background: var(--color-red-100, #fff5f5);
+  border: 1px solid var(--color-red-200, #feb2b2);
 }
 
 .audit-timeline__diff--despues {
-  background: #f0fff4;
-  border: 1px solid #9ae6b4;
+  background: var(--color-success-100, #f0fff4);
+  border: 1px solid var(--color-green-300, #9ae6b4);
 }
 
 .audit-timeline__pagination {
@@ -149,6 +152,7 @@
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border-medium, #e2e8f0);
+  flex-wrap: wrap;
 }
 
 .audit-timeline__pagination button {
@@ -173,4 +177,68 @@
 .audit-timeline__pagination span {
   font-size: 0.8rem;
   color: var(--color-text-muted);
+}
+
+/* Responsive: Tablet */
+@media (max-width: 768px) {
+  .audit-timeline {
+    padding: 0.75rem;
+  }
+
+  .audit-timeline__list {
+    padding-left: 1.5rem;
+  }
+
+  .audit-timeline__list::before {
+    left: 0.65rem;
+  }
+
+  .audit-timeline__marker {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.7rem;
+    margin-left: -0.75rem;
+  }
+
+  .audit-timeline__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .audit-timeline__meta {
+    margin-left: 0;
+  }
+
+  .audit-timeline__diff {
+    flex-direction: column;
+  }
+
+  .audit-timeline__diff-section {
+    min-width: 0;
+  }
+}
+
+/* Responsive: Mobile */
+@media (max-width: 480px) {
+  .audit-timeline {
+    padding: 0.5rem;
+  }
+
+  .audit-timeline__content {
+    padding: 0.5rem;
+  }
+
+  .audit-timeline__desc {
+    font-size: 0.78rem;
+  }
+
+  .audit-timeline__pagination {
+    gap: 0.5rem;
+  }
+
+  .audit-timeline__pagination button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+  }
 }

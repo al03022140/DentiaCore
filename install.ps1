@@ -132,7 +132,9 @@ try {
                 Start-Service "MongoDB" -ErrorAction SilentlyContinue
                 Write-Ok "Servicio instalado e iniciado."
             } else {
-                Write-Warn "No se encontro mongod.exe. Omitiendo servicio."
+                Write-Err "No se encontro mongod.exe en tools\mongo\bin ni en el repositorio."
+                Write-Err "Coloca el binario en tools\mongo\bin\mongod.exe o instala MongoDB Community: https://www.mongodb.com/try/download/community"
+                throw "mongod_not_found"
             }
         } else {
             Write-Ok "Servicio MongoDB ya existe."
@@ -153,6 +155,28 @@ try {
                     }
                 }
             }
+        }
+
+        # Validar que MongoDB esta corriendo y escuchando en 27017
+        $Service = Get-Service "MongoDB" -ErrorAction SilentlyContinue
+        if ($Service -and $Service.Status -ne 'Running') {
+            Write-Step "Iniciando servicio MongoDB..."
+            Start-Service "MongoDB" -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            $Service.Refresh()
+        }
+        if (-not $Service -or $Service.Status -ne 'Running') {
+            Write-Err "El servicio MongoDB no esta corriendo. Revisa $LogDir\mongod.log e intenta: Start-Service MongoDB"
+            throw "mongo_service_not_running"
+        }
+        $TcpOk = $false
+        try {
+            $TcpOk = (Test-NetConnection -ComputerName 127.0.0.1 -Port 27017 -InformationLevel Quiet -WarningAction SilentlyContinue)
+        } catch { $TcpOk = $false }
+        if (-not $TcpOk) {
+            Write-Warn "MongoDB esta como servicio pero el puerto 27017 no responde aun. Esto puede deberse a un arranque lento; verifica con 'Test-NetConnection 127.0.0.1 -Port 27017'."
+        } else {
+            Write-Ok "MongoDB corriendo y escuchando en 127.0.0.1:27017"
         }
     }
 
@@ -196,11 +220,26 @@ try {
     Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados."
 
     Write-Header "4. INSTALANDO Y COMPILANDO"
-    
+
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         Write-Warn "Instalando Node.js..."
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent 2>$null
+        $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
     }
+
+    # Validar version minima de Node (>= 18 para Vite 6)
+    $NodeVersionRaw = (& node -v 2>$null)
+    if (-not $NodeVersionRaw) {
+        Write-Err "Node.js no quedo disponible en PATH tras la instalacion. Reinicia la terminal o instala manualmente desde https://nodejs.org"
+        throw "node_not_found"
+    }
+    $NodeMajor = 0
+    try { $NodeMajor = [int]((($NodeVersionRaw -replace '^v','') -split '\.')[0]) } catch { $NodeMajor = 0 }
+    if ($NodeMajor -lt 18) {
+        Write-Err "Node.js v18 o superior es requerido (detectado: $NodeVersionRaw). Actualiza con: winget upgrade OpenJS.NodeJS.LTS"
+        throw "node_version_too_old"
+    }
+    Write-Ok "Node.js validado: $NodeVersionRaw"
 
     Run-NpmInstall $RepoRoot
 

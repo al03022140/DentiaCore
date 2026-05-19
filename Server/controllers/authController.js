@@ -6,9 +6,32 @@ const auditLogger = require('../middlewares/auditLogger');
 const { hashToken, generateSecureToken, getJwtSecret, validatePasswordStrength } = require('../utils/crypto');
 const logger = require('../utils/logger');
 
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (_e) {
+  bcrypt = require('bcryptjs');
+}
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MINUTES = 15;
 const PASSWORD_RESET_TTL_MINUTES = 30;
+const BCRYPT_COST = 12;
+
+// Hash bcrypt precomputado contra el que comparamos cuando el usuario NO existe.
+// Sin esto, login responde rápido si el email no existe (no se ejecuta bcrypt)
+// y lento si existe — eso permite enumerar emails midiendo timing. Con el
+// dummy hash, ambos caminos pagan los ~100-300ms del bcrypt.compare.
+let _dummyPasswordHashPromise = null;
+const getDummyPasswordHash = () => {
+  if (!_dummyPasswordHashPromise) {
+    _dummyPasswordHashPromise = bcrypt.hash(
+      'never-a-real-password-' + Math.random().toString(36).slice(2),
+      BCRYPT_COST
+    );
+  }
+  return _dummyPasswordHashPromise;
+};
 
 const getAccessTtl = () => process.env.JWT_ACCESS_TTL || '15m';
 const getRefreshTtl = () => process.env.JWT_REFRESH_TTL || '7d';
@@ -78,7 +101,11 @@ const respondWithTokens = async (res, user) => {
   const accessToken = signAccessToken(user, permissions);
   const refreshToken = signRefreshToken(user);
 
-  // Store hashed refresh token — never store raw tokens in DB
+  // Guardamos el hash actual como "previo" antes de rotar. Permite tolerar
+  // refresh concurrente (multi-tab) sin disparar el detector de reuso —
+  // los dos requests llegan con el mismo token viejo y deben poder rotarlo
+  // sin que el segundo crea que es un ataque.
+  user.previousRefreshTokenHash = user.refreshTokenHash || null;
   user.refreshTokenHash = hashToken(refreshToken);
   user.refreshTokenExpiresAt = new Date(Date.now() + parseDurationToMs(getRefreshTtl()));
   await user.save();
@@ -99,55 +126,66 @@ const respondWithTokens = async (res, user) => {
 
 const login = async (req, res, next) => {
   try {
-  const { email, contraseña } = req.body || {};
+    const { email, contraseña } = req.body || {};
 
-  if (!email || !contraseña) {
-    return res.status(400).json({ message: 'Email y contraseña son requeridos' });
-  }
-
-  const user = await Usuario.findOne({ email: email.toLowerCase().trim() });
-  if (!user) {
-    return res.status(401).json({ message: 'Credenciales inválidas' });
-  }
-
-  if (user.active === false) {
-    return res.status(403).json({ message: 'Usuario desactivado' });
-  }
-
-  if (user.lockUntil && user.lockUntil > Date.now()) {
-    return res.status(423).json({ message: 'Cuenta bloqueada temporalmente' });
-  }
-
-  const passwordMatches = await user.compararContraseña(contraseña);
-  if (!passwordMatches) {
-    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-    if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
-      user.lockUntil = Date.now() + LOCK_TIME_MINUTES * 60 * 1000;
-      user.failedLoginAttempts = 0;
+    if (!email || !contraseña) {
+      return res.status(400).json({ message: 'Email y contraseña son requeridos' });
     }
-    await user.save();
 
-    // Registrar login fallido en auditoría (NOM-024)
-    auditLogger.registrarManual(
-      { user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip },
-      'login_fallido',
-      { resourceType: 'usuario', resourceId: user._id, detalles: { intentos: user.failedLoginAttempts } }
-    ).catch(() => {});
+    const user = await Usuario.findOne({ email: String(email).toLowerCase().trim() });
 
-    return res.status(401).json({ message: 'Credenciales inválidas' });
-  }
+    // Mantener tiempo constante: si el usuario no existe, comparar contra el
+    // hash dummy para que el atacante no pueda enumerar emails por timing.
+    const hashToCompare = user ? user.contraseña : await getDummyPasswordHash();
+    const passwordMatches = await bcrypt.compare(contraseña, hashToCompare);
 
-  user.failedLoginAttempts = 0;
-  user.lockUntil = null;
-  user.lastLoginAt = new Date();
+    // El bloqueo por cuenta inactiva o por intentos fallidos sólo aplica a
+    // usuarios reales. Si no hay user, devolvemos el 401 genérico.
+    if (!user) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
+    }
 
-  // Registrar login exitoso en auditoría
-  auditLogger.registrarManual({ user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip }, 'login_exitoso', {
-    resourceType: 'usuario',
-    resourceId: user._id,
-  }).catch(() => {});
+    if (user.active === false) {
+      return res.status(403).json({ message: 'Usuario desactivado' });
+    }
 
-  return respondWithTokens(res, user);
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      return res.status(423).json({ message: 'Cuenta bloqueada temporalmente' });
+    }
+
+    if (!passwordMatches) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        user.lockUntil = Date.now() + LOCK_TIME_MINUTES * 60 * 1000;
+        user.failedLoginAttempts = 0;
+      }
+      await user.save();
+
+      // Registrar login fallido en auditoría (NOM-024)
+      auditLogger.registrarManual(
+        { user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip },
+        'login_fallido',
+        { resourceType: 'usuario', resourceId: user._id, detalles: { intentos: user.failedLoginAttempts } }
+      ).catch(() => {});
+
+      return res.status(401).json({ message: 'Credenciales inválidas' });
+    }
+
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    // Resetear pinFailedAttempts: el mensaje del 423 del PIN dice "Inicie
+    // sesión nuevamente" — sin esto, el PIN quedaba bloqueado para siempre
+    // después de 5 intentos fallidos.
+    user.pinFailedAttempts = 0;
+    user.lastLoginAt = new Date();
+
+    // Registrar login exitoso en auditoría
+    auditLogger.registrarManual({ user: { id: user._id, role: user.rol, nombre: user.nombre }, ip: req.ip }, 'login_exitoso', {
+      resourceType: 'usuario',
+      resourceId: user._id,
+    }).catch(() => {});
+
+    return respondWithTokens(res, user);
   } catch (error) {
     next(error);
   }
@@ -155,38 +193,48 @@ const login = async (req, res, next) => {
 
 const refresh = async (req, res, next) => {
   try {
-  const token = req.cookies?.refreshToken || req.body?.refreshToken;
-  if (!token) {
-    return res.status(401).json({ message: 'Refresh token requerido' });
-  }
+    // SÓLO cookie HttpOnly. Quitamos el fallback a req.body.refreshToken
+    // como defensa en profundidad: aunque algún componente futuro guarde
+    // el refresh en localStorage por error, no podrá usarse desde JS.
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res.status(401).json({ message: 'Refresh token requerido' });
+    }
 
-  let payload;
-  try {
-    payload = jwt.verify(token, getJwtSecret());
-  } catch (_error) {
-    return res.status(401).json({ message: 'Refresh token inválido o expirado' });
-  }
+    let payload;
+    try {
+      payload = jwt.verify(token, getJwtSecret());
+    } catch (_error) {
+      return res.status(401).json({ message: 'Refresh token inválido o expirado' });
+    }
 
-  if (payload.type !== 'refresh') {
-    return res.status(401).json({ message: 'Refresh token inválido' });
-  }
+    if (payload.type !== 'refresh') {
+      return res.status(401).json({ message: 'Refresh token inválido' });
+    }
 
-  const user = await Usuario.findById(payload.sub);
-  if (!user || user.active === false) {
-    return res.status(401).json({ message: 'Refresh token inválido' });
-  }
+    const user = await Usuario.findById(payload.sub);
+    if (!user || user.active === false) {
+      return res.status(401).json({ message: 'Refresh token inválido' });
+    }
 
-  // Compare hashed refresh token
-  if (user.refreshTokenHash !== hashToken(token)) {
-    // Possible token reuse attack — invalidate all sessions for this user
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
-    await user.save();
-    logger.warn(`Refresh token reuse detected for user ${user._id}`);
-    return res.status(401).json({ message: 'Refresh token inválido' });
-  }
+    const incomingHash = hashToken(token);
+    // Aceptamos el hash actual o el inmediatamente anterior. Esto tolera el
+    // refresh concurrente desde múltiples pestañas (las dos pestañas envían
+    // el mismo token viejo). Si llega un hash que no es ninguno de los dos,
+    // es reutilización real → invalidamos toda la sesión.
+    const matchesCurrent = user.refreshTokenHash && user.refreshTokenHash === incomingHash;
+    const matchesPrevious = user.previousRefreshTokenHash && user.previousRefreshTokenHash === incomingHash;
 
-  return respondWithTokens(res, user);
+    if (!matchesCurrent && !matchesPrevious) {
+      user.refreshTokenHash = null;
+      user.previousRefreshTokenHash = null;
+      user.refreshTokenExpiresAt = null;
+      await user.save();
+      logger.warn(`Refresh token reuse detected for user ${user._id}`);
+      return res.status(401).json({ message: 'Refresh token inválido' });
+    }
+
+    return respondWithTokens(res, user);
   } catch (error) {
     next(error);
   }
@@ -194,32 +242,46 @@ const refresh = async (req, res, next) => {
 
 const logout = async (req, res, next) => {
   try {
-  const token = req.cookies?.refreshToken;
-  if (token) {
-    try {
-      const payload = jwt.verify(token, getJwtSecret());
-      const user = await Usuario.findById(payload.sub);
-      if (user) {
-        user.refreshTokenHash = null;
-        user.refreshTokenExpiresAt = null;
-        await user.save();
+    const token = req.cookies?.refreshToken;
+    // La ruta /logout NO usa el middleware `authenticate` (debe poder llamarse
+    // con access token expirado), así que `req.user` viene siempre undefined.
+    // Recuperamos el userId desde el refresh token cookie para poder dejar
+    // el audit log NOM-024.
+    let userIdForAudit = null;
+    let userForAudit = null;
+
+    if (token) {
+      try {
+        const payload = jwt.verify(token, getJwtSecret());
+        userIdForAudit = payload.sub;
+        const user = await Usuario.findById(payload.sub);
+        if (user) {
+          userForAudit = user;
+          user.refreshTokenHash = null;
+          user.previousRefreshTokenHash = null;
+          user.refreshTokenExpiresAt = null;
+          await user.save();
+        }
+      } catch (_error) {
+        // Ignorar errores de token al cerrar sesión
       }
-    } catch (_error) {
-      // Ignorar errores de token al cerrar sesión
     }
-  }
 
-  // Registrar logout en auditoría (NOM-024)
-  if (req.user) {
-    auditLogger.registrarManual(
-      req,
-      'logout',
-      { resourceType: 'usuario', resourceId: req.user.id }
-    ).catch(() => {});
-  }
+    // Registrar logout en auditoría (NOM-024). Preferimos req.user si vino
+    // por un middleware externo, pero caemos al refresh token si no.
+    if (req.user || userIdForAudit) {
+      const ctx = req.user
+        ? req
+        : { user: { id: userIdForAudit, role: userForAudit?.rol, nombre: userForAudit?.nombre }, ip: req.ip };
+      auditLogger.registrarManual(
+        ctx,
+        'logout',
+        { resourceType: 'usuario', resourceId: req.user?.id || userIdForAudit }
+      ).catch(() => {});
+    }
 
-  res.clearCookie('refreshToken', buildCookieOptions());
-  return res.status(204).send();
+    res.clearCookie('refreshToken', buildCookieOptions());
+    return res.status(204).send();
   } catch (error) {
     next(error);
   }
@@ -228,8 +290,12 @@ const logout = async (req, res, next) => {
 const me = async (req, res, next) => {
   try {
   const user = await Usuario.findById(req.user.id);
-  if (!user) {
-    return res.status(404).json({ message: 'Usuario no encontrado' });
+  if (!user || user.active === false) {
+    // El JWT era válido pero el usuario fue eliminado o desactivado:
+    // tratar como sesión inválida (401) en vez de 404 para que el front
+    // dispare el flujo de logout sin distinguir "usuario borrado" de
+    // "token inválido".
+    return res.status(401).json({ message: 'Sesión inválida' });
   }
 
   const settings = await ClinicSettings.getSettings();

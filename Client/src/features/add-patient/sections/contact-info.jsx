@@ -13,7 +13,7 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
           />
         </div>
         <div className="form-group">
-          <label>Teléfono</label>
+          <label>Teléfono *</label>
           <input
             type="text"
             value={formData.contacto?.telefono || ""}
@@ -21,7 +21,7 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
           />
         </div>
         <div className="form-group">
-          <label>Dirección</label>
+          <label>Dirección *</label>
           <input
             type="text"
             value={formData.contacto?.direccion || ""}
@@ -45,7 +45,7 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
           />
         </div>
         <div className="form-group">
-          <label>Ciudad</label>
+          <label>Ciudad *</label>
           <input
             type="text"
             value={formData.contacto?.ciudad || ""}
@@ -53,7 +53,7 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
           />
         </div>
         <div className="form-group">
-          <label>Entidad Federativa</label>
+          <label>Entidad Federativa *</label>
           <input
             type="text"
             value={formData.contacto?.entidad_federativa || ""}

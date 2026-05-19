@@ -79,7 +79,7 @@ const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
         }
         className="action-button"
       >
-        <img src={plusIcon} alt="+" width="16" height="16" /> Agregar Antecedente Familiar
+        <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Antecedente Familiar
       </button>
     </section>
   );

@@ -1,121 +1,112 @@
 .header {
-  /* Altura estimada del header usada por otras vistas (ajustable) */
-  --app-header-height: 15vh;
-  grid-row: 1 / 2; /* Está en la primera fila */
-  grid-column: 2 / -1; /* Ocupa desde la segunda columna hacia la derecha */
-  background-color: var(--color-header-bg);
-  /* Usamos padding horizontal; la altura la controla la variable */
-  padding: 0 2rem;
   height: var(--app-header-height);
-  display: flex; /* Flexbox para alinear título y reloj */
+  background-color: var(--color-header-bg);
+  padding: 0 var(--figma-space-2xl);
+  display: flex;
   align-items: center;
-  justify-content: space-between; /* Título a la izquierda, reloj a la derecha */
-  font: var(--text-heading-lg);
-  color: var(--color-text-secondary);
-  border-bottom: 1px solid var(--color-border-medium);
-  box-sizing: border-box; /* Garantiza que padding no afecte el ancho */
+  justify-content: space-between;
+  border-bottom: 1px solid var(--figma-border-default);
+  box-sizing: border-box;
+  gap: var(--figma-space-lg);
+  box-shadow: var(--figma-shadow-card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: height 0.25s ease, border-color 0.25s ease, opacity 0.2s ease;
+}
+
+/* Auto-hide del header SÓLO en la página de detalle de paciente. La página
+   marca <body data-pd-app-header-hidden="true"> al scrollear hacia abajo
+   (ver patient-detail.jsx); el header colapsa su altura a 0 y, como el
+   contenedor `.main` es flex column con `.content` flex:1, `.content` ocupa
+   la altura liberada. La barra de pestañas (sticky top:0 dentro de
+   `.content`) sube con él. Sin los atributos del body el header se
+   comporta normal en el resto de la app. */
+body[data-pd-app-header-hidden="true"] .header {
+  height: 0;
+  border-bottom-color: transparent;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .header h1,
 .header .header-greeting {
-  font: var(--text-display-xl);
-  color: var(--color-text-secondary);
+  font: var(--figma-fw-medium) clamp(1.75rem, 3vw, 3rem) / 1.3 var(--font-family-primary);
+  color: var(--figma-text-primary);
   flex: 1;
   min-width: 0;
   text-align: left;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-.header__title {
-  font-family: var(--font-family-primary);
+  margin: 0;
 }
 
-/* Contenedor de acciones del header (botones a la derecha) */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--figma-space-xs);
+  flex-shrink: 0;
 }
 
 .lock-button {
-  background: none;
-  border: 1px solid var(--color-border-medium);
-  border-radius: 6px;
-  padding: 0.4rem 0.8rem;
+  background: var(--figma-bg-input);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
+  padding: var(--figma-badge-padding);
   cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  transition: background 0.2s;
+  font: var(--figma-text-small);
+  color: var(--figma-text-secondary);
+  transition: background var(--figma-transition-fast), border-color var(--figma-transition-fast);
 }
+
 .lock-button:hover {
-  background: var(--color-bg-tertiary, #f0f0f0);
+  background: var(--figma-bg-neutral);
+  border-color: var(--figma-text-secondary);
 }
 
-
-/* Ajustes responsivos */
-@media (max-width: 1200px) {
-  .header {
-    font: var(--text-heading-md); /* Reduce el tamaño de la fuente para pantallas más pequeñas */
-    --app-header-height: 72px;
-    padding: 0 1.5rem;
-  }
-  .header h1 {
-    font: var(--text-heading-xl);
-  }
+.hamburger-button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: var(--figma-bg-input);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-sm);
+  padding: 0.5rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  width: var(--figma-btn-height);
+  height: var(--figma-btn-height);
+  align-items: center;
+  transition: background var(--figma-transition-fast);
 }
 
-@media (max-width: 992px) {
-  .header {
-    font: var(--text-heading-sm); /* Reduce aún más el tamaño de la fuente */
-    --app-header-height: 64px;
-    padding: 0 1.25rem;
-  }
-  .header h1 {
-    font: var(--text-heading-lg);
-  }
+.hamburger-button:hover {
+  background: var(--figma-bg-neutral);
+}
+
+.hamburger-line {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  background-color: var(--figma-text-primary);
+  border-radius: 1px;
+  transition: transform var(--figma-transition-fast);
 }
 
 @media (max-width: 768px) {
   .header {
-    font: var(--text-heading-xs); /* Reduce el tamaño de la fuente para pantallas medianas */
-    --app-header-height: 56px;
-    padding: 0 1rem;
-  }
-  .header h1 {
-    font: var(--text-heading-md);
-  }
-}
-
-@media (max-width: 576px) {
-  .header {
-    font: var(--text-heading-xxs); /* Reduce el tamaño de la fuente para pantallas pequeñas */
-    --app-header-height: 48px;
-    padding: 0 0.75rem;
-  }
-  .header h1 {
-    font: var(--text-heading-sm);
+    height: 56px;
+    padding: 0 var(--figma-space-lg);
   }
 }
 
 @media (max-width: 480px) {
   .header {
-    font: var(--text-subtitle-lg); /* Reduce aún más el tamaño de la fuente para pantallas muy pequeñas */
-    --app-header-height: 44px;
-    padding: 0 0.5rem;
-  }
-  .header h1 {
-    font: var(--text-heading-xs);
-  }
-}
-
-/* Ajustes para escala de 125% */
-@media (resolution: 125dpi) {
-  .header {
-    font: var(--text-heading-sm); /* Ajusta el tamaño de la fuente para escala de 125% */
-    padding: 0.4rem 1rem;
-  }
-  .header h1 {
-    font: var(--text-heading-lg);
+    height: 48px;
+    padding: 0 var(--figma-space-md);
   }
 }

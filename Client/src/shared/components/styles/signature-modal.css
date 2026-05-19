@@ -7,6 +7,7 @@
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
+  padding: 1rem;
 }
 
 .signature-modal-card {
@@ -60,6 +61,8 @@
   transition: border-color 0.2s;
   background-color: var(--color-bg-white);
   color: var(--color-text-dark);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .signature-modal-input:focus {
@@ -124,4 +127,29 @@
 .signature-modal-btn-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .signature-modal-card {
+    padding: 1.5rem 1rem;
+    width: 100%;
+  }
+
+  .signature-modal-card h2 {
+    font-size: 1.05rem;
+  }
+
+  .signature-modal-input {
+    font-size: 1.4rem;
+    letter-spacing: 0.35em;
+  }
+
+  .signature-modal-actions {
+    flex-direction: column;
+  }
+
+  .signature-modal-btn-cancel,
+  .signature-modal-btn-sign {
+    width: 100%;
+  }
 }

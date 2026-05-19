@@ -1,0 +1,93 @@
+---
+description: Reglas del design system basado en Figma MediCare UI KIT. Aplica tokens, patrones de componentes y convenciones de estilo para mantener consistencia visual.
+globs: ["Client/src/**/*.jsx", "Client/src/**/*.css"]
+alwaysApply: false
+---
+
+# Figma Design System — DentiaCore
+
+## Archivos de Referencia
+
+- **Tokens CSS**: `Client/src/shared/styles/figma-tokens.css`
+- **Variables existentes**: `Client/src/shared/styles/variables.css`
+- **Documentación**: `Client/src/docs/design-system.md`
+- **Figma source**: `figma.com/design/DXqn10kdViIi9kWXPqYHvd`
+
+## Reglas de Colores
+
+- IMPORTANTE: Nunca usar colores hex hardcodeados. Usar variables de `variables.css` o `figma-tokens.css`.
+- Texto principal: `var(--figma-text-primary)` o `var(--color-text-strong)`
+- Texto secundario: `var(--figma-text-secondary)` o `var(--color-text-secondary)`
+- Fondo de cards: `var(--figma-bg-card)` o `var(--color-bg-white)`
+- Fondo de página: `var(--figma-bg-page)` o `var(--color-bg-light)`
+- Bordes de contenedores: `var(--figma-border-default)` → `rgba(0,0,0,0.1)`
+- Fondos neutros (tabs, avatares): `var(--figma-bg-neutral)`
+- Fondos de inputs: `var(--figma-bg-input)`
+
+## Reglas de Tipografía
+
+- Font family del proyecto: `var(--font-family-primary)` (Montserrat)
+- Usar los font shorthand tokens de figma-tokens.css para nuevos componentes:
+  - Números/stats grandes: `font: var(--figma-text-stat)`
+  - Headings de sección: `font: var(--figma-text-heading-lg)`
+  - Subtítulos: `font: var(--figma-text-heading-md)`
+  - Nombres/body: `font: var(--figma-text-body)`
+  - Labels/botones: `font: var(--figma-text-label)`
+  - Captions: `font: var(--figma-text-caption)`
+  - Textos pequeños: `font: var(--figma-text-small)`
+
+## Reglas de Espaciado
+
+- Gap entre cards en grid: `var(--figma-gap-card-grid)` (16px)
+- Gap entre secciones: `var(--figma-gap-section)` (24px)
+- Gap entre list items: `var(--figma-gap-list-item)` (12px)
+- Gap inline (iconos/botones): `var(--figma-gap-inline)` (8px)
+- Padding de contenedores: `var(--figma-space-2xl)` (24px)
+
+## Reglas de Border Radius
+
+- Botones, badges, inputs: `var(--figma-radius-sm)` (8px)
+- List items, filas: `var(--figma-radius-md)` (10px)
+- Cards, contenedores principales: `var(--figma-radius-lg)` (14px)
+- Avatares: `var(--figma-radius-full)` (circle)
+
+## Patrones de Componentes
+
+### Stat Cards
+- Grid de 4 columnas con `gap: var(--figma-gap-card-grid)`
+- Cada card: bg white, border `var(--figma-border-default)`, radius 14px, padding 24px
+- Título con `--figma-text-label`, valor con `--figma-text-stat`, subtítulo con `--figma-text-small-regular`
+
+### Botones
+- Primario: bg `var(--figma-color-active-bg)`, text white, radius 8px, height 36px
+- Secundario/Ghost: bg `var(--figma-bg-input)`, border transparent, radius 8px
+
+### Badges de Estado
+- Height 22px, padding 3px 9px, radius 8px, font `--figma-text-small`
+- Active: bg oscuro (#030213), text white
+- Scheduled: bg neutral (#eceef2), text oscuro
+
+### Tab Bar
+- Container: bg `var(--figma-bg-neutral)`, radius 14px, height 36px
+- Tab activo: bg white, radius 14px
+- Tab inactivo: transparente
+
+### List Items
+- Border `var(--figma-border-default)`, radius 10px, height 70px
+- Flex entre avatar+nombre (izq) y hora+badge (der)
+
+### Avatares
+- 40x40px, circle, bg `var(--figma-bg-neutral)`, font `--figma-text-body-regular`
+
+## Dark Mode
+
+- Todos los tokens de `figma-tokens.css` se adaptan automáticamente con `[data-theme="dark"]`
+- IMPORTANTE: Siempre usar variables CSS, nunca valores directos, para que dark mode funcione
+
+## Flujo de Implementación
+
+1. Importar `figma-tokens.css` después de `variables.css` en `index.css`
+2. Para nuevos componentes, consultar `Client/src/docs/design-system.md`
+3. Usar tokens de Figma para colores, tipografía, espaciado y radius
+4. Cuando exista un token equivalente en `variables.css`, preferir ese
+5. Validar soporte dark mode al final

@@ -3,10 +3,11 @@
    Estandarizado con patient-detail
    ============================== */
 
-/* Layout principal */
+/* Layout principal: 2×2 — fila superior ~40%, inferior ~60% */
 .cash-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 4fr) minmax(0, 6fr);
   gap: 1.5rem;
   width: 100%;
   height: 100%;
@@ -16,15 +17,31 @@
   padding: 0;
   background-color: transparent;
   overflow: hidden;
-}
-
-.cash-left-section,
-.cash-right-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
   min-height: 0;
   min-width: 0;
+}
+
+.cash-dashboard-card {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.cash-actions-card {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cash-movements-card {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.pending-charges-panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Card base (alineado con consultas panel) ── */
@@ -65,17 +82,11 @@
   gap: 0.5rem;
 }
 
-/* Variantes de card */
-.cash-dashboard-card {
-  flex: 0 0 auto;
-}
-
-.cash-actions-card {
-  flex: 1;
-}
-
+/* Variantes de card — ocupan la celda del grid */
+.cash-dashboard-card,
+.cash-actions-card,
 .cash-movements-card {
-  flex: 1;
+  min-height: 0;
 }
 
 /* ── Ant Design Overrides (reset total) ── */
@@ -293,19 +304,27 @@
 /* ── Responsive ── */
 @media (max-width: 1366px) {
   .cash-page {
-    grid-template-columns: 55% 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 992px) {
   .cash-page {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: min(100%, 100vh);
+    overflow: auto;
     padding: 1rem;
+    gap: 1.5rem;
   }
 
-  .cash-left-section,
-  .cash-right-section {
-    height: auto;
+  .cash-dashboard-card,
+  .cash-actions-card,
+  .cash-movements-card,
+  .pending-charges-panel {
+    grid-column: unset;
+    grid-row: unset;
   }
 
   .cash-actions-card {
@@ -313,18 +332,15 @@
   }
 
   .cash-movements-card {
-    min-height: 31.25rem;
+    min-height: 18rem;
+  }
+
+  .pending-charges-panel {
+    min-height: 16rem;
   }
 }
 
 /* ── Cobros Pendientes de Citas ── */
-.pending-charges-panel {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .pending-charges-panel__count {
   font: var(--pd-font-label-sm);
   color: var(--color-text-muted);

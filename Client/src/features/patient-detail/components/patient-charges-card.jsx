@@ -164,7 +164,7 @@ const PatientChargesCard = ({ patientId }) => {
       </div>
 
       {charges.length === 0 ? (
-        <div className="patient-charges-card__empty">No hay cobros registrados</div>
+        <div className="patient-charges-card__empty patient-detail__empty-message">No hay cobros registrados</div>
       ) : (
         <div className="patient-charges-card__list">
           {Object.entries(groupedCharges).map(([dateLabel, dateCharges]) => (

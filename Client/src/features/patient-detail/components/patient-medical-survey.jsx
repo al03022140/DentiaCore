@@ -8,7 +8,7 @@ const MedicationList = React.memo(({ medicacion }) => {
   if (!medicacion || medicacion.length === 0) {
     return (
       <ul aria-label="Sin medicación">
-        <li className="no-items-message">No hay medicación registrada.</li>
+        <li className="no-items-message patient-detail__empty-message">No hay medicación registrada.</li>
       </ul>
     );
   }
@@ -52,7 +52,7 @@ const AllergiesList = React.memo(({ alergias }) => {
   if (!alergias || alergias.length === 0) {
     return (
       <ul aria-label="Sin alergias">
-        <li className="no-items-message">No hay alergias registradas.</li>
+        <li className="no-items-message patient-detail__empty-message">No hay alergias registradas.</li>
       </ul>
     );
   }
@@ -99,7 +99,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
     return (
       <section className="patient-detail__section" aria-labelledby={sectionId}>
         <SectionHeader title="Encuesta Médica" id={sectionId} />
-        <p className="no-items-message">No hay información de la encuesta médica disponible.</p>
+        <p className="no-items-message patient-detail__empty-message">No hay información de la encuesta médica disponible.</p>
       </section>
     );
   }
@@ -162,7 +162,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
           </dl>
         ) : (
           <ul aria-label="Sin historial médico">
-            <li className="no-items-message">No hay datos de historial médico adicional.</li>
+            <li className="no-items-message patient-detail__empty-message">No hay datos de historial médico adicional.</li>
           </ul>
         )}
       </article>
@@ -184,7 +184,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
           </ul>
         ) : (
           <ul aria-label="Sin cirugías previas">
-            <li className="no-items-message">No hay cirugías previas registradas.</li>
+            <li className="no-items-message patient-detail__empty-message">No hay cirugías previas registradas.</li>
           </ul>
         )}
       </article>
@@ -211,7 +211,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
           </dl>
         ) : (
           <ul aria-label="Sin datos de ansiedad dental">
-            <li className="no-items-message">No hay datos de ansiedad dental.</li>
+            <li className="no-items-message patient-detail__empty-message">No hay datos de ansiedad dental.</li>
           </ul>
         )}
       </article>
@@ -306,7 +306,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
           </dl>
         ) : (
           <ul aria-label="Sin información médica general">
-            <li className="no-items-message">No hay información médica general.</li>
+            <li className="no-items-message patient-detail__empty-message">No hay información médica general.</li>
           </ul>
         )}
       </article>
@@ -341,7 +341,7 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
           </dl>
         ) : (
           <ul aria-label="Sin hábitos de estilo de vida">
-            <li className="no-items-message">No hay información de hábitos de estilo de vida.</li>
+            <li className="no-items-message patient-detail__empty-message">No hay información de hábitos de estilo de vida.</li>
           </ul>
         )}
       </article>
@@ -400,7 +400,6 @@ const PatientMedicalSurvey = ({ encuesta = null }) => {
                     trastornos_coagulacion: 'Trastornos de Coagulación',
                     anemia: 'Anemia',
                     sida: 'SIDA',
-                    arteriosclerosis: 'Arteriosclerosis',
                     hipotiroidismo: 'Hipotiroidismo',
                     cancer: 'Cáncer',
                     esclerodermia: 'Esclerodermia',

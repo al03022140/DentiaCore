@@ -172,22 +172,29 @@ const VALIDATORS = {
 // Funciones de sanitización
 const SANITIZERS = {
     /**
-     * Sanitiza texto para prevenir XSS
+     * Sanitiza texto para prevenir XSS de forma idempotente.
+     *
+     * El sanitizador anterior re-escapaba las entidades en cada edición:
+     * "&amp;" se volvía "&amp;amp;" tras un GET→re-save. Aquí primero
+     * decodificamos las entidades reconocidas y luego volvemos a escapar
+     * una sola vez, de modo que aplicar la función dos veces produce el
+     * mismo resultado que aplicarla una sola vez.
      */
     sanitizeText: (text) => {
         if (!text || typeof text !== 'string') return text;
-        return text
-            .replace(/[<>"'&]/g, (match) => {
-                const entities = {
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    // eslint-disable-next-line quotes
-                    '"': "&quot;",
-                    "'": '&#x27;',
-                    '&': '&amp;'
-                };
-                return entities[match];
-            })
+        const decoded = text
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#x27;/g, "'")
+            .replace(/&#39;/g, "'");
+        return decoded
+            .replace(/&(?!amp;|lt;|gt;|quot;|#x27;|#39;)/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
             .trim();
     },
     

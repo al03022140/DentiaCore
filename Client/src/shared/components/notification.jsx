@@ -33,7 +33,7 @@ const Notification = ({ message, type = 'info', duration = 3000, onClose }) => {
     <div className={`notification ${type} ${visible ? 'visible' : 'hidden'}`}>
       <div className="notification-content">
         <div className="notification-icon">
-          {type === 'success' && <img src={checkCircle2Icon} alt="✓" width="20" height="20" />}
+          {type === 'success' && <img src={checkCircle2Icon} alt="✓" width="20" height="20" className="theme-icon" />}
           {type === 'error' && '❌'}
           {type === 'warning' && '⚠️'}
           {type === 'info' && 'ℹ️'}

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { createAppointment } from '../../../shared/services/appointment-service';
 import { getSettings } from '../../../shared/services/settingsService';
 import API from '../../../shared/services/axios-instance';
-import userNot from '../../../assets/images/avatars/UserNot.png';
+import { getAllPatients } from '../../../shared/services/api';
+import userNot from '../../../assets/images/icons/Profile Default.svg';
 import './CreateAppointmentModal.css';
 
-const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
+const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = null }) => {
   // Patient search
   const [patientQuery, setPatientQuery] = useState('');
   const [patientResults, setPatientResults] = useState([]);
@@ -28,6 +29,13 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // `min` para el input datetime-local: ahora mismo en hora local, formato YYYY-MM-DDTHH:mm.
+  const nowLocalISO = (() => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset() * 60_000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  })();
+
   // Load doctors, service catalog & patients when modal opens
   useEffect(() => {
     if (!visible) return;
@@ -36,12 +44,12 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
         const [usersRes, settings, patientsRes] = await Promise.all([
           API.get('/users').then(r => r.data).catch(() => []),
           getSettings().catch(() => ({})),
-          API.get('/patients').then(r => r.data).catch(() => [])
+          getAllPatients().catch(() => ({}))
         ]);
         const usersList = Array.isArray(usersRes) ? usersRes : (usersRes.users || []);
-        setDoctors(usersList.filter(u => u.role === 'doctor' || u.role === 'superadmin' || u.role === 'administrador'));
+        setDoctors(usersList.filter(u => u.rol === 'doctor' || u.rol === 'superadmin' || u.rol === 'administrador'));
         setServiceCatalog(settings.serviceCatalog || []);
-        const patientsList = Array.isArray(patientsRes) ? patientsRes : (patientsRes.patients || []);
+        const patientsList = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.patients ?? patientsRes ?? []);
         setAllPatients(patientsList);
       } catch {
         setDoctors([]);
@@ -55,7 +63,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
   // Reset state when modal opens
   useEffect(() => {
     if (visible) {
-      setSelectedPatient(null);
+      setSelectedPatient(fixedPatient || null);
       setPatientQuery('');
       setPatientResults([]);
       setSelectedDoctor('');
@@ -66,7 +74,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
       setError('');
       setSaving(false);
     }
-  }, [visible]);
+  }, [visible, fixedPatient]);
 
   // Filter patients locally (instant, no extra API calls)
   useEffect(() => {
@@ -85,9 +93,12 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
     setPatientResults(filtered);
   }, [patientQuery, allPatients]);
 
-  const getPatientFullName = (p) =>
-    [p.primer_nombre, p.otros_nombres, p.apellido_paterno, p.apellido_materno]
+  const getPatientFullName = (p) => {
+    if (!p) return '';
+    if (p.nombre && p.apellidos) return `${p.nombre} ${p.apellidos}`.trim();
+    return [p.primer_nombre, (p.otros_nombres || p.segundo_nombre), p.apellido_paterno, p.apellido_materno]
       .filter(Boolean).join(' ');
+  };
 
   const calculateAge = (fechaNacimiento) => {
     if (!fechaNacimiento) return '—';
@@ -125,6 +136,43 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
     return sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0);
   }, 0);
 
+  // Helper: read Google access token stored by the calendar widget
+  const getGoogleToken = () => {
+    try {
+      const raw = localStorage.getItem('accessToken');
+      if (!raw) return null;
+      if (!raw.startsWith('{')) return raw;
+      const parsed = JSON.parse(raw);
+      if (parsed.token && parsed.expiration && parsed.expiration > Date.now()) return parsed.token;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Try to refresh an expired Google token
+  const refreshGoogleToken = async () => {
+    try {
+      const raw = localStorage.getItem('accessToken');
+      if (!raw || !raw.startsWith('{')) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed.refreshToken) return null;
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+      const res = await fetch(`${API}/api/google/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: parsed.refreshToken }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const expiration = Date.now() + (data.expiresIn || 3600) * 1000;
+      localStorage.setItem('accessToken', JSON.stringify({
+        token: data.accessToken, expiration, refreshToken: data.refreshToken || parsed.refreshToken,
+      }));
+      return data.accessToken;
+    } catch { return null; }
+  };
+
   const handleCreate = async () => {
     setError('');
     if (!selectedPatient) return setError('Seleccione un paciente');
@@ -147,6 +195,35 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
           precioUnitario: Number(i.precioUnitario)
         })) : undefined
       });
+
+      // Sync to Google Calendar if the user is authenticated with Google
+      let googleToken = getGoogleToken();
+      if (!googleToken) googleToken = await refreshGoogleToken();
+      if (googleToken) {
+        const patientName = getPatientFullName(selectedPatient);
+        const doctorObj = doctors.find(d => d._id === selectedDoctor);
+        const doctorName = doctorObj ? doctorObj.nombre : '';
+        const start = new Date(fechaHora);
+        const end = new Date(start.getTime() + 60 * 60 * 1000); // default 1h duration
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const gcalEvent = {
+          summary: `Cita: ${patientName}${doctorName ? ` — Dr. ${doctorName}` : ''}`,
+          description: [
+            `Motivo: ${motivo.trim()}`,
+            comentario.trim() ? `Procedimiento: ${comentario.trim()}` : null,
+          ].filter(Boolean).join('\n'),
+          start: { dateTime: start.toISOString(), timeZone },
+          end: { dateTime: end.toISOString(), timeZone },
+          calendarId: localStorage.getItem('google_selected_calendar') || 'primary',
+        };
+        // Fire-and-forget: don't block the UI if GCal sync fails
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5002'}/api/google/calendar/events`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(gcalEvent),
+        }).catch(() => {});
+      }
+
       onCreated?.();
       onClose();
     } catch (err) {
@@ -171,18 +248,23 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
           <div className="cam-section">
             <label className="cam-label">Paciente</label>
             {selectedPatient ? (
-              <div className="cam-patient-card">
+              <div className={`cam-patient-card ${fixedPatient ? 'cam-patient-card--fixed' : ''}`}>
                 <img
-                  src={selectedPatient.foto ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${selectedPatient.foto}` : userNot}
+                  src={(selectedPatient.photoURL || selectedPatient.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${encodeURIComponent(selectedPatient.photoURL || selectedPatient.foto)}` : userNot}
                   alt={getPatientFullName(selectedPatient)}
-                  className="cam-patient-avatar"
-                  onError={e => { e.target.src = userNot; }}
+                  className={`cam-patient-avatar${(selectedPatient.photoURL || selectedPatient.foto) ? '' : ' profile-default-avatar'}`}
+                  onError={e => {
+                    e.target.src = userNot;
+                    e.target.classList.add('profile-default-avatar');
+                  }}
                 />
                 <div className="cam-patient-info">
                   <strong>{getPatientFullName(selectedPatient)}</strong>
                   <span>{calculateAge(selectedPatient.fecha_nacimiento)} años</span>
                 </div>
-                <button className="cam-remove-btn" onClick={() => setSelectedPatient(null)}>&times;</button>
+                {!fixedPatient && (
+                  <button className="cam-remove-btn" onClick={() => setSelectedPatient(null)}>&times;</button>
+                )}
               </div>
             ) : (
               <div className="cam-search-wrapper">
@@ -199,10 +281,13 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
                     {patientResults.map(p => (
                       <li key={p._id} onClick={() => selectPatient(p)}>
                         <img
-                          src={p.foto ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${p.foto}` : userNot}
+                          src={(p.photoURL || p.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${encodeURIComponent(p.photoURL || p.foto)}` : userNot}
                           alt={getPatientFullName(p)}
-                          className="cam-result-avatar"
-                          onError={e => { e.target.src = userNot; }}
+                          className={`cam-result-avatar${(p.photoURL || p.foto) ? '' : ' profile-default-avatar'}`}
+                          onError={e => {
+                            e.target.src = userNot;
+                            e.target.classList.add('profile-default-avatar');
+                          }}
                         />
                         <div>
                           <strong>{getPatientFullName(p)}</strong>
@@ -222,7 +307,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
             <select className="cam-input" value={selectedDoctor} onChange={e => setSelectedDoctor(e.target.value)}>
               <option value="">Seleccionar doctor...</option>
               {doctors.map(d => (
-                <option key={d._id} value={d._id}>{d.nombre} {d.apellidos || ''}</option>
+                <option key={d._id} value={d._id}>{d.nombre}</option>
               ))}
             </select>
           </div>
@@ -233,6 +318,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated }) => {
             <input
               type="datetime-local"
               className="cam-input"
+              min={nowLocalISO}
               value={fechaHora}
               onChange={e => setFechaHora(e.target.value)}
             />

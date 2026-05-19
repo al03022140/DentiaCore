@@ -30,7 +30,11 @@ const entrySchema = new Schema({
   tooth:   { type: String, required: true }, // TODO: Considerar validación regex/enum para piezas dentales
   damage:  { type: String, required: true },
   surface: { type: String, default: 'O' }, // 'O' por Oclusal como default común
-  note:    { type: String, default: '' }
+  note:    { type: String, default: '' },
+  // Fecha en que se registró/persistió esta entrada. El servidor la estampa con `new Date()`
+  // al guardar — los valores enviados por el cliente se ignoran para evitar fechas falsificadas
+  // o stale.
+  fecha:   { type: Date, default: () => new Date() }
 }, { _id: false }); // No necesitan su propio _id si son parte de 'datos' o 'current'
 
 /**
@@ -61,7 +65,8 @@ const entrySchema = new Schema({
  */
 const historyEntrySchema = new Schema({
   datos:    { type: [entrySchema], required: true },
-  imageUrl: { type: String, required: true }, // Cada snapshot de historial debe tener su imagen
+  // imageUrl es opcional: el inicial guarda PNG del canvas, el clínico no tiene imagen.
+  imageUrl: { type: String, default: '' },
   savedAt:  { type: Date, default: () => new Date() },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
@@ -127,7 +132,8 @@ const odontogramaSchema = new Schema({
   patientId: { type: Types.ObjectId, ref: 'Patient', required: true, index: true },
   type:      { type: String, enum: ['initial', 'clinic'], required: true }, // Coincide con TYPE_INITIAL y TYPE_CLINIC
   current: {
-    imageUrl: { type: String, required: true }, // La imagen actual es requerida
+    // imageUrl es opcional: el inicial guarda PNG del canvas, el clínico no tiene imagen.
+    imageUrl: { type: String, default: '' },
     datos:    { type: [entrySchema], default: [] }, // Unificado a 'datos'
     savedAt:  { type: Date, default: () => new Date() }
   },
@@ -163,8 +169,12 @@ const odontogramaSchema = new Schema({
   timestamps: true // Añade createdAt y updatedAt automáticamente
 });
 
-// Índice único por paciente y tipo para asegurar que solo haya un odontograma 'initial' y uno 'clinic' por paciente
-odontogramaSchema.index({ patientId: 1, type: 1 }, { unique: true });
+// Índice único por paciente y tipo, sólo para documentos NO archivados (soft-deleted).
+// Permite archivar un odontograma y crear uno nuevo del mismo tipo sin colisión.
+odontogramaSchema.index(
+  { patientId: 1, type: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: null } }
+);
 
 // Índices para búsquedas/ordenamientos comunes
 odontogramaSchema.index({ 'current.savedAt': -1 });

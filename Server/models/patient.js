@@ -25,7 +25,7 @@ const PatientSchema = new mongoose.Schema({
   // 📌 Identificación
   documento: {
       tipo: { type: String, enum: ["Licencia", "Pasaporte", "INE", "Otro"], required: true },
-      numero: { type: String, required: true, unique: true }
+      numero: { type: String, required: true, unique: true, trim: true, uppercase: true }
   },
 
   // 📌 Datos Personales
@@ -41,7 +41,7 @@ const PatientSchema = new mongoose.Schema({
   lugar_nacimiento: { type: String, default: "" },
   escolaridad: { type: String, default: "" },
   ocupacion: { type: String, default: "" },
-  email: { type: String, default: "" },
+  email: { type: String, default: "", trim: true, lowercase: true },
   
   // 📌 Situación Laboral
   situacion_laboral: {
@@ -56,7 +56,7 @@ const PatientSchema = new mongoose.Schema({
 
   // 📌 Información de Contacto
   contacto: {
-      telefono: { type: String, default: "" },
+      telefono: { type: String, default: "", trim: true },
       direccion: { type: String, default: "" },
       codigo_postal: { type: String, default: "" },
       colonia: { type: String, default: "" },
@@ -856,11 +856,9 @@ PatientSchema.statics.getStatistics = async function() {
 
 // ─── Índices optimizados ───────────────────────────────────────────────────────
 
-// Índice único para paciente_id
-PatientSchema.index({ paciente_id: 1 }, { unique: true, sparse: true });
-
-// Índices únicos para documentos
-PatientSchema.index({ 'documento.numero': 1 }, { unique: true, sparse: true });
+// NOTA: los índices únicos para `paciente_id` y `documento.numero` ya están
+// declarados a nivel de campo (unique: true). Declararlos aquí de nuevo
+// producía warnings de mongoose por índice duplicado.
 
 // Índices para búsquedas frecuentes
 PatientSchema.index({ 

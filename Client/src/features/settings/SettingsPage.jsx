@@ -14,6 +14,7 @@ import SecuritySection from './sections/SecuritySection';
 import AppointmentsSection from './sections/AppointmentsSection';
 import CashSection from './sections/CashSection';
 import TraceabilitySection from './sections/TraceabilitySection';
+import GoogleCalendarSection from './sections/GoogleCalendarSection';
 import './settings.css';
 import bellIcon from '../../assets/images/icons/bell.svg';
 import shieldIcon from '../../assets/images/icons/shield.svg';
@@ -23,19 +24,24 @@ import trazability2Icon from '../../assets/images/icons/trazability 2.svg';
 import userIcon from '../../assets/images/icons/user.svg';
 import hospitalIcon from '../../assets/images/icons/hospital.svg';
 import pencilIcon from '../../assets/images/icons/pencil.svg';
+import calendarPlusIcon from '../../assets/images/icons/Calendar plus.svg';
+import idCardIcon from '../../assets/images/icons/id-card.svg';
+import clipboardListIcon from '../../assets/images/icons/clipboard-list.svg';
+import moneyIcon from '../../assets/images/icons/money.svg';
 
 const SECTIONS = [
-  { id: 'apariencia', name: 'Apariencia', icon: <img src={pencilIcon} alt="Apariencia" width="20" height="20" />, desc: 'Tema claro, oscuro o del sistema', roles: null },
-  { id: 'perfil', name: 'Mi Perfil', icon: <img src={userIcon} alt="Mi Perfil" width="20" height="20" />, desc: 'Nombre, correo, contraseña y PIN', roles: null },
-  { id: 'perfil-profesional', name: 'Perfil Profesional', icon: '🩺', desc: 'Firma digital y cédula profesional', roles: ['doctor', 'administrador', 'superadmin'] },
-  { id: 'notificaciones', name: 'Notificaciones', icon: <img src={bellIcon} alt="" width="20" height="20" />, desc: 'Recordatorios de citas y alertas', roles: null },
-  { id: 'preferencias-clinicas', name: 'Preferencias Clínicas', icon: '⚕️', desc: 'Plantillas de notas, formato receta, duración cita', roles: ['doctor'] },
-  { id: 'clinica', name: 'Clínica', icon: <img src={hospitalIcon} alt="Clínica" width="20" height="20" />, desc: 'Nombre, dirección, logo y contacto', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: <img src={lockBlockedIcon} alt="" width="20" height="20" />, desc: 'Controlar accesos por rol y por usuario', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'seguridad', name: 'Seguridad', icon: <img src={shieldIcon} alt="" width="20" height="20" />, desc: 'Tiempo de inactividad, bloqueo de sesión', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'citas', name: 'Citas', icon: <img src={calendarIcon} alt="" width="20" height="20" />, desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'caja', name: 'Caja', icon: '💰', desc: 'Categorías de movimiento, moneda, defaults', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'trazabilidad', name: 'Trazabilidad', icon: <img src={trazability2Icon} alt="" width="20" height="20" />, desc: 'Registro de acciones por usuario, fecha o paciente', roles: ['administrador', 'superadmin'], permission: 'audit.read.full' },
+  { id: 'apariencia', name: 'Apariencia', icon: <img src={pencilIcon} alt="Apariencia" width="36" height="36" className="theme-icon" />, desc: 'Tema claro, oscuro o del sistema', roles: null },
+  { id: 'perfil', name: 'Mi Perfil', icon: <img src={userIcon} alt="Mi Perfil" width="36" height="36" className="theme-icon" />, desc: 'Nombre, correo, contraseña y PIN', roles: null },
+  { id: 'perfil-profesional', name: 'Perfil Profesional', icon: <img src={idCardIcon} alt="Perfil Profesional" width="36" height="36" className="theme-icon" />, desc: 'Firma digital y cédula profesional', roles: ['doctor', 'administrador', 'superadmin'] },
+  { id: 'notificaciones', name: 'Notificaciones', icon: <img src={bellIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Recordatorios de citas y alertas', roles: null },
+  { id: 'preferencias-clinicas', name: 'Preferencias Clínicas', icon: <img src={clipboardListIcon} alt="Preferencias Clínicas" width="36" height="36" className="theme-icon" />, desc: 'Plantillas de notas, formato receta, duración cita', roles: ['doctor'] },
+  { id: 'clinica', name: 'Clínica', icon: <img src={hospitalIcon} alt="Clínica" width="36" height="36" className="theme-icon" />, desc: 'Nombre, dirección, logo y contacto', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: <img src={lockBlockedIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Controlar accesos por rol y por usuario', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'seguridad', name: 'Seguridad', icon: <img src={shieldIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Tiempo de inactividad, bloqueo de sesión', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'citas', name: 'Citas', icon: <img src={calendarIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'google-calendar', name: 'Google Calendar', icon: <img src={calendarPlusIcon} alt="Google Calendar" width="36" height="36" className="theme-icon" />, desc: 'Conectar cuenta, elegir calendario destino', roles: null },
+  { id: 'caja', name: 'Caja', icon: <img src={moneyIcon} alt="Caja" width="36" height="36" className="theme-icon" />, desc: 'Categorías de movimiento, moneda, defaults', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'trazabilidad', name: 'Trazabilidad', icon: <img src={trazability2Icon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Registro de acciones por usuario, fecha o paciente', roles: ['administrador', 'superadmin'], permission: 'audit.read.full' },
 ];
 
 const SECTION_COMPONENTS = {
@@ -50,6 +56,7 @@ const SECTION_COMPONENTS = {
   'citas': AppointmentsSection,
   'caja': CashSection,
   'trazabilidad': TraceabilitySection,
+  'google-calendar': GoogleCalendarSection,
 };
 
 const SettingsPage = () => {
@@ -84,7 +91,9 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-page">
-      <h2 className="settings-title">Configuración</h2>
+      <div className="settings-title-strip">
+        <h2 className="settings-title">Configuración</h2>
+      </div>
       <div className="settings-list">
         {visibleSections.map((s) => (
           <button

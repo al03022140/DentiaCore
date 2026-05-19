@@ -62,6 +62,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Guarda el hash inmediatamente anterior para tolerar refresh concurrente
+  // (multi-tab) sin que el segundo request crea que es reutilización maliciosa.
+  // Sólo se acepta como válido el actual o este previo.
+  previousRefreshTokenHash: {
+    type: String,
+    default: null
+  },
   refreshTokenExpiresAt: {
     type: Date,
     default: null

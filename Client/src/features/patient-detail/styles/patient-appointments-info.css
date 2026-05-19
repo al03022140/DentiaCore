@@ -1,4 +1,49 @@
 /* Estilos específicos para la información de citas del paciente */
+
+.patient-appointments-info__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Mismo estilo que el botón "+" de Caja en Patient Detail */
+.patient-appointments-info__add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-full);
+  border: 2px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.patient-appointments-info__add-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Wrapper transparente — el look de tarjeta lo da .patient-detail__empty-message */
+.patient-appointments-info__empty-state {
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
+  border-left: none;
+}
+
+.patient-appointments-info__empty-state .empty-message {
+  margin: 0;
+}
 /* patient-detail-shared.css se importa centralmente desde patient-detail.css */
 
 /* El contenedor principal ya está definido en patient-detail-shared.css como .patient-detail__section */
@@ -73,17 +118,16 @@
 
 /* Los estilos para strong y span ya están definidos en patient-detail-shared.css */
 
-/* Estilos para mensajes de ausencia de cita */
+/* Wrapper transparente — el look de tarjeta lo da .patient-detail__empty-message */
 .patient-detail__section .empty-message {
-  padding: 1rem;
-  background-color: var(--color-neutral-100);
-  border-radius: 4px;
-  border-left: 3px solid var(--color-neutral-400);
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
+  border-left: none;
 }
 
+/* El <p> dentro mantiene su propio padding desde .patient-detail__empty-message */
 .patient-detail__section .empty-message p {
-  font-style: italic;
-  color: var(--color-neutral-900);
   margin: 0;
 }
 
@@ -108,7 +152,7 @@
   }
   
   .patient-detail__section .empty-message {
-    padding: 0.5rem 0;
+    padding: 0;
     background-color: transparent !important;
     border-radius: 0;
     border-left: none;

@@ -1,51 +1,140 @@
-/* Contenedor de estadísticas de pacientes */
 .patient-stats-container {
-  background-color: var(--home-stats-background);
-  border-radius: var(--home-stats-border-radius);
-  padding: var(--home-stats-padding);
-  box-shadow: var(--home-stats-shadow);
-  border: var(--home-stats-border);
+  background-color: var(--figma-bg-card);
+  border-radius: var(--figma-radius-lg);
+  padding: var(--figma-space-2xl);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
   flex-grow: 1;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   min-height: 0;
-  font: var(--home-stats-font);
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
 }
 
-.patient-stats-container canvas {
-  flex-grow: 1; /* Asegura que el canvas ocupe todo el alto disponible */
-  width: 100%; /* Asegura que el canvas ocupe todo el ancho disponible */
-  min-height: 100%;
-  height: 100%; /* Asegura que el canvas ocupe todo el alto disponible */
+/* ── Header ── */
+.patient-stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
 }
 
-/* Ajustes responsivos - solo padding cambia, font se hereda del base */
-@media (max-width: 1200px) {
-  .patient-stats-container { padding: var(--home-stats-padding-1200); }
+.patient-stats-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--figma-text-primary, #1a1a1a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-@media (max-width: 992px) {
-  .patient-stats-container { padding: var(--home-stats-padding-992); }
+
+/* ── 3-dot menu ── */
+.patient-stats-menu {
+  position: relative;
+  flex-shrink: 0;
 }
+
+.patient-stats-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.12s;
+}
+
+.patient-stats-dots:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.patient-stats-dots span {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--figma-text-secondary, #6b7280);
+}
+
+/* ── Dropdown ── */
+.patient-stats-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--figma-bg-card, #fff);
+  border: 1px solid var(--figma-border-default, rgba(0,0,0,0.1));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  min-width: 200px;
+  overflow: hidden;
+  animation: dropdown-appear 0.12s ease;
+}
+
+@keyframes dropdown-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.patient-stats-dropdown__item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--figma-text-primary, #1a1a1a);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.patient-stats-dropdown__item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.patient-stats-dropdown__item.active {
+  font-weight: 600;
+  color: var(--figma-color-primary, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.06);
+}
+
+/* ── Chart body ── */
+.patient-stats-body {
+  flex-grow: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.patient-stats-body canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.patient-stats-error {
+  color: var(--color-danger);
+  font: var(--figma-text-caption);
+  text-align: center;
+  padding: var(--figma-space-2xl);
+}
+
 @media (max-width: 768px) {
-  .patient-stats-container { padding: var(--home-stats-padding-768); }
-}
-@media (max-width: 576px) {
-  .patient-stats-container { padding: var(--home-stats-padding-576); }
-}
-@media (max-width: 480px) {
-  .patient-stats-container { padding: var(--home-stats-padding-480); }
+  .patient-stats-container {
+    padding: var(--figma-space-lg);
+  }
 }
 
-/* Ajustes para escala de pantalla */
-@media (resolution: 125dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-125dpi); }
-}
-@media (resolution: 150dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-150dpi); }
-}
-@media (resolution: 200dpi) {
-  .patient-stats-container { padding: var(--home-stats-padding-200dpi); }
+@media (max-width: 480px) {
+  .patient-stats-container {
+    padding: var(--figma-space-md);
+  }
 }

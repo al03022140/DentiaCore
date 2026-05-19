@@ -59,17 +59,14 @@ const CashPage = () => {
   }
 
   return (
-    <div className="cash-page">
+    <>
       <OpenBoxModal visible={showOpenModal} onOpenSuccess={handleOpenSuccess} onCancel={handleDismissModal} />
 
-      {/* Columna Izquierda */}
-      <div className="cash-left-section">
-        {/* Panel Superior: Ganancias y Estado */}
+      <div className="cash-page">
+        {/* Fila superior ~40%: izq. Ganancias/Estado, der. Acciones operativas */}
         <div className="cash-card cash-dashboard-card">
           <CashDashboard key={refreshTrigger} />
         </div>
-        
-        {/* Panel Inferior: Acciones Operativas */}
         <div className="cash-card cash-actions-card">
           <ActionsPanel
             isBoxOpen={isBoxOpen}
@@ -78,16 +75,14 @@ const CashPage = () => {
             onRequestOpenBox={handleRequestOpenBox}
           />
         </div>
-      </div>
 
-      {/* Columna Derecha */}
-      <div className="cash-right-section">
+        {/* Fila inferior ~60%: izq. Últimos movimientos, der. Cobros de citas */}
         <div className="cash-card cash-movements-card">
           <MovementsList refreshTrigger={refreshTrigger} />
         </div>
         <PendingChargesPanel refreshTrigger={refreshTrigger} />
       </div>
-    </div>
+    </>
   );
 };
 

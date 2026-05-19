@@ -384,6 +384,12 @@
   box-sizing: border-box;
 }
 
+/* Lingual inferior: bajar ligeramente las ilustraciones dentro de la celda */
+.arch-section.inferior .lingual-images .image-cell {
+  align-items: flex-end;
+  padding-bottom: 10px;
+}
+
 /* Estados de hover consolidados */
 .image-cell:hover,
 .data-cell:hover {
@@ -683,6 +689,101 @@
   .tooth-image {
     width: 52px;
     height: 123px;
+  }
+}
+
+@media (max-width: 480px) {
+  .data-row,
+  .data-row.images,
+  .images-row,
+  .tooth-numbers-header {
+    grid-template-columns: 65px repeat(16, 48px);
+    gap: 1px;
+    justify-content: center;
+  }
+
+  .image-cell,
+  .row-label.image-label {
+    width: 48px;
+    height: 130px;
+    min-height: 130px;
+    padding: 2px;
+  }
+
+  .tooth-image-container,
+  .tooth-background,
+  .background-image {
+    width: 42px;
+    height: 118px;
+  }
+
+  .tooth-foreground,
+  .tooth-image {
+    width: 42px;
+    height: 100px;
+  }
+
+  .arch-section {
+    padding: 12px 8px;
+  }
+
+  .arch-title {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+  }
+
+  .row-label {
+    font-size: 0.72rem;
+    padding: 4px 4px;
+    padding-left: 6px;
+    min-height: 26px;
+  }
+
+  .tooth-number-btn {
+    font-size: 13px;
+    padding: 2px;
+  }
+
+  .tooth-number {
+    font-size: 0.7rem;
+    padding: 4px 2px;
+  }
+
+  .data-cell {
+    font-size: 0.7rem;
+    min-height: 24px;
+    padding: 2px;
+  }
+
+  .triple-input {
+    gap: 2px;
+    padding: 2px;
+    max-width: 48px;
+    min-width: 48px;
+  }
+
+  .triple-checkbox {
+    gap: 2px;
+    padding: 2px;
+    max-width: 44px;
+    min-width: 44px;
+  }
+
+  .mini-input {
+    max-width: 20px;
+    height: 15px;
+    font-size: 0.75rem;
+  }
+
+  .mini-select {
+    max-width: 40px;
+    height: 20px;
+    font-size: 0.65rem;
+  }
+
+  .periodontogram-title {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
   }
 }
 
@@ -1329,7 +1430,7 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
     margin: 8mm;
   }
 
-  /* ESCALAR TODO EL PERIODONTOGRAMA MUY PEQUEÑO para que quepa en vertical */
+  /* Escala compacta: sin margen negativo (provocaba solapamiento de filas al imprimir). */
   .periodontogram-design,
   .periodontogram-container {
     transform: scale(0.52) !important;
@@ -1338,7 +1439,8 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
     max-width: 192% !important;
     margin: 0 !important;
     padding: 0 !important;
-    margin-bottom: -140px !important; /* Reducir espacio después del escalado */
+    margin-bottom: 0 !important;
+    padding-bottom: 24px !important;
   }
 
   /* Asegurar que el periodontograma se muestre completo en impresión */

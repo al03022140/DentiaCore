@@ -771,6 +771,72 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
   margin-bottom: 1rem;
 }
 
+/* =========================
+   WIZARD STEPS
+   ========================= */
+.add-patient-steps {
+  margin-bottom: 2rem;
+  padding: 0 0.5rem;
+}
+
+.add-patient-steps .ant-steps-item-title {
+  font: var(--text-label) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+.add-patient-steps .ant-steps-item-description {
+  font: var(--text-caption-xs) !important;
+  color: var(--color-text-muted) !important;
+}
+
+.add-patient-steps .ant-steps-item-process .ant-steps-item-title {
+  color: var(--color-primary) !important;
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.wizard-actions {
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  flex-wrap: wrap;
+}
+
+.wizard-actions .back-button {
+  order: 0;
+}
+
+.wizard-actions .confirm-button {
+  order: 1;
+  margin-left: auto;
+}
+
+.wizard-actions .cancel-button {
+  order: 2;
+}
+
+@media (max-width: 768px) {
+  .add-patient-steps .ant-steps-item-description {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .add-patient-steps .ant-steps-item-title {
+    font-size: 0.75rem !important;
+  }
+  .wizard-actions {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+  .wizard-actions .confirm-button {
+    margin-left: 0;
+    width: 100%;
+  }
+  .wizard-actions .back-button,
+  .wizard-actions .cancel-button {
+    width: 100%;
+  }
+}
+
 /* ============================================================
    MEDIA QUERIES — Responsividad completa
    ============================================================ */

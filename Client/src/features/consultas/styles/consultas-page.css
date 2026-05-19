@@ -1,4 +1,4 @@
-﻿/* Force content layout to single column for this page */
+/* Force content layout to single column for this page */
 .content:has(.consultas-page) {
   grid-template-columns: 1fr;
   overflow-x: hidden;
@@ -40,15 +40,57 @@
   box-shadow: var(--card-shadow);
   border: var(--card-border);
   box-sizing: border-box;
-  flex: 1; 
+  flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0; 
-  overflow-y: hidden; /* Hide overflow on container, let content scroll? */
-  /* Actually, usually content scrolls. */
-  /* Let's see ConsultasPage.jsx, is there a scrollable inner div? */
-  /* If not, we set overflow-y: auto here */
+  min-height: 0;
   overflow-y: auto;
+}
+
+/* Misma tarjeta que con cita seleccionada; contenido centrado al estilo otras páginas */
+.selected-detail-panel--empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.consultas-empty-state {
+  text-align: center;
+  padding: 1.5rem 1.25rem;
+  max-width: 22rem;
+}
+
+.consultas-empty-state__title {
+  margin: 0 0 0.65rem;
+  font: var(--text-heading-sm);
+  color: var(--color-primary);
+}
+
+.consultas-empty-state__text {
+  margin: 0;
+  font: var(--pd-font-section-body);
+  color: var(--color-text-muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.consultas-list-empty {
+  margin: 0 0 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-md);
+  font: var(--pd-font-body-sm);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.consultas-inline-empty {
+  margin: 0;
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 /* --- COLUMNA DERECHA --- */
@@ -79,6 +121,40 @@
   flex-direction: column;
   gap: 1rem;
   flex-shrink: 0;
+}
+
+.next-patient-card--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+}
+
+.consultas-card-loading-text {
+  margin: 0;
+  text-align: center;
+  font: var(--pd-font-section-body);
+  color: var(--color-text-muted);
+}
+
+.next-patient-card--empty .next-patient-header {
+  align-items: flex-start;
+}
+
+.next-patient-avatar--placeholder {
+  opacity: 0.85;
+}
+
+.next-patient-empty-caption {
+  margin: 0.35rem 0 0;
+  font: var(--pd-font-body-sm);
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  max-width: 36ch;
+}
+
+.next-patient-card--empty .next-patient-info h2 {
+  font: var(--text-heading-xxs);
+  color: var(--color-primary);
 }
 
 .next-patient-header {
@@ -264,7 +340,7 @@
 }
 
 .consultas-right h3 {
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   font: var(--text-heading-sm);
   margin-top: 0;
   margin-bottom: 0;
@@ -277,27 +353,27 @@
   margin-bottom: 1.5rem;
 }
 
+/* Mismo estilo que caja (ActionsPanel): botón con PlusCircleOutlined */
 .consultas-add-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-primary);
-  color: var(--color-bg-white);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
+  display: inline-flex !important;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px var(--color-black-10, rgba(0,0,0,0.1));
-  flex-shrink: 0;
+  gap: 0.35rem;
+  background-color: var(--color-success) !important;
+  border-color: var(--color-success) !important;
+  font: var(--text-label-strong) !important;
+  box-shadow: 0 0.125rem 0.25rem var(--color-black-10) !important;
+  transition: all 0.15s ease !important;
 }
 
 .consultas-add-btn:hover {
-  background: var(--color-primary-hover);
-  transform: scale(1.1);
+  background-color: var(--color-green-600) !important;
+  border-color: var(--color-green-600) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 0.35rem 0.75rem var(--color-black-15) !important;
+}
+
+.consultas-add-btn .anticon {
+  font-size: 1.1em;
 }
 
 .consultas-list-container {
@@ -308,7 +384,7 @@
 
 .list-section-title {
   font: var(--text-overline);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   margin: 1.5rem 0 0.5rem 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;

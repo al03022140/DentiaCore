@@ -1,8 +1,7 @@
 import API from '../../../shared/services/axios-instance.js';
 
 // Configuración de timeouts
-const UPLOAD_TIMEOUT = 15000; // 15 segundos para subidas
-const DEFAULT_TIMEOUT = 10000; // 10 segundos para otras peticiones
+const DEFAULT_TIMEOUT = 10000;
 
 /**
  * @typedef {Object} InitialOdontogramResponse
@@ -104,24 +103,21 @@ const odontogramaService = {
   },
 
   /**
-   * Guarda un odontograma inicial (imagen y datos asociados)
+   * Guarda el odontograma inicial. Sólo persiste las entradas (datos por diente).
+   * Ya NO sube imagen — la vista read-only se renderiza desde los datos.
+   * Esta operación sólo se permite UNA vez por paciente (NOM-024). El servidor
+   * responde 409 si ya existe un odontograma inicial OFICIAL.
    * @param {string} patientId - ID del paciente
-   * @param {FormData} formData - Datos del formulario con la imagen
-   * @returns {Promise<InitialOdontogramResponse>}
+   * @param {Array} entries - Array de entradas { tooth, damage, surface, note }
+   * @returns {Promise<{exists: boolean, datos: Array, history: Array}>}
    */
-  async saveInitialOdontogram(patientId, formData) {
+  async saveInitialOdontogram(patientId, entries) {
     try {
-      // ¡IMPORTANTE! No fijar Content-Type aquí: axios lo gestiona automáticamente para FormData
+      const normalized = Array.isArray(entries) ? entries.map(mapToBackend) : [];
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial`,
-        formData,
-        {
-          timeout: UPLOAD_TIMEOUT,
-          onUploadProgress: progressEvent => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            console.log(`📤 Subida: ${percentCompleted}%`);
-          }
-        }
+        { entries: normalized },
+        { timeout: DEFAULT_TIMEOUT }
       );
       return data;
     } catch (error) {
@@ -138,19 +134,8 @@ const odontogramaService = {
     return `/patients/${patientId}/odontograma-inicial/image`;
   },
 
-  /**
-   * Elimina el odontograma inicial
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<{message: string}>}
-   */
-  async deleteInitialOdontogram(patientId) {
-    try {
-      const { data } = await API.delete(`/patients/${patientId}/odontograma-inicial`);
-      return data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
+  // NOTA: no existe `deleteInitialOdontogram`. El odontograma inicial es de
+  // captura única e inmutable por paciente — no se puede archivar ni borrar.
 
   /**
    * Obtiene el historial del odontograma inicial

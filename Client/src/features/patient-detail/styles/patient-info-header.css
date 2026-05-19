@@ -22,7 +22,6 @@
   padding-bottom: 2rem;
   border-bottom: 1px solid var(--color-border-medium);
   margin-bottom: 2rem;
-  position: relative; /* Para posicionar el botón Editar */
 }
 
 /* Estilos para la foto del paciente */
@@ -56,13 +55,6 @@
 
 /* Los estilos para strong y span están centralizados en patient-detail-shared.css */
 
-/* Botón Editar - reutiliza estilos globales de button-primary */
-.Boton_Editar {
-  position: absolute;
-  top: 1rem; /* Ajustar según sea necesario */
-  right: 1rem; /* Ajustar según sea necesario */
-}
-
 /* =========================
    RESPONSIVO
    ========================= */
@@ -84,12 +76,6 @@
   }
   .patient-detail__details {
     width: 100%;
-  }
-  .Boton_Editar {
-    position: static;
-    margin-top: 0.75rem;
-    display: flex;
-    justify-content: center;
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import "../styles/next-patient.css";
-import userNot from '../../../assets/images/avatars/UserNot.png';
+import userNot from '../../../assets/images/icons/Profile Default.svg';
 import { getTodayAppointments } from '../../../shared/services/appointment-service';
 
 const NextPatient = () => {
@@ -54,7 +54,11 @@ const NextPatient = () => {
           <img
             src={patientImage || userNot}
             alt={patientName}
-            onError={e => { e.target.src = userNot; }}
+            className={patientImage ? undefined : 'profile-default-avatar'}
+            onError={e => {
+              e.target.src = userNot;
+              e.target.classList.add('profile-default-avatar');
+            }}
           />
         </div>
         <div className="patient-details">
