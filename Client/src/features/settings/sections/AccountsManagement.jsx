@@ -18,7 +18,7 @@ import {
  *  - auto-desactivarte
  *  - cambiarte el propio rol
  */
-const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'administrador', 'doctor_admin', 'superadmin'];
+const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'doctor_admin', 'administrador', 'superadmin'];
 
 const ROLE_LABELS = {
   recepcionista: 'Recepcionista',

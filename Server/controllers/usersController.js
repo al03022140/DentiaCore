@@ -3,10 +3,10 @@ const { validatePasswordStrength } = require('../utils/crypto');
 const { isAdminRole } = require('../utils/permissions');
 
 // Role hierarchy: higher index = more privileged
-// doctor_admin (dentista-director) tiene capacidades de doctor + administrador,
-// por eso queda arriba de `administrador` — solo `superadmin` puede crearlo
-// o modificar sus cuentas.
-const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'administrador', 'doctor_admin', 'superadmin'];
+// doctor_admin va entre doctor y administrador: el dentista-director tiene
+// más capacidades clínicas que el doctor "puro", pero queda subordinado al
+// administrador (dueño/gestor del consultorio que también puede crearlo).
+const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'doctor_admin', 'administrador', 'superadmin'];
 
 const getRoleLevel = (role) => {
   const idx = ROLE_HIERARCHY.indexOf(role);
