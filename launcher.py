@@ -1344,13 +1344,25 @@ class DentiaCoreLauncher:
             messagebox.showwarning("Advertencia", "No se pudo determinar la URL de la aplicación")
             return
 
-        webbrowser.open(target_url)
+        webbrowser.open(self._normalize_browser_url(target_url))
+
+    def _normalize_browser_url(self, url):
+        """
+        Convierte URLs server-bind (0.0.0.0) a URLs cliente-válidas (localhost).
+        Un browser no puede abrir http://0.0.0.0:xxx — esa dirección significa
+        'bind a todas las interfaces' del lado server, no un destino real.
+        """
+        if not url:
+            return url
+        # Reemplazar 0.0.0.0 por localhost (preserva el puerto)
+        return url.replace('//0.0.0.0:', '//localhost:').replace('//0.0.0.0/', '//localhost/')
 
     def _auto_open_browser(self, url):
         """Auto-abre el browser tras un arranque exitoso. Silencioso si falla."""
         try:
-            print(f"🌐 Abriendo navegador en {url}")
-            webbrowser.open(url)
+            safe_url = self._normalize_browser_url(url)
+            print(f"🌐 Abriendo navegador en {safe_url}")
+            webbrowser.open(safe_url)
         except Exception as e:
             print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}")
 
