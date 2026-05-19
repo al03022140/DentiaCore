@@ -148,8 +148,7 @@ const PatientPrintPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [initialData, setInitialData] = useState([]);
-  const [initialImageUrl, setInitialImageUrl] = useState(null);
-  const [showInitialOdontogramImage, setShowInitialOdontogramImage] = useState(false);
+  const [initialExists, setInitialExists] = useState(false);
   const [odontogramHistory, setOdontogramHistory] = useState([]);
   const [fetchedInitial, setFetchedInitial] = useState(false);
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
@@ -196,8 +195,7 @@ const PatientPrintPage = () => {
   }, []);
 
   const resetOdontogramState = useCallback(() => {
-    setInitialImageUrl(null);
-    setShowInitialOdontogramImage(false);
+    setInitialExists(false);
     setInitialData([]);
     setOdontogramHistory([]);
   }, []);
@@ -272,10 +270,9 @@ const PatientPrintPage = () => {
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
       if (data.exists) {
-        setInitialImageUrl(formatImageUrl(data.imageUrl));
-        setShowInitialOdontogramImage(true);
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
+        setInitialExists(true);
         setOdontogramHistory(normalizeHistory(data.history));
         setInitialOdontogramLoadStatus('saved');
       } else {
@@ -286,31 +283,20 @@ const PatientPrintPage = () => {
       resetOdontogramState();
       setInitialOdontogramLoadStatus('none');
     }
-  }, [patientId, formatImageUrl, normalizeHistory, resetOdontogramState, fetchedInitial]);
+  }, [patientId, normalizeHistory, resetOdontogramState, fetchedInitial]);
 
-  const deleteInitial = useCallback(async () => {
-    try {
-      await API.delete(`/patients/${patientId}/odontograma-inicial`);
-      message.success('Odontograma inicial eliminado.');
-      setFetchedInitial(false);
-      await checkInitialOdontogram(true);
-    } catch {
-      message.error('Error al eliminar odontograma inicial.');
-    }
-  }, [patientId, checkInitialOdontogram]);
-
-  const handleSaveSuccess = useCallback(async (receivedImageUrl, datos, receivedHistory) => {
-    setInitialImageUrl(formatImageUrl(receivedImageUrl));
+  const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
     setInitialData(datos || []);
+    setInitialExists(true);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
-    setShowInitialOdontogramImage(true);
+    setInitialOdontogramLoadStatus('saved');
     setFetchedInitial(false);
     try {
       await checkInitialOdontogram(true);
     } catch (err) {
       console.error('Error al refrescar datos del odontograma inicial:', err);
     }
-  }, [formatImageUrl, normalizeHistory, checkInitialOdontogram]);
+  }, [normalizeHistory, checkInitialOdontogram]);
 
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
@@ -503,15 +489,10 @@ const PatientPrintPage = () => {
                   canvasRef={canvas1Ref}
                   patientId={patientId}
                   initialTableData={initialData}
-                  initialImageUrl={initialImageUrl}
-                  showInitialOdontogramImage={showInitialOdontogramImage}
-                  setShowInitialOdontogramImage={setShowInitialOdontogramImage}
+                  exists={initialExists}
                   initialSnapshotStatus={initialOdontogramLoadStatus}
-                  onDelete={deleteInitial}
                   onSaveSuccess={handleSaveSuccess}
-                  onRetryImageLoad={() => checkInitialOdontogram(true)}
                   areScriptsReady={areScriptsReadyState}
-                  formatImageUrl={formatImageUrl}
                 />
               </OdontogramErrorBoundary>
             ) : !areScriptsReadyState && !initializationError ? (

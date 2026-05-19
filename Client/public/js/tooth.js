@@ -204,7 +204,12 @@ Tooth.prototype.create4Surfaces = function (settings) {
     "use strict";
     var width = settings.RECT_DIMEN;
 
-    var startX = this.rect.x + 10;
+    // Centrar el grupo de checkBoxes (cruz de 2*width de ancho) respecto al rect del diente.
+    // La separación vertical con el diente se logra desplazando la IMAGEN (ver Tooth.render).
+    // upShift desplaza todos los checkBoxes hacia arriba en pantalla (Y menor) — aplica igual
+    // para superiores e inferiores: ambos restan upShift de su Y de base.
+    var startX = this.rect.x + (this.rect.width - 2 * width) / 2;
+    var upShift = 0;
 
     /*
      * ids are in the following order
@@ -226,7 +231,7 @@ Tooth.prototype.create4Surfaces = function (settings) {
         rect1.width = width;
         rect1.height = width;
         rect1.x = startX;
-        rect1.y = this.rect.y + this.rect.height + width;
+        rect1.y = this.rect.y + this.rect.height + width - upShift;
         rect1.id = this.id + "_M";
 
         this.checkBoxes.push(rect1);
@@ -236,7 +241,7 @@ Tooth.prototype.create4Surfaces = function (settings) {
         rect2.width = width;
         rect2.height = width;
         rect2.x = startX + width;
-        rect2.y = this.rect.y + this.rect.height + width;
+        rect2.y = this.rect.y + this.rect.height + width - upShift;
         rect2.id = this.id + "_D";
 
         this.checkBoxes.push(rect2);
@@ -245,8 +250,8 @@ Tooth.prototype.create4Surfaces = function (settings) {
 
         rect3.width = width;
         rect3.height = width;
-        rect3.x = startX + 5;
-        rect3.y = this.rect.y + this.rect.height;
+        rect3.x = startX + width / 2;
+        rect3.y = this.rect.y + this.rect.height - upShift;
         rect3.id = this.id + "_V";
 
         this.checkBoxes.push(rect3);
@@ -255,8 +260,8 @@ Tooth.prototype.create4Surfaces = function (settings) {
 
         rect4.width = width;
         rect4.height = width;
-        rect4.x = startX + 5;
-        rect4.y = this.rect.y + this.rect.height + width * 2;
+        rect4.x = startX + width / 2;
+        rect4.y = this.rect.y + this.rect.height + width * 2 - upShift;
         rect4.id = this.id + "_L";
 
         this.checkBoxes.push(rect4);
@@ -268,7 +273,7 @@ Tooth.prototype.create4Surfaces = function (settings) {
         rect1.width = width;
         rect1.height = width;
         rect1.x = startX;
-        rect1.y = this.rect.y - width * 2;
+        rect1.y = this.rect.y - width * 2 - upShift;
         rect1.id = this.id + "_M";
 
         this.checkBoxes.push(rect1);
@@ -278,7 +283,7 @@ Tooth.prototype.create4Surfaces = function (settings) {
         rect2.width = width;
         rect2.height = width;
         rect2.x = startX + width;
-        rect2.y = this.rect.y - width * 2;
+        rect2.y = this.rect.y - width * 2 - upShift;
         rect2.id = this.id + "_D";
 
         this.checkBoxes.push(rect2);
@@ -287,8 +292,8 @@ Tooth.prototype.create4Surfaces = function (settings) {
 
         rect3.width = width;
         rect3.height = width;
-        rect3.x = startX + 5;
-        rect3.y = this.rect.y - width;
+        rect3.x = startX + width / 2;
+        rect3.y = this.rect.y - width - upShift;
         rect3.id = this.id + "_L";
 
         this.checkBoxes.push(rect3);
@@ -297,8 +302,8 @@ Tooth.prototype.create4Surfaces = function (settings) {
 
         rect4.width = width;
         rect4.height = width;
-        rect4.x = startX + 5;
-        rect4.y = this.rect.y - width * 3;
+        rect4.x = startX + width / 2;
+        rect4.y = this.rect.y - width * 3 - upShift;
         rect4.id = this.id + "_V";
 
         this.checkBoxes.push(rect4);
@@ -316,20 +321,24 @@ Tooth.prototype.create5Surfaces = function (settings) {
     "use strict";
     var width = settings.RECT_DIMEN;
 
-    var startX = this.rect.x + 5;
+    // Centrar el grupo de checkBoxes (cruz de 3*width de ancho) respecto al rect del diente.
+    // La separación vertical con el diente se logra desplazando la IMAGEN (ver Tooth.render).
+    // upShift desplaza todos los checkBoxes hacia arriba en pantalla (Y menor).
+    var startX = this.rect.x + (this.rect.width - 3 * width) / 2;
+    var upShift = 0;
 
     /*
      * ids are in the following order
-     * 
+     *
      * upper
      *   1
      * 2 5 4
      *   3
-     *   
+     *
      * lower
      *   3
      * 4 5 2
-     *   1  
+     *   1
      */
 
     if (this.type === 0) {
@@ -339,7 +348,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect1.width = width;
         rect1.height = width;
         rect1.x = startX;
-        rect1.y = this.rect.y + this.rect.height + width;
+        rect1.y = this.rect.y + this.rect.height + width - upShift;
         rect1.id = this.id + "_M";
 
         this.checkBoxes.push(rect1);
@@ -349,7 +358,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect2.width = width;
         rect2.height = width;
         rect2.x = startX + width;
-        rect2.y = this.rect.y + this.rect.height + width;
+        rect2.y = this.rect.y + this.rect.height + width - upShift;
         rect2.id = this.id + "_0";
 
         this.checkBoxes.push(rect2);
@@ -359,7 +368,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect3.width = width;
         rect3.height = width;
         rect3.x = startX + width * 2;
-        rect3.y = this.rect.y + this.rect.height + width;
+        rect3.y = this.rect.y + this.rect.height + width - upShift;
         rect3.id = this.id + "_D";
 
         this.checkBoxes.push(rect3);
@@ -369,7 +378,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect4.width = width;
         rect4.height = width;
         rect4.x = startX + width;
-        rect4.y = this.rect.y + this.rect.height;
+        rect4.y = this.rect.y + this.rect.height - upShift;
         rect4.id = this.id + "_V";
 
         this.checkBoxes.push(rect4);
@@ -379,7 +388,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect5.width = width;
         rect5.height = width;
         rect5.x = startX + width;
-        rect5.y = this.rect.y + this.rect.height + width * 2;
+        rect5.y = this.rect.y + this.rect.height + width * 2 - upShift;
         rect5.id = this.id + "_L";
 
         this.checkBoxes.push(rect5);
@@ -391,7 +400,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect1.width = width;
         rect1.height = width;
         rect1.x = startX;
-        rect1.y = this.rect.y - width * 2;
+        rect1.y = this.rect.y - width * 2 - upShift;
         rect1.id = this.id + "_M";
 
         this.checkBoxes.push(rect1);
@@ -401,7 +410,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect2.width = width;
         rect2.height = width;
         rect2.x = startX + width;
-        rect2.y = this.rect.y - width * 2;
+        rect2.y = this.rect.y - width * 2 - upShift;
         rect2.id = this.id + "_0";
 
         this.checkBoxes.push(rect2);
@@ -411,7 +420,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect3.width = width;
         rect3.height = width;
         rect3.x = startX + width * 2;
-        rect3.y = this.rect.y - width * 2;
+        rect3.y = this.rect.y - width * 2 - upShift;
         rect3.id = this.id + "_D";
 
         this.checkBoxes.push(rect3);
@@ -421,7 +430,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect4.width = width;
         rect4.height = width;
         rect4.x = startX + width;
-        rect4.y = this.rect.y - width;
+        rect4.y = this.rect.y - width - upShift;
         rect4.id = this.id + "_L";
 
         this.checkBoxes.push(rect4);
@@ -431,7 +440,7 @@ Tooth.prototype.create5Surfaces = function (settings) {
         rect5.width = width;
         rect5.height = width;
         rect5.x = startX + width;
-        rect5.y = this.rect.y - width * 3;
+        rect5.y = this.rect.y - width * 3 - upShift;
         rect5.id = this.id + "_V";
 
         this.checkBoxes.push(rect5);
@@ -694,16 +703,66 @@ Tooth.prototype.render = function (context, settings, constants) {
         this.textBox.drawLabel(context);
 
         // draw the image of the tooth
-        if (this.image !== undefined) {
+        if (this.image !== undefined && this.image.naturalWidth) {
 
-            // center of tooth
-            var cx = (this.rect.x + this.rect.width / 2);
+            // Si el diente tiene aplicado un damage de IMPLANTE (id 6) y la imagen
+            // de implante del periodontograma ya cargó, la usamos en lugar del
+            // diente normal. Eso reemplaza visualmente la pieza.
+            var imageToUse = this.image;
+            var implantId = (constants && constants.IMPLANTE !== undefined)
+                ? constants.IMPLANTE : 6;
+            this._renderingAsImplant = false;
+            if (this.implantImage && this.implantImage.naturalWidth) {
+                for (var di = 0; di < this.damages.length; di++) {
+                    if (this.damages[di] && this.damages[di].id === implantId) {
+                        imageToUse = this.implantImage;
+                        this._renderingAsImplant = true;
+                        break;
+                    }
+                }
+            }
 
-            // centerinng of the tooth in x axis
-            var dx = cx - this.image.naturalWidth / 2;
+            // Calcular tamaño de render preservando proporción nativa del PNG
+            // (los up*.png son 54x141 y los down*.png 66x141: si forzamos al rect
+            // se estiran). Hacemos "fit" dentro del rect y centramos.
+            var rx = this.rect.x;
+            var ry = this.rect.y;
+            var rw = this.rect.width;
+            var rh = this.rect.height;
+            var nW = imageToUse.naturalWidth;
+            var nH = imageToUse.naturalHeight;
+            var scale = Math.min(rw / nW, rh / nH);
+            var renderW = nW * scale;
+            var renderH = nH * scale;
+            var dx = rx + (rw - renderW) / 2;
+            var dy = ry + (rh - renderH) / 2;
 
-            // draw tooth
-            context.drawImage(this.image, dx, this.rect.y);
+            // Desplazar la imagen para crear separación visual con los checkBoxes:
+            // superiores se mueven HACIA ARRIBA (el checkBox sigue justo bajo el rect),
+            // inferiores HACIA ABAJO (el checkBox sigue justo encima del rect).
+            // Los checkBoxes mantienen su posición original — el "aire" lo aporta el diente.
+            var verticalShift = 12;
+            if (this.type === 0) {
+                dy -= verticalShift;
+            } else if (this.type === 1) {
+                dy += verticalShift;
+            }
+
+            // Ajuste fino: bajar todas las imágenes 2 px en pantalla.
+            dy += 2;
+
+            if (this.type === 1) {
+                // Diente inferior: voltear verticalmente para que la raíz apunte hacia abajo.
+                // Los assets up*/down* del periodontograma comparten orientación
+                // (corona abajo, raíz arriba), así que los inferiores se invierten al pintar.
+                context.save();
+                context.translate(dx, dy + renderH);
+                context.scale(1, -1);
+                context.drawImage(imageToUse, 0, 0, renderW, renderH);
+                context.restore();
+            } else {
+                context.drawImage(imageToUse, dx, dy, renderW, renderH);
+            }
         }
 
         // id
@@ -729,8 +788,17 @@ Tooth.prototype.render = function (context, settings, constants) {
         }
     }
 
-    // draw all damages
+    // draw all damages — saltar el sticker de IMPLANTE si la imagen del diente
+    // ya fue reemplazada por la del implante del periodontograma (evita el doble
+    // dibujo del símbolo viejo encima).
+    var implantIdSkip = (constants && constants.IMPLANTE !== undefined)
+        ? constants.IMPLANTE : 6;
     for (var i = 0; i < this.damages.length; i++) {
+        if (this._renderingAsImplant
+            && this.damages[i]
+            && this.damages[i].id === implantIdSkip) {
+            continue;
+        }
         this.damages[i].render(context, settings, constants);
     }
 

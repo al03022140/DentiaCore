@@ -96,6 +96,11 @@ API.interceptors.response.use(
         return new Promise((resolve, reject) => {
           pendingRequests.push({ resolve, reject });
         }).then(token => {
+          // Marcamos _retry también para los requests encolados. Si por algún
+          // motivo este reintento vuelve a recibir 401, no debe entrar de
+          // nuevo al ciclo de refresh (evita un segundo refresh innecesario
+          // o un bucle si el nuevo access token también se rechaza).
+          originalRequest._retry = true;
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return API(originalRequest);
         });
@@ -113,7 +118,14 @@ API.interceptors.response.use(
         .catch(refreshError => {
           processQueue(refreshError, null);
           clearAccessToken();
-          window.location.href = '/login';
+          // Preservar la ruta actual para volver tras el login. Sin esto,
+          // el usuario que estaba en /patient/123 acaba siempre en /.
+          const currentPath = window.location.pathname + window.location.search;
+          if (currentPath && !currentPath.startsWith('/login')) {
+            window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+          } else {
+            window.location.href = '/login';
+          }
           return Promise.reject(refreshError);
         })
         .finally(() => {
@@ -121,9 +133,10 @@ API.interceptors.response.use(
         });
     }
 
-    if (error.response?.status === 403) {
-      window.location.href = '/login';
-    }
+    // No redirigir automáticamente en 403: muchos 403 son "permiso
+    // insuficiente para esta acción" con la sesión perfectamente válida.
+    // Forzar /login en esos casos rompía el flujo del usuario. Cada vista
+    // debe manejar el 403 mostrando un mensaje de "no autorizado".
     return Promise.reject(error);
   }
 );

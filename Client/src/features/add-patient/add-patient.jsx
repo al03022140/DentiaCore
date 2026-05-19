@@ -19,21 +19,28 @@ import DentalEvaluation from './sections/dental-evaluation';
 import WomenSection from './sections/women-section';
 
 
+// `step` indica en qué paso del wizard vive cada campo obligatorio. Sirve para
+// (1) bloquear el avance entre pasos cuando faltan campos y (2) marcar el paso
+// con una equis roja en el Steps de Antd.
 const REQUIRED_FIELDS = [
-  { path: ["documento", "tipo"], label: "Tipo de documento" },
-  { path: ["documento", "numero"], label: "Número de documento" },
-  { path: ["primer_nombre"], label: "Primer nombre" },
-  { path: ["apellido_paterno"], label: "Apellido paterno" },
-  { path: ["fecha_nacimiento"], label: "Fecha de nacimiento" },
-  { path: ["sexo"], label: "Sexo" },
-  { path: ["contacto", "telefono"], label: "Teléfono de contacto" },
-  { path: ["contacto", "direccion"], label: "Dirección" },
-  { path: ["contacto", "ciudad"], label: "Ciudad" },
-  { path: ["contacto", "entidad_federativa"], label: "Entidad federativa" }
+  { path: ["documento", "tipo"], label: "Tipo de documento", step: 0 },
+  { path: ["documento", "numero"], label: "Número de documento", step: 0 },
+  { path: ["primer_nombre"], label: "Primer nombre", step: 0 },
+  { path: ["apellido_paterno"], label: "Apellido paterno", step: 0 },
+  { path: ["fecha_nacimiento"], label: "Fecha de nacimiento", step: 0 },
+  { path: ["sexo"], label: "Sexo", step: 0 },
+  { path: ["contacto", "telefono"], label: "Teléfono de contacto", step: 1 },
+  { path: ["contacto", "direccion"], label: "Dirección", step: 1 },
+  { path: ["contacto", "ciudad"], label: "Ciudad", step: 1 },
+  { path: ["contacto", "entidad_federativa"], label: "Entidad federativa", step: 1 }
 ];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[\d\s\-+()]{7,20}$/;
+// Acepta el formato visible (espacios, guiones, paréntesis, +), pero
+// requiere que tenga AL MENOS 7 dígitos reales; "((((((" o "+++--" se rechazan.
+const PHONE_ALLOWED_CHARS = /^[\d\s\-+()]+$/;
+const PHONE_MIN_DIGITS = 7;
+const PHONE_MAX_DIGITS = 15;
 
 const validateFormat = (data) => {
   const errors = [];
@@ -41,8 +48,11 @@ const validateFormat = (data) => {
     errors.push({ label: 'El correo electrónico tiene un formato inválido' });
   }
   const phone = data.contacto?.telefono;
-  if (phone && !PHONE_REGEX.test(phone)) {
-    errors.push({ label: 'El teléfono tiene un formato inválido (mín. 7 dígitos)' });
+  if (phone) {
+    const digits = String(phone).replace(/\D/g, '');
+    if (!PHONE_ALLOWED_CHARS.test(phone) || digits.length < PHONE_MIN_DIGITS || digits.length > PHONE_MAX_DIGITS) {
+      errors.push({ label: `El teléfono debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos` });
+    }
   }
   if (data.fecha_nacimiento) {
     const birthDate = new Date(data.fecha_nacimiento);
@@ -51,11 +61,25 @@ const validateFormat = (data) => {
       errors.push({ label: 'La fecha de nacimiento no puede ser futura' });
     }
     const age = today.getFullYear() - birthDate.getFullYear();
-    if (age > 150) {
-      errors.push({ label: 'La fecha de nacimiento parece incorrecta (>150 años)' });
+    if (age > 120) {
+      errors.push({ label: 'La fecha de nacimiento implica una edad mayor a 120 años' });
     }
   }
   return errors;
+};
+
+// Hace trim a todos los strings (recursivo) antes de enviar al backend.
+// Evita que el usuario teclee "   " en campos required y le aparezca un error
+// confuso del backend después de que el schema haga trim.
+const trimStringsDeep = (value) => {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.map(trimStringsDeep);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = trimStringsDeep(v);
+    return out;
+  }
+  return value;
 };
 
 class PatientValidationError extends Error {
@@ -80,17 +104,31 @@ const getValueFromPath = (data, path) =>
 const validateRequiredFields = (data) =>
   REQUIRED_FIELDS.filter(({ path }) => isEmptyValue(getValueFromPath(data, path)));
 
-const showMissingFieldsModal = (missingFields) => {
+const getMissingFieldsForStep = (data, step) =>
+  REQUIRED_FIELDS.filter(f => f.step === step && isEmptyValue(getValueFromPath(data, f.path)));
+
+const showMissingFieldsModal = (missingFields, stepTitles) => {
+  // Agrupar por paso para que el usuario vea claramente qué falta en cada sección.
+  const grouped = {};
+  for (const f of missingFields) {
+    const stepKey = typeof f.step === 'number' ? f.step : 'otros';
+    if (!grouped[stepKey]) grouped[stepKey] = [];
+    grouped[stepKey].push(f);
+  }
   Modal.error({
     title: "Completa los campos obligatorios",
     content: (
       <div>
         <p>Antes de continuar, revisa los campos pendientes:</p>
-        <ul>
-          {missingFields.map(({ label }) => (
-            <li key={label}>{label}</li>
-          ))}
-        </ul>
+        {Object.entries(grouped).map(([stepKey, fields]) => {
+          const title = stepTitles && stepTitles[stepKey] ? stepTitles[stepKey] : null;
+          return (
+            <div key={stepKey} style={{ marginBottom: 8 }}>
+              {title && <strong>{title}:</strong>}
+              <ul>{fields.map(({ label }) => <li key={label}>{label}</li>)}</ul>
+            </div>
+          );
+        })}
       </div>
     )
   });
@@ -414,6 +452,18 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
+  // Bloquea doble-submit: si el usuario hace doble-click en "Guardar" o se
+  // impacienta y vuelve a tocar el botón, el segundo click no dispara un
+  // segundo POST que terminaría en 409 por documento.numero duplicado.
+  // El ref hace el chequeo sincrónico (los setState son asíncronos y dos
+  // clicks muy seguidos pueden leer el valor anterior antes de que React
+  // re-renderice); el state se conserva para refrescar el botón.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  // Pasos que el usuario intentó dejar (con campos faltantes) o que se
+  // marcaron como erróneos al intentar guardar. Sólo estos muestran la equis
+  // roja para no abrumar al usuario con errores antes de tocar la sección.
+  const [attemptedSteps, setAttemptedSteps] = useState(() => new Set());
   
   // useEffect para inicializar el formulario con datos del paciente cuando se está editando
   useEffect(() => {
@@ -658,7 +708,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
           fecha_ultima_menstruacion: "",
           toma_anticonceptivos: false
         },
-        photoURL: patientToEdit.foto || patientToEdit.fotoUrl || ""
+        photoURL: patientToEdit.photoURL || patientToEdit.fotoUrl || ""
       });
     }
   }, [patientToEdit]);
@@ -838,33 +888,49 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   /** Confirmar edición (envío de datos y navegación) */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return; // chequeo sincrónico contra doble click
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    // Si se está usando como modal, usar la función onSave proporcionada
-    if (onSave) {
-      try {
-        await handleSavePatient();
-        onSave();
-      } catch (error) {
-        console.error('Error al guardar paciente:', error);
+    try {
+      if (onSave) {
+        try {
+          await handleSavePatient();
+          onSave();
+        } catch (error) {
+          console.error('Error al guardar paciente:', error);
+        }
+        return;
       }
-      return;
-    }
 
-    // Lógica original para cuando no se usa como modal
-    await handleSavePatient();
+      await handleSavePatient();
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   /** Función auxiliar para guardar paciente */
   const handleSavePatient = async () => {
     // Crear FormData para enviar archivos
     const formDataToSend = new FormData();
-    
-    // Crear una copia del formData para no modificar el estado directamente
-    const patientData = { ...formData };
+
+    // Trim recursivo de strings antes de validar y enviar — evita que campos
+    // required acepten "   " en cliente y rebotan luego en el backend.
+    const patientData = trimStringsDeep(formData);
 
     const missingFields = validateRequiredFields(patientData);
     if (missingFields.length > 0) {
-      showMissingFieldsModal(missingFields);
+      // Marcar como "intentados" todos los pasos donde hay campos faltantes,
+      // para que se pinten con la equis roja al cerrar el modal.
+      setAttemptedSteps(prev => {
+        const next = new Set(prev);
+        for (const f of missingFields) {
+          if (typeof f.step === 'number') next.add(f.step);
+        }
+        return next;
+      });
+      showMissingFieldsModal(missingFields, stepTitlesByIndex);
       throw new PatientValidationError("Faltan campos obligatorios", missingFields);
     }
 
@@ -1111,6 +1177,51 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
   const isLastStep = currentStep === WIZARD_STEPS.length - 1;
 
+  // Mapa { stepIndex: "Título del paso" } usado por el modal cuando agrupa
+  // los campos faltantes por sección.
+  const stepTitlesByIndex = WIZARD_STEPS.reduce((acc, s, idx) => {
+    acc[idx] = s.title;
+    return acc;
+  }, {});
+
+  // Intenta avanzar/saltar a `newStep`. Si se va hacia adelante valida todos
+  // los pasos intermedios (incluyendo el actual): si alguno tiene campos
+  // obligatorios faltantes, bloquea la navegación, los marca como `attempted`
+  // (para que se pinten con la equis roja) y muestra el modal agrupado.
+  const goToStep = (newStep) => {
+    if (newStep === currentStep) return;
+    if (newStep < currentStep) {
+      // Retroceder es libre.
+      setCurrentStep(newStep);
+      return;
+    }
+    const missingByStep = [];
+    const newAttempted = new Set(attemptedSteps);
+    for (let i = currentStep; i < newStep; i++) {
+      const missing = getMissingFieldsForStep(formData, i);
+      newAttempted.add(i);
+      if (missing.length > 0) missingByStep.push(...missing);
+    }
+    setAttemptedSteps(newAttempted);
+    if (missingByStep.length > 0) {
+      showMissingFieldsModal(missingByStep, stepTitlesByIndex);
+      return;
+    }
+    setCurrentStep(newStep);
+  };
+
+  // Items del stepper con `status: 'error'` cuando el paso fue intentado y
+  // aún tiene campos obligatorios faltantes. Antd pinta una equis roja.
+  const wizardItems = WIZARD_STEPS.map((step, idx) => {
+    const missing = getMissingFieldsForStep(formData, idx);
+    const showError = attemptedSteps.has(idx) && missing.length > 0;
+    return {
+      title: step.title,
+      description: step.description,
+      ...(showError ? { status: 'error' } : {})
+    };
+  });
+
   return (
     <div className="add-patient-wrapper">
       <div className="scrollable-form">
@@ -1185,8 +1296,8 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
           <Steps
             current={currentStep}
-            items={WIZARD_STEPS}
-            onChange={(step) => setCurrentStep(step)}
+            items={wizardItems}
+            onChange={goToStep}
             className="add-patient-steps"
             size="small"
             responsive
@@ -1197,21 +1308,23 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
             <div className="actions-container wizard-actions">
               {currentStep > 0 && (
-                <button type="button" className="back-button" onClick={() => setCurrentStep(prev => prev - 1)}>
+                <button type="button" className="back-button" onClick={() => goToStep(currentStep - 1)}>
                   ← Anterior
                 </button>
               )}
               {!isLastStep && (
-                <button type="button" className="confirm-button" onClick={() => setCurrentStep(prev => prev + 1)}>
+                <button type="button" className="confirm-button" onClick={() => goToStep(currentStep + 1)}>
                   Siguiente →
                 </button>
               )}
               {isLastStep && (
-                <button type="submit" className="confirm-button">
-                  {patientToEdit ? "Actualizar Paciente" : "Guardar Paciente"}
+                <button type="submit" className="confirm-button" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? (patientToEdit ? "Actualizando..." : "Guardando...")
+                    : (patientToEdit ? "Actualizar Paciente" : "Guardar Paciente")}
                 </button>
               )}
-              <button type="button" onClick={handleCancelEdit} className="cancel-button">
+              <button type="button" onClick={handleCancelEdit} className="cancel-button" disabled={isSubmitting}>
                 Cancelar
               </button>
             </div>

@@ -1,7 +1,7 @@
 /**
  * Utilidades para el manejo de datos del odontograma
  */
-import { formatDateToDDMMYYYY, getCurrentDateFormatted } from '../../../shared/utils/date-utils';
+import { formatDateToDDMMYYYY } from '../../../shared/utils/date-utils';
 
 // Mapeo entre código numérico y letra
 const NUMERIC_TO_LETTER = {
@@ -185,8 +185,11 @@ export const prepareDataSource = (data, prefix = 'ds') => {
                         : 'No especificado';
     const rawSurface = item.superficie ?? item.surface ?? 'O';
     const superficie = getSurfaceNameByCode(rawSurface);
-    const fechaRaw   = item.fecha ?? getCurrentDateFormatted();
-    const fecha      = formatDateToDDMMYYYY(fechaRaw);
+    // La fecha la provee el servidor por entrada (savedAt del momento del guardado).
+    // No usamos "hoy" como fallback: mostrar "—" deja claro que el dato falta en BD
+    // en vez de inducir al usuario a creer que la entrada se guardó hoy.
+    const fechaRaw   = item.fecha;
+    const fecha      = fechaRaw ? formatDateToDDMMYYYY(fechaRaw) : '—';
     return {
       diente,
       tipo,

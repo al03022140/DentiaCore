@@ -8,25 +8,33 @@ const periodontogramRoutes = require('./periodontogramRoutes');
 const { getUploadsBase, resolveUploadsPath } = require('../utils/uploads');
 const uploadsBase = getUploadsBase();
 
+// SOLO aceptamos como folder-id candidatos que sean ObjectId válidos. Si un
+// cliente envía algo como `patientId=../../etc/passwd` como campo de texto
+// ANTES del archivo en el multipart, multer lo recibe poblado en req.body en
+// destination(); sin esta validación path.join lo aceptaría y multer escribiría
+// la foto fuera de uploads/. Se ignora cualquier valor que no sea ObjectId.
+const safeObjectIdString = (value) => {
+  if (typeof value !== 'string') return null;
+  return mongoose.Types.ObjectId.isValid(value) && /^[a-fA-F0-9]{24}$/.test(value)
+    ? value
+    : null;
+};
+
 const resolveUploadTarget = (req) => {
-  if (req.params?.id) {
-    req.uploadTargetId = req.params.id;
+  const fromParams = safeObjectIdString(req.params?.id);
+  if (fromParams) {
+    req.uploadTargetId = fromParams;
     return req.uploadTargetId;
   }
 
   if (req.body) {
-    const { patientId, _id, paciente_id } = req.body;
-    if (patientId) {
-      req.uploadTargetId = patientId;
-      return req.uploadTargetId;
-    }
-    if (_id) {
-      req.uploadTargetId = _id;
-      return req.uploadTargetId;
-    }
-    if (paciente_id) {
-      req.uploadTargetId = paciente_id;
-      return req.uploadTargetId;
+    const candidates = [req.body.patientId, req.body._id, req.body.paciente_id];
+    for (const candidate of candidates) {
+      const safe = safeObjectIdString(candidate);
+      if (safe) {
+        req.uploadTargetId = safe;
+        return req.uploadTargetId;
+      }
     }
   }
 
@@ -169,7 +177,11 @@ const handleMulterError = (err, req, res, _next) => {
 router
   .route('/')
   .get(readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getAllPatients)
-  .post(writeLimiter, authorize(['patients.create']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
+  // El recepcionista tiene `patients.create.basic`. Antes la ruta sólo
+  // aceptaba `patients.create` y le devolvía 403. Ahora pasa el gate y el
+  // controller (whitelist CREATE_ALLOWED_FIELDS) sigue limitando lo que
+  // puede escribir.
+  .post(writeLimiter, authorize(['patients.create', 'patients.create.basic']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
   .delete(writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 
 router.post('/batch', writeLimiter, authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
@@ -179,7 +191,9 @@ router
   .route('/:id')
   .all(validateId)
   .get(readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.getPatientById)
-  .put(writeLimiter, authorize(['patients.update']), uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
+  // Igual que en POST: el recepcionista tiene `patients.update.basic` y
+  // necesita poder editar datos de contacto.
+  .put(writeLimiter, authorize(['patients.update', 'patients.update.basic']), uploadFoto.single('foto'), handleMulterError, patientCtrl.updatePatient)
   .delete(writeLimiter, authorize(['patients.delete']), patientCtrl.deletePatient);
 
 /**

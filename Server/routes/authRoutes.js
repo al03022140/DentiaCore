@@ -27,6 +27,27 @@ const passwordResetRateLimit = rateLimit({
   legacyHeaders: false
 });
 
+// Limita /refresh: protege CPU contra flood de jwt.verify y dificulta abusar
+// un refresh token robado. 60 refreshes/15min/IP es holgado para uso normal
+// (refresh ~cada 14m por sesión activa) pero corta el flood.
+const refreshRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { message: 'Demasiadas peticiones de refresh. Intente más tarde.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Limita /verify-pin a nivel HTTP además del límite por usuario en DB.
+// Evita brute-force sobre PINs cuando varios usuarios comparten IP.
+const pinRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  message: { message: 'Demasiados intentos de PIN. Espere unos minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 const withValidation = (rules) => [
   ...rules,
   (req, res, next) => {
@@ -51,7 +72,7 @@ router.post(
   authController.login
 );
 
-router.post('/refresh', authController.refresh);
+router.post('/refresh', refreshRateLimit, authController.refresh);
 router.post('/logout', authController.logout);
 router.get('/me', authenticate, authController.me);
 
@@ -80,7 +101,7 @@ router.post('/set-pin', authenticate, withValidation([
   body('pin').isString().isLength({ min: 4, max: 4 }).matches(/^\d{4}$/).withMessage('PIN debe ser 4 dígitos')
 ]), authController.setPin);
 
-router.post('/verify-pin', authenticate, withValidation([
+router.post('/verify-pin', pinRateLimit, authenticate, withValidation([
   body('pin').isString().isLength({ min: 4, max: 4 }).matches(/^\d{4}$/).withMessage('PIN debe ser 4 dígitos')
 ]), authController.verifyPin);
 

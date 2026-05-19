@@ -20,8 +20,14 @@ const LoginPage = () => {
     setIsSubmitting(true);
 
     try {
-      await login({ email, contraseña });
-      const target = location.state?.from?.pathname || '/';
+      // Trim del email para que "  user@x.com" no rebote en el validator
+      // del backend (que normaliza con toLowerCase().trim() antes de buscar).
+      await login({ email: email.trim(), contraseña });
+      // `from` puede venir como state de React Router (cuando ProtectedRoute
+      // redirige) o como query param `?from=...` (cuando el interceptor de
+      // axios hizo una redirección dura tras refresh fallido).
+      const queryFrom = new URLSearchParams(location.search).get('from');
+      const target = location.state?.from?.pathname || queryFrom || '/';
       navigate(target, { replace: true });
     } catch (err) {
       setError(err?.response?.data?.message || 'No se pudo iniciar sesión');

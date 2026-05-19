@@ -19,10 +19,46 @@ const ROLE_PERMISSIONS = {
   ],
 
   // ─── Dueño / Director de la clínica ──────────────────────────
+  // Lista EXPLÍCITA (no wildcard `*`). roles.MD §3 (matriz) limita al
+  // administrador a R sobre contenido clínico — no puede crear/editar
+  // odontogramas, periodontogramas, consultas ni exámenes. Eso es
+  // exclusivo del cirujano dentista (NOM-013 + NOM-004 Art. 5.10).
   administrador: [
-    '*',                 // todos los permisos de clínica
-    // NO tiene system.* ni maintenance.*
+    // Pacientes — CRUD completo (D = soft-delete)
+    'patients.read',
+    'patients.create',
+    'patients.update',
+    'patients.delete',
+    // Lectura del contenido clínico (sin escritura)
+    'odontogram.read',
+    'periodontogram.read',
+    'consultas.read',
+    'exams.read',
+    // Citas — CRUD completo
+    'appointments.read',
+    'appointments.create',
+    'appointments.update',
+    'appointments.delete',
+    // Caja
+    'cash.read',
+    'cash.manage',
+    // Estadísticas — todas
+    'stats.read.admin',
+    'stats.read.own',
+    // Usuarios — CRUD (soft-delete vía disable)
+    'users.read',
+    'users.create',
+    'users.update',
+    'users.disable',
+    // Configuración
+    'settings.read',
+    'settings.update',
+    // Auditoría (clinic-scope; system events siguen siendo de superadmin)
+    'audit.read.full',
+    // Modo Cortina (LFPDPPP Art. 19)
     'session.lock',
+    // Legacy periodontogram (compatibilidad)
+    'read_periodontogram',
   ],
 
   // ─── Cirujano Dentista (NOM-013) ─────────────────────────────
@@ -73,6 +109,7 @@ const ROLE_PERMISSIONS = {
     'consultas.read',
     'consultas.create.draft',        // redacción de nota en borrador
     'consultas.update.draft',        // edición de borrador propio
+    'exams.read',                    // matriz §3: asistente tiene R sobre exámenes
     'appointments.read',
     'notes.template.use',            // plantillas de evolución Anti-Olvidos
     'settings.read',                 // leer configuración de clínica

@@ -71,6 +71,8 @@ const OdontogramClinicalSection = ({
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [currentCanvasData, setCurrentCanvasData] = useState([]);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    // Tabla colapsable: por defecto oculta para que el canvas use todo el ancho.
+    const [tableVisible, setTableVisible] = useState(false);
 
     // Consolidar refs del motor
     const engineManagerRef = useRef({
@@ -522,11 +524,76 @@ const OdontogramClinicalSection = ({
         <section className="patient-detail_odontograma">
             <div className="odontograma-section">
               <div className="odontograma-header2">
-                <h2>Odontograma Clínico</h2>
-
+                <div className="odontograma-initial-heading-block">
+                  <h2>Odontograma Clínico</h2>
+                  <p className="odontograma-initial-status-line" role="status">
+                    Selecciona una herramienta, marca los dientes en el canvas y pulsa «Guardar estado». El registro clínico puede actualizarse en cada consulta.
+                  </p>
+                </div>
+                <div className="odontograma-controls">
+                  <button
+                    type="button"
+                    className="button-primary capture-button"
+                    onClick={triggerSave}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar estado'}
+                  </button>
+                  <button
+                    type="button"
+                    className="odontograma-toggle-table-btn"
+                    onClick={() => setTableVisible(v => !v)}
+                    aria-pressed={tableVisible}
+                    title={tableVisible ? 'Ocultar tabla de daños' : 'Mostrar tabla de daños'}
+                  >
+                    {tableVisible ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="odontograma-toggle-icon"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="odontograma-toggle-icon"
+                        aria-hidden="true"
+                      >
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                        <path d="M9 11h6" />
+                        <path d="M9 15h6" />
+                      </svg>
+                    )}
+                    <span>{tableVisible ? 'Ocultar registro' : 'Ver registro'}</span>
+                    {tableData.length > 0 && (
+                      <span className="odontograma-toggle-badge" aria-label={`${tableData.length} daños`}>
+                        {tableData.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="odontograma-wrapper">
-                <div className="odontograma-container odontograma-flex-container">
+                <div className={`odontograma-container odontograma-flex-container${tableVisible ? '' : ' odontograma-table-collapsed'}`}>
                   {isFullscreen && (
                     <div
                       className="odontograma-fullscreen-backdrop"
@@ -571,15 +638,6 @@ const OdontogramClinicalSection = ({
                     )}
                   </div>
                   <div className="odontograma-table-container">
-                                        <button
-                                            type="button"
-                                            className="button-primary odontogram-save-button"
-                                            onClick={triggerSave}
-                                            disabled={isSaving}
-                                        >
-                                            {isSaving ? 'Guardando...' : 'Guardar estado'}
-                                        </button>
-                   
                    <Tabs
                      defaultActiveKey="current"
                      items={[

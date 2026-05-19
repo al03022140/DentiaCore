@@ -29,6 +29,13 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // `min` para el input datetime-local: ahora mismo en hora local, formato YYYY-MM-DDTHH:mm.
+  const nowLocalISO = (() => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset() * 60_000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  })();
+
   // Load doctors, service catalog & patients when modal opens
   useEffect(() => {
     if (!visible) return;
@@ -40,7 +47,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
           getAllPatients().catch(() => ({}))
         ]);
         const usersList = Array.isArray(usersRes) ? usersRes : (usersRes.users || []);
-        setDoctors(usersList.filter(u => u.role === 'doctor' || u.role === 'superadmin' || u.role === 'administrador'));
+        setDoctors(usersList.filter(u => u.rol === 'doctor' || u.rol === 'superadmin' || u.rol === 'administrador'));
         setServiceCatalog(settings.serviceCatalog || []);
         const patientsList = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.patients ?? patientsRes ?? []);
         setAllPatients(patientsList);
@@ -195,7 +202,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
       if (googleToken) {
         const patientName = getPatientFullName(selectedPatient);
         const doctorObj = doctors.find(d => d._id === selectedDoctor);
-        const doctorName = doctorObj ? `${doctorObj.nombre} ${doctorObj.apellidos || ''}`.trim() : '';
+        const doctorName = doctorObj ? doctorObj.nombre : '';
         const start = new Date(fechaHora);
         const end = new Date(start.getTime() + 60 * 60 * 1000); // default 1h duration
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -243,9 +250,9 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
             {selectedPatient ? (
               <div className={`cam-patient-card ${fixedPatient ? 'cam-patient-card--fixed' : ''}`}>
                 <img
-                  src={selectedPatient.foto ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${selectedPatient.foto}` : userNot}
+                  src={(selectedPatient.photoURL || selectedPatient.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${encodeURIComponent(selectedPatient.photoURL || selectedPatient.foto)}` : userNot}
                   alt={getPatientFullName(selectedPatient)}
-                  className={`cam-patient-avatar${selectedPatient.foto ? '' : ' profile-default-avatar'}`}
+                  className={`cam-patient-avatar${(selectedPatient.photoURL || selectedPatient.foto) ? '' : ' profile-default-avatar'}`}
                   onError={e => {
                     e.target.src = userNot;
                     e.target.classList.add('profile-default-avatar');
@@ -274,9 +281,9 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
                     {patientResults.map(p => (
                       <li key={p._id} onClick={() => selectPatient(p)}>
                         <img
-                          src={p.foto ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${p.foto}` : userNot}
+                          src={(p.photoURL || p.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${encodeURIComponent(p.photoURL || p.foto)}` : userNot}
                           alt={getPatientFullName(p)}
-                          className={`cam-result-avatar${p.foto ? '' : ' profile-default-avatar'}`}
+                          className={`cam-result-avatar${(p.photoURL || p.foto) ? '' : ' profile-default-avatar'}`}
                           onError={e => {
                             e.target.src = userNot;
                             e.target.classList.add('profile-default-avatar');
@@ -300,7 +307,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
             <select className="cam-input" value={selectedDoctor} onChange={e => setSelectedDoctor(e.target.value)}>
               <option value="">Seleccionar doctor...</option>
               {doctors.map(d => (
-                <option key={d._id} value={d._id}>{d.nombre} {d.apellidos || ''}</option>
+                <option key={d._id} value={d._id}>{d.nombre}</option>
               ))}
             </select>
           </div>
@@ -311,6 +318,7 @@ const CreateAppointmentModal = ({ visible, onClose, onCreated, fixedPatient = nu
             <input
               type="datetime-local"
               className="cam-input"
+              min={nowLocalISO}
               value={fechaHora}
               onChange={e => setFechaHora(e.target.value)}
             />

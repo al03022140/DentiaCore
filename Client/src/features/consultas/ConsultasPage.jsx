@@ -22,13 +22,16 @@ const calculateAge = (fechaNacimiento) => {
 const getPatientName = (apt) => {
   const p = apt.paciente_id;
   if (!p) return 'Paciente desconocido';
-  return `${p.nombre || ''} ${p.apellidos || ''}`.trim();
+  const fullName = [p.primer_nombre, p.otros_nombres, p.apellido_paterno, p.apellido_materno]
+    .filter(Boolean).join(' ').trim();
+  return fullName || `${p.nombre || ''} ${p.apellidos || ''}`.trim() || 'Paciente desconocido';
 };
 
 const getPatientImage = (apt) => {
   const p = apt.paciente_id;
-  if (!p || !p.foto) return null;
-  return `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${p.foto}`;
+  const photo = p?.photoURL || p?.foto;
+  if (!p || !photo) return null;
+  return `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${encodeURIComponent(photo)}`;
 };
 
 const statusMap = {

@@ -1,33 +1,44 @@
-const { hasPermission, isAdminRole, isClinicalRole } = require('../utils/permissions');
+const { hasPermission, isAdminRole, isClinicalRole, normalizeRole } = require('../utils/permissions');
 
 /**
  * Middleware de autorización por permisos.
  *
+ * Reglas:
+ * - `superadmin` (programador/soporte) — bypasa el chequeo de permisos pero
+ *   DEBE incluir `motivo` en el body para toda escritura (POST/PUT/PATCH/DELETE).
+ *   Roles.MD §2: "Toda operación realizada con este rol debe generar una
+ *   entrada en el log de auditoría con `motivo` obligatorio".
+ * - `administrador` (dueño de clínica) — NO bypasa. Sus permisos están
+ *   declarados explícitamente en `permissions.js` (sin wildcard). El admin
+ *   NO puede escribir contenido clínico (NOM-013: exclusividad del dentista).
+ * - Los demás roles pasan por `hasPermission`.
+ *
  * @param {string[]} requiredPermissions - Permisos requeridos (OR — al menos uno).
- * @param {object}   [options]
- * @param {boolean}  [options.requireMotivo] - Si true, exige `req.body.motivo` (superadmin).
  * @returns Express middleware
  */
-const authorize = (requiredPermissions = [], options = {}) => (req, res, next) => {
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+const authorize = (requiredPermissions = []) => (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Usuario no autenticado' });
   }
 
-  const role = req.user.role;
+  const role = normalizeRole(req.user.role);
 
-  // Superadmin y administrador pasan las verificaciones de permisos clínica
-  if (isAdminRole(role)) {
-    // Superadmin requiere motivo en toda operación de escritura
-    if (role === 'superadmin' && options.requireMotivo && req.method !== 'GET') {
-      if (!req.body?.motivo) {
+  // superadmin bypasea TODOS los permisos pero exige `motivo` en escrituras.
+  if (role === 'superadmin') {
+    if (WRITE_METHODS.has(req.method)) {
+      const motivo = req.body?.motivo;
+      if (!motivo || typeof motivo !== 'string' || motivo.trim().length < 3) {
         return res.status(400).json({
-          message: 'El rol superadmin requiere un campo "motivo" en cada operación de escritura'
+          message: 'El rol superadmin requiere un campo "motivo" (≥3 caracteres) en cada operación de escritura'
         });
       }
     }
     return next();
   }
 
+  // El administrador YA NO bypasea: cae al chequeo normal de permisos.
   if (!hasPermission(req.user.permissions, requiredPermissions)) {
     return res.status(403).json({ message: 'Permisos insuficientes para esta operación' });
   }
@@ -75,6 +86,24 @@ const BASIC_PATIENT_FIELDS = [
 ];
 
 /**
+ * Campos que el recepcionista puede ESCRIBIR cuando sólo tiene
+ * `patients.create.basic` / `patients.update.basic`. Nada del expediente
+ * clínico (encuesta médica, antecedentes, evaluación dental, etc.).
+ * roles.MD §2 (recepcionista): "Crear pacientes (ficha básica de
+ * identificación, sin historia clínica)".
+ */
+const BASIC_PATIENT_WRITE_FIELDS = [
+  'documento',
+  'primer_nombre', 'otros_nombres', 'apellido_paterno', 'apellido_materno',
+  'fecha_nacimiento', 'sexo',
+  'estado_civil', 'nacionalidad', 'lugar_nacimiento', 'escolaridad', 'ocupacion',
+  'email',
+  'situacion_laboral',
+  'contacto',
+  'contactos_emergencia',
+];
+
+/**
  * Filtra campos clínicos de un objeto paciente.
  * Devuelve solo los campos básicos (contacto).
  */
@@ -111,3 +140,4 @@ module.exports.filterPatientFields = filterPatientFields;
 module.exports.sanitizePatientForBasicRead = sanitizePatientForBasicRead;
 module.exports.requireClinicalRole = requireClinicalRole;
 module.exports.BASIC_PATIENT_FIELDS = BASIC_PATIENT_FIELDS;
+module.exports.BASIC_PATIENT_WRITE_FIELDS = BASIC_PATIENT_WRITE_FIELDS;

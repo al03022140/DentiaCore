@@ -163,7 +163,10 @@ Engine.prototype.setCanvas = function (canvas) {
 Engine.prototype.getXpos = function (event) {
     "use strict";
     var boundingRect = this.canvas.getBoundingClientRect();
-    var scaleX = this.canvas.width / boundingRect.width;
+    // Usar el ancho LÓGICO (no el físico escalado por DPR) para mantener
+    // las coordenadas del click en el mismo espacio que el layout del motor.
+    var logicalW = this.canvas._logicalWidth || this.canvas.width;
+    var scaleX = logicalW / boundingRect.width;
 
     return Math.round((event.clientX - boundingRect.left) * scaleX);
 };
@@ -177,7 +180,8 @@ Engine.prototype.getXpos = function (event) {
 Engine.prototype.getYpos = function (event) {
     "use strict";
     var boundingRect = this.canvas.getBoundingClientRect();
-    var scaleY = this.canvas.height / boundingRect.height;
+    var logicalH = this.canvas._logicalHeight || this.canvas.height;
+    var scaleY = logicalH / boundingRect.height;
 
     return Math.round((event.clientY - boundingRect.top) * scaleY);
 };
@@ -222,14 +226,15 @@ Engine.prototype.init = function () {
     this.child.active = false;
     this.buttons.push(this.child);
 
+    var canvasLogicalW = this.canvas._logicalWidth || this.canvas.width;
     this.save = new MenuItem();
-    this.save.setUp((this.canvas.width-10) - 160, 150, 75, 20);
+    this.save.setUp((canvasLogicalW - 10) - 160, 150, 75, 20);
     this.save.textBox.text = "Guardar";
     this.save.active = false;
     this.buttons.push(this.save);
-    
+
     this.clear = new MenuItem();
-    this.clear.setUp((this.canvas.width-10) - 76, 150, 75, 20);
+    this.clear.setUp((canvasLogicalW - 10) - 76, 150, 75, 20);
     this.clear.textBox.text = "Reset";
     this.clear.active = false;
     this.buttons.push(this.clear);
@@ -283,15 +288,15 @@ Engine.prototype.update = function () {
         this.renderer.render(this.buttons, this.settings, this.constants);
 
         if (this.settings.DEBUG) {
-
-            this.renderer.renderText("DEBUG MODE", 2, this.canvas.height, this.settings.COLOR_TEXT);
+            var debugH = this.canvas._logicalHeight || this.canvas.height;
+            this.renderer.renderText("DEBUG MODE", 2, debugH, this.settings.COLOR_TEXT);
 
             this.renderer.renderText("X: " + this.cursorX + ", Y: " + this.cursorY,
-                128, this.canvas.height, this.settings.COLOR_TEXT);
+                128, debugH, this.settings.COLOR_TEXT);
 
 
             this.renderer.renderText("Selected Damage : " + this.selectedDamage,
-                220, this.canvas.height, this.settings.COLOR_TEXT);
+                220, debugH, this.settings.COLOR_TEXT);
         }
 
     } else {
@@ -2746,7 +2751,8 @@ Engine.prototype.createMenu = function () {
 
     let buttonWidth = 130;
     let buttonHeight = 25;
-    let startX = (this.canvas.width / 2) - ((buttonWidth * 6) / 2);
+    let canvasLogicalW = this.canvas._logicalWidth || this.canvas.width;
+    let startX = (canvasLogicalW / 2) - ((buttonWidth * 6) / 2);
 
     let posY = 10;
     let ySeparator = 0;

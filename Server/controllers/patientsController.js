@@ -7,7 +7,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
-const { sanitizePatientForBasicRead } = require('../middlewares/authorize');
+const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
 
 // Utilidad compartida: calcular edad a partir de fecha de nacimiento
 const calcularEdad = (fechaNacimiento) => {
@@ -194,31 +194,44 @@ exports.getPatientById = async (req, res) => {
 
 
 
-/** 🔹 Crear un paciente con subida de foto y archivos anexos */
-exports.createPatient = async (req, res) => {
-    try {
-        console.log("📥 Recibiendo paciente:", req.body);
-        console.log("📝 Validando estructura de datos recibidos:", JSON.stringify(req.body, null, 2));
+// Campos que el cliente puede enviar al crear un paciente.
+// Cualquier otro campo (paciente_id, _id, edad, ruta_archivos, notas_evolucion,
+// planes_tratamiento, creadoPor, integrityHash, deletedAt, etc.) lo controla
+// el servidor para evitar mass-assignment.
+const CREATE_ALLOWED_FIELDS = [
+    'documento', 'primer_nombre', 'otros_nombres', 'apellido_paterno', 'apellido_materno',
+    'fecha_nacimiento', 'sexo', 'estado_civil', 'nacionalidad', 'lugar_nacimiento',
+    'escolaridad', 'ocupacion', 'email', 'situacion_laboral', 'contacto',
+    'contactos_emergencia', 'antecedentes_heredo_familiares', 'encuesta_medica',
+    'informacion_femenina', 'habitos_higiene', 'evaluacion_dental_oclusal',
+    'datosNoCompartir'
+];
 
-        // 📌 Parsear datos del paciente si vienen en el campo patientData
+/** 🔹 Crear un paciente con subida de foto */
+exports.createPatient = async (req, res) => {
+    // Si multer subió la foto, ya creó la carpeta en uploads/pacientes/<req.body._id>.
+    // Si en cualquier punto fallamos antes de guardar, limpiamos esa carpeta para no
+    // dejar fotos huérfanas en disco.
+    let folderIdToCleanup = (req.file && req.body._id && mongoose.Types.ObjectId.isValid(req.body._id))
+        ? req.body._id
+        : null;
+    let savedSuccessfully = false;
+
+    try {
+        // 📌 Parsear datos del paciente si vienen en el campo patientData (FormData)
         let patientData = req.body;
         if (req.body.patientData) {
             try {
                 patientData = JSON.parse(req.body.patientData);
-                console.log("📝 Datos del paciente parseados:", patientData);
             } catch (parseError) {
                 console.error("Error al parsear patientData:", parseError);
                 return res.status(400).json({ message: "Error al parsear los datos del paciente" });
             }
         }
 
-        // Si multer generó un _id para la subida, propagarlo al patientData para que coincida con la carpeta creada
-        if (req.body._id && mongoose.Types.ObjectId.isValid(req.body._id) && !patientData._id) {
-            patientData._id = req.body._id;
-        }
-        // Nuevo: sanitizar y limitar tamaño de payload para evitar 500 por formularios muy grandes
+        // Sanitizar y limitar tamaño de payload
         const payloadSize = estimatePayloadSize(patientData);
-        const MAX_PAYLOAD_SIZE_BYTES = 2 * 1024 * 1024; // 2MB de tope lógico para campos de texto
+        const MAX_PAYLOAD_SIZE_BYTES = 2 * 1024 * 1024;
         if (payloadSize > MAX_PAYLOAD_SIZE_BYTES) {
             return res.status(413).json({
                 message: "El formulario enviado es demasiado grande",
@@ -226,8 +239,15 @@ exports.createPatient = async (req, res) => {
             });
         }
         patientData = sanitizeAndLimitPayload(patientData);
+
+        // Filtrar entradas vacías en sub-arreglos
         if (Array.isArray(patientData.contactos_emergencia)) {
-            patientData.contactos_emergencia = patientData.contactos_emergencia.filter(c => c && typeof c === 'object' && (c.nombre && String(c.nombre).trim()) && (c.parentesco && String(c.parentesco).trim()) && (c.telefono && String(c.telefono).trim()));
+            patientData.contactos_emergencia = patientData.contactos_emergencia.filter(c =>
+                c && typeof c === 'object' &&
+                (c.nombre && String(c.nombre).trim()) &&
+                (c.parentesco && String(c.parentesco).trim()) &&
+                (c.telefono && String(c.telefono).trim())
+            );
         }
         if (Array.isArray(patientData.antecedentes_heredo_familiares)) {
             patientData.antecedentes_heredo_familiares = patientData.antecedentes_heredo_familiares.filter(a => {
@@ -240,76 +260,74 @@ exports.createPatient = async (req, res) => {
             });
         }
 
-        // 📌 Validar si se envió la fecha de nacimiento correctamente
-        if (!patientData.fecha_nacimiento) {
-            console.error("❌ Fecha de nacimiento no proporcionada");
+        // Whitelist: solo aceptamos campos clínicos/demográficos del cliente.
+        // Esto bloquea mass-assignment de _id, paciente_id, notas_evolucion,
+        // planes_tratamiento, firmadoPor, integrityHash, deletedAt, etc.
+        // Si el usuario sólo tiene `patients.create.basic` (recepcionista),
+        // restringimos aún más a la ficha básica de identificación —
+        // roles.MD: "Crear pacientes (ficha básica, sin historia clínica)".
+        const hasFullCreate = hasPermission(req.user?.permissions, ['patients.create']);
+        const allowedFields = hasFullCreate ? CREATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
+        const safePatientData = {};
+        for (const key of allowedFields) {
+            if (patientData[key] !== undefined) safePatientData[key] = patientData[key];
+        }
+
+        // Validar fecha de nacimiento (rango, no futura, edad <= 120)
+        if (!safePatientData.fecha_nacimiento) {
             return res.status(400).json({ message: "Fecha de nacimiento no proporcionada" });
         }
-        
-        // Verificar si la fecha está en formato DD/MM/YYYY y convertirla correctamente
-        let fechaNacimiento;
-        if (typeof patientData.fecha_nacimiento === 'string' && patientData.fecha_nacimiento.includes('/')) {
-            // Si viene en formato DD/MM/YYYY, convertir correctamente
-            const parts = patientData.fecha_nacimiento.split('/');
-            if (parts.length === 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1; // Los meses en JS son 0-indexados
-                const year = parseInt(parts[2], 10);
-                fechaNacimiento = new Date(year, month, day);
-                // Actualizar el valor en patientData para usarlo más adelante
-                patientData.fecha_nacimiento = fechaNacimiento;
-            } else {
-                // Formato DD/MM/YYYY inválido, intentar parsear como cadena genérica
-                fechaNacimiento = new Date(patientData.fecha_nacimiento);
-            }
-        } else {
-            // Si no está en formato DD/MM/YYYY, intentar parsear normalmente
-            fechaNacimiento = new Date(patientData.fecha_nacimiento);
-        }
-        
-        if (isNaN(fechaNacimiento.getTime())) {
-            console.error("❌ Fecha de nacimiento inválida");
+        const parsed = parseAndValidateBirthDate(safePatientData.fecha_nacimiento);
+        if (!parsed) {
             return res.status(400).json({ message: "Fecha de nacimiento inválida" });
         }
+        if (parsed.error === 'future') {
+            return res.status(400).json({ message: "La fecha de nacimiento no puede ser futura" });
+        }
+        if (parsed.error === 'too_old') {
+            return res.status(400).json({ message: "La fecha de nacimiento implica una edad mayor a 120 años" });
+        }
+        safePatientData.fecha_nacimiento = parsed.date;
 
-        // 📌 Generar un ID único para el paciente si no se proporciona
-        if (!patientData.paciente_id) {
-            console.log("🔧 Generando ID único para paciente...");
-            patientData.paciente_id = await Patient.generateUniquePatientId();
-            console.log("✅ ID generado:", patientData.paciente_id);
+        // Normalizar documento.numero (trim + uppercase) ANTES del unique-validator
+        // para que la detección de duplicados sea case-insensitive de facto.
+        if (safePatientData.documento && safePatientData.documento.numero != null) {
+            safePatientData.documento.numero = String(safePatientData.documento.numero).trim().toUpperCase();
+            if (!safePatientData.documento.numero) {
+                return res.status(400).json({ message: "Número de documento es obligatorio" });
+            }
         }
 
-        // Validar _id si viene en el payload
-        if (patientData._id && !mongoose.Types.ObjectId.isValid(patientData._id)) {
-            console.error("❌ ID de paciente inválido en el payload");
-            return res.status(400).json({ message: "ID de paciente inválido en el payload" });
+        // _id del paciente: siempre lo decide el servidor. Si multer ya creó
+        // una carpeta usando un _id generado por sí mismo, lo reutilizamos para
+        // que la foto subida quede en la carpeta correcta.
+        let patientObjectId;
+        if (req.body._id && mongoose.Types.ObjectId.isValid(req.body._id)) {
+            patientObjectId = new mongoose.Types.ObjectId(req.body._id);
+        } else {
+            patientObjectId = new mongoose.Types.ObjectId();
         }
+        const patientIdStr = patientObjectId.toString();
+        folderIdToCleanup = patientIdStr;
 
-        // 📌 Crear paciente en la base de datos
-        if (patientData._id && mongoose.Types.ObjectId.isValid(patientData._id)) {
-            patientData._id = new mongoose.Types.ObjectId(patientData._id);
-        }
+        // Generar paciente_id (4 dígitos) — la colisión se reintenta abajo en save
+        const pacienteId = await Patient.generateUniquePatientId();
 
         const newPatient = new Patient({
-            ...patientData,
-            edad: calcularEdad(patientData.fecha_nacimiento),
+            ...safePatientData,
+            _id: patientObjectId,
+            paciente_id: pacienteId,
+            edad: calcularEdad(safePatientData.fecha_nacimiento),
             creadoPor: req.user?.id || null
         });
-        
-        // 📂 Crear carpeta del paciente usando el _id de mongoose
-        const patientIdStr = newPatient._id.toString();
-        const patientFolderPath = resolveUploadsPath('pacientes', patientIdStr);
-        const initialOdontogramPath = resolveUploadsPath('pacientes', patientIdStr, 'odontograma-inicial');
-        // profile-pic folder created below via ensureUploadsPath
 
+        // Asegurar estructura de carpetas (multer pudo haber creado profile-pic ya)
+        const patientFolderPath = resolveUploadsPath('pacientes', patientIdStr);
         try {
             await ensureUploadsPath('pacientes');
             await ensureUploadsPath('pacientes', patientIdStr);
             await ensureUploadsPath('pacientes', patientIdStr, 'odontograma-inicial');
             await ensureUploadsPath('pacientes', patientIdStr, 'profile-pic');
-            console.log(`✅ Carpeta del paciente creada en: ${patientFolderPath}`);
-            console.log(`✅ Subcarpeta para odontograma inicial creada en: ${initialOdontogramPath}`);
-            // Actualizar el paciente con la ruta de archivos principal
             newPatient.ruta_archivos = patientFolderPath;
         } catch (err) {
             console.error('❌ Error al crear carpetas del paciente:', err);
@@ -319,47 +337,32 @@ exports.createPatient = async (req, res) => {
             });
         }
 
-        // 📌 Guardar la foto del paciente si se subió
-        let fotoPath = null;
+        // photoURL = ruta servible de la foto subida por multer
         if (req.file) {
-            // La foto se guarda en la ruta específica configurada en multer
-            fotoPath = `/uploads/pacientes/${patientIdStr}/profile-pic/${req.file.filename}`;
+            newPatient.photoURL = `/uploads/pacientes/${patientIdStr}/profile-pic/${req.file.filename}`;
         }
 
-        // 📌 Guardar archivos anexos si se subieron
-        let archivosAnexos = [];
-        if (req.files && req.files.archivos) {
-            archivosAnexos = req.files.archivos.map(file => path.join(patientFolderPath, file.filename));
-        }
-        
-        // Actualizar el paciente con las rutas de archivos
-        newPatient.photoURL = fotoPath;
-        newPatient.foto = fotoPath; // También guardar en el campo foto para compatibilidad
-        newPatient.archivos = archivosAnexos;
-
-        console.log("💾 Intentando guardar paciente en la base de datos...");
-        await newPatient.save();
+        // Guardar con retry ante colisión de paciente_id (rango 1000-9999)
+        await savePatientWithRetry(newPatient);
+        savedSuccessfully = true;
         console.log("✅ Paciente guardado exitosamente con ID:", newPatient._id);
 
-        // 📌 INICIALIZACIÓN AUTOMÁTICA DEL PERIODONTOGRAMA
+        // Periodontograma inicial (best-effort, no aborta la creación)
         try {
-            console.log("🦷 Creando periodontograma inicial para el paciente...");
             const initialPeriodontogram = await Periodontogram.createInitial(newPatient._id);
-            console.log("✅ Periodontograma inicial creado exitosamente con ID:", initialPeriodontogram._id);
+            console.log("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
         } catch (periodontogramError) {
             console.error("⚠️ Error al crear periodontograma inicial:", periodontogramError.message);
-            // No detener la creación del paciente por este error, solo registrarlo
-            console.log("ℹ️ El paciente se creó correctamente, pero el periodontograma deberá crearse manualmente");
         }
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "✅ Paciente creado correctamente",
             patient: newPatient
         });
 
     } catch (error) {
         console.error("❌ Error al crear el paciente:", error);
-        // Manejo detallado de errores comunes para evitar 500 genérico
+
         if (error?.name === 'ValidationError') {
             return res.status(400).json({
                 message: 'Error de validación al crear el paciente',
@@ -379,30 +382,81 @@ exports.createPatient = async (req, res) => {
             });
         }
         return res.status(500).json({ message: "Error al crear el paciente", error: error.message });
+    } finally {
+        // Limpiar carpeta + foto subida si no llegamos a persistir el paciente
+        if (!savedSuccessfully && folderIdToCleanup) {
+            try {
+                const folder = resolveUploadsPath('pacientes', folderIdToCleanup);
+                if (await fs.pathExists(folder)) {
+                    await fs.remove(folder);
+                    console.log("🧹 Carpeta limpiada tras fallo de creación:", folder);
+                }
+            } catch (cleanupErr) {
+                console.error("Error limpiando carpeta tras fallo:", cleanupErr);
+            }
+        }
     }
 };
 
-/** 🔹 Crear múltiples pacientes */
+/** 🔹 Crear múltiples pacientes (batch) */
 exports.createPatients = async (req, res) => {
     try {
-        console.log("📥 Recibiendo pacientes:", req.body);
-
         if (!Array.isArray(req.body) || req.body.length === 0) {
             return res.status(400).json({ message: "Debe enviar un array de pacientes" });
         }
 
-        const patientsWithId = await Promise.all(req.body.map(async (patientData) => {
-            if (!patientData.paciente_id) {
-                patientData.paciente_id = await Patient.generateUniquePatientId();
+        const MAX_BATCH = 100;
+        if (req.body.length > MAX_BATCH) {
+            return res.status(400).json({ message: `El batch máximo es de ${MAX_BATCH} pacientes` });
+        }
+
+        const patientsToInsert = [];
+        for (let i = 0; i < req.body.length; i++) {
+            const raw = req.body[i];
+            if (!raw || typeof raw !== 'object') {
+                return res.status(400).json({ message: `Entrada inválida en índice ${i}` });
             }
 
-            const newPatient = new Patient(patientData);
-            newPatient.edad = calcularEdad(patientData.fecha_nacimiento);
-            newPatient.creadoPor = req.user?.id || null;
-            return newPatient;
-        }));
+            // Whitelist por entrada (mismo set que createPatient) — bloquea
+            // mass-assignment de notas, planes, paciente_id, _id, etc.
+            const safe = {};
+            for (const key of CREATE_ALLOWED_FIELDS) {
+                if (raw[key] !== undefined) safe[key] = raw[key];
+            }
 
-        const newPatients = await Patient.insertMany(patientsWithId);
+            if (!safe.fecha_nacimiento) {
+                return res.status(400).json({ message: `Falta fecha_nacimiento en índice ${i}` });
+            }
+            const parsed = parseAndValidateBirthDate(safe.fecha_nacimiento);
+            if (!parsed) {
+                return res.status(400).json({ message: `Fecha de nacimiento inválida en índice ${i}` });
+            }
+            if (parsed.error === 'future') {
+                return res.status(400).json({ message: `Fecha de nacimiento futura en índice ${i}` });
+            }
+            if (parsed.error === 'too_old') {
+                return res.status(400).json({ message: `Edad mayor a 120 años en índice ${i}` });
+            }
+            safe.fecha_nacimiento = parsed.date;
+
+            if (safe.documento && safe.documento.numero != null) {
+                safe.documento.numero = String(safe.documento.numero).trim().toUpperCase();
+                if (!safe.documento.numero) {
+                    return res.status(400).json({ message: `Número de documento vacío en índice ${i}` });
+                }
+            }
+
+            const pacienteId = await Patient.generateUniquePatientId();
+            const newPatient = new Patient({
+                ...safe,
+                paciente_id: pacienteId,
+                edad: calcularEdad(safe.fecha_nacimiento),
+                creadoPor: req.user?.id || null
+            });
+            patientsToInsert.push(newPatient);
+        }
+
+        const newPatients = await Patient.insertMany(patientsToInsert);
         res.status(201).json({
             message: "Pacientes creados correctamente",
             patients: newPatients
@@ -410,12 +464,37 @@ exports.createPatients = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error al crear los pacientes:", error);
+        if (error?.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Error de validación', errors: error.errors });
+        }
+        if (error?.code === 11000) {
+            return res.status(409).json({ message: 'Datos duplicados (índice único)', keyValue: error.keyValue || null });
+        }
         res.status(500).json({ message: "Error al crear los pacientes", error: error.message });
     }
 };
 
+// Campos que el cliente puede modificar en un PUT. Para evitar
+// mass-assignment + bypass del middleware pre-save (findOneAndUpdate NO
+// dispara las hooks que protegen notas/planes), esta lista no incluye
+// paciente_id, notas_evolucion, planes_tratamiento, firmadoPor, integrityHash
+// ni nada de auditoría/soft-delete.
+const UPDATE_ALLOWED_FIELDS = [
+    'documento', 'primer_nombre', 'otros_nombres', 'apellido_paterno', 'apellido_materno',
+    'fecha_nacimiento', 'sexo', 'estado_civil', 'nacionalidad', 'lugar_nacimiento',
+    'escolaridad', 'ocupacion', 'email', 'situacion_laboral', 'contacto',
+    'contactos_emergencia', 'antecedentes_heredo_familiares', 'encuesta_medica',
+    'informacion_femenina', 'habitos_higiene', 'evaluacion_dental_oclusal',
+    'datosNoCompartir'
+];
+
 /** 🔹 Actualizar paciente */
 exports.updatePatient = async (req, res) => {
+    // Si multer subió una foto nueva, queda en disco aunque el update falle
+    // o el paciente no exista. Track para limpiar después.
+    const uploadedFile = req.file || null;
+    let updateSucceeded = false;
+
     try {
         // 📌 Parsear datos enviados como FormData (patientData) y preparar update
         let updateData = req.body || {};
@@ -451,35 +530,51 @@ exports.updatePatient = async (req, res) => {
             });
         }
 
-        //  Normalizar formato de fecha_nacimiento (aceptar DD/MM/YYYY) y recalcular edad
-        if (updateData.fecha_nacimiento) {
-            let fechaNacimiento = updateData.fecha_nacimiento;
-            if (typeof fechaNacimiento === 'string' && fechaNacimiento.includes('/')) {
-                const parts = fechaNacimiento.split('/');
-                if (parts.length === 3) {
-                    const day = parseInt(parts[0], 10);
-                    const month = parseInt(parts[1], 10) - 1; // 0-index
-                    const year = parseInt(parts[2], 10);
-                    fechaNacimiento = new Date(year, month, day);
-                }
-            } else {
-                fechaNacimiento = new Date(fechaNacimiento);
-            }
-            if (isNaN(fechaNacimiento.getTime())) {
+        // Whitelist: el cliente sólo puede tocar campos clínicos/demográficos.
+        // notas_evolucion y planes_tratamiento son inmutables por NOM-004 y se
+        // editan únicamente vía sus endpoints dedicados (que respetan las hooks
+        // pre-save). findOneAndUpdate bypassa esas hooks, así que el whitelist
+        // es la barrera principal.
+        // Si el usuario sólo tiene `patients.update.basic` (recepcionista),
+        // restringimos a la ficha básica — sin tocar el expediente clínico.
+        const hasFullUpdate = hasPermission(req.user?.permissions, ['patients.update']);
+        const allowedUpdateFields = hasFullUpdate ? UPDATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
+        const safeUpdate = {};
+        for (const key of allowedUpdateFields) {
+            if (updateData[key] !== undefined) safeUpdate[key] = updateData[key];
+        }
+
+        // Normalizar y validar fecha_nacimiento si se incluye
+        if (safeUpdate.fecha_nacimiento !== undefined) {
+            const parsed = parseAndValidateBirthDate(safeUpdate.fecha_nacimiento);
+            if (!parsed) {
                 return res.status(400).json({ message: 'Fecha de nacimiento inválida' });
             }
-            updateData.fecha_nacimiento = fechaNacimiento;
-            updateData.edad = calcularEdad(fechaNacimiento);
+            if (parsed.error === 'future') {
+                return res.status(400).json({ message: 'La fecha de nacimiento no puede ser futura' });
+            }
+            if (parsed.error === 'too_old') {
+                return res.status(400).json({ message: 'La fecha de nacimiento implica una edad mayor a 120 años' });
+            }
+            safeUpdate.fecha_nacimiento = parsed.date;
+            safeUpdate.edad = calcularEdad(parsed.date);
         }
 
-        // 📌 Manejar actualización de foto si se subió una nueva
-        if (req.file) {
-            const fotoPath = `/uploads/pacientes/${req.params.id}/profile-pic/${req.file.filename}`;
-            updateData.photoURL = fotoPath;
-            updateData.foto = fotoPath; // También guardar en el campo foto para compatibilidad
+        // Normalizar documento.numero igual que en create
+        if (safeUpdate.documento && safeUpdate.documento.numero != null) {
+            const norm = String(safeUpdate.documento.numero).trim().toUpperCase();
+            if (!norm) {
+                return res.status(400).json({ message: 'Número de documento es obligatorio' });
+            }
+            safeUpdate.documento.numero = norm;
         }
 
-        // 🧩 Evitar reemplazar subdocumentos completos: aplanar a notación con puntos
+        // Foto: ruta servible. Sólo `photoURL` existe en el schema.
+        if (uploadedFile) {
+            safeUpdate.photoURL = `/uploads/pacientes/${req.params.id}/profile-pic/${uploadedFile.filename}`;
+        }
+
+        // Aplanar a notación con puntos para no reemplazar subdocumentos completos
         const flattenToDot = (obj, prefix = '') => {
             const res = {};
             for (const [key, value] of Object.entries(obj || {})) {
@@ -492,17 +587,11 @@ exports.updatePatient = async (req, res) => {
             }
             return res;
         };
-        const setPayload = flattenToDot(updateData);
+        const setPayload = flattenToDot(safeUpdate);
 
-        // Inyectar campos de auditoría
+        // Auditoría
         setPayload.modificadoPor = req.user?.id || null;
         setPayload.modificadoEn = new Date();
-
-        // Eliminar campos protegidos del payload para evitar manipulación de auditoría/soft-delete
-        const protectedKeys = ['deletedAt', 'deletedBy', 'deleteReason', 'creadoPor', '_id'];
-        for (const key of protectedKeys) {
-            delete setPayload[key];
-        }
 
         const updatedPatient = await Patient.findOneAndUpdate(
             { _id: req.params.id, deletedAt: null },
@@ -514,6 +603,7 @@ exports.updatePatient = async (req, res) => {
             return res.status(404).json({ message: "Paciente no encontrado" });
         }
 
+        updateSucceeded = true;
         res.status(200).json({
             message: "Paciente modificado correctamente",
             patient: updatedPatient
@@ -541,6 +631,20 @@ exports.updatePatient = async (req, res) => {
             });
         }
         return res.status(500).json({ message: "Error interno al actualizar el paciente", error: error.message });
+    } finally {
+        // Si subieron foto y el update no fue exitoso (validación, 404, etc.),
+        // el archivo de multer quedó huérfano en profile-pic/. Borrarlo.
+        if (uploadedFile && !updateSucceeded) {
+            try {
+                const orphan = resolveUploadsPath('pacientes', req.params.id, 'profile-pic', uploadedFile.filename);
+                if (await fs.pathExists(orphan)) {
+                    await fs.remove(orphan);
+                    console.log("🧹 Foto huérfana eliminada tras fallo de update:", orphan);
+                }
+            } catch (cleanupErr) {
+                console.error("Error limpiando foto huérfana tras fallo de update:", cleanupErr);
+            }
+        }
     }
 };
 
@@ -795,6 +899,84 @@ function estimatePayloadSize(obj) {
   } catch {
     return 0;
   }
+}
+
+// Parsea fecha de nacimiento aceptando Date, ISO (YYYY-MM-DD) y DD/MM/YYYY.
+// Rechaza días/meses fuera de rango (no acepta overflow silencioso como 32/13/2020),
+// fechas futuras y edades > 120 años. Devuelve { date } en éxito o { error } en
+// errores específicos, null para formatos inválidos.
+function parseAndValidateBirthDate(input) {
+  let date = null;
+  if (input instanceof Date) {
+    date = new Date(input.getTime());
+  } else if (typeof input === 'string') {
+    const trimmed = input.trim();
+    const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (dmy) {
+      const d = parseInt(dmy[1], 10);
+      const m = parseInt(dmy[2], 10);
+      const y = parseInt(dmy[3], 10);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      const candidate = new Date(y, m - 1, d);
+      if (candidate.getFullYear() === y && candidate.getMonth() === m - 1 && candidate.getDate() === d) {
+        date = candidate;
+      } else {
+        return null;
+      }
+    } else if (ymd) {
+      const y = parseInt(ymd[1], 10);
+      const m = parseInt(ymd[2], 10);
+      const d = parseInt(ymd[3], 10);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      // Construimos la fecha en zona local para evitar el corrimiento de un día
+      // que aparece cuando new Date("YYYY-MM-DD") la interpreta como UTC.
+      const candidate = new Date(y, m - 1, d);
+      if (candidate.getFullYear() === y && candidate.getMonth() === m - 1 && candidate.getDate() === d) {
+        date = candidate;
+      } else {
+        return null;
+      }
+    } else {
+      const candidate = new Date(trimmed);
+      if (!isNaN(candidate.getTime())) date = candidate;
+    }
+  } else if (input != null) {
+    const candidate = new Date(input);
+    if (!isNaN(candidate.getTime())) date = candidate;
+  }
+
+  if (!date || isNaN(date.getTime())) return null;
+
+  const now = new Date();
+  if (date.getTime() > now.getTime()) return { error: 'future' };
+  const ageYears = (now.getTime() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  if (ageYears > 120) return { error: 'too_old' };
+  return { date };
+}
+
+// Reintenta el save si colisiona el paciente_id (sólo 9000 IDs posibles: hay
+// race entre exists() y save() en cargas concurrentes).
+async function savePatientWithRetry(newPatient, maxAttempts = 5) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await newPatient.save();
+      return;
+    } catch (err) {
+      lastErr = err;
+      const isE11000 = err?.code === 11000;
+      const e11000Key = err?.keyPattern || err?.keyValue || {};
+      const isPacienteIdDupe = isE11000 && Object.prototype.hasOwnProperty.call(e11000Key, 'paciente_id');
+      const isUVPacienteId = err?.name === 'ValidationError' && err?.errors?.paciente_id?.kind === 'unique';
+      if ((isPacienteIdDupe || isUVPacienteId) && attempt < maxAttempts) {
+        newPatient.paciente_id = await newPatient.constructor.generateUniquePatientId();
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 
