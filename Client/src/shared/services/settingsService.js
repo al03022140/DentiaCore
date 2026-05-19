@@ -87,8 +87,12 @@ export const deleteFirma = async () => {
   return data;
 };
 
-export const getFirmaUrl = (userId) =>
-  `${API.defaults.baseURL}/settings/users/${encodeURIComponent(userId)}/firma`;
+// `version` opcional fuerza cache-bust al `<img>` cuando la firma se acaba
+// de subir o reemplazar (el endpoint sirve siempre desde la misma URL).
+export const getFirmaUrl = (userId, version) => {
+  const base = `${API.defaults.baseURL}/settings/users/${encodeURIComponent(userId)}/firma`;
+  return version ? `${base}?v=${encodeURIComponent(version)}` : base;
+};
 
 // ── Users list (for Accounts & Permissions) ──────────────────
 
@@ -96,6 +100,38 @@ export const getUsers = async () => {
   const { data } = await API.get('/users');
   return data;
 };
+
+// Lista liviana de doctores — accesible a cualquier usuario autenticado.
+// La usa el asistente para pedirle la firma al doctor al crear notas.
+export const getDoctors = async () => {
+  const { data } = await API.get('/users/doctors');
+  return Array.isArray(data) ? data : [];
+};
+
+// ── User CRUD (Cuentas y Permisos → Gestionar cuentas) ───────
+// El backend ya valida jerarquía de roles + uniqueness de email + fuerza
+// de password. Aquí solo enviamos el payload mínimo necesario.
+
+export const createUser = async (payload) => {
+  // payload: { nombre, email, contraseña, pin, rol, active? }
+  const { data } = await API.post('/users', payload);
+  return data;
+};
+
+export const updateUser = async (userId, payload) => {
+  // payload puede incluir: { nombre?, email?, rol?, contraseña?, active? }
+  // Cambiar contraseña invalida la sesión activa del usuario afectado.
+  const { data } = await API.put(`/users/${encodeURIComponent(userId)}`, payload);
+  return data;
+};
+
+export const disableUser = async (userId) => {
+  const { data } = await API.patch(`/users/${encodeURIComponent(userId)}/disable`);
+  return data;
+};
+
+// No hay endpoint "enable" dedicado: se reusa PUT con { active: true }.
+export const enableUser = (userId) => updateUser(userId, { active: true });
 
 // ── Clinic Logo ──────────────────────────────────────────────
 

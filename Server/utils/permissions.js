@@ -61,6 +61,42 @@ const ROLE_PERMISSIONS = {
     'read_periodontogram',
   ],
 
+  // ─── Doctor + Administrador (Director clínico — el dueño-dentista) ──
+  // Unión de permisos de `doctor` y `administrador`. Es el dentista que
+  // además administra la clínica: puede crear/editar contenido clínico
+  // (NOM-013) Y gestionar cuentas, caja, configuración, etc.
+  // Jerarquía: solo `superadmin` puede crear o tocar cuentas con este rol.
+  doctor_admin: [
+    // Pacientes — CRUD completo
+    'patients.read', 'patients.create', 'patients.update', 'patients.delete',
+    // Clínico (de doctor)
+    'odontogram.read', 'odontogram.create', 'odontogram.update',
+    'periodontogram.read', 'periodontogram.create', 'periodontogram.update',
+    'consultas.read', 'consultas.create', 'consultas.update',
+    'exams.read', 'exams.create', 'exams.update',
+    // Citas — CRUD completo (delete de admin)
+    'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
+    // Caja (de admin)
+    'cash.read', 'cash.manage',
+    // Estadísticas — propias + administrativas
+    'stats.read.own', 'stats.read.admin',
+    // Usuarios — CRUD (de admin)
+    'users.read', 'users.create', 'users.update', 'users.disable',
+    // Configuración — read + update (update de admin)
+    'settings.read', 'settings.update',
+    'professional.update',
+    // Auditoría (de admin)
+    'audit.read.full',
+    // Borradores y firma (de doctor)
+    'draft.approve', 'drafts.batch_sign',
+    // Notas (de doctor)
+    'notes.create.backdated', 'notes.template.use', 'notes.template.manage',
+    // Modo Cortina
+    'session.lock',
+    // Legacy
+    'read_periodontogram', 'create_periodontogram', 'update_periodontogram',
+  ],
+
   // ─── Cirujano Dentista (NOM-013) ─────────────────────────────
   doctor: [
     'patients.read',
@@ -93,6 +129,14 @@ const ROLE_PERMISSIONS = {
     'settings.read',            // leer configuración de clínica
     'professional.update',      // actualizar su propio perfil profesional
     'session.lock',             // Modo Cortina
+    // Gestión de cuentas — para consultorios pequeños donde el doctor
+    // administra al asistente y a la recepcionista. La jerarquía de roles
+    // (usersController.checkPrivilegeEscalation) impide que asigne roles
+    // superiores al suyo o toque cuentas administrador/superadmin.
+    'users.read',
+    'users.create',
+    'users.update',
+    'users.disable',
     // Legacy periodontogram permissions (compatibilidad)
     'read_periodontogram',
     'create_periodontogram',
@@ -211,19 +255,28 @@ const hasPermission = (userPermissions = [], requiredPermissions = []) => {
 };
 
 /**
- * Verifica si un rol es de tipo administrador (administrador o superadmin).
+ * Verifica si un rol es de tipo administrador (administrador, doctor_admin o superadmin).
+ * `doctor_admin` cuenta como administrador para todas las gates donde se
+ * necesita capacidad administrativa (gestión de cuentas, caja, etc.).
  */
 const isAdminRole = (role) => {
   const normalized = normalizeRole(role);
-  return normalized === 'administrador' || normalized === 'superadmin' || normalized === 'admin';
+  return normalized === 'administrador'
+    || normalized === 'superadmin'
+    || normalized === 'admin'
+    || normalized === 'doctor_admin';
 };
 
 /**
- * Verifica si un rol es clínico (doctor o asistente).
+ * Verifica si un rol es clínico (doctor, asistente o doctor_admin).
+ * `doctor_admin` también es clínico porque practica como dentista
+ * (NOM-013 Art. 5.10).
  */
 const isClinicalRole = (role) => {
   const normalized = normalizeRole(role);
-  return normalized === 'doctor' || normalized === 'asistente';
+  return normalized === 'doctor'
+    || normalized === 'asistente'
+    || normalized === 'doctor_admin';
 };
 
 module.exports = {

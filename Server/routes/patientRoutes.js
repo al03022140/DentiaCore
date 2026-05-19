@@ -457,6 +457,18 @@ router
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addEvolutionNote);
 
+// ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
+router
+  .route('/:id/finalize-history')
+  .all(validateId, checkPatient)
+  .post(requireClinicalRole, authorize(['patients.update']), patientCtrl.finalizeClinicalHistory);
+
+// Revocación de consentimiento — para corregir errores clínicos
+router
+  .route('/:id/revoke-hc-consent')
+  .all(validateId, checkPatient)
+  .post(requireClinicalRole, authorize(['patients.update']), patientCtrl.revokeHCConsent);
+
 // ── Anidar rutas de periodontograma ────────────────────────
 router.use('/:id/periodontogram', validateId, checkPatient, periodontogramRoutes);
 

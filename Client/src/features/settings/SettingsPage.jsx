@@ -36,7 +36,7 @@ const SECTIONS = [
   { id: 'notificaciones', name: 'Notificaciones', icon: <img src={bellIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Recordatorios de citas y alertas', roles: null },
   { id: 'preferencias-clinicas', name: 'Preferencias Clínicas', icon: <img src={clipboardListIcon} alt="Preferencias Clínicas" width="36" height="36" className="theme-icon" />, desc: 'Plantillas de notas, formato receta, duración cita', roles: ['doctor'] },
   { id: 'clinica', name: 'Clínica', icon: <img src={hospitalIcon} alt="Clínica" width="36" height="36" className="theme-icon" />, desc: 'Nombre, dirección, logo y contacto', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
-  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: <img src={lockBlockedIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Controlar accesos por rol y por usuario', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'cuentas-permisos', name: 'Cuentas y Permisos', icon: <img src={lockBlockedIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Gestionar usuarios, roles y permisos', roles: ['doctor', 'administrador', 'superadmin'], permission: ['settings.update', 'users.read'] },
   { id: 'seguridad', name: 'Seguridad', icon: <img src={shieldIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Tiempo de inactividad, bloqueo de sesión', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
   { id: 'citas', name: 'Citas', icon: <img src={calendarIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
   { id: 'google-calendar', name: 'Google Calendar', icon: <img src={calendarPlusIcon} alt="Google Calendar" width="36" height="36" className="theme-icon" />, desc: 'Conectar cuenta, elegir calendario destino', roles: null },
@@ -68,7 +68,10 @@ const SettingsPage = () => {
 
   const visibleSections = SECTIONS.filter((s) => {
     if (s.roles && !s.roles.includes(userRole)) return false;
-    if (s.permission && !hasPermission(permissions, [s.permission]) && !['administrador', 'superadmin'].includes(userRole)) return false;
+    if (s.permission) {
+      const required = Array.isArray(s.permission) ? s.permission : [s.permission];
+      if (!hasPermission(permissions, required) && !['administrador', 'superadmin'].includes(userRole)) return false;
+    }
     return true;
   });
 

@@ -3,7 +3,10 @@ const { validatePasswordStrength } = require('../utils/crypto');
 const { isAdminRole } = require('../utils/permissions');
 
 // Role hierarchy: higher index = more privileged
-const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'administrador', 'superadmin'];
+// doctor_admin (dentista-director) tiene capacidades de doctor + administrador,
+// por eso queda arriba de `administrador` — solo `superadmin` puede crearlo
+// o modificar sus cuentas.
+const ROLE_HIERARCHY = ['recepcionista', 'asistente', 'doctor', 'administrador', 'doctor_admin', 'superadmin'];
 
 const getRoleLevel = (role) => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -68,9 +71,40 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+/**
+ * GET /users/doctors
+ * Lista mínima de usuarios con rol clínico-firmable (doctor / doctor_admin)
+ * para que el asistente sepa a quién pedir la firma. Sólo expone campos
+ * estrictamente necesarios (NOM-024 + LFPDPPP Art. 6, proporcionalidad).
+ */
+const listDoctors = async (req, res) => {
+  try {
+    const doctors = await Usuario.find({
+      rol: { $in: ['doctor', 'doctor_admin'] },
+      active: true,
+    })
+      .select('_id nombre cedulaProfesional firmaDigitalUrl rol')
+      .sort({ nombre: 1 })
+      .lean();
+    res.json(doctors.map((d) => ({
+      id: d._id,
+      nombre: d.nombre,
+      cedulaProfesional: d.cedulaProfesional || null,
+      rol: d.rol,
+      hasFirma: Boolean(d.firmaDigitalUrl),
+    })));
+  } catch (error) {
+    console.error('[users.listDoctors] Error:', error);
+    res.status(500).json({ message: 'Error al listar doctores' });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
-    const { nombre, email, contraseña, rol, pin, permissions, active } = req.body || {};
+    const {
+      nombre, email, contraseña, rol, pin, permissions, active,
+      cedulaProfesional, especialidad, universidad, registroSSA
+    } = req.body || {};
 
     if (!nombre || !email || !contraseña || !rol || !pin) {
       return res.status(400).json({ message: 'Nombre, email, contraseña, PIN y rol son requeridos' });
@@ -84,6 +118,14 @@ const createUser = async (req, res) => {
 
     if (!/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: 'El PIN debe ser exactamente 4 dígitos numéricos' });
+    }
+
+    // NOM-004 Art. 5.10: cédula profesional obligatoria para cualquier rol
+    // que practique clínicamente (doctor y doctor_admin).
+    if ((rol === 'doctor' || rol === 'doctor_admin') && (!cedulaProfesional || !String(cedulaProfesional).trim())) {
+      return res.status(400).json({
+        message: 'La cédula profesional es obligatoria para crear una cuenta de doctor.'
+      });
     }
 
     const strength = validatePasswordStrength(contraseña);
@@ -102,15 +144,28 @@ const createUser = async (req, res) => {
       contraseña,
       rol,
       permissions: permissions || [],
-      active: active !== undefined ? Boolean(active) : true
+      active: active !== undefined ? Boolean(active) : true,
+      ...(cedulaProfesional ? { cedulaProfesional: String(cedulaProfesional).trim() } : {}),
+      ...(especialidad ? { especialidad: String(especialidad).trim() } : {}),
+      ...(universidad ? { universidad: String(universidad).trim() } : {}),
+      ...(registroSSA ? { registroSSA: String(registroSSA).trim() } : {})
     });
 
     await user.setPin(pin);
 
     await user.save();
     return res.status(201).json(sanitizeUser(user));
-  } catch (_error) {
-    res.status(500).json({ message: 'Error al crear usuario' });
+  } catch (error) {
+    // Errores comunes con mensajes útiles (ValidationError, duplicate key)
+    if (error?.name === 'ValidationError') {
+      const firstMsg = Object.values(error.errors || {})[0]?.message || error.message;
+      return res.status(400).json({ message: firstMsg });
+    }
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: 'Ya existe un usuario con ese email' });
+    }
+    console.error('[users.createUser] Error inesperado:', error);
+    res.status(500).json({ message: error?.message || 'Error al crear usuario' });
   }
 };
 
@@ -128,7 +183,10 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { nombre, email, contraseña, rol, permissions, active } = req.body || {};
+    const {
+      nombre, email, contraseña, rol, permissions, active,
+      cedulaProfesional, especialidad, universidad, registroSSA
+    } = req.body || {};
     const user = await Usuario.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -149,11 +207,24 @@ const updateUser = async (req, res) => {
       }
     }
 
+    // Si el rol final es doctor o doctor_admin, exigir cédula.
+    const finalRol = rol !== undefined ? rol : user.rol;
+    const finalCedula = cedulaProfesional !== undefined ? cedulaProfesional : user.cedulaProfesional;
+    if ((finalRol === 'doctor' || finalRol === 'doctor_admin') && (!finalCedula || !String(finalCedula).trim())) {
+      return res.status(400).json({
+        message: 'La cédula profesional es obligatoria para cuentas de doctor.'
+      });
+    }
+
     if (nombre !== undefined) user.nombre = nombre;
     if (email !== undefined) user.email = email.toLowerCase().trim();
     if (rol !== undefined) user.rol = rol;
     if (permissions !== undefined) user.permissions = permissions;
     if (active !== undefined) user.active = Boolean(active);
+    if (cedulaProfesional !== undefined) user.cedulaProfesional = String(cedulaProfesional).trim() || null;
+    if (especialidad !== undefined) user.especialidad = especialidad ? String(especialidad).trim() : null;
+    if (universidad !== undefined) user.universidad = universidad ? String(universidad).trim() : null;
+    if (registroSSA !== undefined) user.registroSSA = registroSSA ? String(registroSSA).trim() : null;
     if (contraseña) {
       const strength = validatePasswordStrength(contraseña);
       if (!strength.valid) {
@@ -168,8 +239,16 @@ const updateUser = async (req, res) => {
 
     await user.save();
     return res.json(sanitizeUser(user));
-  } catch (_error) {
-    res.status(500).json({ message: 'Error al actualizar usuario' });
+  } catch (error) {
+    if (error?.name === 'ValidationError') {
+      const firstMsg = Object.values(error.errors || {})[0]?.message || error.message;
+      return res.status(400).json({ message: firstMsg });
+    }
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: 'Ya existe otro usuario con ese email' });
+    }
+    console.error('[users.updateUser] Error inesperado:', error);
+    res.status(500).json({ message: error?.message || 'Error al actualizar usuario' });
   }
 };
 
@@ -196,13 +275,15 @@ const disableUser = async (req, res) => {
     await user.save();
 
     return res.json(sanitizeUser(user));
-  } catch (_error) {
-    res.status(500).json({ message: 'Error al desactivar usuario' });
+  } catch (error) {
+    console.error('[users.disableUser] Error inesperado:', error);
+    res.status(500).json({ message: error?.message || 'Error al desactivar usuario' });
   }
 };
 
 module.exports = {
   getAllUsers,
+  listDoctors,
   createUser,
   getUserById,
   updateUser,

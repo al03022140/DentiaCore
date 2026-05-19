@@ -1039,3 +1039,242 @@
     align-items: flex-start;
   }
 }
+
+/* ────────────────────────────────────────────────────────────
+   Cuentas y Permisos → Gestionar cuentas
+   ──────────────────────────────────────────────────────────── */
+.accounts-management__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.accounts-management__header h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  color: var(--color-text-dark, #1a202c);
+}
+
+.accounts-management__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #4a5568);
+  max-width: 60ch;
+  line-height: 1.5;
+}
+
+.accounts-management__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 10px;
+}
+
+.accounts-management__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.accounts-management__table thead th {
+  background: var(--color-bg-light, #f7fafc);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #4a5568);
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--color-border-light, #e2e8f0);
+}
+
+.accounts-management__table tbody td {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--color-border-light, #e2e8f0);
+  vertical-align: middle;
+  color: var(--color-text-dark, #1a202c);
+}
+
+.accounts-management__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.accounts-management__table tr.is-inactive td {
+  opacity: 0.55;
+}
+
+.accounts-management__table .muted {
+  color: var(--color-text-muted, #718096);
+  font-size: 0.85rem;
+}
+
+.accounts-management__table .no-data {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--color-text-muted, #718096);
+  font-style: italic;
+}
+
+.accounts-management__actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.accounts-management__actions .settings-btn-primary,
+.accounts-management__actions .settings-btn-secondary,
+.accounts-management__actions .settings-btn-danger {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.badge-self {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--color-primary, #2b6cb0);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: lowercase;
+}
+
+.role-pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--color-bg-light, #edf2f7);
+  color: var(--color-text-dark, #1a202c);
+  text-transform: capitalize;
+}
+
+.role-pill--doctor          { background: #dbeafe; color: #1d4ed8; }
+.role-pill--doctor_admin    { background: #ede9fe; color: #5b21b6; }
+.role-pill--administrador   { background: #fef3c7; color: #92400e; }
+.role-pill--superadmin      { background: #fce7f3; color: #9d174d; }
+.role-pill--asistente       { background: #d1fae5; color: #065f46; }
+.role-pill--recepcionista   { background: #e0e7ff; color: #3730a3; }
+
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-pill.is-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.is-disabled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.settings-message-close {
+  float: right;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  opacity: 0.7;
+}
+
+.settings-message-close:hover {
+  opacity: 1;
+}
+
+.settings-form-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #718096);
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.account-form .settings-form-group {
+  margin: 0;
+}
+
+/* Campo contraseña / PIN con botón "ojo" */
+.secret-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.secret-input input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+.secret-input__toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--color-text-muted, #4a5568);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.secret-input__toggle:hover:not(:disabled) {
+  color: var(--color-text-dark, #1a202c);
+  background: var(--color-bg-light, #f0f0f0);
+}
+
+.secret-input__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .accounts-management__table thead {
+    display: none;
+  }
+
+  .accounts-management__table,
+  .accounts-management__table tbody,
+  .accounts-management__table tr,
+  .accounts-management__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .accounts-management__table tr {
+    border: 1px solid var(--color-border-light, #e2e8f0);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .accounts-management__table tbody td {
+    border-bottom: none;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .accounts-management__actions {
+    margin-top: 0.5rem;
+  }
+}

@@ -151,6 +151,126 @@
     grid-template-columns: 1fr; /* stack */
   }
 }
+/* Banner informativo para asistentes — "solo el doctor firma" */
+.evolution-note-hint {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  color: #1e3a8a;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* Botón secundario "Guardar borrador" */
+.save-button--secondary {
+  background: transparent !important;
+  color: var(--color-primary, #2b6cb0) !important;
+  border: 1px solid var(--color-primary, #2b6cb0) !important;
+  margin-right: 0.5rem;
+}
+
+.save-button--secondary:hover:not(:disabled) {
+  background: var(--color-primary, #2b6cb0) !important;
+  color: #fff !important;
+}
+
+/* Miniaturas de firma en el historial — paciente y doctor */
+.patient-sig-thumb,
+.doctor-sig-thumb {
+  max-width: 90px;
+  max-height: 36px;
+  display: block;
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  background: #fff;
+  padding: 2px;
+}
+
+.patient-sig-link,
+.doctor-sig-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+}
+
+.doctor-sig-stale {
+  color: #d97706;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.patient-sig-missing {
+  color: var(--color-text-muted, #718096);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* Flujo de firma del doctor (tabs PIN | Pad) dentro del overlay */
+.doctor-sign-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.doctor-sign-tab {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border-medium, #cbd5e0);
+  background: var(--color-bg-light, #f7fafc);
+  color: var(--color-text-dark, #1a202c);
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.doctor-sign-tab.is-active {
+  background: var(--color-primary, #2b6cb0);
+  color: #fff;
+  border-color: var(--color-primary, #2b6cb0);
+}
+
+.doctor-sign-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doctor-sign-pin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.doctor-sign-pin label {
+  font-size: 0.85rem;
+  color: var(--color-text-dark, #1a202c);
+  font-weight: 500;
+}
+
+.doctor-sign-pin input {
+  text-align: center;
+  font-size: 1.75rem;
+  letter-spacing: 0.5em;
+  padding: 0.55rem;
+  border: 2px solid var(--color-border-medium, #cbd5e0);
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: var(--color-text-dark, #1a202c);
+}
+
+.doctor-sign-pin input:focus {
+  border-color: var(--color-primary, #2b6cb0);
+}
+
+.doctor-sign-pad-prompt p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #4a5568);
+}
+
 /* Printable Area Styles */
 .printable-evolution-notes {
   display: none;

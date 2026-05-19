@@ -19,6 +19,10 @@ const withValidation = (rules) => [
 
 router.get('/', authorize(['users.read']), usersController.getAllUsers);
 
+// Listado liviano de doctores — accesible a cualquier usuario autenticado.
+// Lo necesita el asistente para pedirle la firma al doctor al crear notas.
+router.get('/doctors', usersController.listDoctors);
+
 router.post(
   '/',
   accountCreationLimiter,

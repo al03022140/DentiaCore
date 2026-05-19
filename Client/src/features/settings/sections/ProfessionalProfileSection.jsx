@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../../../app/auth/AuthContext';
 import {
   updateProfessionalProfile,
@@ -10,7 +11,9 @@ import pencilIcon from '../../../assets/images/icons/pencil.svg';
 import folderUploadIcon from '../../../assets/images/icons/folder-upload.svg';
 
 const ProfessionalProfileSection = () => {
-  const { user, refreshUser } = useAuth();
+  // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
+  // hacía que el user del front no se actualizara tras subir firma.
+  const { user, refreshProfile } = useAuth();
   const userId = user?._id || user?.id;
 
   const [cedula, setCedula] = useState(user?.cedulaProfesional || '');
@@ -20,18 +23,24 @@ const ProfessionalProfileSection = () => {
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Firma
+  // Firma — mismo motor que el resto del sistema (react-signature-canvas).
   const [hasFirma, setHasFirma] = useState(!!user?.firmaDigitalUrl);
   const [firmaMode, setFirmaMode] = useState('upload'); // 'upload' | 'draw'
   const [firmaMsg, setFirmaMsg] = useState(null);
-  const canvasRef = useRef(null);
-  const drawingRef = useRef(false);
+  const [firmaSaving, setFirmaSaving] = useState(false);
+  const [padEmpty, setPadEmpty] = useState(true);
+  // Cache-buster para forzar al <img> a recargar tras subir/reemplazar firma.
+  const [firmaVersion, setFirmaVersion] = useState(() => Date.now());
+  // Preview inmediato (dataURL) de la firma que acaba de hacer/subir el usuario,
+  // mostrada antes de que el server la procese y devuelva la URL definitiva.
+  const [localPreview, setLocalPreview] = useState(null);
+  const sigPadRef = useRef(null);
 
   useEffect(() => {
     setHasFirma(!!user?.firmaDigitalUrl);
   }, [user?.firmaDigitalUrl]);
 
-  // ── Professional data save ──
+  // ── Datos profesionales ──
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -43,7 +52,7 @@ const ProfessionalProfileSection = () => {
         universidad,
         registroSSA,
       });
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setMsg({ type: 'success', text: 'Perfil profesional actualizado' });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });
@@ -52,126 +61,122 @@ const ProfessionalProfileSection = () => {
     }
   };
 
-  // ── Upload file ──
+  // ── Subir firma desde archivo ──
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFirmaMsg(null);
+
+    // Preview inmediato con el archivo elegido — el usuario ve su firma
+    // antes de que termine el roundtrip al servidor.
+    const reader = new FileReader();
+    reader.onload = (ev) => setLocalPreview(ev.target.result);
+    reader.readAsDataURL(file);
+
     try {
       await uploadFirma(file);
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setHasFirma(true);
+      setFirmaVersion(Date.now());  // bust cache del <img>
       setFirmaMsg({ type: 'success', text: 'Firma subida correctamente' });
+      // Reset input para permitir resubir el mismo archivo si hace falta.
+      if (e.target) e.target.value = '';
     } catch (err) {
+      setLocalPreview(null);
       setFirmaMsg({ type: 'error', text: err.response?.data?.message || 'Error al subir firma' });
     }
   };
 
-  // ── Canvas drawing helpers ──
-  const lastPointRef = useRef(null);
-
-  const setupCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#111';
-  }, []);
-
-  useEffect(() => {
-    if (firmaMode === 'draw') {
-      // Small delay so the canvas is rendered with its CSS size
-      const id = requestAnimationFrame(setupCanvas);
-      return () => cancelAnimationFrame(id);
-    }
-  }, [firmaMode, setupCanvas]);
-
-  const getCanvasCoords = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  };
-
-  const startDraw = (e) => {
-    e.preventDefault();
-    drawingRef.current = true;
-    const point = getCanvasCoords(e);
-    lastPointRef.current = point;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(point.x, point.y);
-  };
-
-  const draw = (e) => {
-    e.preventDefault();
-    if (!drawingRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    const point = getCanvasCoords(e);
-    const last = lastPointRef.current;
-    // Quadratic curve through midpoint for smooth strokes
-    const mid = { x: (last.x + point.x) / 2, y: (last.y + point.y) / 2 };
-    ctx.quadraticCurveTo(last.x, last.y, mid.x, mid.y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(mid.x, mid.y);
-    lastPointRef.current = point;
-  };
-
-  const endDraw = (e) => {
-    if (e) e.preventDefault();
-    drawingRef.current = false;
-    lastPointRef.current = null;
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setupCanvas();
-  };
-
-  const saveCanvasAsFirma = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // ── Pad: limpiar + guardar ──
+  const handleClear = () => {
+    sigPadRef.current?.clear?.();
+    setPadEmpty(true);
     setFirmaMsg(null);
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const file = new File([blob], 'firma.png', { type: 'image/png' });
-      try {
-        await uploadFirma(file);
-        if (refreshUser) await refreshUser();
-        setHasFirma(true);
-        setFirmaMsg({ type: 'success', text: 'Firma guardada correctamente' });
-      } catch (err) {
-        setFirmaMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar firma' });
+  };
+
+  const handleBegin = () => setPadEmpty(false);
+  const handleEnd = () => {
+    try {
+      const empty = sigPadRef.current?.isEmpty?.();
+      if (empty === true) setPadEmpty(true);
+    } catch { /* ignore */ }
+  };
+
+  const saveDrawnFirma = async () => {
+    const pad = sigPadRef.current;
+    if (!pad) return;
+    setFirmaMsg(null);
+
+    let empty;
+    try { empty = pad.isEmpty(); } catch { empty = false; }
+    if (empty) {
+      setFirmaMsg({ type: 'error', text: 'La firma está vacía. Dibuja antes de guardar.' });
+      return;
+    }
+
+    let canvas;
+    try {
+      canvas = pad.getTrimmedCanvas ? pad.getTrimmedCanvas() : pad.getCanvas();
+    } catch {
+      try { canvas = pad.getCanvas(); } catch {
+        setFirmaMsg({ type: 'error', text: 'No se pudo capturar la imagen de la firma.' });
+        return;
       }
-    }, 'image/png');
-  }, [refreshUser]);
+    }
+
+    // Preview inmediato con el dataURL del canvas — instantáneo.
+    try {
+      setLocalPreview(canvas.toDataURL('image/png'));
+    } catch { /* fallback al server después */ }
+
+    setFirmaSaving(true);
+    try {
+      await new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+          if (!blob) return reject(new Error('No se pudo generar el PNG'));
+          const file = new File([blob], 'firma.png', { type: 'image/png' });
+          try {
+            await uploadFirma(file);
+            await refreshProfile?.();
+            setHasFirma(true);
+            setFirmaVersion(Date.now());
+            setPadEmpty(true);
+            pad.clear?.();
+            setFirmaMsg({ type: 'success', text: 'Firma guardada correctamente' });
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        }, 'image/png');
+      });
+    } catch (err) {
+      setLocalPreview(null);
+      setFirmaMsg({ type: 'error', text: err?.response?.data?.message || err?.message || 'Error al guardar firma' });
+    } finally {
+      setFirmaSaving(false);
+    }
+  };
 
   const handleDeleteFirma = async () => {
+    if (!window.confirm('¿Eliminar la firma digital? Tendrás que volver a subirla o dibujarla para firmar con PIN.')) return;
     setFirmaMsg(null);
     try {
       await deleteFirma();
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setHasFirma(false);
+      setLocalPreview(null);
+      setFirmaVersion(Date.now());
       setFirmaMsg({ type: 'success', text: 'Firma eliminada' });
     } catch (err) {
       setFirmaMsg({ type: 'error', text: err.response?.data?.message || 'Error al eliminar firma' });
     }
   };
+
+  // URL a mostrar en el preview:
+  //  1. localPreview (dataURL) si acabamos de capturar/subir → INSTANTÁNEO
+  //  2. URL del servidor con cache-bust si hay firma persistida
+  const previewSrc = localPreview
+    || (hasFirma && userId ? getFirmaUrl(userId, firmaVersion) : null);
 
   return (
     <div>
@@ -207,14 +212,32 @@ const ProfessionalProfileSection = () => {
       <h3 style={{ marginBottom: '1rem' }}>Firma digital</h3>
       {firmaMsg && <div className={`settings-message ${firmaMsg.type}`}>{firmaMsg.text}</div>}
 
-      {hasFirma && (
+      {previewSrc && (
         <div className="signature-preview" style={{ marginBottom: '1rem' }}>
           <img
-            src={getFirmaUrl(userId)}
-            alt="Firma digital"
+            src={previewSrc}
+            alt="Firma digital actual"
+            key={firmaVersion}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
-          <button className="settings-btn-danger" onClick={handleDeleteFirma}>Eliminar firma</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontWeight: 600, color: 'var(--color-text-dark)' }}>
+              {localPreview ? 'Vista previa (recién guardada)' : 'Firma actual'}
+            </span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              Esta es la firma que se usará al firmar con PIN en notas y consentimientos.
+            </span>
+            {hasFirma && (
+              <button
+                type="button"
+                className="settings-btn-danger"
+                style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}
+                onClick={handleDeleteFirma}
+              >
+                Eliminar firma
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -243,20 +266,34 @@ const ProfessionalProfileSection = () => {
           </div>
         ) : (
           <>
-            <canvas
-              ref={canvasRef}
-              className="signature-canvas"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={endDraw}
-              onMouseLeave={endDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={endDraw}
+            <SignatureCanvas
+              ref={sigPadRef}
+              penColor="#102a43"
+              backgroundColor="#ffffff"
+              canvasProps={{
+                className: 'signature-canvas',
+                'aria-label': 'Área de firma',
+              }}
+              onBegin={handleBegin}
+              onEnd={handleEnd}
             />
             <div className="settings-actions">
-              <button className="settings-btn-secondary" onClick={clearCanvas} type="button">Limpiar</button>
-              <button className="settings-btn-primary" onClick={saveCanvasAsFirma} type="button">Guardar firma</button>
+              <button
+                className="settings-btn-secondary"
+                onClick={handleClear}
+                type="button"
+                disabled={firmaSaving || padEmpty}
+              >
+                Limpiar
+              </button>
+              <button
+                className="settings-btn-primary"
+                onClick={saveDrawnFirma}
+                type="button"
+                disabled={firmaSaving}
+              >
+                {firmaSaving ? 'Guardando…' : 'Guardar firma'}
+              </button>
             </div>
           </>
         )}

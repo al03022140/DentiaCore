@@ -25,8 +25,22 @@ import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientChargesCard from './components/patient-charges-card.jsx';
 import PatientAttachments from './components/patient-attachments.jsx';
 import CreateAppointmentModal from '../consultas/components/CreateAppointmentModal';
+import SignaturePadModal from '../../shared/components/SignaturePadModal.jsx';
+import DoctorSignStep from '../../shared/components/DoctorSignStep.jsx';
+import { useAuth } from '../../app/auth/AuthContext.jsx';
+import { hasPermission } from '../../app/auth/permissions';
 
 import { getPatientById } from '../../shared/services/api.js';
+
+const CONSENTIMIENTO_HC_TEXTO = `Yo, el paciente abajo firmante, declaro que la información proporcionada en esta historia clínica es veraz, completa y correcta a mi leal saber y entender. Reconozco que los datos personales y de salud aquí recabados serán utilizados con fines de diagnóstico, tratamiento, prevención y seguimiento de mi atención odontológica.
+
+Otorgo mi consentimiento expreso para la captura, tratamiento y conservación de mis datos clínicos por parte de este consultorio, conforme a:
+- NOM-004-SSA3-2012 (Expediente Clínico)
+- LFPDPPP, Arts. 8 y 16 (consentimiento informado y derechos ARCO)
+- LFPDPPP, Art. 11 (conservación del expediente)
+
+Entiendo que tengo derecho a acceder, rectificar, cancelar u oponerme al tratamiento de mis datos (Derechos ARCO) y que puedo ejercerlos en cualquier momento solicitándolo en este consultorio.`;
+
 
 class OdontogramErrorBoundary extends React.Component {
   constructor(props) {
@@ -135,6 +149,9 @@ const PatientDetail = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  // Permiso real (no rol) — matches backend gate `authorize(['patients.update'])`.
+  const canFinalizeHC = hasPermission(user?.permissions, ['patients.update']);
   // Cita activa pasada en la URL desde "INICIAR CONSULTA AHORA" (consultas).
   // Si está presente, todo lo que se guarde en este expediente quedará ligado.
   const currentAppointmentId = searchParams.get('appointmentId') || null;
@@ -155,6 +172,16 @@ const PatientDetail = () => {
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
+  // Flujo de finalización HC: null → 'patient' → 'doctor' → submit
+  const [hcStep, setHcStep] = useState(null);
+  const [hcPatientSig, setHcPatientSig] = useState(null);
+  const [isSavingHCConsent, setIsSavingHCConsent] = useState(false);
+  const [isRevokeOpen, setIsRevokeOpen] = useState(false);
+  const [revokeReason, setRevokeReason] = useState('');
+  const [revokeMethod, setRevokeMethod] = useState('pin'); // pin | pad
+  const [revokePin, setRevokePin] = useState('');
+  const [revokePadOpen, setRevokePadOpen] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   // Marca <body data-pd-page="true"> para que header.css quite el sticky del
   // header global SOLO en esta pagina (el header se queda en su posicion
@@ -345,6 +372,97 @@ const PatientDetail = () => {
   const handlePrintClick = useCallback(() => {
     navigate(`/patient/${patientId}/imprimir?autoPrint=1`);
   }, [navigate, patientId]);
+
+  const submitRevocation = useCallback(async (doctorSignature) => {
+    setRevoking(true);
+    try {
+      const { data } = await API.post(`/patients/${patientId}/revoke-hc-consent`, {
+        motivo: revokeReason.trim(),
+        doctorSignature,
+      });
+      if (data?.success) {
+        message.success('Consentimiento revocado. Ya puedes corregir el expediente.');
+        setIsRevokeOpen(false);
+        setRevokeReason('');
+        setRevokePin('');
+        setRevokeMethod('pin');
+        setRevokePadOpen(false);
+        await fetchPatientData();
+      } else {
+        throw new Error(data?.error || 'No se pudo revocar el consentimiento');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Error al revocar';
+      message.error(msg);
+      throw err;
+    } finally {
+      setRevoking(false);
+    }
+  }, [patientId, revokeReason, fetchPatientData]);
+
+  const handleRevokePinSubmit = useCallback(async () => {
+    if (revokeReason.trim().length < 10) {
+      message.warning('El motivo debe tener al menos 10 caracteres.');
+      return;
+    }
+    if (!/^\d{4}$/.test(revokePin)) {
+      message.warning('Ingrese su PIN de 4 dígitos.');
+      return;
+    }
+    await submitRevocation({ method: 'pin', pin: revokePin });
+  }, [revokeReason, revokePin, submitRevocation]);
+
+  const handleRevokePadConfirm = useCallback(async (pngDataUrl) => {
+    if (revokeReason.trim().length < 10) {
+      message.warning('El motivo debe tener al menos 10 caracteres.');
+      return;
+    }
+    setRevokePadOpen(false);
+    await submitRevocation({ method: 'pad', dataUrl: pngDataUrl });
+  }, [revokeReason, submitRevocation]);
+
+  // PASO 1 — paciente firma con pad → guardamos PNG y avanzamos al doctor.
+  const handleHCPatientSigned = useCallback((pngDataUrl) => {
+    setHcPatientSig(pngDataUrl);
+    setHcStep('doctor');
+  }, []);
+
+  // PASO 2 — doctor co-firma (PIN o pad). Recién aquí se postea al backend.
+  const handleHCDoctorSigned = useCallback(async (doctorSignature) => {
+    if (!hcPatientSig) {
+      message.error('Falta la firma del paciente. Reinicie el flujo.');
+      setHcStep(null);
+      return;
+    }
+    setIsSavingHCConsent(true);
+    try {
+      const { data } = await API.post(`/patients/${patientId}/finalize-history`, {
+        patientSignature: hcPatientSig,
+        textoConsentimiento: CONSENTIMIENTO_HC_TEXTO,
+        doctorSignature,
+      });
+      if (data?.success) {
+        message.success('Historia clínica firmada (paciente + doctor).');
+        setHcStep(null);
+        setHcPatientSig(null);
+        await fetchPatientData();
+      } else {
+        throw new Error(data?.error || 'No se pudo registrar la firma');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Error al guardar la firma';
+      message.error(msg);
+      throw err; // que el modal muestre el error
+    } finally {
+      setIsSavingHCConsent(false);
+    }
+  }, [patientId, hcPatientSig, fetchPatientData]);
+
+  const handleHCCancel = useCallback(() => {
+    if (isSavingHCConsent) return;
+    setHcStep(null);
+    setHcPatientSig(null);
+  }, [isSavingHCConsent]);
 
   const handleDeleteClick = useCallback(() => {
     setIsDeleteConfirmVisible(true);
@@ -545,10 +663,44 @@ const PatientDetail = () => {
           ← Regresar
         </button>
         <div className="patient-detail__header-actions">
+          {patientData.patient.consentimientoHC?.firmadoEn && !patientData.patient.consentimientoHC?.revocadoEn ? (
+            <>
+              <span
+                className="hc-consent-badge"
+                title={`Firmada el ${new Date(patientData.patient.consentimientoHC.firmadoEn).toLocaleString()} — expediente en solo lectura`}
+              >
+                ✓ HC firmada · solo lectura
+              </span>
+              {canFinalizeHC && (
+                <button
+                  type="button"
+                  className="Boton_RevocarHC"
+                  onClick={() => setIsRevokeOpen(true)}
+                  aria-label="Revocar consentimiento para poder corregir"
+                  title="Revocar consentimiento para corregir información clínica"
+                >
+                  Revocar
+                </button>
+              )}
+            </>
+          ) : canFinalizeHC ? (
+            <button
+              type="button"
+              className="Boton_FinalizarHC button-primary"
+              onClick={() => setHcStep('patient')}
+              aria-label="Finalizar historia clínica con firma del paciente"
+            >
+              Finalizar historia clínica
+            </button>
+          ) : null}
           <button
             className="Boton_Editar button-primary"
             onClick={handleEditClick}
             aria-label="Editar datos del paciente"
+            disabled={Boolean(patientData.patient.consentimientoHC?.firmadoEn && !patientData.patient.consentimientoHC?.revocadoEn)}
+            title={patientData.patient.consentimientoHC?.firmadoEn && !patientData.patient.consentimientoHC?.revocadoEn
+              ? 'La HC está firmada por el paciente. Revoque el consentimiento para corregir.'
+              : 'Editar datos del paciente'}
           >
             Editar
           </button>
@@ -616,6 +768,166 @@ const PatientDetail = () => {
         onClose={() => setShowCreateAppointmentModal(false)}
         onCreated={fetchPatientData}
         fixedPatient={patientData?.patient ?? null}
+      />
+
+      {/* PASO 1 — Firma del paciente con pad */}
+      <SignaturePadModal
+        isOpen={hcStep === 'patient'}
+        onClose={handleHCCancel}
+        onConfirm={handleHCPatientSigned}
+        title="Consentimiento de historia clínica"
+        subtitle="El paciente lee el texto y firma en el cuadro"
+        signerName={[
+          patientData.patient.primer_nombre,
+          patientData.patient.otros_nombres,
+          patientData.patient.apellido_paterno,
+          patientData.patient.apellido_materno,
+        ].filter(Boolean).join(' ')}
+        signerRole="Paciente"
+        consentText={
+          <>
+            {CONSENTIMIENTO_HC_TEXTO.split('\n\n').map((p, i) => (
+              <p key={i} style={{ whiteSpace: 'pre-line' }}>{p}</p>
+            ))}
+          </>
+        }
+        confirmLabel="Continuar a firma del doctor"
+        loading={isSavingHCConsent}
+      />
+
+      {/* PASO 2 — Co-firma del doctor (PIN o pad) */}
+      <DoctorSignStep
+        isOpen={hcStep === 'doctor'}
+        onClose={handleHCCancel}
+        onConfirm={handleHCDoctorSigned}
+        title="Co-firma del doctor — Historia clínica"
+        subtitle="El doctor valida que la historia clínica es completa y correcta (NOM-013)."
+        loading={isSavingHCConsent}
+      />
+
+      {/* Revocación del consentimiento HC — motivo + firma del doctor */}
+      {isRevokeOpen && !revokePadOpen && (
+        <div className="signature-pad-overlay" onClick={() => !revoking && setIsRevokeOpen(false)}>
+          <div className="signature-pad-card" onClick={(e) => e.stopPropagation()}>
+            <div className="signature-pad-header">
+              <h2>Revocar consentimiento de HC</h2>
+              <p className="signature-pad-subtitle">
+                Esto reabre el expediente para correcciones. Quedará registrado el motivo y tu firma.
+              </p>
+            </div>
+
+            <div className="signature-pad-consent">
+              <p><strong>Motivo (mínimo 10 caracteres)</strong></p>
+              <textarea
+                value={revokeReason}
+                onChange={(e) => setRevokeReason(e.target.value)}
+                placeholder="Ej. Corrección de antecedente heredo-familiar incorrecto reportado por el paciente."
+                rows={3}
+                disabled={revoking}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #cbd5e0',
+                  borderRadius: 8,
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div className="doctor-sign-tabs">
+              <button
+                type="button"
+                className={`doctor-sign-tab${revokeMethod === 'pin' ? ' is-active' : ''}`}
+                onClick={() => setRevokeMethod('pin')}
+                disabled={revoking}
+              >
+                Firmar con PIN
+              </button>
+              <button
+                type="button"
+                className={`doctor-sign-tab${revokeMethod === 'pad' ? ' is-active' : ''}`}
+                onClick={() => setRevokeMethod('pad')}
+                disabled={revoking}
+              >
+                Firmar con pad
+              </button>
+            </div>
+
+            {revokeMethod === 'pin' ? (
+              <form
+                className="doctor-sign-pin"
+                onSubmit={(e) => { e.preventDefault(); handleRevokePinSubmit(); }}
+              >
+                <label htmlFor="revoke-pin">PIN de 4 dígitos</label>
+                <input
+                  id="revoke-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  pattern="\d{4}"
+                  value={revokePin}
+                  onChange={(e) => setRevokePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="••••"
+                  disabled={revoking}
+                  autoFocus
+                />
+                <div className="signature-pad-actions">
+                  <button
+                    type="button"
+                    className="signature-pad-btn signature-pad-btn-cancel"
+                    onClick={() => setIsRevokeOpen(false)}
+                    disabled={revoking}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="signature-pad-btn signature-pad-btn-confirm"
+                    disabled={revoking || revokePin.length !== 4 || revokeReason.trim().length < 10}
+                  >
+                    {revoking ? 'Revocando…' : 'Revocar consentimiento'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="doctor-sign-pad-prompt">
+                <p>Se abrirá el pad para que dibujes tu firma autorizando la revocación.</p>
+                <div className="signature-pad-actions">
+                  <button
+                    type="button"
+                    className="signature-pad-btn signature-pad-btn-cancel"
+                    onClick={() => setIsRevokeOpen(false)}
+                    disabled={revoking}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="signature-pad-btn signature-pad-btn-confirm"
+                    onClick={() => setRevokePadOpen(true)}
+                    disabled={revoking || revokeReason.trim().length < 10}
+                  >
+                    Abrir pad
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <SignaturePadModal
+        isOpen={isRevokeOpen && revokePadOpen}
+        onClose={() => setRevokePadOpen(false)}
+        onConfirm={handleRevokePadConfirm}
+        title="Firma del doctor — revocación"
+        subtitle="Dibuja tu firma para autorizar la revocación"
+        signerName={user?.nombre || ''}
+        signerRole={user?.cedulaProfesional ? `Cédula ${user.cedulaProfesional}` : 'Doctor'}
+        confirmLabel="Firmar y revocar"
+        loading={revoking}
       />
 
       <Modal

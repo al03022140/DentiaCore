@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema({
   },
   rol: {
     type: String,
-    enum: ["superadmin", "doctor", "recepcionista", "administrador", "asistente"],
+    enum: ["superadmin", "doctor_admin", "doctor", "recepcionista", "administrador", "asistente"],
     default: "recepcionista"
   },
   permissions: {
@@ -145,8 +145,11 @@ userSchema.pre('save', async function(next) {
 });
 
 // **Validación condicional: cédula obligatoria para doctores (NOM-004 Art. 5.10)**
+// Aplica tanto a `doctor` puro como a `doctor_admin` (doctor + director clínico).
 userSchema.path('cedulaProfesional').validate(function(v) {
-  if (this.rol === 'doctor') return !!v && v.trim().length > 0;
+  if (this.rol === 'doctor' || this.rol === 'doctor_admin') {
+    return !!v && v.trim().length > 0;
+  }
   return true;
 }, 'La cédula profesional es obligatoria para doctores');
 

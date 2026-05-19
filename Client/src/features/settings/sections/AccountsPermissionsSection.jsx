@@ -5,6 +5,9 @@ import {
   getUsers,
   updateUserPermissions,
 } from '../../../shared/services/settingsService';
+import { useAuth } from '../../../app/auth/AuthContext';
+import { hasPermission } from '../../../app/auth/permissions';
+import AccountsManagement from './AccountsManagement';
 
 /*
  * Catálogo de permisos (label + descripción humanizada).
@@ -76,6 +79,12 @@ const PERMISSIONS_META = {
 
   // Sesión
   'session.lock':               { group: 'Sesión',           label: 'Bloquear pantalla',       desc: 'Activar el Modo Cortina con bloqueo por PIN (LFPDPPP Art. 19).' },
+
+  // Gestión de cuentas (CRUD de usuarios)
+  'users.read':                 { group: 'Cuentas',          label: 'Ver cuentas',             desc: 'Listar y consultar las cuentas de usuario del sistema.' },
+  'users.create':               { group: 'Cuentas',          label: 'Crear cuenta',            desc: 'Registrar nuevos usuarios (limitado por jerarquía de roles).' },
+  'users.update':               { group: 'Cuentas',          label: 'Editar cuenta',           desc: 'Cambiar nombre, email, rol y contraseña de otros usuarios.' },
+  'users.disable':              { group: 'Cuentas',          label: 'Desactivar cuenta',       desc: 'Soft-disable de cuenta. Se conserva auditoría pero no puede ingresar.' },
 };
 
 const ALL_PERMISSIONS = Object.keys(PERMISSIONS_META);
@@ -86,6 +95,26 @@ const ALL_PERMISSIONS = Object.keys(PERMISSIONS_META);
  * Solo incluyo los roles editables desde la UI (doctor / asistente / recepcionista).
  */
 const ROLE_DEFAULTS = {
+  doctor_admin: [
+    // Pacientes — CRUD completo
+    'patients.read', 'patients.create', 'patients.update', 'patients.delete',
+    // Clínico
+    'odontogram.read', 'odontogram.create', 'odontogram.update',
+    'periodontogram.read', 'periodontogram.create', 'periodontogram.update',
+    'consultas.read', 'consultas.create', 'consultas.update',
+    'exams.read', 'exams.create', 'exams.update',
+    // Citas — CRUD completo
+    'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
+    'cash.read', 'cash.manage',
+    'stats.read.own', 'stats.read.admin',
+    'users.read', 'users.create', 'users.update', 'users.disable',
+    'settings.read', 'settings.update',
+    'professional.update',
+    'audit.read.full',
+    'draft.approve', 'drafts.batch_sign',
+    'notes.create.backdated', 'notes.template.use', 'notes.template.manage',
+    'session.lock',
+  ],
   doctor: [
     'patients.read', 'patients.create', 'patients.update',
     'odontogram.read', 'odontogram.create', 'odontogram.update',
@@ -98,6 +127,8 @@ const ROLE_DEFAULTS = {
     'notes.create.backdated', 'notes.template.use', 'notes.template.manage',
     'settings.read', 'professional.update',
     'session.lock',
+    // Gestión de cuentas — para consultorios pequeños
+    'users.read', 'users.create', 'users.update', 'users.disable',
   ],
   asistente: [
     'patients.read',
@@ -121,6 +152,7 @@ const ROLE_DEFAULTS = {
 };
 
 const ROLES = [
+  { id: 'doctor_admin',  label: 'Doctor (administrador)', desc: 'Dentista-director: practica clínicamente Y administra cuentas, caja, configuración y citas.' },
   { id: 'doctor',        label: 'Doctor',        desc: 'Acceso clínico completo: pacientes, citas, odontograma y periodontograma.' },
   { id: 'recepcionista', label: 'Recepcionista', desc: 'Gestión de agenda, citas y caja desde la recepción.' },
   { id: 'asistente',     label: 'Asistente',     desc: 'Apoyo clínico bajo supervisión directa del doctor (captura en borrador).' },
@@ -138,19 +170,40 @@ const buildGroups = () => {
 };
 
 const AccountsPermissionsSection = () => {
+  const { user: currentUser } = useAuth();
+  const currentRole = currentUser?.rol || currentUser?.role;
+  const userPermsList = currentUser?.permissions || [];
+
+  // Las pestañas de permisos (Por Rol / Por Usuario) son administrativas:
+  // solo quienes tienen settings.update (admin/superadmin) las ven. El
+  // doctor entra solo a "Gestionar cuentas".
+  const canManagePerms = hasPermission(userPermsList, ['settings.update'])
+    || currentRole === 'administrador'
+    || currentRole === 'superadmin';
+  const canManageAccounts = hasPermission(userPermsList, ['users.read'])
+    || ['doctor', 'administrador', 'superadmin'].includes(currentRole);
+
   const [rolePerms, setRolePerms] = useState({});
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userPerms, setUserPerms] = useState([]);
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('roles');
+  // Tab inicial: la primera disponible para el usuario actual.
+  const initialTab = canManageAccounts ? 'accounts' : 'roles';
+  const [tab, setTab] = useState(initialTab);
   const [openRoles, setOpenRoles] = useState({});
   const [savingRole, setSavingRole] = useState(null);
 
   const permGroups = useMemo(() => buildGroups(), []);
 
   useEffect(() => {
+    // Para roles que no pueden gestionar permisos, NO pedimos los datos de
+    // permisos (404/403 inútil). Solo cargamos lo mínimo.
+    if (!canManagePerms) {
+      setLoading(false);
+      return;
+    }
     Promise.all([getRolePermissions(), getUsers()])
       .then(([rp, u]) => {
         // rp viene del servidor como { [role]: string[] } SOLO con overrides existentes.
@@ -169,7 +222,7 @@ const AccountsPermissionsSection = () => {
       })
       .catch(() => setMsg({ type: 'error', text: 'Error al cargar datos' }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [canManagePerms]);
 
   const toggleRoleOpen = (roleId) => {
     setOpenRoles((prev) => ({ ...prev, [roleId]: !prev[roleId] }));
@@ -230,19 +283,33 @@ const AccountsPermissionsSection = () => {
       {msg && <div className={`settings-message ${msg.type}`}>{msg.text}</div>}
 
       <div className="perm-tabs">
-        <button
-          className={tab === 'roles' ? 'settings-btn-primary' : 'settings-btn-secondary'}
-          onClick={() => setTab('roles')}
-        >
-          Por Rol
-        </button>
-        <button
-          className={tab === 'users' ? 'settings-btn-primary' : 'settings-btn-secondary'}
-          onClick={() => setTab('users')}
-        >
-          Por Usuario
-        </button>
+        {canManageAccounts && (
+          <button
+            className={tab === 'accounts' ? 'settings-btn-primary' : 'settings-btn-secondary'}
+            onClick={() => setTab('accounts')}
+          >
+            Gestionar cuentas
+          </button>
+        )}
+        {canManagePerms && (
+          <>
+            <button
+              className={tab === 'roles' ? 'settings-btn-primary' : 'settings-btn-secondary'}
+              onClick={() => setTab('roles')}
+            >
+              Por Rol
+            </button>
+            <button
+              className={tab === 'users' ? 'settings-btn-primary' : 'settings-btn-secondary'}
+              onClick={() => setTab('users')}
+            >
+              Por Usuario
+            </button>
+          </>
+        )}
       </div>
+
+      {tab === 'accounts' && canManageAccounts && <AccountsManagement />}
 
       {tab === 'roles' && (
         <div className="perm-roles">

@@ -4,6 +4,7 @@ import API from '../services/axios-instance';
 import { getSettings } from '../services/settingsService';
 import './styles/lock-screen.css';
 import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
+import lockTimerIcon from '../../assets/images/icons/lock.svg';
 
 const LockScreenContext = createContext(null);
 
@@ -11,13 +12,23 @@ const LockScreenContext = createContext(null);
 const DEFAULT_INACTIVITY_MIN = 15;
 const INACTIVITY_MIN_BOUND = 1;
 const INACTIVITY_MAX_BOUND = 120;
-const CHECK_INTERVAL_MS = 30 * 1000; // comprobar cada 30s
+const CHECK_INTERVAL_MS = 5 * 1000; // chequear cada 5s para countdown granular
+// Duración de la "etapa 1" — periodo silencioso de detección antes de
+// mostrar la advertencia con countdown.
+const STAGE_1_MS = 60 * 1000; // 1 minuto
 // Evento que dispara SecuritySection al guardar — permite recargar el timeout
 // sin obligar al usuario a refrescar la página.
 export const SETTINGS_UPDATED_EVENT = 'dentiacore:settings-updated';
 // Debe coincidir con MAX_PIN_ATTEMPTS del backend (authController.js).
 // El backend es la fuente de verdad: envía `intentosRestantes` en cada 401.
 const MAX_PIN_ATTEMPTS = 5;
+
+const formatMmSs = (ms) => {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
 
 const clampInactivity = (minutes) => {
   const n = Number(minutes);
@@ -31,6 +42,9 @@ export const LockScreenProvider = ({ children }) => {
   const [pinInput, setPinInput] = useState('');
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
+  // Estado de la advertencia de inactividad — visible durante la etapa 2.
+  // `null` = etapa 1 (silenciosa o usuario activo). Número = ms restantes.
+  const [warningRemainingMs, setWarningRemainingMs] = useState(null);
   const lastActivityRef = useRef(Date.now());
   const checkIntervalRef = useRef(null);
   // Timeout configurable desde Configuración → Seguridad (en ms).
@@ -48,9 +62,18 @@ export const LockScreenProvider = ({ children }) => {
     }
   }, []);
 
-  // Registrar actividad del usuario
+  // Registrar actividad del usuario — resetea ambas etapas a cero.
+  // El setter de warningRemainingMs solo se llama si está visible para evitar
+  // re-renders innecesarios en cada mousemove.
   const registerActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
+    setWarningRemainingMs((prev) => (prev !== null ? null : prev));
+  }, []);
+
+  // Acción "Sigo aquí" — equivalente a registerActivity pero explícito.
+  const dismissWarning = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    setWarningRemainingMs(null);
   }, []);
 
   // Bloquear pantalla
@@ -58,6 +81,7 @@ export const LockScreenProvider = ({ children }) => {
     setIsLocked(true);
     setPinInput('');
     setError('');
+    setWarningRemainingMs(null);
     sessionStorage.setItem('dentiacore_locked', 'true');
 
     try {
@@ -107,6 +131,7 @@ export const LockScreenProvider = ({ children }) => {
         setPinInput('');
         setError('');
         setAttempts(0);
+        setWarningRemainingMs(null);
         sessionStorage.removeItem('dentiacore_locked');
         lastActivityRef.current = Date.now();
 
@@ -166,6 +191,7 @@ export const LockScreenProvider = ({ children }) => {
         const min = clampInactivity(detail.inactivityTimeout);
         inactivityTimeoutMsRef.current = min * 60 * 1000;
         lastActivityRef.current = Date.now(); // resetear contador con el nuevo valor
+        setWarningRemainingMs(null);
       } else {
         loadInactivityTimeout();
       }
@@ -174,7 +200,12 @@ export const LockScreenProvider = ({ children }) => {
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, handler);
   }, [user, loadInactivityTimeout]);
 
-  // Monitorear inactividad
+  // Monitorear inactividad — dos etapas:
+  //   Etapa 1 (silenciosa): primer minuto sin actividad → nada visible.
+  //   Etapa 2 (countdown): tras 1 min sin actividad, mostrar modal con el
+  //   tiempo restante hasta el lock. Cualquier evento del usuario (mouse,
+  //   teclado, touch, scroll) resetea inmediatamente a cero (oculta el modal).
+  // El lock real dispara al alcanzar el config completo (p. ej. 15 min).
   useEffect(() => {
     if (!user || isLocked) return;
 
@@ -183,8 +214,24 @@ export const LockScreenProvider = ({ children }) => {
 
     checkIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - lastActivityRef.current;
-      if (elapsed >= inactivityTimeoutMsRef.current) {
+      const total = inactivityTimeoutMsRef.current;
+
+      if (elapsed >= total) {
+        setWarningRemainingMs(null);
         lock('auto');
+        return;
+      }
+
+      // Si el timeout total es ≤ 1 min, no usamos etapa 1 — todo el periodo
+      // se cuenta como countdown visible para que el usuario alcance a verlo.
+      const effectiveStage1 = total > STAGE_1_MS ? STAGE_1_MS : 0;
+
+      if (elapsed >= effectiveStage1) {
+        const remaining = total - elapsed;
+        setWarningRemainingMs(remaining);
+      } else {
+        // Aún en etapa 1: ocultar warning si por alguna razón estaba visible.
+        setWarningRemainingMs((prev) => (prev !== null ? null : prev));
       }
     }, CHECK_INTERVAL_MS);
 
@@ -211,13 +258,39 @@ export const LockScreenProvider = ({ children }) => {
   return (
     <LockScreenContext.Provider value={value}>
       {children}
+
+      {/* Advertencia de inactividad (etapa 2). No bloquea la UI — el usuario
+          puede seguir trabajando; cualquier interacción la cierra. */}
+      {user && !isLocked && warningRemainingMs !== null && (
+        <div className="inactivity-warning" role="status" aria-live="polite">
+          <img src={lockTimerIcon} alt="" aria-hidden="true" className="inactivity-warning__icon theme-icon" />
+          <div className="inactivity-warning__content">
+            <strong>Tu sesión se cerrará por inactividad</strong>
+            <span>
+              Tiempo restante: <strong>{formatMmSs(warningRemainingMs)}</strong>. Mueve el mouse o pulsa una tecla para continuar.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="inactivity-warning__btn"
+            onClick={dismissWarning}
+          >
+            Sigo aquí
+          </button>
+        </div>
+      )}
+
       {user && isLocked && (
         <div className="lock-screen-overlay">
           <div className="lock-screen-card">
             <div className="lock-screen-icon">
-              {user.nombre === 'Administrador Local'
-                ? <img src={lockBlockedIcon} alt="Administrador Local" className="theme-icon" style={{ width: 80, height: 80 }} />
-                : <span style={{ fontSize: '4.5rem', lineHeight: 1 }}>🔒</span>}
+              <img
+                src={lockBlockedIcon}
+                alt=""
+                aria-hidden="true"
+                className="theme-icon"
+                style={{ width: 80, height: 80 }}
+              />
             </div>
             <h2>Pantalla bloqueada</h2>
             <p className="lock-screen-user">{user.nombre || 'Usuario'}</p>

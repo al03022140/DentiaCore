@@ -519,6 +519,16 @@ const PatientSchema = new mongoose.Schema({
         firmadoEn: { type: Date, default: null },
         contentHash: { type: String, default: null },
         firmaDesactualizada: { type: Boolean, default: false },
+        // ── Firma del paciente (NOM-004 + LFPDPPP — autógrafa por nota) ──
+        pacienteFirmaUrl: { type: String, default: null },
+        pacienteFirmadoEn: { type: Date, default: null },
+        pacienteFirmaContentHash: { type: String, default: null },
+        // ── Firma del doctor — siempre se guarda la URL mostrable: ──
+        //   method='pad' → PNG capturado en el momento (snapshot inmutable)
+        //   method='pin' → snapshot de signerDoctor.firmaDigitalUrl al firmar
+        // Si el doctor luego cambia su firma, la histórica no se altera.
+        doctorFirmaUrl: { type: String, default: null },
+        doctorFirmaMethod: { type: String, enum: ['pin', 'pad', null], default: null },
         // Soft-delete (NOM-004 Art. 5.4)
         deletedAt: { type: Date, default: null },
         deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
@@ -546,7 +556,32 @@ const PatientSchema = new mongoose.Schema({
 
     // 📌 Derechos ARCO — Cancelación (LFPDPPP Arts. 22-36, roles.MD §6)
     // true = el paciente solicita que sus datos NO se compartan con fines secundarios
-    datosNoCompartir: { type: Boolean, default: false }
+    datosNoCompartir: { type: Boolean, default: false },
+
+    // 📌 Consentimiento de la historia clínica firmado por el paciente
+    // (NOM-004-SSA3-2012 Art. 4.5 + LFPDPPP Arts. 8 y 16). Se captura una
+    // vez al finalizar la HC; el paciente firma con pad gráfico declarando
+    // que los datos son veraces y autoriza su tratamiento.
+    consentimientoHC: {
+        firmadoEn: { type: Date, default: null },
+        firmaUrl: { type: String, default: null },
+        contentHash: { type: String, default: null },
+        textoConsentimiento: { type: String, default: null },
+        // Usuario que CAPTURÓ el consentimiento (asistente / doctor / admin)
+        firmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        ipCliente: { type: String, default: null },
+        // Co-firma del doctor — NOM-013: el dentista valida que la HC es completa.
+        doctorFirmadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        doctorFirmadoEn: { type: Date, default: null },
+        // URL de la firma del doctor: si method=pad, PNG capturado; si method=pin, su firmaDigitalUrl.
+        doctorFirmaUrl: { type: String, default: null },
+        doctorFirmaMethod: { type: String, enum: ['pin', 'pad', null], default: null },
+        // Revocación (Derechos ARCO)
+        revocadoEn: { type: Date, default: null },
+        revocadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        revocadoMotivo: { type: String, default: null },
+        revocacionFirmaUrl: { type: String, default: null }
+    }
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -647,6 +682,32 @@ PatientSchema.pre('validate', async function(next) {
         if (this.isNew && !this.paciente_id) {
             this.paciente_id = await this.constructor.generateUniquePatientId();
         }
+
+        // 🔒 Defensa en profundidad contra mass-assignment: en creación
+        // forzamos consentimientoHC a su estado inicial (sin firmar). Solo
+        // los endpoints dedicados (finalizeClinicalHistory / revokeHCConsent)
+        // tienen permiso para mover esos campos. Sin esto, un cliente
+        // malicioso que bypassee el whitelist del controller podría
+        // falsificar un consentimiento firmado en el create.
+        if (this.isNew) {
+            this.consentimientoHC = {
+                firmadoEn: null,
+                firmaUrl: null,
+                contentHash: null,
+                textoConsentimiento: null,
+                firmadoPor: null,
+                ipCliente: null,
+                doctorFirmadoPor: null,
+                doctorFirmadoEn: null,
+                doctorFirmaUrl: null,
+                doctorFirmaMethod: null,
+                revocadoEn: null,
+                revocadoPor: null,
+                revocadoMotivo: null,
+                revocacionFirmaUrl: null,
+            };
+        }
+
         next();
     } catch (error) {
         next(error);

@@ -119,3 +119,77 @@
     letter-spacing: 0.35em;
   }
 }
+
+/* ────────────────────────────────────────────────────────────
+   Advertencia de inactividad — etapa 2 del timer
+   No-bloqueante: el usuario puede seguir trabajando, cualquier
+   actividad la oculta automáticamente.
+   ──────────────────────────────────────────────────────────── */
+.inactivity-warning {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9990;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: 460px;
+  background: #fff8e1;
+  border: 1px solid #f6c343;
+  border-left: 4px solid #d97706;
+  color: #78350f;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  animation: inactivityWarningIn 200ms ease-out;
+}
+
+@keyframes inactivityWarningIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.inactivity-warning__icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.inactivity-warning__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.inactivity-warning__content strong {
+  font-weight: 600;
+}
+
+.inactivity-warning__btn {
+  background: #d97706;
+  color: #fff;
+  border: none;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.inactivity-warning__btn:hover {
+  background: #b45309;
+}
+
+@media (max-width: 520px) {
+  .inactivity-warning {
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
+    bottom: 0.75rem;
+  }
+}
+
