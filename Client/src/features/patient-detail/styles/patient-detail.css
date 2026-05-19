@@ -172,10 +172,9 @@
 
 .odontograma-initial-status-line {
   margin: 0;
-  font: var(--pd-font-card-list);
-  color: var(--color-neutral-680);
+  font-size: 0.9em;
+  color: var(--color-text-secondary);
   max-width: 42rem;
-  line-height: 1.45;
 }
 
 
@@ -216,12 +215,45 @@
   box-shadow: 0 0 0 3px var(--color-blue-500-25);
 }
 
-.capture-button {
+/* Botón primario del odontograma — mismo azul profundo que el botón "Guardar"
+   del periodontograma (.button-primary → var(--color-primary)) para mantener
+   coherencia visual entre ambos features. */
+.capture-button,
+.odontogram-save-button {
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  border: 2px solid transparent !important;
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 6px !important;
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-decoration: none;
+  text-align: center;
   margin: var(--spacing-xs) 2px;
+  box-shadow: none;
 }
 
-.odontogram-save-button {
-  margin-bottom: var(--spacing-md);
+.capture-button:hover:not(:disabled),
+.odontogram-save-button:hover:not(:disabled) {
+  background: var(--color-primary-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.3);
+}
+
+.capture-button:disabled,
+.odontogram-save-button:disabled {
+  background: var(--color-neutral-900) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .odontograma-status {
@@ -278,6 +310,43 @@
 .odontograma-canvas {
   border: var(--border-radius-sm) solid var(--color-border-medium);
   max-width: 100%;
+  /* `height: auto` evita que el alto se quede fijo en 700px (valor del atributo
+     HTML del canvas) cuando max-width recorta el ancho al mostrar la tabla.
+     `aspect-ratio` es red de seguridad por si el navegador no escala el alto
+     automáticamente. El resultado: la dentadura mantiene su proporción 1200×700
+     cuando el canvas se hace más pequeño. */
+  height: auto;
+  aspect-ratio: 1200 / 700;
+}
+
+/* Modo solo-lectura (view-mode del odontograma inicial): al ocultar los botones
+   del engine queda mucho espacio en blanco arriba y abajo del canvas. Ampliamos
+   visualmente los dientes con un `transform: scale()` centrado y dejamos que el
+   `overflow:hidden` recorte los márgenes blancos.
+
+   Importante: NO recortamos el contenedor con aspect-ratio porque la dentadura
+   ocupa más alto del visible (los arcos superior e inferior, más sus filas de
+   superficies y numeración, abarcan aproximadamente y=200 a y=620 dentro del
+   canvas de 700px). Si forzamos un alto menor se clipea la mandíbula inferior.
+
+   Mantenemos el aspect-ratio natural del canvas (1200x700) y aplicamos un scale
+   moderado (1.3x) — eso recorta sólo las franjas verdaderamente blancas (los
+   ~80px de arriba y ~80px de abajo del canvas) y deja toda la dentadura
+   visible y más grande. */
+.odontograma-canvas-container--readonly {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.odontograma-canvas-container--readonly .odontograma-canvas {
+  /* El canvas mantiene su resolución interna (1200×700) — el engine renderiza igual,
+     sólo cambia la presentación visual. */
+  transform: scale(1.3);
+  transform-origin: center center;
+  /* Evita interpolación borrosa al ampliar: bordes nítidos como una imagen vectorial. */
+  image-rendering: crisp-edges;
 }
 
 /* =========================
@@ -446,6 +515,92 @@
   background-color: var(--color-bg-light);
   padding-left: 0%;
   padding-right: 0%;
+  transition: width 0.3s ease, opacity 0.25s ease, padding 0.3s ease,
+              margin 0.3s ease, border-width 0.3s ease;
+}
+
+/* Drawer colapsable: cuando la tabla está oculta, el canvas usa todo el ancho */
+.odontograma-flex-container.odontograma-table-collapsed .odontograma-table-container {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.odontograma-flex-container.odontograma-table-collapsed .odontograma-canvas-container {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+/* Contenedor de los botones del odontograma: flex para que "Capturar" y
+   "Ver registro" queden lado a lado a la misma altura. */
+.odontograma-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+/* Botón toggle "Ver registro" — outline azul profundo (mismo --color-primary
+   que el botón "Guardar" del periodontograma). Mismo TAMAÑO que .capture-button
+   / .save-complete-button (idéntico padding y font-size) pero con jerarquía
+   visual secundaria. */
+.odontograma-toggle-table-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid var(--color-primary);
+  border-radius: 6px;
+  background: var(--color-bg-white);
+  color: var(--color-primary);
+  font-family: var(--font-family-primary, 'Montserrat', sans-serif);
+  font-weight: 500;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  /* Igualar altura visual con .capture-button / .odontogram-save-button (que
+     heredan height: var(--figma-btn-height) de .button-primary, en content-box
+     por defecto) para que "Ver registro" y "Guardar" queden alineados. */
+  height: var(--figma-btn-height);
+}
+
+.odontograma-toggle-table-btn:hover {
+  background: rgba(8, 72, 136, 0.08);
+  color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(8, 72, 136, 0.3);
+}
+
+.odontograma-toggle-table-btn:active {
+  transform: translateY(0);
+}
+
+/* Icono SVG inline: hereda el color del texto del botón vía
+   `stroke="currentColor"`; sólo necesitamos evitar que se encoja en el flex. */
+.odontograma-toggle-table-btn .odontograma-toggle-icon {
+  flex-shrink: 0;
+}
+
+.odontograma-toggle-table-btn .odontograma-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.78em;
+  font-weight: 600;
+  line-height: 1;
 }
 
 /* Override Ant Design table styles to make it narrower */
@@ -459,6 +614,58 @@
 
 .odontograma-table .ant-table-content {
   width: auto !important;
+}
+
+/* Eliminar scroll horizontal interno dentro del panel de registro
+   (.odontograma-table-container). Cubre tres fuentes posibles de scroll-x:
+   1) El nav de Tabs de AntD ("Estado Actual" / "Historial") que añade
+      flechas de scroll cuando cree que no caben — forzamos overflow visible,
+      ocultamos los botones de overflow y compactamos el padding del tab para
+      que ambos quepan a la par sin recortarse.
+   2) El body de la tabla, que AntD a veces hace scrolleable horizontalmente
+      con `scroll={{ y }}`.
+   3) El propio contenedor (ya tiene overflow-x: hidden, lo mantenemos). */
+.odontograma-table-container .ant-tabs-nav {
+  margin: 0 0 var(--spacing-xs) 0 !important;
+}
+
+.odontograma-table-container .ant-tabs-nav-wrap {
+  overflow: visible !important;
+}
+
+.odontograma-table-container .ant-tabs-nav-list {
+  transform: none !important;
+  width: 100%;
+  display: flex;
+}
+
+.odontograma-table-container .ant-tabs-nav-operations {
+  display: none !important;
+}
+
+.odontograma-table-container .ant-tabs-tab {
+  flex: 1 1 0;
+  justify-content: center;
+  padding: 8px 6px !important;
+  margin: 0 !important;
+  min-width: 0;
+}
+
+.odontograma-table-container .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 0 !important;
+}
+
+.odontograma-table-container .ant-tabs-tab .ant-tabs-tab-btn {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.odontograma-table-container .ant-table-body,
+.odontograma-table-container .ant-table-content {
+  overflow-x: hidden !important;
 }
 
 /* Make table cells more compact */
@@ -491,12 +698,6 @@
 
 [data-theme="dark"] .odontograma-saving-overlay {
   background: rgba(0, 0, 0, 0.45);
-}
-
-.odontograma-tools-hint {
-  margin: 0;
-  font-size: 0.9em;
-  color: var(--color-text-secondary);
 }
 
 /* Modo oscuro: tablas y pestañas del odontograma (Ant Design sigue tokens claros por defecto) */
@@ -560,6 +761,7 @@
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
   flex-wrap: wrap;
+  padding: var(--spacing-md) var(--spacing-xxl);
 }
 
 .patient-detail__header-actions {
@@ -665,13 +867,19 @@
   margin-top: var(--spacing-lg);
 }
 
+/* La barra de pestañas SIEMPRE queda visible flotando: se pega al tope del
+   contenedor scrolleable (.content de app.css, overflow-y:auto). Como
+   .content arranca justo debajo del header global, top:0 alinea la barra
+   exactamente con el borde inferior del header. Cuando el header colapsa al
+   scrollear (height:0 vía body[data-pd-app-header-hidden]), .content sube
+   con él y la barra de pestañas queda pegada al tope absoluto del viewport. */
 .patient-detail-tabs .ant-tabs-nav {
   margin-bottom: var(--spacing-xl);
   position: sticky;
-  top: -25px;
-  z-index: 10;
+  top: 0;
+  z-index: 90;
   background: var(--figma-bg-page, var(--color-bg-light));
-  padding-top: var(--spacing-xl);
+  padding-top: var(--spacing-sm);
   padding-bottom: var(--spacing-md);
 }
 

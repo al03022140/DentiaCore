@@ -138,8 +138,7 @@ const PatientDetail = () => {
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [initialData, setInitialData] = useState([]);
-  const [initialImageUrl, setInitialImageUrl] = useState(null);
-  const [showInitialOdontogramImage, setShowInitialOdontogramImage] = useState(false);
+  const [initialExists, setInitialExists] = useState(false);
   const [odontogramHistory, setOdontogramHistory] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -150,6 +149,68 @@ const PatientDetail = () => {
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
+
+  // Auto-hide del header GLOBAL de la app (.header con "Buenos días, ...") al
+  // scrollear hacia abajo dentro de la página del paciente, y la barra de
+  // pestañas (selector de secciones) queda flotando arriba en su lugar.
+  // El header del paciente (Regresar/Editar) sí hace scroll normal con el
+  // contenido — no se queda flotando.
+  //
+  // Se marca `<body data-pd-app-header-hidden="true">` para que header.css
+  // aplique el translate sólo aquí (no en otras páginas). Se limpia al
+  // desmontar.
+  const [isAppHeaderHidden, setIsAppHeaderHidden] = useState(false);
+
+  useEffect(() => {
+    const TOP_THRESHOLD = 80;
+    const DELTA = 6;
+
+    let lastY = window.scrollY || 0;
+    let ticking = false;
+
+    const readY = (eventTarget) => {
+      if (!eventTarget || eventTarget === window || eventTarget === document) {
+        return window.scrollY || document.documentElement.scrollTop || 0;
+      }
+      return eventTarget.scrollTop ?? 0;
+    };
+
+    const onScroll = (e) => {
+      // El scroll real ocurre en `.content` (overflow-y:auto). Filtramos para
+      // ignorar scroll de sub-scrollables (dropdowns, modales) que dispararían
+      // el handler con scrollTop sin relación al header.
+      const t = e.target;
+      const isMain = t === window || t === document ||
+        (t && t.classList && t.classList.contains('content'));
+      if (!isMain) return;
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        const y = readY(t);
+        if (y <= TOP_THRESHOLD) {
+          setIsAppHeaderHidden(false);
+        } else if (y - lastY > DELTA) {
+          setIsAppHeaderHidden(true);
+        } else if (lastY - y > DELTA) {
+          setIsAppHeaderHidden(false);
+        }
+        lastY = y;
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', onScroll, { capture: true });
+  }, []);
+
+  useEffect(() => {
+    document.body.dataset.pdAppHeaderHidden = isAppHeaderHidden ? 'true' : 'false';
+    document.body.dataset.pdPage = 'true';
+    return () => {
+      delete document.body.dataset.pdAppHeaderHidden;
+      delete document.body.dataset.pdPage;
+    };
+  }, [isAppHeaderHidden]);
 
   const formatImageUrl = useCallback((url) => {
     if (!url) return '';
@@ -190,8 +251,7 @@ const PatientDetail = () => {
   }, []);
 
   const resetOdontogramState = useCallback(() => {
-    setInitialImageUrl(null);
-    setShowInitialOdontogramImage(false);
+    setInitialExists(false);
     setInitialData([]);
     setOdontogramHistory([]);
   }, []);
@@ -260,10 +320,9 @@ const PatientDetail = () => {
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
       if (data.exists) {
-        setInitialImageUrl(formatImageUrl(data.imageUrl));
-        setShowInitialOdontogramImage(true);
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
+        setInitialExists(true);
         setOdontogramHistory(normalizeHistory(data.history));
         setInitialOdontogramLoadStatus('saved');
       } else {
@@ -274,31 +333,22 @@ const PatientDetail = () => {
       resetOdontogramState();
       setInitialOdontogramLoadStatus('none');
     }
-  }, [patientId, formatImageUrl, normalizeHistory, resetOdontogramState, fetchedInitial]);
+  }, [patientId, normalizeHistory, resetOdontogramState, fetchedInitial]);
 
-  const deleteInitial = useCallback(async () => {
-    try {
-      await API.delete(`/patients/${patientId}/odontograma-inicial`);
-      message.success('Odontograma inicial eliminado.');
-      setFetchedInitial(false);
-      await checkInitialOdontogram(true);
-    } catch {
-      message.error('Error al eliminar odontograma inicial.');
-    }
-  }, [patientId, checkInitialOdontogram]);
-
-  const handleSaveSuccess = useCallback(async (receivedImageUrl, datos, receivedHistory) => {
-    setInitialImageUrl(formatImageUrl(receivedImageUrl));
+  const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
     setInitialData(datos || []);
+    setInitialExists(true);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
-    setShowInitialOdontogramImage(true);
+    setInitialOdontogramLoadStatus('saved');
     setFetchedInitial(false);
     try {
+      // Refresca desde el servidor para asegurar que estamos viendo el estado real
+      // (importante si la respuesta del POST cambia algo o si vino de 409).
       await checkInitialOdontogram(true);
     } catch (err) {
       console.error('Error al refrescar datos del odontograma inicial:', err);
     }
-  }, [formatImageUrl, normalizeHistory, checkInitialOdontogram]);
+  }, [normalizeHistory, checkInitialOdontogram]);
 
   useEffect(() => {
     resetOdontogramState();
@@ -464,15 +514,10 @@ const PatientDetail = () => {
                 canvasRef={canvas1Ref}
                 patientId={patientId}
                 initialTableData={initialData}
-                initialImageUrl={initialImageUrl}
-                showInitialOdontogramImage={showInitialOdontogramImage}
-                setShowInitialOdontogramImage={setShowInitialOdontogramImage}
+                exists={initialExists}
                 initialSnapshotStatus={initialOdontogramLoadStatus}
-                onDelete={deleteInitial}
                 onSaveSuccess={handleSaveSuccess}
-                onRetryImageLoad={() => checkInitialOdontogram(true)}
                 areScriptsReady={areScriptsReadyState}
-                formatImageUrl={formatImageUrl}
               />
             </OdontogramErrorBoundary>
           ) : !areScriptsReadyState && !initializationError ? (
@@ -519,7 +564,9 @@ const PatientDetail = () => {
   ];
 
   return (
-    <div className="patient-detail">
+    <div
+      className={`patient-detail${isAppHeaderHidden ? ' patient-detail--app-header-hidden' : ''}`}
+    >
       <div className="patient-detail__header">
         <button className="back-button" onClick={() => navigate("/pacientes")}>
           ← Regresar
