@@ -212,12 +212,30 @@ try {
         $FinalEnv[$Key] = $NetworkConfig[$Key]
     }
 
+    # Generar JWT_SECRET aleatorio si no existe — evita warning del server
+    # "WARNING: JWT_SECRET not set or insecure. Using ephemeral secret..."
+    if (-not $FinalEnv.ContainsKey("JWT_SECRET") -or [string]::IsNullOrWhiteSpace($FinalEnv["JWT_SECRET"]) -or $FinalEnv["JWT_SECRET"].Length -lt 32) {
+        $Bytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($Bytes)
+        $FinalEnv["JWT_SECRET"] = ([BitConverter]::ToString($Bytes) -replace '-','').ToLower()
+        Write-Step "JWT_SECRET aleatorio generado (64 chars hex)"
+    }
+
+    # Asegurar NODE_ENV (production para LAN install, development si nada definido)
+    if (-not $FinalEnv.ContainsKey("NODE_ENV") -or [string]::IsNullOrWhiteSpace($FinalEnv["NODE_ENV"])) {
+        $FinalEnv["NODE_ENV"] = "production"
+    }
+    # COOKIE_SECURE off por default (no usamos HTTPS en LAN local)
+    if (-not $FinalEnv.ContainsKey("COOKIE_SECURE")) {
+        $FinalEnv["COOKIE_SECURE"] = "false"
+    }
+
     $NewContent = @()
     foreach ($Key in $FinalEnv.Keys) {
         $NewContent += "$Key=$($FinalEnv[$Key])"
     }
     $NewContent | Set-Content -Path $EnvFile -Encoding UTF8
-    Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados."
+    Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados y JWT_SECRET garantizado."
 
     Write-Header "4. INSTALANDO Y COMPILANDO"
 

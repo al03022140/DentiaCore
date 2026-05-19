@@ -512,12 +512,60 @@ class DentiaCoreLauncher:
             self._start_spinner(self.start_all_btn, 'Iniciando...')
             threading.Thread(target=self._start_all_thread, daemon=True).start()
         
+    def _ensure_server_env_file(self):
+        """
+        Garantiza que Server/.env exista. Si falta (instalador no se corrió o
+        fue parcial), crea uno mínimo con valores de desarrollo local.
+        Devuelve True si existía o se creó OK, False si no se pudo.
+        """
+        env_file = self.server_dir / '.env'
+        if env_file.exists() and env_file.stat().st_size > 0:
+            return True  # Ya existe con contenido
+
+        print(f"⚠️  {env_file} no existe — creando con valores por defecto…")
+
+        # Generar JWT_SECRET aleatorio (64 chars hex) para evitar el warning
+        import secrets
+        jwt_secret = secrets.token_hex(32)
+
+        env_content = (
+            "# Generado automáticamente por el launcher (fallback)\n"
+            "# Para producción, ajusta los valores y corre EJECUTAR_INSTALADOR.bat\n"
+            "NODE_ENV=development\n"
+            "PORT=5002\n"
+            "HOST=127.0.0.1\n"
+            "MONGODB_URI=mongodb://127.0.0.1:27017/DentiaCore\n"
+            "CLIENT_URL=http://localhost:5173\n"
+            "PUBLIC_URL=http://localhost:5002\n"
+            f"JWT_SECRET={jwt_secret}\n"
+            "COOKIE_SECURE=false\n"
+        )
+        try:
+            env_file.parent.mkdir(parents=True, exist_ok=True)
+            env_file.write_text(env_content, encoding='utf-8')
+            print(f"✅ Creado {env_file} (JWT_SECRET aleatorio generado)")
+            return True
+        except Exception as e:
+            print(f"❌ No se pudo crear {env_file}: {e}")
+            self.root.after(0, lambda: messagebox.showerror(
+                'Server/.env faltante',
+                f'No se pudo crear el archivo {env_file}.\n\n'
+                f'Error: {e}\n\n'
+                'Solución: corre EJECUTAR_INSTALADOR.bat como administrador, '
+                'o crea el archivo manualmente con MONGODB_URI=mongodb://127.0.0.1:27017/DentiaCore'
+            ))
+            return False
+
     def _start_all_thread(self):
         """Hilo para iniciar todos los servicios"""
         try:
             # VERIFICACIONES PREVIAS AL INICIO
             print("🚀 Iniciando verificaciones del sistema...")
-            
+
+            # 0. Garantizar Server/.env antes de cualquier cosa (server crashea sin él)
+            if not self._ensure_server_env_file():
+                return
+
             # 1. Verificar todos los requisitos del sistema
             requirements_ok, requirements_error = self._verify_system_requirements()
             if not requirements_ok:
@@ -526,7 +574,7 @@ class DentiaCoreLauncher:
                     f"No se pueden iniciar los servicios:\n\n{requirements_error}"
                 ))
                 return
-            
+
             # Matar puertos antes de iniciar (ya verificados en _verify_system_requirements)
             self._kill_port(5002)  # Puerto del servidor
             self._kill_port(5173)  # Puerto del cliente Vite
