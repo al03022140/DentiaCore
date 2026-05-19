@@ -848,22 +848,69 @@ class DentiaCoreLauncher:
             pass  # Ignorar errores si el puerto ya está libre
 
     def _install_missing_dependencies(self):
-        """Intenta instalar las dependencias faltantes automáticamente."""
+        """
+        Instala dependencias faltantes con feedback visual.
+        En Windows abre UNA consola visible para que el usuario vea el progreso
+        de npm install (que tarda 5-15 min en frío). Sin esto, el launcher se
+        queda 'Iniciando...' silenciosamente y parece colgado.
+        """
+        targets = [
+            ('raíz',   self.project_dir),
+            ('Server', self.server_dir),
+            ('Client', self.client_dir),
+        ]
+        # Timeout por step — fresh install puede tardar mucho pero no infinito
+        TIMEOUT_SECS = 15 * 60  # 15 min máximo por carpeta
+
         try:
-            print("🔄 Instalando dependencias faltantes...")
-            
-            # Instalar en raíz
-            print("📦 Instalando dependencias en raíz...")
-            subprocess.run(['npm', 'install'], cwd=self.project_dir, shell=(sys.platform == 'win32'), check=True)
+            print("🔄 Instalando dependencias faltantes (puede tardar varios minutos)...")
+            for label, target_dir in targets:
+                # Saltar si ya tiene node_modules con contenido
+                nm = Path(target_dir) / 'node_modules'
+                if nm.exists() and any(nm.iterdir()):
+                    print(f"⏭️  {label}: node_modules ya existe, saltando")
+                    continue
 
-            # Instalar en Server
-            print("📦 Instalando dependencias en Server...")
-            subprocess.run(['npm', 'install'], cwd=self.server_dir, shell=(sys.platform == 'win32'), check=True)
+                print(f"📦 Instalando dependencias en {label} ({target_dir})...")
+                # Actualizar UI: que el usuario VEA que está pasando algo
+                self.root.after(0, lambda l=label: self._stop_spinner(self.start_all_btn))
+                self.root.after(0, lambda l=label: self._start_spinner(
+                    self.start_all_btn, f'Instalando {l}...'
+                ))
 
-            # Instalar en Client
-            print("📦 Instalando dependencias en Client...")
-            subprocess.run(['npm', 'install'], cwd=self.client_dir, shell=(sys.platform == 'win32'), check=True)
-            
+                if sys.platform == 'win32':
+                    # Abrir consola visible para que el usuario vea el progreso real de npm
+                    # /K mantiene la consola abierta tras terminar para inspección
+                    cmd_str = f'npm install && echo. && echo OK: deps instaladas en {label} && timeout /T 3 /NOBREAK'
+                    proc = subprocess.Popen(
+                        ['cmd.exe', '/c', cmd_str],
+                        cwd=str(target_dir),
+                        creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    )
+                    try:
+                        rc = proc.wait(timeout=TIMEOUT_SECS)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        print(f"⏰ Timeout instalando {label} (>{TIMEOUT_SECS//60} min)")
+                        return False
+                    if rc != 0:
+                        print(f"❌ npm install en {label} salió con código {rc}")
+                        return False
+                else:
+                    # macOS/Linux: stream output al terminal del launcher
+                    rc = subprocess.run(
+                        ['npm', 'install'],
+                        cwd=str(target_dir),
+                        timeout=TIMEOUT_SECS,
+                    ).returncode
+                    if rc != 0:
+                        print(f"❌ npm install en {label} salió con código {rc}")
+                        return False
+
+            print("✅ Todas las dependencias instaladas")
+            # Restaurar spinner principal
+            self.root.after(0, lambda: self._stop_spinner(self.start_all_btn))
+            self.root.after(0, lambda: self._start_spinner(self.start_all_btn, 'Iniciando...'))
             return True
         except subprocess.CalledProcessError as e:
             print(f"❌ Error instalando dependencias: {e}")
