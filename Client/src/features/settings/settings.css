@@ -625,6 +625,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  /* Mismo ancho máximo que el pad (signature-pad-canvas-wrap) para que el
+     toggle y el pad queden alineados al centro del panel de settings. */
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .signature-toggle {
@@ -648,30 +653,22 @@
   border-color: var(--color-primary);
 }
 
-.signature-canvas {
-  border: 2px dashed var(--color-border-medium);
-  border-radius: var(--border-radius-lg);
-  cursor: crosshair;
-  touch-action: none;
-  width: 100%;
-  height: 150px;
-  background: var(--color-bg-white);
-}
-
-.signature-preview {
+/* Preview de la firma cargada — reusa el wrap del pad del paciente
+   (signature-pad-canvas-wrap) y solo overridea para mostrar <img> en lugar
+   del <canvas>, manteniendo aspect ratio 5:2 y el baseline con "×". */
+.signature-pad-canvas-wrap--preview {
+  aspect-ratio: 5 / 2;
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--border-radius-lg);
-  background: var(--color-bg-light);
+  justify-content: center;
+  padding: 0.75rem;
 }
 
-.signature-preview img {
-  max-height: 80px;
-  max-width: 200px;
+.signature-pad-canvas--preview {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  background: #fff;
 }
 
 /* ── Note Template Editor ─────────────── */
@@ -800,6 +797,37 @@
 
 .trace-date-range .settings-form-group {
   flex: 1;
+}
+
+/* ── Toggle de filtros de listado ── */
+
+.trace-filter-toggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-soft, #f7f9fc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: var(--border-radius-md, 6px);
+  font-size: 0.875rem;
+}
+
+.trace-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-text-muted, #4a5568);
+}
+
+.trace-toggle-label input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.trace-toggle-count {
+  color: var(--color-text-light, #718096);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Patient dropdown ── */

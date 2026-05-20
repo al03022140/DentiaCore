@@ -15,6 +15,19 @@ import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
 import { getAllPatients } from '../../shared/services/api';
 
+// Formato compacto DD/MM/YY para que la fecha quepa en el chip de
+// "última visita" sin desbordar la card (el row tiene overflow:hidden y
+// flex-wrap:nowrap; el año a 4 dígitos cortaba el texto).
+const formatVisitDate = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+};
+
 /* Icono de edad (silueta de persona) – usa currentColor */
 const AgeIcon = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -52,7 +65,12 @@ const PatientCard = memo(function PatientCard({ patient, onClick }) {
   ].filter(Boolean).join(' ');
 
   const patientId = patient.paciente_id || patient._id;
-  const lastVisit = patient.ultimaVisita || 'Sin dato';
+  // ultimaVisita viene del backend como ISO (o null). Mostramos DD/MM/YY
+  // para no desbordar el chip; el tooltip lleva el detalle completo.
+  const lastVisit = formatVisitDate(patient.ultimaVisita) || 'Sin dato';
+  const lastVisitTooltip = patient.ultimaVisita
+    ? new Date(patient.ultimaVisita).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+    : 'Sin visitas registradas';
   const age = formatAgeYearsOnly(patient.fecha_nacimiento) || '—';
   const photoURL = patient.photoURL || userNot;
   const isDefaultPhoto = !patient.photoURL;
@@ -96,7 +114,7 @@ const PatientCard = memo(function PatientCard({ patient, onClick }) {
             <AgeIcon />
             {age}
           </span>
-          <span className="patient-visit" title="Última visita">
+          <span className="patient-visit" title={`Última visita: ${lastVisitTooltip}`}>
             <VisitIcon />
             {lastVisit}
           </span>

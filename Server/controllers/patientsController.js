@@ -12,6 +12,8 @@ const { hasPermission, getEffectivePermissions } = require('../utils/permissions
 const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
 const { saveSignatureDataUrl, copyFirmaToSnapshot } = require('../utils/saveSignatureImage');
 const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
+const auditLogger = require('../middlewares/auditLogger');
+const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 
 // Logs informativos sólo en desarrollo (los errores siempre se loggean).
 const DEBUG_LOGS = process.env.NODE_ENV !== 'production';
@@ -77,6 +79,10 @@ exports.deleteAllPatients = async (req, res) => {
 // historia clínica, encuestas, periodontogramas, etc. — el detalle individual
 // se obtiene con GET /patients/:id. Reduce el payload ~15-25x con muchos
 // pacientes.
+//
+// Nota: `ultimaVisita` no es un campo persistido del modelo Patient — se
+// calcula en runtime a partir de la última cita atendida (ver agregación
+// más abajo). Por eso NO aparece en el select.
 const PATIENT_LIST_FIELDS = [
     '_id',
     'paciente_id',
@@ -84,11 +90,17 @@ const PATIENT_LIST_FIELDS = [
     'apellido_paterno', 'apellido_materno',
     'fecha_nacimiento', 'edad', 'sexo',
     'photoURL',
-    'ultimaVisita',
     'documento',
     'contacto',
     'createdAt', 'updatedAt',
 ].join(' ');
+
+// Estados de cita que cuentan como "visita atendida" para `ultimaVisita`:
+//  - Pasada / EnCurso: la atención ocurrió.
+//  - Confirmada: cita confirmada por el paciente; si su fecha ya pasó pero
+//    el hook pre-save aún no la migró a "Pasada", igual cuenta.
+// NO cuentan: Pendiente (sin confirmar), NoShow (no llegó), Cancelada.
+const VISITA_ESTADOS = ['Pasada', 'EnCurso', 'Confirmada'];
 
 exports.getAllPatients = async (req, res) => {
     try {
@@ -121,11 +133,44 @@ exports.getAllPatients = async (req, res) => {
             debugLog("⚠️ No se encontraron pacientes.");
         }
 
+        // ── Calcular `ultimaVisita` por paciente en UNA sola agregación ──
+        // Para cada paciente de la página, tomamos la fecha de la última
+        // cita "atendida" (estado en VISITA_ESTADOS, fecha_hora ≤ ahora,
+        // no soft-deleted). Una agregación evita N queries (una por
+        // paciente) y escala bien aunque haya cientos de pacientes.
+        const patientIds = patients.map(p => p._id);
+        const now = new Date();
+        const lastVisits = patientIds.length
+            ? await Appointment.aggregate([
+                {
+                    $match: {
+                        paciente_id: { $in: patientIds },
+                        deletedAt: null,
+                        fecha_hora: { $lte: now },
+                        estado: { $in: VISITA_ESTADOS }
+                    }
+                },
+                { $sort: { fecha_hora: -1 } },
+                {
+                    $group: {
+                        _id: '$paciente_id',
+                        ultimaVisita: { $first: '$fecha_hora' }
+                    }
+                }
+            ])
+            : [];
+
+        const visitMap = new Map();
+        for (const v of lastVisits) {
+            visitMap.set(String(v._id), v.ultimaVisita);
+        }
+
         // Verificar que todos los pacientes tengan un `paciente_id` generado correctamente.
         // Con .lean() ya son POJOs, no necesitamos .toObject().
         let patientsWithId = patients.map(patient => ({
             ...patient,
-            paciente_id: patient.paciente_id || "No asignado"
+            paciente_id: patient.paciente_id || "No asignado",
+            ultimaVisita: visitMap.get(String(patient._id)) || null
         }));
 
         // Filtrar datos clínicos si el usuario solo tiene patients.read.basic
@@ -239,7 +284,16 @@ exports.getPatientById = async (req, res) => {
         ? sanitizePatientForBasicRead(patient)
         : patient.toObject();
 
-      res.status(200).json({ 
+      // Filtrar subdocs soft-deleted. Antes se devolvía toda la lista, lo
+      // que mostraba notas/planes "borradas" en la UI del expediente.
+      if (Array.isArray(patientObj.notas_evolucion)) {
+        patientObj.notas_evolucion = patientObj.notas_evolucion.filter(n => !n.deletedAt);
+      }
+      if (Array.isArray(patientObj.planes_tratamiento)) {
+        patientObj.planes_tratamiento = patientObj.planes_tratamiento.filter(p => !p.deletedAt);
+      }
+
+      res.status(200).json({
         patient: patientObj,
         citas: {
           pasadas: citasPasadas,
@@ -836,16 +890,50 @@ exports.deletePatient = async (req, res) => {
         }
 
         // Soft-delete del paciente
-        patient.deletedAt = new Date();
-        patient.deletedBy = req.user?.id || null;
+        const deletedAt = new Date();
+        const deletedBy = req.user?.id || null;
+        const cascadeReason = 'Paciente dado de baja';
+        patient.deletedAt = deletedAt;
+        patient.deletedBy = deletedBy;
         patient.deleteReason = deleteReason.trim();
         await patient.save({ validateModifiedOnly: true });
 
-        // Soft-delete de citas asociadas (deletedAt: null coincide con null y campo ausente)
-        await Appointment.updateMany(
-            { paciente_id: patient._id, deletedAt: null },
-            { $set: { deletedAt: new Date(), deletedBy: req.user?.id || null, deleteReason: 'Paciente dado de baja' } }
-        );
+        // Cascade soft-delete a registros clínicos, cargos y adjuntos.
+        // Antes sólo se cascadeaba a citas, dejando odontogramas/perio/
+        // charges/attachments huérfanos apuntando al paciente "borrado"
+        // (LFPDPPP derecho de cancelación). Cada modelo usa su propio
+        // mecanismo:
+        //   - Appointment, Odontograma, Periodontogram, PatientAttachment: `deletedAt`
+        //   - PatientCharge: `cancelado` con motivo
+        // CashMovement NO se cascadea: no tiene deletedAt y los
+        // movimientos cerrados forman parte del registro contable diario.
+        const Odontograma = require('../models/odontograma.js');
+        const PatientCharge = require('../models/patientCharge.js');
+        const PatientAttachment = require('../models/patientAttachment.js');
+
+        const softDeleteSet = { $set: { deletedAt, deletedBy, deleteReason: cascadeReason } };
+        await Promise.all([
+            Appointment.updateMany(
+                { paciente_id: patient._id, deletedAt: null },
+                softDeleteSet
+            ),
+            Odontograma.updateMany(
+                { patientId: patient._id, deletedAt: null },
+                softDeleteSet
+            ),
+            Periodontogram.updateMany(
+                { patient: patient._id, deletedAt: null },
+                softDeleteSet
+            ),
+            PatientCharge.updateMany(
+                { patientId: patient._id, cancelado: { $ne: true } },
+                { $set: { cancelado: true, canceladoEn: deletedAt, canceladoPor: deletedBy, canceladoMotivo: cascadeReason } }
+            ),
+            PatientAttachment.updateMany(
+                { patientId: patient._id, deletedAt: null },
+                softDeleteSet
+            )
+        ]);
 
         res.status(200).json({ message: 'Paciente dado de baja correctamente' });
     } catch (_error) {
@@ -970,35 +1058,67 @@ exports.addEvolutionNote = async (req, res) => {
         }
       }
 
-      // Verificar PIN contra el doctor que firma
-      if (doctorSignature.method === 'pin') {
-        if (!signerDoctor.pinHash) {
-          return res.status(400).json({
+      // Verificar PIN contra el doctor que firma. Antes el método 'pad'
+      // saltaba toda verificación de PIN, dejando que un asistente con
+      // permisos pudiera enviar un PNG cualquiera como "firma del doctor"
+      // → suplantación. Ahora ambos métodos exigen PIN del doctor.
+      if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+        });
+      }
+      if (!signerDoctor.pinHash) {
+        return res.status(400).json({
+          success: false,
+          error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
+        });
+      }
+      const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+      if (!pinResult.ok) {
+        if (pinResult.locked) {
+          const minutos = Math.ceil(pinResult.remainingMs / 60000);
+          return res.status(429).json({
             success: false,
-            error: 'El doctor no tiene PIN configurado. Use el pad o configure el PIN en Mi Perfil.'
+            error: `PIN del doctor bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
+            locked: true
           });
         }
-        if (!signerDoctor.firmaDigitalUrl) {
-          return res.status(400).json({
-            success: false,
-            error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-          });
-        }
-        const pinOk = await signerDoctor.verificarPin(doctorSignature.pin || '');
-        if (!pinOk) {
-          return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.' });
-        }
+        return res.status(401).json({
+          success: false,
+          error: 'PIN del doctor incorrecto.',
+          attemptsLeft: pinResult.attemptsLeft
+        });
       }
     }
 
-    // Calcular numero_procedimiento como longitud_actual + 1
-    const numero_procedimiento = (patient.notas_evolucion?.length || 0) + 1;
+    // Calcular numero_procedimiento atómicamente vía $inc en BD para
+    // evitar duplicados bajo concurrencia (dos saves simultáneos antes
+    // generaban el mismo número porque ambos leían length antes de
+    // hacer push). El counter arranca en 0 y siempre sube — nunca se
+    // resetea aunque se borren notas (mantiene monotonía clínica).
+    const counterDoc = await Patient.findOneAndUpdate(
+      { _id: id },
+      { $inc: { _evolutionNoteCounter: 1 } },
+      { new: true, projection: { _evolutionNoteCounter: 1 } }
+    );
+    // Para registros legados sin counter persistido, sembrar con el
+    // length actual + 1 (un único save concurrente verá el mismo length,
+    // pero esto sólo aplica al primer escrito post-deploy del fix).
+    let numero_procedimiento = counterDoc?._evolutionNoteCounter;
+    if (!numero_procedimiento || numero_procedimiento < (patient.notas_evolucion?.length || 0) + 1) {
+      numero_procedimiento = (patient.notas_evolucion?.length || 0) + 1;
+      await Patient.updateOne({ _id: id }, { $set: { _evolutionNoteCounter: numero_procedimiento } });
+    }
 
     // Preparar la nueva nota de evolución
     const now = new Date();
-    const appointmentId = mongoose.Types.ObjectId.isValid(evolutionNote.appointmentId || req.body.appointmentId)
-      ? (evolutionNote.appointmentId || req.body.appointmentId)
-      : null;
+    // Valida que la appointment pertenezca a este paciente — evita
+    // vincular notas con citas de otro paciente (cross-linking).
+    const appointmentId = await resolvePatientAppointmentId(
+      evolutionNote.appointmentId || req.body.appointmentId,
+      id
+    );
     const newEvolutionNote = {
       numero_procedimiento,
       procedimiento: (evolutionNote.procedimiento || '').trim(),
@@ -1030,7 +1150,10 @@ exports.addEvolutionNote = async (req, res) => {
       const noteId = savedSubdoc._id.toString();
       const contentHash = _computeEvolutionNoteHash(savedSubdoc);
 
-      // 1) Firma del paciente
+      // 1) Firma del paciente. Guardamos también el hash SHA-256 del PNG
+      // (`pacienteFirmaImageHash`) para detectar tampering del archivo
+      // en disco posterior al firmado (no reemplaza PKI, es defensa
+      // en profundidad — un script de auditoría puede comparar).
       try {
         const patientSig = await saveSignatureDataUrl(patientSignature, [
           'pacientes', id, 'firmas-notas', `${noteId}_paciente.png`
@@ -1038,6 +1161,7 @@ exports.addEvolutionNote = async (req, res) => {
         savedSubdoc.pacienteFirmaUrl = patientSig.publicUrl;
         savedSubdoc.pacienteFirmadoEn = now;
         savedSubdoc.pacienteFirmaContentHash = contentHash;
+        savedSubdoc.pacienteFirmaImageHash = patientSig.contentHash;
       } catch (e) {
         return res.status(400).json({
           success: false,
@@ -1045,13 +1169,15 @@ exports.addEvolutionNote = async (req, res) => {
         });
       }
 
-      // 2) Firma del doctor — siempre persistimos un snapshot servible.
+      // 2) Firma del doctor — siempre persistimos un snapshot servible
+      // junto con el hash del PNG.
       if (doctorSignature.method === 'pad') {
         try {
           const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
             'pacientes', id, 'firmas-notas', `${noteId}_doctor.png`
           ]);
           savedSubdoc.doctorFirmaUrl = docSig.publicUrl;
+          savedSubdoc.doctorFirmaImageHash = docSig.contentHash;
         } catch (e) {
           return res.status(400).json({
             success: false,
@@ -1070,6 +1196,7 @@ exports.addEvolutionNote = async (req, res) => {
             'pacientes', id, 'firmas-notas', `${noteId}_doctor`
           ]);
           savedSubdoc.doctorFirmaUrl = snap.publicUrl;
+          savedSubdoc.doctorFirmaImageHash = snap.contentHash;
         } catch (e) {
           console.error('[addEvolutionNote] Fallo al copiar snapshot de firma:', e.message);
           return res.status(500).json({
@@ -1093,6 +1220,33 @@ exports.addEvolutionNote = async (req, res) => {
 
     // Devolver el subdocumento guardado (con _id generado por Mongoose)
     const savedNote = patient.notas_evolucion[0];
+
+    // Audit log: create + (si aplica) firma. Antes el flujo no registraba
+    // creación de notas en AuditLog — quedaba sin trazabilidad ante
+    // auditorías NOM-024.
+    auditLogger.registrarManual(req, 'nota_evolucion_creada', {
+      resourceType: 'patient',
+      resourceId: patient._id,
+      patientId: patient._id,
+      detalles: {
+        noteId: savedNote._id,
+        numero_procedimiento: savedNote.numero_procedimiento,
+        estadoRegistro: savedNote.estadoRegistro
+      }
+    }).catch(() => {});
+    if (savedNote.firmadoPor) {
+      auditLogger.registrarManual(req, 'firma_electronica', {
+        resourceType: 'patient',
+        resourceId: savedNote._id,
+        patientId: patient._id,
+        detalles: {
+          context: 'nota_evolucion',
+          contentHash: savedNote.contentHash,
+          doctorFirmaMethod: savedNote.doctorFirmaMethod
+        }
+      }).catch(() => {});
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Nota de evolución agregada correctamente',
@@ -1103,6 +1257,111 @@ exports.addEvolutionNote = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Error interno del servidor al agregar la nota de evolución'
+    });
+  }
+};
+
+/**
+ * 🔹 Actualizar el contenido de una nota de evolución en BORRADOR.
+ *
+ * PATCH /patients/:id/evolution-note/:noteId
+ * Body: { procedimiento?, observaciones?, correcciones? }
+ *
+ * Restricciones:
+ * - La nota debe seguir en BORRADOR (las OFICIAL son inmutables por NOM-024).
+ * - Sólo el creador (o un admin) puede editar.
+ * - Cualquier cambio queda en AuditLog.
+ *
+ * Sin este endpoint, un asistente que se equivoca al capturar tenía que crear
+ * otra nota — contaminaba el historial. Crear y editar BORRADOR es legítimo
+ * porque la nota aún no está firmada.
+ */
+exports.updateDraftEvolutionNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(noteId)) {
+      return res.status(400).json({ success: false, error: 'IDs inválidos.' });
+    }
+
+    const patient = await Patient.findOne({ _id: id, deletedAt: null });
+    if (!patient) {
+      return res.status(404).json({ success: false, error: 'Paciente no encontrado.' });
+    }
+
+    const note = patient.notas_evolucion.id(noteId);
+    if (!note || note.deletedAt) {
+      return res.status(404).json({ success: false, error: 'Nota no encontrada.' });
+    }
+
+    if (note.estadoRegistro !== 'BORRADOR') {
+      return res.status(409).json({
+        success: false,
+        error: 'Sólo se pueden editar notas en BORRADOR. Las notas OFICIALES son inmutables (NOM-024).'
+      });
+    }
+
+    const userPerms = getEffectivePermissions(req.user);
+    const isAdmin = ['administrador', 'superadmin', 'doctor_admin'].includes(req.user?.role);
+    const isCreator = note.creadoPor && note.creadoPor.toString() === req.user?.id;
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sólo el creador de la nota o un administrador pueden editarla.'
+      });
+    }
+    if (!hasPermission(userPerms, ['consultas.create', 'consultas.create.draft'])) {
+      return res.status(403).json({ success: false, error: 'Permiso insuficiente.' });
+    }
+
+    const { procedimiento, observaciones, correcciones } = req.body || {};
+    const changes = {};
+    if (typeof procedimiento === 'string') {
+      changes.procedimiento = procedimiento.trim();
+      note.procedimiento = changes.procedimiento;
+    }
+    if (typeof observaciones === 'string') {
+      changes.observaciones = observaciones.trim();
+      note.observaciones = changes.observaciones;
+    }
+    if (typeof correcciones === 'string') {
+      changes.correcciones = correcciones.trim();
+      note.correcciones = changes.correcciones;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return res.status(400).json({ success: false, error: 'Nada que actualizar.' });
+    }
+
+    // Al menos un campo de contenido debe quedar no vacío (igual que en create).
+    const hasContent = (note.procedimiento || '').trim() || (note.observaciones || '').trim() || (note.correcciones || '').trim();
+    if (!hasContent) {
+      return res.status(400).json({
+        success: false,
+        error: 'La nota no puede quedar vacía (requiere procedimiento, observaciones o correcciones).'
+      });
+    }
+
+    note.modificadoPor = req.user?.id || null;
+    note.modificadoEn = new Date();
+    await patient.save();
+
+    auditLogger.registrarManual(req, 'nota_evolucion_editada', {
+      resourceType: 'patient',
+      resourceId: note._id,
+      patientId: patient._id,
+      detalles: { campos: Object.keys(changes) }
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'Nota actualizada correctamente',
+      data: note
+    });
+  } catch (error) {
+    console.error('Error en updateDraftEvolutionNote:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno al actualizar la nota.'
     });
   }
 };
@@ -1185,23 +1444,37 @@ exports.finalizeClinicalHistory = async (req, res) => {
       }
     }
 
-    // PIN: validar antes de tocar nada
-    if (doctorSignature.method === 'pin') {
-      if (!signerDoctor.pinHash) {
-        return res.status(400).json({
+    // PIN: validar antes de tocar nada. PIN exigido SIEMPRE (incluso si
+    // method='pad') para evitar suplantación — pad sólo controla el
+    // SOURCE visual, no la AUTORIZACIÓN.
+    if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+      });
+    }
+    if (!signerDoctor.pinHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
+      });
+    }
+    {
+      const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+      if (!pinResult.ok) {
+        if (pinResult.locked) {
+          const minutos = Math.ceil(pinResult.remainingMs / 60000);
+          return res.status(429).json({
+            success: false,
+            error: `PIN del doctor bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
+            locked: true
+          });
+        }
+        return res.status(401).json({
           success: false,
-          error: 'El doctor no tiene PIN configurado. Use el pad o configure el PIN en Mi Perfil.'
+          error: 'PIN del doctor incorrecto.',
+          attemptsLeft: pinResult.attemptsLeft
         });
-      }
-      if (!signerDoctor.firmaDigitalUrl) {
-        return res.status(400).json({
-          success: false,
-          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-        });
-      }
-      const pinOk = await signerDoctor.verificarPin(doctorSignature.pin || '');
-      if (!pinOk) {
-        return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.' });
       }
     }
 
@@ -1323,8 +1596,10 @@ exports.revokeHCConsent = async (req, res) => {
       });
     }
 
-    // Verificar autenticación del doctor antes de tocar nada
-    if (doctorSignature.method === 'pin') {
+    // Verificar PIN del doctor antes de tocar nada. La revocación de
+    // consentimiento es un acto serio (LFPDPPP derechos ARCO) — se exige
+    // PIN incluso si method='pad', el pad solo controla el visual.
+    {
       const usuario = await Usuario.findById(req.user.id);
       if (!usuario) {
         return res.status(401).json({ success: false, error: 'Usuario no encontrado' });
@@ -1332,12 +1607,24 @@ exports.revokeHCConsent = async (req, res) => {
       if (!usuario.pinHash) {
         return res.status(400).json({
           success: false,
-          error: 'No tiene PIN configurado. Use el pad para firmar la revocación.'
+          error: 'No tiene PIN configurado. Configure su PIN en Mi Perfil antes de revocar.'
         });
       }
-      const ok = await usuario.verificarPin(doctorSignature.pin || '');
-      if (!ok) {
-        return res.status(401).json({ success: false, error: 'PIN incorrecto' });
+      const pinResult = await usuario.verificarPinDetallado(doctorSignature.pin || '');
+      if (!pinResult.ok) {
+        if (pinResult.locked) {
+          const minutos = Math.ceil(pinResult.remainingMs / 60000);
+          return res.status(429).json({
+            success: false,
+            error: `PIN bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
+            locked: true
+          });
+        }
+        return res.status(401).json({
+          success: false,
+          error: 'PIN incorrecto',
+          attemptsLeft: pinResult.attemptsLeft
+        });
       }
     }
 
@@ -1442,10 +1729,11 @@ exports.addTreatmentPlan = async (req, res) => {
             estadoRegistro = 'BORRADOR';
         }
 
-        // Preparar el nuevo plan de tratamiento
-        const appointmentId = mongoose.Types.ObjectId.isValid(treatmentPlan.appointmentId || req.body.appointmentId)
-            ? (treatmentPlan.appointmentId || req.body.appointmentId)
-            : null;
+        // Preparar el nuevo plan de tratamiento. Valida appointment vs paciente.
+        const appointmentId = await resolvePatientAppointmentId(
+            treatmentPlan.appointmentId || req.body.appointmentId,
+            id
+        );
         const newTreatmentPlan = {
             texto: treatmentPlan.texto.trim(),
             fecha: treatmentPlan.fecha ? new Date(treatmentPlan.fecha) : new Date(),

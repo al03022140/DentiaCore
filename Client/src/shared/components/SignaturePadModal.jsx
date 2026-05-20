@@ -51,7 +51,10 @@ export default function SignaturePadModal({
       const el = wrapRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const w = Math.max(280, Math.floor(rect.width));
+      // Cap a 560px → mismo tamaño que el pad de settings (perfil profesional).
+      // Sin cap, el wrap dentro del modal podía crecer hasta ~672px y verse
+      // más grande que en otras pantallas; ahora ambos miden igual.
+      const w = Math.max(280, Math.min(560, Math.floor(rect.width)));
       // Mantener una relación 5:2 aprox, con un mínimo legible.
       const h = Math.max(180, Math.min(320, Math.round(w * 0.4)));
       setCanvasSize({ w, h });

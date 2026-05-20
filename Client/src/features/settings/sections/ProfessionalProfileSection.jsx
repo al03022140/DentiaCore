@@ -9,6 +9,9 @@ import {
 } from '../../../shared/services/settingsService';
 import pencilIcon from '../../../assets/images/icons/pencil.svg';
 import folderUploadIcon from '../../../assets/images/icons/folder-upload.svg';
+// Reusa el mismo CSS del pad de firma del paciente para que el recuadro
+// (wrap, baseline, "×", proporciones) sea idéntico aquí.
+import '../../../shared/components/styles/signature-pad-modal.css';
 
 const ProfessionalProfileSection = () => {
   // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
@@ -35,10 +38,33 @@ const ProfessionalProfileSection = () => {
   // mostrada antes de que el server la procese y devuelva la URL definitiva.
   const [localPreview, setLocalPreview] = useState(null);
   const sigPadRef = useRef(null);
+  const padWrapRef = useRef(null);
+  // El canvas necesita píxeles explícitos; lo medimos igual que en
+  // SignaturePadModal para mantener el mismo aspecto (mín 280×180, ratio ~5:2).
+  const [canvasSize, setCanvasSize] = useState({ w: 600, h: 240 });
 
   useEffect(() => {
     setHasFirma(!!user?.firmaDigitalUrl);
   }, [user?.firmaDigitalUrl]);
+
+  // Medir el wrap del pad para dimensionar el canvas (responsivo).
+  // Solo aplica en modo 'draw' — cuando el wrap está montado.
+  useEffect(() => {
+    if (firmaMode !== 'draw') return undefined;
+    const measure = () => {
+      const el = padWrapRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Cap a 560px — mismo valor que SignaturePadModal para que ambos
+      // pads se vean exactamente del mismo tamaño.
+      const w = Math.max(280, Math.min(560, Math.floor(rect.width)));
+      const h = Math.max(180, Math.min(320, Math.round(w * 0.4)));
+      setCanvasSize({ w, h });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [firmaMode]);
 
   // ── Datos profesionales ──
   const handleSave = async (e) => {
@@ -213,13 +239,21 @@ const ProfessionalProfileSection = () => {
       {firmaMsg && <div className={`settings-message ${firmaMsg.type}`}>{firmaMsg.text}</div>}
 
       {previewSrc && (
-        <div className="signature-preview" style={{ marginBottom: '1rem' }}>
-          <img
-            src={previewSrc}
-            alt="Firma digital actual"
-            key={firmaVersion}
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
+        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
+          {/* Mismo recuadro que el pad del paciente: wrap dashed + baseline + "×".
+              La firma se centra dentro manteniendo el aspect ratio del pad. */}
+          <div className="signature-pad-canvas-wrap signature-pad-canvas-wrap--preview">
+            <img
+              src={previewSrc}
+              alt="Firma digital actual"
+              key={firmaVersion}
+              className="signature-pad-canvas signature-pad-canvas--preview"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <div className="signature-pad-baseline" aria-hidden="true">
+              <span className="signature-pad-baseline-x">×</span>
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontWeight: 600, color: 'var(--color-text-dark)' }}>
               {localPreview ? 'Vista previa (recién guardada)' : 'Firma actual'}
@@ -266,17 +300,25 @@ const ProfessionalProfileSection = () => {
           </div>
         ) : (
           <>
-            <SignatureCanvas
-              ref={sigPadRef}
-              penColor="#102a43"
-              backgroundColor="#ffffff"
-              canvasProps={{
-                className: 'signature-canvas',
-                'aria-label': 'Área de firma',
-              }}
-              onBegin={handleBegin}
-              onEnd={handleEnd}
-            />
+            {/* Mismo recuadro que el pad del paciente: wrap + baseline + "×". */}
+            <div className="signature-pad-canvas-wrap" ref={padWrapRef}>
+              <SignatureCanvas
+                ref={sigPadRef}
+                penColor="#102a43"
+                backgroundColor="#ffffff"
+                canvasProps={{
+                  width: canvasSize.w,
+                  height: canvasSize.h,
+                  className: 'signature-pad-canvas',
+                  'aria-label': 'Área de firma',
+                }}
+                onBegin={handleBegin}
+                onEnd={handleEnd}
+              />
+              <div className="signature-pad-baseline" aria-hidden="true">
+                <span className="signature-pad-baseline-x">×</span>
+              </div>
+            </div>
             <div className="settings-actions">
               <button
                 className="settings-btn-secondary"
