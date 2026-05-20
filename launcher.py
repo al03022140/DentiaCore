@@ -489,13 +489,17 @@ class DentiaCoreLauncher:
         qbtns.pack(padx=16, pady=(0, 8))
 
         self._make_outline_button(qbtns, '↗   Abrir en navegador', command=self.open_app).grid(
-            row=0, column=0, padx=(0, 6), pady=(0, 6))
+            row=0, column=0, padx=(0, 6), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '⊕   Abrir carpeta', command=self.open_folder).grid(
-            row=0, column=1, padx=(6, 0), pady=(0, 6))
+            row=0, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '👤   Crear administrador', command=self.create_admin).grid(
-            row=1, column=0, padx=(0, 6))
+            row=1, column=0, padx=(0, 6), pady=(0, 6), sticky='ew')
+        self._make_outline_button(qbtns, '🗓   Configurar Google', command=self.configure_google).grid(
+            row=1, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '✕   Limpiar pacientes', command=self.clear_patients).grid(
-            row=1, column=1, padx=(6, 0))
+            row=2, column=0, columnspan=2, padx=0, sticky='ew')
+        qbtns.columnconfigure(0, weight=1)
+        qbtns.columnconfigure(1, weight=1)
 
         # ── Footer ──
         tk.Label(
@@ -558,6 +562,100 @@ class DentiaCoreLauncher:
             ))
             return False
 
+    def _get_external_google_creds_path(self):
+        """Path a las credenciales de Google fuera del repo (en ~/.dentia-credentials/).
+
+        El usuario las pega una sola vez desde el launcher. Si pone esa carpeta
+        en iCloud Drive / Dropbox / OneDrive, las demás PCs las leen
+        automáticamente sin tener que pasar por GitHub.
+        """
+        return Path.home() / '.dentia-credentials' / 'google.env'
+
+    def _parse_simple_env(self, path):
+        """Lee un .env y devuelve un dict, ignorando comentarios y líneas vacías."""
+        result = {}
+        try:
+            if not path.exists():
+                return result
+            for raw in path.read_text(encoding='utf-8').splitlines():
+                line = raw.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, val = line.split('=', 1)
+                # Quitar comillas envolventes si las hay
+                v = val.strip()
+                if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                    v = v[1:-1]
+                result[key.strip()] = v
+        except Exception as e:
+            print(f"⚠️ No se pudo leer {path}: {e}")
+        return result
+
+    def _update_env_file(self, file_path, updates):
+        """Actualiza pares KEY=VALUE en un archivo .env preservando orden y otras claves.
+
+        Si la clave existe, la sobrescribe en su lugar; si no, la añade al final.
+        Devuelve True si escribió OK.
+        """
+        try:
+            lines = []
+            if file_path.exists():
+                lines = file_path.read_text(encoding='utf-8').splitlines()
+
+            keys_seen = set()
+            new_lines = []
+            for line in lines:
+                stripped = line.lstrip()
+                if '=' in stripped and not stripped.startswith('#'):
+                    key = stripped.split('=', 1)[0].strip()
+                    if key in updates:
+                        new_lines.append(f"{key}={updates[key]}")
+                        keys_seen.add(key)
+                        continue
+                new_lines.append(line)
+
+            for key, val in updates.items():
+                if key not in keys_seen:
+                    new_lines.append(f"{key}={val}")
+
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text('\n'.join(new_lines) + '\n', encoding='utf-8')
+            return True
+        except Exception as e:
+            print(f"❌ No se pudo escribir {file_path}: {e}")
+            return False
+
+    def _autoimport_google_creds_if_available(self):
+        """Si Server/.env no tiene Google creds y ~/.dentia-credentials/google.env existe,
+        copia los valores. Ejecutado al iniciar la app — silencioso si no hay nada que importar.
+        """
+        server_env = self.server_dir / '.env'
+        current = self._parse_simple_env(server_env)
+        has_creds = bool(current.get('GOOGLE_CLIENT_ID')) and bool(current.get('GOOGLE_CLIENT_SECRET'))
+        if has_creds:
+            return  # ya configurado
+
+        external = self._get_external_google_creds_path()
+        ext_creds = self._parse_simple_env(external)
+        client_id = ext_creds.get('GOOGLE_CLIENT_ID')
+        client_secret = ext_creds.get('GOOGLE_CLIENT_SECRET')
+        if not client_id or not client_secret:
+            return  # no hay nada que importar
+
+        updates = {
+            'GOOGLE_CLIENT_ID': client_id,
+            'GOOGLE_CLIENT_SECRET': client_secret,
+        }
+        # Solo añadir REDIRECT_URI si no existe ya
+        if not current.get('GOOGLE_REDIRECT_URI'):
+            updates['GOOGLE_REDIRECT_URI'] = ext_creds.get(
+                'GOOGLE_REDIRECT_URI',
+                'http://localhost:5002/api/google/oauth2callback'
+            )
+
+        if self._update_env_file(server_env, updates):
+            print(f"✅ Credenciales Google autoimportadas desde {external}")
+
     def _ensure_client_env_file(self):
         """
         Garantiza que Client/.env exista. En descargas frescas de GitHub el
@@ -608,6 +706,9 @@ class DentiaCoreLauncher:
             # 0b. Garantizar Client/.env (Vite lo necesita para hornear la URL en el build)
             if not self._ensure_client_env_file():
                 return
+
+            # 0c. Autoimport de credenciales Google desde ~/.dentia-credentials (silencioso)
+            self._autoimport_google_creds_if_available()
 
             # 1. Verificar todos los requisitos del sistema
             requirements_ok, requirements_error = self._verify_system_requirements()
@@ -1684,6 +1785,143 @@ class DentiaCoreLauncher:
                 create_btn.config(state='normal'),
                 cancel_btn.config(state='normal')
             ))
+
+    def configure_google(self):
+        """Diálogo para pegar credenciales Google OAuth.
+
+        Guarda en DOS lugares:
+          - Server/.env (lo que usa el server)
+          - ~/.dentia-credentials/google.env (fuera del repo — si está en
+            iCloud/Dropbox/OneDrive se sincroniza a otras PCs y se autoimporta)
+        """
+        import re
+        C = self.colors
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title('Configurar Google Calendar')
+        dlg.configure(bg=C['bg_light'])
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+
+        self.root.update_idletasks()
+        pw, ph = 480, 480
+        rx = self.root.winfo_rootx() + (self.root.winfo_width() - pw) // 2
+        ry = self.root.winfo_rooty() + (self.root.winfo_height() - ph) // 2
+        dlg.geometry(f'{pw}x{ph}+{max(0, rx)}+{max(0, ry)}')
+
+        tk.Label(
+            dlg, text='Configurar Google Calendar',
+            font=('Montserrat', 14, 'bold'), bg=C['bg_light'], fg=C['text_primary']
+        ).pack(pady=(18, 4))
+        tk.Label(
+            dlg,
+            text=('Pega las credenciales de tu OAuth Client de Google Cloud.\n'
+                  'Se guardan localmente y en ~/.dentia-credentials/google.env\n'
+                  '(si esa carpeta está en iCloud/Dropbox, otras PCs las leen automáticamente).'),
+            font=('Montserrat', 9), bg=C['bg_light'], fg=C['text_secondary'],
+            justify='center'
+        ).pack(pady=(0, 14))
+
+        form = tk.Frame(dlg, bg=C['bg_light'])
+        form.pack(fill='x', padx=24)
+
+        def field(label_text, hint=None):
+            tk.Label(form, text=label_text, font=('Montserrat', 9, 'bold'),
+                     bg=C['bg_light'], fg=C['text_primary'], anchor='w').pack(fill='x', pady=(8, 2))
+            e = tk.Entry(form, font=('Montserrat', 9), relief='flat',
+                         highlightthickness=1, highlightbackground=C['border_light'],
+                         highlightcolor=C['primary_light'])
+            e.pack(fill='x', ipady=6)
+            if hint:
+                tk.Label(form, text=hint, font=('Montserrat', 8),
+                         bg=C['bg_light'], fg=C['text_muted'], anchor='w').pack(fill='x', pady=(2, 0))
+            return e
+
+        # Pre-cargar valores actuales (Server/.env primero, luego external)
+        current = self._parse_simple_env(self.server_dir / '.env')
+        if not current.get('GOOGLE_CLIENT_ID'):
+            ext = self._parse_simple_env(self._get_external_google_creds_path())
+            current.setdefault('GOOGLE_CLIENT_ID', ext.get('GOOGLE_CLIENT_ID', ''))
+            current.setdefault('GOOGLE_CLIENT_SECRET', ext.get('GOOGLE_CLIENT_SECRET', ''))
+
+        id_e = field('GOOGLE_CLIENT_ID',
+                     'Termina en .apps.googleusercontent.com')
+        if current.get('GOOGLE_CLIENT_ID'):
+            id_e.insert(0, current['GOOGLE_CLIENT_ID'])
+
+        secret_e = field('GOOGLE_CLIENT_SECRET',
+                         'Empieza con GOCSPX-')
+        if current.get('GOOGLE_CLIENT_SECRET'):
+            secret_e.insert(0, current['GOOGLE_CLIENT_SECRET'])
+
+        msg_var = tk.StringVar(value='')
+        tk.Label(dlg, textvariable=msg_var, font=('Montserrat', 9),
+                 bg=C['bg_light'], fg=C['danger'], wraplength=430).pack(pady=(10, 0))
+
+        btn_row = tk.Frame(dlg, bg=C['bg_light'])
+        btn_row.pack(pady=(10, 18))
+
+        def submit():
+            cid = id_e.get().strip()
+            csec = secret_e.get().strip()
+
+            if not cid.endswith('.apps.googleusercontent.com'):
+                msg_var.set('CLIENT_ID inválido (debe terminar en .apps.googleusercontent.com)')
+                return
+            if not re.match(r'^GOCSPX-[A-Za-z0-9_-]{15,}$', csec):
+                msg_var.set('CLIENT_SECRET inválido (debe empezar con GOCSPX-)')
+                return
+
+            updates = {
+                'GOOGLE_CLIENT_ID': cid,
+                'GOOGLE_CLIENT_SECRET': csec,
+            }
+
+            # Guardar en Server/.env (el que usa el server)
+            ok_local = self._update_env_file(self.server_dir / '.env', updates)
+            # Guardar en ~/.dentia-credentials/google.env (sincronizable)
+            ok_external = self._update_env_file(
+                self._get_external_google_creds_path(),
+                {**updates,
+                 'GOOGLE_REDIRECT_URI': current.get(
+                     'GOOGLE_REDIRECT_URI',
+                     'http://localhost:5002/api/google/oauth2callback')}
+            )
+
+            if not ok_local:
+                msg_var.set('No se pudo escribir Server/.env')
+                return
+            if not ok_external:
+                msg_var.set('Se guardó Server/.env pero falló ~/.dentia-credentials/google.env')
+                # No bloqueamos — el local sí quedó
+            dlg.destroy()
+            ext_path = self._get_external_google_creds_path()
+            messagebox.showinfo(
+                'Google configurado',
+                f'✅ Credenciales guardadas.\n\n'
+                f'Local: Server/.env\n'
+                f'Sincronizable: {ext_path}\n\n'
+                f'Reinicia el server (Detener → Iniciar) para que tome la nueva configuración.'
+            )
+
+        cancel_btn = tk.Button(
+            btn_row, text='Cancelar', command=dlg.destroy,
+            font=('Montserrat', 10), bg=C['bg_white'], fg=C['text_primary'],
+            relief='flat', padx=22, pady=8, bd=0,
+            highlightthickness=1, highlightbackground=C['border_card']
+        )
+        cancel_btn.pack(side='left', padx=(0, 8))
+
+        save_btn = tk.Button(
+            btn_row, text='Guardar', command=submit,
+            font=('Montserrat', 10, 'bold'), bg=C['primary'], fg=C['bg_white'],
+            relief='flat', padx=22, pady=8, bd=0, activebackground=C['primary_hover']
+        )
+        save_btn.pack(side='left')
+
+        id_e.focus_set()
+        dlg.bind('<Return>', lambda _e: submit())
 
     def open_folder(self):
         """Abrir la carpeta del proyecto"""
