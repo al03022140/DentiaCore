@@ -237,6 +237,14 @@ try {
     $NewContent | Set-Content -Path $EnvFile -Encoding UTF8
     Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados y JWT_SECRET garantizado."
 
+    # Client/.env — necesario porque Vite hornea VITE_API_URL en el bundle de producción.
+    # En .gitignore, así que NO viene en descargas frescas de GitHub.
+    $ClientEnvFile = Join-Path $ClientDir ".env"
+    Write-Step "Creando/actualizando Client/.env..."
+    $ClientApiUrl = "http://$DetectedIP" + ":5002"
+    "VITE_API_URL=`"$ClientApiUrl`"" | Set-Content -Path $ClientEnvFile -Encoding UTF8
+    Write-Ok "Client/.env actualizado (VITE_API_URL=$ClientApiUrl)"
+
     Write-Header "4. INSTALANDO Y COMPILANDO"
 
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {

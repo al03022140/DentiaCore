@@ -260,6 +260,13 @@ EOF
 mv "$ENV_FILE.tmp" "$ENV_FILE"
 print_ok ".env actualizado (IP: $LOCAL_IP)"
 
+# Client/.env — Vite hornea VITE_API_URL en el bundle de producción.
+# El archivo está en .gitignore, así que NO viene en descargas frescas.
+CLIENT_ENV_FILE="$CLIENT_DIR/.env"
+print_step "Creando/actualizando Client/.env..."
+echo "VITE_API_URL=\"http://$LOCAL_IP:5002\"" > "$CLIENT_ENV_FILE"
+print_ok "Client/.env actualizado (VITE_API_URL=http://$LOCAL_IP:5002)"
+
 print_header "5. BUILD DEL FRONTEND"
 
 print_step "Compilando frontend para LAN..."

@@ -556,6 +556,43 @@ class DentiaCoreLauncher:
             ))
             return False
 
+    def _ensure_client_env_file(self):
+        """
+        Garantiza que Client/.env exista. En descargas frescas de GitHub el
+        archivo no viene (está en .gitignore) y, aunque axios-instance.js tiene
+        fallback a localhost:5002, en build de producción la URL se hornea en
+        el bundle: sin Client/.env apuntando al IP correcto, los clientes LAN
+        no encuentran la API.
+        Devuelve True si existía o se creó OK, False si no se pudo.
+        """
+        env_file = self.client_dir / '.env'
+        if env_file.exists() and env_file.stat().st_size > 0:
+            return True
+
+        print(f"⚠️  {env_file} no existe — creando con valores por defecto…")
+
+        # Por default apuntamos a localhost; el modo LAN del launcher
+        # sobrescribe VITE_API_URL al build via _apply_mode_environment().
+        env_content = (
+            "# Generado automáticamente por el launcher (fallback)\n"
+            "# Para LAN, ajusta VITE_API_URL al IP del servidor o corre install.ps1/install.sh\n"
+            "VITE_API_URL=\"http://localhost:5002\"\n"
+        )
+        try:
+            env_file.parent.mkdir(parents=True, exist_ok=True)
+            env_file.write_text(env_content, encoding='utf-8')
+            print(f"✅ Creado {env_file}")
+            return True
+        except Exception as e:
+            print(f"❌ No se pudo crear {env_file}: {e}")
+            self.root.after(0, lambda: messagebox.showerror(
+                'Client/.env faltante',
+                f'No se pudo crear el archivo {env_file}.\n\n'
+                f'Error: {e}\n\n'
+                'Crea el archivo manualmente con: VITE_API_URL="http://localhost:5002"'
+            ))
+            return False
+
     def _start_all_thread(self):
         """Hilo para iniciar todos los servicios"""
         try:
@@ -564,6 +601,10 @@ class DentiaCoreLauncher:
 
             # 0. Garantizar Server/.env antes de cualquier cosa (server crashea sin él)
             if not self._ensure_server_env_file():
+                return
+
+            # 0b. Garantizar Client/.env (Vite lo necesita para hornear la URL en el build)
+            if not self._ensure_client_env_file():
                 return
 
             # 1. Verificar todos los requisitos del sistema
