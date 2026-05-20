@@ -493,9 +493,11 @@ class DentiaCoreLauncher:
         self._make_outline_button(qbtns, '⊕   Abrir carpeta', command=self.open_folder).grid(
             row=0, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '👤   Crear administrador', command=self.create_admin).grid(
-            row=1, column=0, padx=(0, 6), sticky='ew')
+            row=1, column=0, padx=(0, 6), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '🗓   Configurar Google', command=self.configure_google).grid(
-            row=1, column=1, padx=(6, 0), sticky='ew')
+            row=1, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
+        self._make_outline_button(qbtns, '🔍   Auditar legacy data', command=self.audit_legacy_data).grid(
+            row=2, column=0, columnspan=2, padx=0, sticky='ew')
         qbtns.columnconfigure(0, weight=1)
         qbtns.columnconfigure(1, weight=1)
 
@@ -1750,6 +1752,50 @@ class DentiaCoreLauncher:
                 create_btn.config(state='normal'),
                 cancel_btn.config(state='normal')
             ))
+
+    def audit_legacy_data(self):
+        """Ejecuta scripts/audit-legacy-data.js (read-only) y muestra el reporte.
+
+        El script NO modifica nada. Reporta cuántos documentos en MongoDB y
+        cuántos archivos en Server/uploads/ están en formato legacy.
+        """
+        threading.Thread(target=self._audit_legacy_thread, daemon=True).start()
+
+    def _audit_legacy_thread(self):
+        try:
+            result = subprocess.run(
+                ['node', 'scripts/audit-legacy-data.js'],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                shell=(sys.platform == 'win32'),
+                timeout=60
+            )
+            stdout = (result.stdout or '').strip()
+            stderr = (result.stderr or '').strip()
+            body = stdout if stdout else stderr
+            if result.returncode == 0:
+                title = 'Auditoría — Sin data legacy'
+                self.root.after(0, lambda: messagebox.showinfo(title, body or 'Todo OK.'))
+            elif result.returncode == 1:
+                title = 'Auditoría — Se encontró data legacy'
+                self.root.after(0, lambda: messagebox.showwarning(title, body))
+            else:
+                title = 'Auditoría — Error'
+                self.root.after(0, lambda: messagebox.showerror(
+                    title, (stderr or stdout or 'Error desconocido')[:1500]
+                ))
+        except subprocess.TimeoutExpired:
+            self.root.after(0, lambda: messagebox.showerror(
+                'Auditoría — Timeout', 'La auditoría tardó más de 60s. Verifica MongoDB.'
+            ))
+        except FileNotFoundError:
+            self.root.after(0, lambda: messagebox.showerror(
+                'Auditoría — Falta Node', 'No se encontró Node.js. Instálalo desde nodejs.org.'
+            ))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda: messagebox.showerror('Auditoría — Error', err))
 
     def configure_google(self):
         """Diálogo para pegar credenciales Google OAuth.
