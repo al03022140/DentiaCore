@@ -63,7 +63,7 @@ Construir una aplicación fiable y mantenible que permita a profesionales dental
 - `Server/` : Código del servidor (API, controladores, modelos), configuración y scripts para ejecución en producción/desarrollo.
 - `DB/` : Archivos de base de datos (WiredTiger) y datos locales.
 - `scripts/` o `Server/scripts/` : Utilidades para gestionar la base de datos (ej. `start-mongo.ps1`, `mongo-utils.ps1`).
-- Archivos en raíz: instaladores, scripts auxiliares (`launcher.py`, `install.ps1`, `EJECUTAR_INSTALADOR- 1.bat`, `delete-all-patients.js`).
+- Archivos en raíz: instaladores y launcher (`launcher.py`, `install.ps1`, `install.sh`, `EJECUTAR_INSTALADOR.bat`).
 
 **Responsabilidad de cada carpeta o módulo**
 

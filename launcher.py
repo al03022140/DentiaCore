@@ -493,11 +493,9 @@ class DentiaCoreLauncher:
         self._make_outline_button(qbtns, '⊕   Abrir carpeta', command=self.open_folder).grid(
             row=0, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '👤   Crear administrador', command=self.create_admin).grid(
-            row=1, column=0, padx=(0, 6), pady=(0, 6), sticky='ew')
+            row=1, column=0, padx=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '🗓   Configurar Google', command=self.configure_google).grid(
-            row=1, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
-        self._make_outline_button(qbtns, '✕   Limpiar pacientes', command=self.clear_patients).grid(
-            row=2, column=0, columnspan=2, padx=0, sticky='ew')
+            row=1, column=1, padx=(6, 0), sticky='ew')
         qbtns.columnconfigure(0, weight=1)
         qbtns.columnconfigure(1, weight=1)
 
@@ -1598,39 +1596,6 @@ class DentiaCoreLauncher:
         self.root.after(0, lambda: messagebox.showerror('MongoDB Service no responde', msg))
         return False
             
-    def clear_patients(self):
-        """Limpiar todos los pacientes"""
-        if not self.is_server_running:
-            messagebox.showwarning("Advertencia", "El servidor debe estar ejecutándose")
-            return
-            
-        result = messagebox.askyesno(
-            "Confirmar", 
-            "¿Estás seguro de que quieres eliminar todos los pacientes?\n\nEsta acción no se puede deshacer."
-        )
-        
-        if result:
-            threading.Thread(target=self._clear_patients_thread, daemon=True).start()
-            
-    def _clear_patients_thread(self):
-        """Hilo para limpiar pacientes"""
-        try:
-            result = subprocess.run(
-                ['node', 'delete-all-patients.js'],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                shell=(sys.platform == 'win32')
-            )
-
-            if result.returncode == 0:
-                self.root.after(0, lambda: messagebox.showinfo("Éxito", "Pacientes eliminados correctamente"))
-            else:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Error al eliminar pacientes: {result.stderr}"))
-
-        except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Error: {str(e)}"))
-
     def create_admin(self):
         """Abrir diálogo para crear el primer usuario administrador.
 

@@ -13,7 +13,6 @@
     "test:server": "npm --prefix Server run test",
     "test:client": "npm --prefix Client run test",
     "test": "npm run test:server && npm run test:client",
-    "seed:demo-patients": "node scripts/seed-demo-patients.js",
     "backup:db": "node scripts/backup-db.js"
   },
   "keywords": [],
