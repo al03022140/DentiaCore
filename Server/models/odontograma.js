@@ -26,8 +26,20 @@ const { Schema, Types } = mongoose;
  *           description: Notas adicionales (opcional).
  *           default: ''
  */
+// FDI tooth numbers:
+//   permanentes 11-18, 21-28, 31-38, 41-48
+//   deciduos    51-55, 61-65, 71-75, 81-85
+const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
+
 const entrySchema = new Schema({
-  tooth:   { type: String, required: true }, // TODO: Considerar validación regex/enum para piezas dentales
+  tooth:   {
+    type: String,
+    required: true,
+    validate: {
+      validator: v => FDI_TOOTH_REGEX.test(v),
+      message: props => `'${props.value}' no es un número FDI válido (11-18, 21-28, 31-38, 41-48, 51-55, 61-65, 71-75, 81-85).`
+    }
+  },
   damage:  { type: String, required: true },
   surface: { type: String, default: 'O' }, // 'O' por Oclusal como default común
   note:    { type: String, default: '' },
@@ -193,4 +205,9 @@ odontogramaSchema.index({ 'current.savedAt': -1 });
 // Índice para buscar snapshots específicos dentro del historial de un paciente
 odontogramaSchema.index({ patientId: 1, 'history._id': 1 });
 
-module.exports = mongoose.model('Odontograma', odontogramaSchema); 
+// Si el contenido firmado (current/datos) cambia tras la firma, marcar
+// firmaDesactualizada = true automáticamente.
+const { attachSignatureInvalidationHook } = require('../utils/signature-invalidation');
+attachSignatureInvalidationHook(odontogramaSchema, 'odontograma');
+
+module.exports = mongoose.model('Odontograma', odontogramaSchema);

@@ -181,8 +181,14 @@ router
   // aceptaba `patients.create` y le devolvía 403. Ahora pasa el gate y el
   // controller (whitelist CREATE_ALLOWED_FIELDS) sigue limitando lo que
   // puede escribir.
-  .post(writeLimiter, authorize(['patients.create', 'patients.create.basic']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient)
-  .delete(writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
+  .post(writeLimiter, authorize(['patients.create', 'patients.create.basic']), uploadFoto.single('foto'), handleMulterError, patientCtrl.createPatient);
+
+// Bulk-delete: SOLO en dev/test. El controller también gatea por
+// NODE_ENV (devuelve 403 si llega en prod), pero no exponer la ruta
+// elimina la entrada en auditorías de superficie.
+if (process.env.NODE_ENV !== 'production') {
+  router.delete('/', writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
+}
 
 router.post('/batch', writeLimiter, authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
 
@@ -456,6 +462,13 @@ router
   .route('/:id/evolution-note')
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addEvolutionNote);
+
+// Editar una nota de evolución mientras siga en BORRADOR. Restricciones
+// (BORRADOR + creador/admin) las aplica el controller.
+router
+  .route('/:id/evolution-note/:noteId')
+  .all(validateId, checkPatient)
+  .patch(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.updateDraftEvolutionNote);
 
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router

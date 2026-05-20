@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Table, Modal, message, Tabs } from 'antd';
-import { prepareDataSource } from '../utils/odontogram-utils.js';
+import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
+import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
@@ -80,6 +81,37 @@ const OdontogramClinicalSection = ({
         handlers: null,
         initialized: false
     });
+    // Marca cambios sin guardar — base del warning beforeunload (cierre de
+    // pestaña/recarga) y del guard SPA (cambio de paciente vía router).
+    // Se mantiene ref + state: ref para handlers (sin re-render), state
+    // para el badge visual "No guardado".
+    const isDirtyRef = useRef(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const { markDirty: ctxMarkDirty, markClean: ctxMarkClean } = useUnsavedChanges();
+    const dirtyKey = `odontogram-clinical-${patientId || 'no-patient'}`;
+    const markDirty = useCallback(() => {
+        isDirtyRef.current = true;
+        setHasUnsavedChanges(true);
+        ctxMarkDirty(dirtyKey);
+    }, [ctxMarkDirty, dirtyKey]);
+    const markClean = useCallback(() => {
+        isDirtyRef.current = false;
+        setHasUnsavedChanges(false);
+        ctxMarkClean(dirtyKey);
+    }, [ctxMarkClean, dirtyKey]);
+    // Cleanup al desmontar — desregistrar para que un componente que
+    // queda dirty no bloquee navegación después de que se desmonta.
+    useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (!isDirtyRef.current) return;
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
 
     useEffect(() => {
         if (!isFullscreen) return;
@@ -149,13 +181,23 @@ const OdontogramClinicalSection = ({
 
     // --- Funciones ---
 
+    // Anti doble-guardado: ref síncrono que captura clicks rápidos antes de
+    // que React procese isSaving. Mismo patrón que `savedOnceRef` en el
+    // inicial pero re-usable (acá sí se permite re-guardar varias veces).
+    const savingRef = useRef(false);
+
     // Función para guardar el estado actual del canvas clínico
     const triggerSave = useCallback(async () => {
+        if (savingRef.current) {
+            // Doble-click instantáneo antes de que isSaving deshabilite el botón.
+            return;
+        }
         if (!isEngineInitialized || !engineManagerRef.current.instance) {
             message.warning('El motor del odontograma no está inicializado');
             return;
         }
         
+        savingRef.current = true;
         setIsSaving(true);
         try {
             const engineData = engineManagerRef.current.instance.getData() || [];
@@ -197,16 +239,20 @@ const OdontogramClinicalSection = ({
                     tipoValue = "Daño aplicado";
                 }
 
+                // NOTA: el backend estampa la `fecha` con new Date() y
+                // ignora cualquier valor del cliente (decisión explícita
+                // del schema en odontograma.js). No la enviamos para
+                // evitar código muerto que confunda al lector.
                 return {
                     ...item,
-                    tipo: tipoValue, // Aseguramos que siempre haya un string descriptivo
-                    fecha: item.fecha || getCurrentDateFormatted()
+                    tipo: tipoValue
                 };
             });
             // --- FIN CORRECCIÓN ---
             
             if (onDataSave && typeof onDataSave === 'function') {
                 await onDataSave(dataWithDates);
+                markClean();
                 message.success('Odontograma clínico guardado exitosamente');
                 await loadClinicalHistory();
             } else {
@@ -218,6 +264,7 @@ const OdontogramClinicalSection = ({
             message.error('Error al guardar el odontograma clínico');
         } finally {
             setIsSaving(false);
+            savingRef.current = false;
         }
     }, [isEngineInitialized, onDataSave, loadClinicalHistory, getDamageNameFromId]);
 
@@ -358,7 +405,14 @@ const OdontogramClinicalSection = ({
                 // console.log('[OdontoClinical] No hay datos para cargar en el engine');
             }
             engine.start();
-            const clickHandler = (e) => engine.onMouseClick(e);
+            // Cada click marca dirty (ref para handlers + state para badge)
+            // y sincroniza la tabla en el siguiente frame (reemplaza al
+            // antiguo setInterval de 1s que leía estados intermedios).
+            const clickHandler = (e) => {
+                markDirty();
+                engine.onMouseClick(e);
+                requestAnimationFrame(() => syncCanvasFromEngineRef.current());
+            };
             const moveHandler = (e) => engine.onMouseMove(e);
             canvasRef.current.addEventListener('click', clickHandler);
             canvasRef.current.addEventListener('mousemove', moveHandler);
@@ -411,6 +465,9 @@ const OdontogramClinicalSection = ({
             try {
                 engine.loadOdontogramaData(engineData);
                 engine.update();
+                // Sincronizar la tabla con el nuevo estado del engine (reemplaza
+                // al antiguo setInterval que polleaba cada 1s).
+                requestAnimationFrame(() => syncCanvasFromEngineRef.current());
             } catch (error) {
                 console.error('[OdontoClinical] Error al actualizar engine:', error);
             } finally {
@@ -419,42 +476,40 @@ const OdontogramClinicalSection = ({
         }
     }, [clinicalData, isEngineInitialized, normalizeForEngine]);
 
-    // NUEVO: Efecto para actualizar datos actuales del canvas en tiempo real
+    // Sincroniza la tabla del canvas con el estado del engine. Antes esto
+    // corría dentro de setInterval(1000) → leía engine.getData() en medio
+    // del render con riesgo de capturar estados intermedios. Ahora se
+    // dispara desde el clickHandler (vía ref) + una vez al montar + cada
+    // vez que clinicalData cambia desde el servidor.
+    const syncCanvasFromEngineRef = useRef(() => {});
     useEffect(() => {
-        const { instance: engine, initialized: engineInitialized } = engineManagerRef.current;
-        if (!engineInitialized || !engine) {
-            setCurrentCanvasData([]);
-            return;
-        }
-
-        const updateCurrentData = () => {
+        syncCanvasFromEngineRef.current = () => {
+            const { instance: engine, initialized } = engineManagerRef.current;
+            if (!initialized || !engine) return;
             try {
                 const engineData = engine.getData() || [];
                 const normalizedData = normalizeForEngine(engineData);
-                
-                // Solo actualizar si los datos han cambiado para evitar re-renders innecesios
                 setCurrentCanvasData(prevData => {
-                    const prevDataStr = JSON.stringify(prevData);
-                    const newDataStr = JSON.stringify(normalizedData);
-                    
-                    if (prevDataStr !== newDataStr) {
-                        return normalizedData;
-                    }
-                    return prevData;
+                    const prevStr = JSON.stringify(prevData);
+                    const newStr = JSON.stringify(normalizedData);
+                    return prevStr !== newStr ? normalizedData : prevData;
                 });
             } catch (error) {
-                console.error('[OdontoClinical] Error al obtener datos actuales del canvas:', error);
+                console.error('[OdontoClinical] Error sincronizando canvas:', error);
             }
         };
+    }, [normalizeForEngine]);
 
-        // Actualizar inmediatamente
-        updateCurrentData();
-
-        // Actualizar cada 1000ms para reflejar cambios en tiempo real (reducido de 500ms para mejor rendimiento)
-        const interval = setInterval(updateCurrentData, 1000);
-
-        return () => clearInterval(interval);
-     }, [isEngineInitialized, normalizeForEngine]);
+    // Sync inicial al montar el engine + reset cuando se desmonta.
+    useEffect(() => {
+        const { instance: engine, initialized } = engineManagerRef.current;
+        if (!initialized || !engine) {
+            setCurrentCanvasData([]);
+            return;
+        }
+        // Microtask: deja que el engine termine cualquier setup async antes de leer.
+        Promise.resolve().then(() => syncCanvasFromEngineRef.current());
+     }, [isEngineInitialized]);
 
     // Listener para el evento unificado 'odontogramSave'
     useEffect(() => {
@@ -474,6 +529,7 @@ const OdontogramClinicalSection = ({
                   return;
                 }
                 if (onDataSave) onDataSave(engineData);
+                markClean();
                 message.success('Guardado OK');
             } catch (err) {
                 message.error('Error guardando clínico');
@@ -548,7 +604,17 @@ const OdontogramClinicalSection = ({
             <div className="odontograma-section">
               <div className="odontograma-header2">
                 <div className="odontograma-initial-heading-block">
-                  <h2>Odontograma Clínico</h2>
+                  <h2>
+                    Odontograma Clínico
+                    {hasUnsavedChanges && (
+                      <span
+                        style={{ marginLeft: 12, fontSize: 13, color: '#d97706', fontWeight: 500 }}
+                        title="Hay cambios en el canvas que no han sido persistidos"
+                      >
+                        ● No guardado
+                      </span>
+                    )}
+                  </h2>
                   <p className="odontograma-initial-status-line" role="status">
                     Selecciona una herramienta, marca los dientes en el canvas y pulsa «Guardar estado». El registro clínico puede actualizarse en cada consulta.
                   </p>

@@ -2,6 +2,7 @@ const PatientCharge = require('../models/patientCharge');
 const CashMovement = require('../models/cashMovement');
 const BoxSession = require('../models/boxSession');
 const mongoose = require('mongoose');
+const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 
 const CONFIRM_PHRASE = 'CONFIRMO';
 
@@ -105,9 +106,13 @@ exports.createCharge = async (req, res) => {
 
     const total = processedItems.reduce((sum, item) => sum + item.subtotal, 0);
 
+    // Valida pertenencia de appointment al paciente — evita cobros
+    // vinculados a citas de otro paciente (cross-linking en auditoría).
+    const validatedAppointmentId = await resolvePatientAppointmentId(appointmentId, patientId);
+
     const charge = new PatientCharge({
       patientId,
-      appointmentId: appointmentId && mongoose.Types.ObjectId.isValid(appointmentId) ? appointmentId : null,
+      appointmentId: validatedAppointmentId,
       fecha: fecha || new Date(),
       items: processedItems,
       total,
@@ -172,28 +177,44 @@ exports.addPayment = async (req, res) => {
     // queda en el cobro mismo.
     const firstItem = charge.items[0]?.nombre || 'Servicios';
     const extra = charge.items.length > 1 ? ` +${charge.items.length - 1}` : '';
-    const movement = new CashMovement({
-      amount,
-      type: 'INCOME',
-      paymentMethod,
-      concept: `Pago cobro · ${firstItem}${extra}`,
-      date: new Date(),
-      patientId: charge.patientId,
-      boxSessionId: activeSession._id,
-      linkedChargeId: charge._id,
-      creadoPor: req.user?.id || null
-    });
-    await movement.save();
+    const now = new Date();
 
-    // Agregar pago al cobro
-    charge.pagos.push({
-      monto: amount,
-      fecha: new Date(),
-      paymentMethod,
-      cashMovementId: movement._id,
-      registradoPor: req.user?.id || null
-    });
-    await charge.save();
+    // Transacción: CashMovement + charge.save deben ser atómicos. Antes,
+    // si charge.save fallaba, el CashMovement ya estaba persistido sin
+    // reflejo en saldoPendiente — la caja del día quedaba inflada con un
+    // INCOME huérfano.
+    const session = await mongoose.startSession();
+    let savedMovementId = null;
+    try {
+      await session.withTransaction(async () => {
+        const [movement] = await CashMovement.create([{
+          amount,
+          type: 'INCOME',
+          paymentMethod,
+          concept: `Pago cobro · ${firstItem}${extra}`,
+          date: now,
+          patientId: charge.patientId,
+          boxSessionId: activeSession._id,
+          linkedChargeId: charge._id,
+          creadoPor: req.user?.id || null
+        }], { session });
+        savedMovementId = movement._id;
+
+        charge.pagos.push({
+          monto: amount,
+          fecha: now,
+          paymentMethod,
+          cashMovementId: movement._id,
+          registradoPor: req.user?.id || null
+        });
+        await charge.save({ session });
+      });
+    } catch (txError) {
+      console.error('Error en transacción de pago:', txError);
+      return res.status(500).json({ message: 'Error al registrar pago: la operación se revirtió.' });
+    } finally {
+      session.endSession();
+    }
 
     const populated = await PatientCharge.findById(charge._id)
       .populate('appointmentId', 'fecha_hora motivo estado')

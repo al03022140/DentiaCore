@@ -16,11 +16,14 @@
 const { computeIntegrityHash, getSignableFields } = require('./integrity');
 
 // ── Mapa resourceType → modelo Mongoose name ──────────────────
+// Sólo se incluyen los modelos que tienen controller/rutas CRUD reales.
+// `tratamiento` y `receta` están definidos en /models pero NO tienen
+// endpoint para crear/editar el documento — exponer un endpoint de firma
+// sobre docs imposibles era superficie muerta. Si en el futuro se
+// implementa CRUD para ellos, re-agregar aquí.
 const RESOURCE_MODEL_MAP = {
   patient:         'Patient',
   examen:          'Examen',
-  receta:          'Receta',
-  tratamiento:     'Tratamiento',
   periodontograma: 'Periodontogram',
   odontograma:     'Odontograma',
 };

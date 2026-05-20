@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Modal, message, Input } from 'antd';
-import { prepareDataSource } from '../utils/odontogram-utils.js';
+import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
+import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 
 /**
  * Odontograma inicial.
@@ -33,6 +34,12 @@ const OdontogramInitialSection = ({
   // Anti doble-guardado: una vez aceptado un save, este ref se queda en true.
   // Se resetea sólo si el backend devuelve error (para que pueda reintentar).
   const savedOnceRef = useRef(false);
+  // Marca cambios sin guardar — base del warning beforeunload (cierre de
+  // pestaña/recarga) y del guard SPA (cambio de paciente vía router).
+  const isDirtyRef = useRef(false);
+  const { markDirty: ctxMarkDirty, markClean: ctxMarkClean } = useUnsavedChanges();
+  const dirtyKey = `odontogram-initial-${patientId || 'no-patient'}`;
+  useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
 
   const [saving, setSaving] = useState(false);
   const [engineError, setEngineError] = useState(null);
@@ -103,8 +110,15 @@ const OdontogramInitialSection = ({
         });
       }
 
+      // Carga inicial: hacemos load aquí para el primer mount. Cambios
+      // posteriores en `initialTableData` se gestionan en un useEffect
+      // dedicado abajo (sin re-crear el engine — antes cada save
+      // provocaba cleanup + reinit a mitad de la transición a view-mode).
       if (Array.isArray(initialTableData) && initialTableData.length > 0) {
-        engine.loadOdontogramaData(initialTableData);
+        const entriesForEngine = normalizeEntriesForEngine(initialTableData);
+        if (entriesForEngine.length > 0) {
+          engine.loadOdontogramaData(entriesForEngine);
+        }
       }
 
       if (typeof engine.setShowAllTeeth === 'function') {
@@ -115,8 +129,14 @@ const OdontogramInitialSection = ({
 
       // Listeners de mouse SÓLO en edit-mode. En view-mode el canvas queda inerte
       // porque no hay handlers del lado del DOM (el engine no se auto-registra).
+      // Cada click marca isDirty=true para que el beforeunload avise antes de
+      // perder cambios.
       if (mode === 'edit') {
-        clickHandler = (e) => engine.onMouseClick(e);
+        clickHandler = (e) => {
+          isDirtyRef.current = true;
+          ctxMarkDirty(dirtyKey);
+          engine.onMouseClick(e);
+        };
         moveHandler = (e) => engine.onMouseMove(e);
         canvasRef.current.addEventListener('click', clickHandler);
         canvasRef.current.addEventListener('mousemove', moveHandler);
@@ -147,7 +167,26 @@ const OdontogramInitialSection = ({
       engineRef.current = null;
       handlersRef.current = null;
     };
-  }, [areScriptsReady, mode, patientId, canvasRef, initialTableData]);
+    // initialTableData NO está en deps a propósito: el useEffect dedicado
+    // de abajo maneja los cambios sin re-crear el engine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areScriptsReady, mode, patientId, canvasRef]);
+
+  // Carga de datos en el engine ya instanciado. Se separa del useEffect
+  // de init para que cambios en `initialTableData` (tras un save o
+  // refresh del padre) NO destruyan el engine.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (!Array.isArray(initialTableData) || initialTableData.length === 0) return;
+    const entriesForEngine = normalizeEntriesForEngine(initialTableData);
+    if (entriesForEngine.length === 0) return;
+    try {
+      engine.loadOdontogramaData(entriesForEngine);
+    } catch (err) {
+      console.error('[OdontogramInitial] Error cargando datos en engine ya instanciado:', err);
+    }
+  }, [initialTableData]);
 
   // ── Guardado ─────────────────────────────────────────────────────────────
   const handleConfirmSave = useCallback(async () => {
@@ -187,12 +226,9 @@ const OdontogramInitialSection = ({
         }))
         .filter((e) => e.tooth && e.damage !== '');
 
-      if (entries.length === 0) {
-        // El backend requiere al menos 1 entry. Inyectamos un marcador "Sano"
-        // para registrar que se hizo la captura inicial aunque no haya daños.
-        entries.push({ tooth: '11', damage: 'Sano', surface: 'O', note: 'Odontograma inicial sin daños registrados' });
-      }
-
+      // El backend ahora acepta entries=[]: registra captura inicial sin
+      // hallazgos sin contaminar el odontograma con un daño-fantasma ('Sano')
+      // que el engine no reconoce al recargar.
       const { default: odontogramaService } = await import('../api/odontograma-service.js');
       const response = await odontogramaService.saveInitialOdontogram(patientId, entries);
 
@@ -201,6 +237,8 @@ const OdontogramInitialSection = ({
       }
 
       message.success('Odontograma inicial guardado.');
+      isDirtyRef.current = false;
+      ctxMarkClean(dirtyKey);
       onSaveSuccess?.(response.datos || [], response.history || []);
       // `savedOnceRef` queda en true: el componente cambiará a modo view por el
       // refresh del padre, y este ref impide cualquier disparo residual.
@@ -252,6 +290,19 @@ const OdontogramInitialSection = ({
     if (mode === 'view') return 'Odontograma inicial guardado (sólo lectura). Este registro es permanente.';
     return 'Marca los dientes en el canvas y pulsa «Capturar Odontograma». Sólo se puede guardar una vez y no podrá modificarse.';
   }, [initialSnapshotStatus, mode]);
+
+  // Bloquea cierre de pestaña/recarga con captura sin guardar. No cubre
+  // navegación SPA (cambio de paciente) — eso requiere coordinación con el
+  // padre y queda fuera de este parche.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   return (
     <section className="patient-detail_odontograma">

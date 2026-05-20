@@ -4,7 +4,7 @@ import {
   updateAppointment,
   searchPatients
 } from '../../../shared/services/appointment-service';
-import { getSettings } from '../../../shared/services/settingsService';
+import { getSettings, getDoctors } from '../../../shared/services/settingsService';
 import API from '../../../shared/services/axios-instance';
 import userNot from '../../../assets/images/icons/Profile Default.svg';
 import './CreateAppointmentModal.css';
@@ -59,17 +59,26 @@ const CreateAppointmentModal = ({
     return new Date(d.getTime() - offset).toISOString().slice(0, 16);
   };
 
-  // Load doctors & service catalog when modal opens
+  // Load doctors & service catalog when modal opens.
+  // Usamos /users/doctors (rol === 'doctor' o 'doctor_admin') porque sólo
+  // ellos atienden citas clínicas — administrador y superadmin gestionan
+  // pero no son titulares de consultas.
   useEffect(() => {
     if (!visible) return;
     const loadData = async () => {
       try {
-        const [usersRes, settings] = await Promise.all([
-          API.get('/users').then(r => r.data).catch(() => []),
+        const [doctorsRes, settings] = await Promise.all([
+          getDoctors().catch(() => []),
           getSettings().catch(() => ({}))
         ]);
-        const usersList = Array.isArray(usersRes) ? usersRes : (usersRes.users || []);
-        setDoctors(usersList.filter(u => u.rol === 'doctor' || u.rol === 'superadmin' || u.rol === 'administrador'));
+        // getDoctors() devuelve { id, nombre, rol, ... }. Normalizamos a la
+        // forma { _id, nombre, rol } que el resto del modal espera.
+        const normalized = (doctorsRes || []).map(d => ({
+          _id: d.id || d._id,
+          nombre: d.nombre,
+          rol: d.rol,
+        }));
+        setDoctors(normalized);
         setServiceCatalog(settings.serviceCatalog || []);
         if (settings.defaultAppointmentDuration && !appointment) {
           setDuracion(settings.defaultAppointmentDuration);
@@ -218,16 +227,26 @@ const CreateAppointmentModal = ({
     } catch { return null; }
   };
 
+  // Devuelve { status }:
+  //  - 'not-connected': no hay token de Google (ni siquiera con refresh)
+  //  - 'ok': evento creado en Google Calendar
+  //  - 'failed': hubo token pero la API de Google rechazó
   const syncToGoogle = async (gcalEvent) => {
     let googleToken = getGoogleToken();
     if (!googleToken) googleToken = await refreshGoogleToken();
-    if (!googleToken) return;
+    if (!googleToken) return { status: 'not-connected' };
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
-    fetch(`${API_URL}/api/google/calendar/events`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(gcalEvent),
-    }).catch(() => {});
+    try {
+      const resp = await fetch(`${API_URL}/api/google/calendar/events`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(gcalEvent),
+      });
+      if (!resp.ok) return { status: 'failed' };
+      return { status: 'ok' };
+    } catch {
+      return { status: 'failed' };
+    }
   };
 
   const handleSave = async () => {
@@ -254,6 +273,8 @@ const CreateAppointmentModal = ({
         })) : []
       };
 
+      let gcalResult = { status: 'not-connected' };
+
       if (isEditing) {
         await updateAppointment(appointment._id, payload);
       } else {
@@ -267,7 +288,7 @@ const CreateAppointmentModal = ({
         const start = new Date(fechaHora);
         const end = new Date(start.getTime() + (Number(duracion) || 30) * 60_000);
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        await syncToGoogle({
+        gcalResult = await syncToGoogle({
           summary: `Cita: ${patientName}${doctorName ? ` — Dr. ${doctorName}` : ''}`,
           description: [
             `Motivo: ${motivo.trim()}`,
@@ -279,16 +300,24 @@ const CreateAppointmentModal = ({
         });
       }
 
-      onCreated?.();
+      // Pasamos la fecha de la cita para que el padre pueda navegar a ese
+      // día — antes la agenda recargaba sólo el día actual y la cita
+      // "desaparecía" si era para otro día.
+      onCreated?.({
+        appointmentDate: new Date(fechaHora),
+        gcalResult,
+      });
       onClose();
     } catch (err) {
-      // Si vino conflicto (409), informar de la cita en conflicto
+      // Si vino conflicto (409), informar de la cita en conflicto.
+      // El backend distingue 'doctor' vs 'patient' en `conflictType`.
       const status = err?.response?.status;
       const data = err?.response?.data;
       if (status === 409 && data?.conflict) {
         const c = data.conflict;
         const when = new Date(c.fecha_hora).toLocaleString('es-MX');
-        setError(`Conflicto: ${when} (${c.duracion} min) — ${c.motivo || 'otra cita'}`);
+        const subject = data.conflictType === 'patient' ? 'El paciente' : 'El doctor';
+        setError(`${subject} ya tiene una cita el ${when} (${c.duracion} min) — ${c.motivo || 'otra cita'}`);
       } else {
         setError(data?.message || err?.message || 'Error al guardar la cita');
       }

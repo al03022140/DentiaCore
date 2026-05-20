@@ -283,6 +283,34 @@ const ConsultasPage = () => {
     setEditingAppointment(apt);
   };
 
+  // Callback que llama el modal de Crear/Editar al terminar exitosamente.
+  // - Si la cita es para otro día, navegamos al día de la cita (antes
+  //   "desaparecía" porque la agenda seguía mostrando el día actual).
+  // - Damos feedback del resultado de la sincronización a Google Calendar.
+  const handleAppointmentSaved = ({ appointmentDate, gcalResult } = {}) => {
+    invalidateTodayAppointmentsCache();
+    if (appointmentDate) {
+      const targetDay = startOfDay(appointmentDate);
+      const currentDay = startOfDay(currentDate);
+      if (targetDay.getTime() !== currentDay.getTime()) {
+        setCurrentDate(targetDay);
+        // setCurrentDate dispara el useEffect que recarga la agenda.
+      } else {
+        loadAgenda(currentDate);
+      }
+    } else {
+      loadAgenda(currentDate);
+    }
+
+    if (gcalResult?.status === 'ok') {
+      message.success('Cita guardada y sincronizada con Google Calendar');
+    } else if (gcalResult?.status === 'failed') {
+      message.warning('Cita guardada, pero no se pudo sincronizar con Google Calendar');
+    } else {
+      message.success('Cita guardada');
+    }
+  };
+
   const buildActionItems = (apt) => {
     const allowed = ACTIONS_BY_STATE[apt.estado] || [];
     const items = [];
@@ -491,16 +519,23 @@ const ConsultasPage = () => {
               </div>
             </div>
 
-            <div className="timeline-section">
-              <h4>Motivo</h4>
-              <p>{selectedConsultation.motivo}</p>
-            </div>
+            {/* Motivo + Procedimiento: si la cita seleccionada es la misma
+                que ya se muestra arriba en la card "Próxima/Siguiente", los
+                ocultamos aquí para no duplicar info. */}
+            {String(selectedConsultation._id) !== String(nextPatient?._id) && (
+              <>
+                <div className="timeline-section">
+                  <h4>Motivo</h4>
+                  <p>{selectedConsultation.motivo}</p>
+                </div>
 
-            {selectedConsultation.comentarioProcedimiento && (
-              <div className="timeline-section">
-                <h4>Procedimiento</h4>
-                <p>{selectedConsultation.comentarioProcedimiento}</p>
-              </div>
+                {selectedConsultation.comentarioProcedimiento && (
+                  <div className="timeline-section">
+                    <h4>Procedimiento</h4>
+                    <p>{selectedConsultation.comentarioProcedimiento}</p>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="timeline-section">
@@ -853,14 +888,14 @@ const ConsultasPage = () => {
       <CreateAppointmentModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={() => loadAgenda(currentDate)}
+        onCreated={handleAppointmentSaved}
       />
 
       <CreateAppointmentModal
         visible={!!editingAppointment}
         appointment={editingAppointment}
         onClose={() => setEditingAppointment(null)}
-        onCreated={() => loadAgenda(currentDate)}
+        onCreated={handleAppointmentSaved}
       />
 
       <Modal

@@ -1,6 +1,36 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { AppointmentProvider } from "../../shared/contexts/AppointmentContext.jsx";
+import { UnsavedChangesProvider, useUnsavedChanges } from "../../shared/contexts/UnsavedChangesContext.jsx";
+
+/**
+ * Guard del cambio de patientId. Va dentro de UnsavedChangesProvider para
+ * poder consumir el contexto vía hook. Si el patientId cambia y hay
+ * cambios sin guardar, pide confirm y devuelve al usuario al paciente
+ * anterior con navigate(-1). El primer mount no dispara confirm.
+ */
+const PatientChangeGuard = ({ patientId }) => {
+  const { hasDirty, clearDirty } = useUnsavedChanges();
+  const navigate = useNavigate();
+  const prevPatientIdRef = useRef(patientId);
+
+  useEffect(() => {
+    if (prevPatientIdRef.current === patientId) return;
+    if (hasDirty()) {
+      const ok = window.confirm('Tienes cambios sin guardar en este expediente. ¿Salir y perderlos?');
+      if (!ok) {
+        // Volver al paciente anterior. navigate(-1) preserva el historial
+        // del browser y devuelve al usuario exactamente donde estaba.
+        navigate(-1);
+        return;
+      }
+      clearDirty();
+    }
+    prevPatientIdRef.current = patientId;
+  }, [patientId, hasDirty, clearDirty, navigate]);
+
+  return null;
+};
 import { Tabs, Modal, Input, message, Skeleton } from 'antd';
 import "./styles/patient-detail.css";
 import userNot from "../../assets/images/icons/Profile Default.svg";
@@ -22,7 +52,7 @@ import PatientHygieneHabits from './components/patient-hygiene-habits.jsx';
 import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx';
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
-import PatientChargesCard from './components/patient-charges-card.jsx';
+import PatientCashMovements from './components/patient-cash-movements.jsx';
 import PatientAttachments from './components/patient-attachments.jsx';
 import CreateAppointmentModal from '../consultas/components/CreateAppointmentModal';
 import SignaturePadModal from '../../shared/components/SignaturePadModal.jsx';
@@ -30,7 +60,9 @@ import DoctorSignStep from '../../shared/components/DoctorSignStep.jsx';
 import { useAuth } from '../../app/auth/AuthContext.jsx';
 import { hasPermission } from '../../app/auth/permissions';
 
-import { getPatientById } from '../../shared/services/api.js';
+import { getPatientById, deletePatient } from '../../shared/services/api.js';
+
+const MIN_DELETE_REASON_LENGTH = 10;
 
 const CONSENTIMIENTO_HC_TEXTO = `Yo, el paciente abajo firmante, declaro que la información proporcionada en esta historia clínica es veraz, completa y correcta a mi leal saber y entender. Reconozco que los datos personales y de salud aquí recabados serán utilizados con fines de diagnóstico, tratamiento, prevención y seguimiento de mi atención odontológica.
 
@@ -165,6 +197,7 @@ const PatientDetail = () => {
   const [odontogramHistory, setOdontogramHistory] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const [fetchedInitial, setFetchedInitial] = useState(false);
   /** 'loading' | 'saved' | 'none' — resultado de GET /odontograma-inicial para la UI */
@@ -172,6 +205,10 @@ const PatientDetail = () => {
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
+  // updatedAt del documento odontograma — base del control de concurrencia
+  // optimista (se reenvía como expectedUpdatedAt al guardar).
+  const [initialOdontogramUpdatedAt, setInitialOdontogramUpdatedAt] = useState(null);
+  const [clinicalOdontogramUpdatedAt, setClinicalOdontogramUpdatedAt] = useState(null);
   // Flujo de finalización HC: null → 'patient' → 'doctor' → submit
   const [hcStep, setHcStep] = useState(null);
   const [hcPatientSig, setHcPatientSig] = useState(null);
@@ -300,6 +337,7 @@ const PatientDetail = () => {
     setInitialOdontogramLoadStatus('loading');
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
+      setInitialOdontogramUpdatedAt(data.updatedAt || null);
       if (data.exists) {
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
@@ -340,18 +378,39 @@ const PatientDetail = () => {
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
+      const options = {};
+      if (currentAppointmentId) options.appointmentId = currentAppointmentId;
+      // Si tenemos updatedAt cargado, el server lo usará para bloquear writes
+      // stale (otro usuario o pestaña editando) con un 409 ODONTOGRAMA_STALE.
+      if (clinicalOdontogramUpdatedAt) options.expectedUpdatedAt = clinicalOdontogramUpdatedAt;
       const result = await odontogramaService.default.saveClinicalOdontogramState(
         patientId,
         entryData,
-        currentAppointmentId ? { appointmentId: currentAppointmentId } : {}
+        options
       );
       setClinicalOdontogramData(result.datos || entryData || []);
       setClinicalOdontogramExists(result.exists ?? true);
+      setClinicalOdontogramUpdatedAt(result.updatedAt || null);
     } catch (err) {
+      const code = err?.response?.data?.error?.code;
+      if (code === 'ODONTOGRAMA_STALE') {
+        message.warning('Otro usuario modificó este odontograma. Recargando cambios…');
+        // Recargar para refrescar updatedAt y datos antes del próximo intento.
+        try {
+          const odontogramaService = await import('../odontogram/api/odontograma-service.js');
+          const fresh = await odontogramaService.default.getClinicalOdontogramState(patientId);
+          setClinicalOdontogramData(fresh.datos || []);
+          setClinicalOdontogramExists(fresh.exists || false);
+          setClinicalOdontogramUpdatedAt(fresh.updatedAt || null);
+        } catch (refreshErr) {
+          console.error('Error refrescando odontograma clínico tras 409:', refreshErr);
+        }
+        return;
+      }
       console.error('Error al guardar odontograma clínico:', err);
       message.error('Error al guardar el odontograma clínico');
     }
-  }, [patientId, currentAppointmentId]);
+  }, [patientId, currentAppointmentId, clinicalOdontogramUpdatedAt]);
 
   const handleDeleteClinicalCanvasState = useCallback(async () => {
     try {
@@ -467,6 +526,7 @@ const PatientDetail = () => {
   const handleDeleteClick = useCallback(() => {
     setIsDeleteConfirmVisible(true);
     setDeleteConfirmText('');
+    setDeleteReason('');
   }, []);
 
   const handleDeleteConfirmOk = useCallback(async () => {
@@ -475,23 +535,35 @@ const PatientDetail = () => {
       message.warning(`Debes escribir ${REQUIRED_DELETE_PHRASE} o ${REQUIRED_DELETE_PHRASE_ACCENTED} para confirmar la eliminación.`);
       return;
     }
+    const reason = deleteReason.trim();
+    if (reason.length < MIN_DELETE_REASON_LENGTH) {
+      message.warning(`El motivo de eliminación debe tener al menos ${MIN_DELETE_REASON_LENGTH} caracteres.`);
+      return;
+    }
     try {
       setIsDeleting(true);
-      await API.delete(`/patients/${patientId}`);
+      await deletePatient(patientId, reason);
       message.success('Paciente eliminado correctamente');
       setIsDeleteConfirmVisible(false);
+      setDeleteConfirmText('');
+      setDeleteReason('');
       navigate('/pacientes');
     } catch (err) {
       console.error('Error al eliminar el paciente:', err);
-      message.error('No se pudo eliminar el paciente. Intenta de nuevo.');
+      // Reset del texto de confirmación así el siguiente intento no dispara
+      // el DELETE de inmediato sin re-confirmar.
+      setDeleteConfirmText('');
+      const serverMsg = err?.response?.data?.message;
+      message.error(serverMsg || 'No se pudo eliminar el paciente. Intenta de nuevo.');
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteConfirmText, patientId, navigate]);
+  }, [deleteConfirmText, deleteReason, patientId, navigate]);
 
   const handleDeleteConfirmCancel = useCallback(() => {
     setIsDeleteConfirmVisible(false);
     setDeleteConfirmText('');
+    setDeleteReason('');
   }, []);
 
   const {
@@ -515,10 +587,12 @@ const PatientDetail = () => {
         if (cancelled) return;
         setClinicalOdontogramData(clinicalState.datos || []);
         setClinicalOdontogramExists(clinicalState.exists || false);
+        setClinicalOdontogramUpdatedAt(clinicalState.updatedAt || null);
       } catch {
         if (cancelled) return;
         setClinicalOdontogramData([]);
         setClinicalOdontogramExists(false);
+        setClinicalOdontogramUpdatedAt(null);
       }
     })();
     return () => { cancelled = true; };
@@ -550,7 +624,7 @@ const PatientDetail = () => {
             proximaCita={patientData.citas?.proximaCita}
             onAddAppointment={() => setShowCreateAppointmentModal(true)}
           />
-          <PatientChargesCard patientId={patientId} />
+          <PatientCashMovements patientId={patientId} />
         </>
       ),
     },
@@ -657,6 +731,8 @@ const PatientDetail = () => {
 
   return (
     <AppointmentProvider appointmentId={currentAppointmentId}>
+    <UnsavedChangesProvider>
+    <PatientChangeGuard patientId={patientId} />
     <div className="patient-detail">
       <div className="patient-detail__header">
         <button className="back-button" onClick={() => navigate("/pacientes")}>
@@ -945,8 +1021,21 @@ const PatientDetail = () => {
           placeholder={`${REQUIRED_DELETE_PHRASE} / ${REQUIRED_DELETE_PHRASE_ACCENTED}`}
           aria-label="Texto de confirmación de eliminación"
         />
+        <p style={{ marginTop: 16 }}>
+          Motivo de la eliminación (mínimo {MIN_DELETE_REASON_LENGTH} caracteres):
+        </p>
+        <Input.TextArea
+          value={deleteReason}
+          onChange={(e) => setDeleteReason(e.target.value)}
+          placeholder="Ej. Solicitud expresa del paciente / duplicado en sistema"
+          rows={3}
+          maxLength={500}
+          showCount
+          aria-label="Motivo de la eliminación"
+        />
       </Modal>
     </div>
+    </UnsavedChangesProvider>
     </AppointmentProvider>
   );
 };

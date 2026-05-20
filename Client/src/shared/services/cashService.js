@@ -40,6 +40,14 @@ export const getLastMovements = async () => {
   return response.data;
 };
 
+export const getMovementsByPatient = async (patientId, options = {}) => {
+  const response = await API.get('/cash/movements', {
+    params: { patientId },
+    signal: options.signal
+  });
+  return response.data;
+};
+
 export const updateMovement = async (movementId, payload) => {
   const response = await API.put(`/cash/movements/${encodeURIComponent(movementId)}`, payload);
   return response.data;

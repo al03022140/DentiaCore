@@ -7,6 +7,12 @@ const {
 const mongoose = require('mongoose');
 const OdontogramaModel = require('../models/odontograma');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
+const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
+
+// Logging gated por NODE_ENV: los console.log informativos filtraban
+// patientId y otros datos a stdout en producción. console.error y
+// console.warn se mantienen siempre activos.
+const debugLog = process.env.NODE_ENV !== 'production' ? console.log.bind(console) : () => {};
 
 // ——— Constantes de tipo de odontograma ————————————————————————————————————————————————
 const TYPE_INITIAL = 'initial';
@@ -15,25 +21,25 @@ const TYPE_CLINIC = 'clinic';
 // ——— Controladores ——————————————————————————————————————————————————————————————
 const verificarOdontogramaInicial = async (req, res, next) => {
   try {
-    console.log('🔍 [verificarOdontogramaInicial] Buscando odontograma para paciente:', req.patient?.id || req.patient?._id);
+    debugLog('🔍 [verificarOdontogramaInicial] Buscando odontograma para paciente:', req.patient?.id || req.patient?._id);
     
     const patientId = req.patient?.id || req.patient?._id;
     if (!patientId) {
-      console.log('❌ [verificarOdontogramaInicial] PatientId inválido');
+      debugLog('❌ [verificarOdontogramaInicial] PatientId inválido');
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
       });
     }
     
-    console.log('🔍 [verificarOdontogramaInicial] Buscando en BD con patientId:', patientId, 'type:', TYPE_INITIAL);
+    debugLog('🔍 [verificarOdontogramaInicial] Buscando en BD con patientId:', patientId, 'type:', TYPE_INITIAL);
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_INITIAL,
       deletedAt: null
     });
 
-    console.log('📋 [verificarOdontogramaInicial] Documento encontrado:', {
+    debugLog('📋 [verificarOdontogramaInicial] Documento encontrado:', {
       docExists: !!doc,
       currentExists: !!doc?.current,
       currentDatos: doc?.current?.datos,
@@ -48,23 +54,27 @@ const verificarOdontogramaInicial = async (req, res, next) => {
     }));
 
     if (!doc || !doc.current) {
-      console.log('📭 [verificarOdontogramaInicial] Sin datos actuales, devolviendo vacío');
-      return res.json({ 
-        exists: false, 
-        imageUrl: null, 
-        datos: [], 
-        history 
+      debugLog('📭 [verificarOdontogramaInicial] Sin datos actuales, devolviendo vacío');
+      return res.json({
+        exists: false,
+        imageUrl: null,
+        datos: [],
+        history,
+        updatedAt: null
       });
     }
 
+    // updatedAt se devuelve para que el cliente lo pase como expectedUpdatedAt
+    // al guardar; es la base del control de concurrencia 409.
     const responseData = {
       exists: true,
       imageUrl: doc.current.imageUrl,
       datos: (doc.current.datos || []).map(normalizeEntry),
-      history
+      history,
+      updatedAt: doc.updatedAt
     };
     
-    console.log('📤 [verificarOdontogramaInicial] Respuesta enviada:', {
+    debugLog('📤 [verificarOdontogramaInicial] Respuesta enviada:', {
       exists: responseData.exists,
       imageUrl: responseData.imageUrl,
       datosCount: responseData.datos.length,
@@ -138,6 +148,25 @@ const guardarOdontogramaInicial = async (req, res, next) => {
           error: { code: 'FORBIDDEN', message: 'Sólo el creador o un administrador pueden modificar este borrador.' }
         });
       }
+
+      // Concurrencia optimista: si el cliente envió expectedUpdatedAt y el
+      // documento fue modificado por otro usuario/pestaña, abortar para que
+      // refresque antes de pisar cambios.
+      const expectedUpdatedAt = req.body?.expectedUpdatedAt;
+      if (expectedUpdatedAt) {
+        const currentTs = new Date(existingDoc.updatedAt).getTime();
+        const expectedTs = new Date(expectedUpdatedAt).getTime();
+        if (Number.isNaN(expectedTs) || currentTs !== expectedTs) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'ODONTOGRAMA_STALE',
+              message: 'El odontograma fue modificado por otro usuario. Recarga para ver los cambios antes de guardar.',
+              currentUpdatedAt: existingDoc.updatedAt
+            }
+          });
+        }
+      }
     }
 
     // Estampar `fecha` por entrada con el momento del guardado.
@@ -151,9 +180,11 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       fecha: savedAt
     }));
 
-    const appointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
-      ? req.body.appointmentId
-      : null;
+    // Validar que appointmentId, si vino, pertenece al paciente. Si no
+    // pertenece (intento de vinculación cruzada) lo ignoramos y guardamos
+    // sin appointmentId — preferimos perder la asociación a corromper el
+    // historial cruzando pacientes.
+    const appointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
     const snapshot = {
       imageUrl: '',
       datos,
@@ -192,7 +223,8 @@ const guardarOdontogramaInicial = async (req, res, next) => {
         id: v._id,
         fecha: v.savedAt.toISOString(),
         datos: (v.datos || []).map(normalizeEntry)
-      }))
+      })),
+      updatedAt: odontograma.updatedAt
     });
   } catch (err) {
     console.error('[guardarOdontogramaInicial] Error:', err.message);
@@ -202,25 +234,25 @@ const guardarOdontogramaInicial = async (req, res, next) => {
 
 const obtenerHistorialInicial = async (req, res, next) => {
   try {
-    console.log('📜 [obtenerHistorialInicial] Iniciando para paciente:', req.patient?.id || req.patient?._id);
+    debugLog('📜 [obtenerHistorialInicial] Iniciando para paciente:', req.patient?.id || req.patient?._id);
     
     const patientId = req.patient?.id || req.patient?._id;
     if (!patientId) {
-      console.log('❌ [obtenerHistorialInicial] PatientId inválido');
+      debugLog('❌ [obtenerHistorialInicial] PatientId inválido');
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
       });
     }
     
-    console.log('🔍 [obtenerHistorialInicial] Buscando historial con patientId:', patientId, 'type:', TYPE_INITIAL);
+    debugLog('🔍 [obtenerHistorialInicial] Buscando historial con patientId:', patientId, 'type:', TYPE_INITIAL);
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_INITIAL,
       deletedAt: null
     }).select('history');
 
-    console.log('📋 [obtenerHistorialInicial] Documento encontrado:', {
+    debugLog('📋 [obtenerHistorialInicial] Documento encontrado:', {
       docExists: !!doc,
       historyExists: !!doc?.history,
       historyLength: doc?.history?.length
@@ -228,7 +260,7 @@ const obtenerHistorialInicial = async (req, res, next) => {
 
     const activeHistory = (doc?.history || []).filter(v => !v.deletedAt);
     if (!doc || activeHistory.length === 0) {
-      console.log('📭 [obtenerHistorialInicial] Sin historial, devolviendo vacío');
+      debugLog('📭 [obtenerHistorialInicial] Sin historial, devolviendo vacío');
       return res.json({ exists: false, history: [] });
     }
 
@@ -239,7 +271,7 @@ const obtenerHistorialInicial = async (req, res, next) => {
       datos: (v.datos || []).map(normalizeEntry)
     }));
 
-    console.log('📤 [obtenerHistorialInicial] Enviando historial con', history.length, 'entradas');
+    debugLog('📤 [obtenerHistorialInicial] Enviando historial con', history.length, 'entradas');
     res.json({
       exists: true,
       history
@@ -334,9 +366,7 @@ const agregarHistorialInicial = async (req, res, next) => {
       note: e.note,
       fecha: savedAt
     }));
-    const snapshotAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
-      ? req.body.appointmentId
-      : null;
+    const snapshotAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
     const snapshot = {
       imageUrl: odontograma.current.imageUrl,
       datos: entries,
@@ -379,25 +409,25 @@ const agregarHistorialInicial = async (req, res, next) => {
 // ——— Clínico —————————————————————————————————————————————————————————————————
 const verificarOdontogramaClinico = async (req, res, next) => {
   try {
-    console.log('🔍 [verificarOdontogramaClinico] Buscando odontograma para paciente:', req.patient?.id || req.patient?._id);
+    debugLog('🔍 [verificarOdontogramaClinico] Buscando odontograma para paciente:', req.patient?.id || req.patient?._id);
     
     const patientId = req.patient?.id || req.patient?._id;
     if (!patientId) {
-      console.log('❌ [verificarOdontogramaClinico] PatientId inválido');
+      debugLog('❌ [verificarOdontogramaClinico] PatientId inválido');
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
       });
     }
     
-    console.log('🔍 [verificarOdontogramaClinico] Buscando en BD con patientId:', patientId, 'type:', TYPE_CLINIC);
+    debugLog('🔍 [verificarOdontogramaClinico] Buscando en BD con patientId:', patientId, 'type:', TYPE_CLINIC);
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_CLINIC,
       deletedAt: null
     });
     
-    console.log('📋 [verificarOdontogramaClinico] Documento encontrado:', {
+    debugLog('📋 [verificarOdontogramaClinico] Documento encontrado:', {
       docExists: !!doc,
       currentExists: !!doc?.current,
       currentDatos: doc?.current?.datos,
@@ -410,14 +440,17 @@ const verificarOdontogramaClinico = async (req, res, next) => {
       fecha: h.savedAt.toISOString(),
       datos: (h.datos || []).map(normalizeEntry)
     }));
-    
+
+    // updatedAt se devuelve para que el cliente lo pase como expectedUpdatedAt
+    // al guardar; es la base del control de concurrencia 409.
     const responseData = {
       exists: !!doc && !!doc.current,
       datos,
       history,
+      updatedAt: doc ? doc.updatedAt : null,
     };
     
-    console.log('📤 [verificarOdontogramaClinico] Respuesta enviada:', {
+    debugLog('📤 [verificarOdontogramaClinico] Respuesta enviada:', {
       exists: responseData.exists,
       datosCount: responseData.datos.length,
       historyCount: responseData.history.length
@@ -432,25 +465,25 @@ const verificarOdontogramaClinico = async (req, res, next) => {
 
 const obtenerHistorialClinico = async (req, res, next) => {
   try {
-    console.log('📜 [obtenerHistorialClinico] Iniciando para paciente:', req.patient?.id || req.patient?._id);
+    debugLog('📜 [obtenerHistorialClinico] Iniciando para paciente:', req.patient?.id || req.patient?._id);
     
     const patientId = req.patient?.id || req.patient?._id;
     if (!patientId) {
-      console.log('❌ [obtenerHistorialClinico] PatientId inválido');
+      debugLog('❌ [obtenerHistorialClinico] PatientId inválido');
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
       });
     }
     
-    console.log('🔍 [obtenerHistorialClinico] Buscando historial con patientId:', patientId, 'type:', TYPE_CLINIC);
+    debugLog('🔍 [obtenerHistorialClinico] Buscando historial con patientId:', patientId, 'type:', TYPE_CLINIC);
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_CLINIC,
       deletedAt: null
     }).select('history');
 
-    console.log('📋 [obtenerHistorialClinico] Documento encontrado:', {
+    debugLog('📋 [obtenerHistorialClinico] Documento encontrado:', {
       docExists: !!doc,
       historyExists: !!doc?.history,
       historyLength: doc?.history?.length
@@ -458,7 +491,7 @@ const obtenerHistorialClinico = async (req, res, next) => {
 
     const activeHistory = (doc?.history || []).filter(h => !h.deletedAt);
     if (!doc || activeHistory.length === 0) {
-      console.log('📭 [obtenerHistorialClinico] Sin historial, devolviendo vacío');
+      debugLog('📭 [obtenerHistorialClinico] Sin historial, devolviendo vacío');
       return res.json({ exists: false, history: [] });
     }
 
@@ -468,7 +501,7 @@ const obtenerHistorialClinico = async (req, res, next) => {
       datos: (h.datos || []).map(normalizeEntry)
     }));
 
-    console.log('📤 [obtenerHistorialClinico] Enviando historial con', history.length, 'entradas');
+    debugLog('📤 [obtenerHistorialClinico] Enviando historial con', history.length, 'entradas');
     res.json({
       exists: true,
       history
@@ -496,17 +529,6 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             };
         });
 
-        const clinicAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
-            ? req.body.appointmentId
-            : null;
-        const snapshot = {
-            datos: entries,
-            imageUrl: '',
-            savedAt,
-            appointmentId: clinicAppointmentId,
-            savedBy: req.user?.id || null
-        };
-
         const patientId = req.patient?.id || req.patient?._id;
         if (!patientId) {
             return res.status(400).json({
@@ -514,6 +536,17 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
                 error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
             });
         }
+
+        // Valida appointmentId vs paciente — descartado silenciosamente
+        // si referencia una cita de otro paciente (anti cross-linking).
+        const clinicAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
+        const snapshot = {
+            datos: entries,
+            imageUrl: '',
+            savedAt,
+            appointmentId: clinicAppointmentId,
+            savedBy: req.user?.id || null
+        };
 
     // NOM-024: Los registros firmados son inmutables — solo se permiten addenda
     const existingClinic = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_CLINIC, deletedAt: null });
@@ -534,6 +567,27 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       }
     }
 
+    // Concurrencia optimista: si el cliente envió expectedUpdatedAt y el
+    // documento fue modificado por otro usuario/pestaña, abortar para que
+    // refresque antes de pisar cambios.
+    if (existingClinic) {
+      const expectedUpdatedAt = req.body?.expectedUpdatedAt;
+      if (expectedUpdatedAt) {
+        const currentTs = new Date(existingClinic.updatedAt).getTime();
+        const expectedTs = new Date(expectedUpdatedAt).getTime();
+        if (Number.isNaN(expectedTs) || currentTs !== expectedTs) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'ODONTOGRAMA_STALE',
+              message: 'El odontograma clínico fue modificado por otro usuario. Recarga para ver los cambios antes de guardar.',
+              currentUpdatedAt: existingClinic.updatedAt
+            }
+          });
+        }
+      }
+    }
+
     // Determinar estadoRegistro según permisos (asistente → BORRADOR)
     const userPerms = getEffectivePermissions(req.user);
     let estadoRegistro = 'OFICIAL';
@@ -550,17 +604,31 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       auditUpdate.capturaExtemporanea = req.body._capturaExtemporanea;
     }
 
+    // Dedupe del history: si el snapshot nuevo es idéntico al `current`
+    // existente (mismo set de entries), NO se agrega otra entrada al
+    // history. Antes cada click "Guardar" sin cambios reales sumaba un
+    // snapshot duplicado al historial (bloat).
+    const isIdenticalToCurrent = (existing, nextEntries) => {
+      const prev = (existing?.current?.datos || []).map(e => `${e.tooth}|${e.damage}|${e.surface}|${e.note || ''}`).sort();
+      const next = nextEntries.map(e => `${e.tooth}|${e.damage}|${e.surface}|${e.note || ''}`).sort();
+      if (prev.length !== next.length) return false;
+      return prev.every((v, i) => v === next[i]);
+    };
+    const shouldPushHistory = !existingClinic || !isIdenticalToCurrent(existingClinic, entries);
+    const updateOps = {
+      $set: { current: snapshot, ...auditUpdate },
+      $setOnInsert: { creadoPor: req.user?.id || null }
+    };
+    if (shouldPushHistory) {
+      updateOps.$push = { history: snapshot };
+    }
     const doc = await OdontogramaModel.findOneAndUpdate(
       { patientId: patientId, type: TYPE_CLINIC, deletedAt: null },
-      {
-        $set: { current: snapshot, ...auditUpdate },
-        $push: { history: snapshot },
-        $setOnInsert: { creadoPor: req.user?.id || null }
-      },
+      updateOps,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     
-    // console.log('💾 [saveClinicalHistoryEntries] Documento guardado en BD:', {
+    // debugLog('💾 [saveClinicalHistoryEntries] Documento guardado en BD:', {
     //   docId: doc._id,
     //   currentDatos: doc.current?.datos,
     //   historyLength: doc.history?.length
@@ -573,10 +641,11 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
         id: h._id,
         fecha: h.savedAt.toISOString(),
         datos: (h.datos || []).map(normalizeEntry)
-      }))
+      })),
+      updatedAt: doc.updatedAt
     };
     
-    // console.log('📤 [saveClinicalHistoryEntries] Respuesta enviada:', {
+    // debugLog('📤 [saveClinicalHistoryEntries] Respuesta enviada:', {
     //   exists: responseData.exists,
     //   datosCount: responseData.datos.length,
     //   historyCount: responseData.history.length
@@ -696,7 +765,7 @@ const deleteClinicalOdontogramState = async (req, res, next) => {
 
 // ——— Middlewares y Error Handler ——————————————————————————————————————————————————————
 const validarEntradasOdontograma = (req, res, next) => {
-  // console.log('[DEBUG] validarEntradasOdontograma - Inicio:', {
+  // debugLog('[DEBUG] validarEntradasOdontograma - Inicio:', {
   //   hasBody: !!req.body,
   //   bodyType: typeof req.body,
   //   bodyKeys: req.body ? Object.keys(req.body) : null,
@@ -706,7 +775,7 @@ const validarEntradasOdontograma = (req, res, next) => {
   // });
 
   if (!req.body || typeof req.body !== 'object' || !('entries' in req.body)) {
-    // console.log('[ERROR] No se encontró entries en el body');
+    // debugLog('[ERROR] No se encontró entries en el body');
     return res.status(400).json({
       success: false,
       error: { code: 'NO_ENTRIES_KEY', message: "El body debe tener la clave 'entries'" }
@@ -715,30 +784,32 @@ const validarEntradasOdontograma = (req, res, next) => {
   const raw = req.body.entries;
   let entries;
 
-  // console.log('[DEBUG] Raw entries:', { type: typeof raw, value: raw });
+  // debugLog('[DEBUG] Raw entries:', { type: typeof raw, value: raw });
 
   try {
     entries = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    // console.log('[DEBUG] Parsed entries:', { type: typeof entries, isArray: Array.isArray(entries), length: entries?.length, value: entries });
+    // debugLog('[DEBUG] Parsed entries:', { type: typeof entries, isArray: Array.isArray(entries), length: entries?.length, value: entries });
   } catch (_parseError) {
-    // console.log('[ERROR] Error parseando entries:', parseError.message);
+    // debugLog('[ERROR] Error parseando entries:', parseError.message);
     return res.status(400).json({
       success: false,
       error: { code: 'INVALID_JSON', message: 'entries debe ser JSON válido' }
     });
   }
 
-  if (!Array.isArray(entries) || entries.length === 0) {
-    // console.log('[ERROR] Entries inválidas:', { isArray: Array.isArray(entries), length: entries?.length });
+  // Aceptar array vacío: representa una captura "sin hallazgos" — estado
+  // clínico legítimo. Antes el cliente inyectaba un entry-fantasma "Sano"
+  // que el engine no reconocía al recargar.
+  if (!Array.isArray(entries)) {
     return res.status(400).json({
       success: false,
-      error: { code: 'NO_ENTRIES', message: 'Debes enviar un array de entries no vacío' }
+      error: { code: 'NO_ENTRIES', message: "entries debe ser un array (puede ser vacío)." }
     });
   }
 
   // Mapear usando la función normalizada del helper
   const mappedEntries = entries.map((e) => {
-    // console.log(`[DEBUG] Procesando entry #${index}:`, e);
+    // debugLog(`[DEBUG] Procesando entry #${index}:`, e);
     const normalized = normalizeEntry(e);
     // Mantener compatibilidad con campos adicionales del controlador
     const mapped = {
@@ -747,7 +818,7 @@ const validarEntradasOdontograma = (req, res, next) => {
       // Normalizar 'condition' como alias de 'damage'
       damage: e.condition !== undefined ? e.condition : normalized.damage
     };
-    // console.log(`[DEBUG] Entry #${index} mapeada:`, mapped);
+    // debugLog(`[DEBUG] Entry #${index} mapeada:`, mapped);
     return mapped;
   });
 
@@ -773,11 +844,11 @@ const validarEntradasOdontograma = (req, res, next) => {
   
   req.validatedEntries = uniqueEntries;
 
-  // console.log('[DEBUG] Todas las entries validadas:', req.validatedEntries);
+  // debugLog('[DEBUG] Todas las entries validadas:', req.validatedEntries);
 
   for (let i = 0; i < req.validatedEntries.length; i++) {
     const item = req.validatedEntries[i];
-    // console.log(`[DEBUG] Validando entry #${i}:`, {
+    // debugLog(`[DEBUG] Validando entry #${i}:`, {
     //   tooth: item.tooth,
     //   damage: item.damage,
     //   hasTooth: !!item.tooth,
@@ -785,7 +856,7 @@ const validarEntradasOdontograma = (req, res, next) => {
     //   damageType: typeof item.damage
     // });
     if (!item.tooth || item.damage === '') {
-      // console.log(`[ERROR] Entry #${i} inválida:`, item);
+      // debugLog(`[ERROR] Entry #${i} inválida:`, item);
       return res.status(400).json({
         success: false,
         error: {

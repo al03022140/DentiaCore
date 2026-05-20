@@ -1,0 +1,239 @@
+@import './patient-detail-shared.css';
+
+/* ── Cabecera con toggle + acciones ───────────────────────── */
+
+.patient-cash-movements .cash-mov-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.patient-cash-movements .cash-mov-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.patient-cash-movements .cash-mov-toggle:focus-visible {
+  outline: 2px solid var(--color-primary, #3182ce);
+  outline-offset: 4px;
+  border-radius: var(--border-radius-sm, 4px);
+}
+
+/* El SectionHeader interno ya trae su h2 con estilos del shared.
+   Quitamos su border-bottom porque no queremos doble línea con la
+   del .patient-detail__section. */
+.patient-cash-movements .cash-mov-toggle h2 {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+.patient-cash-movements .cash-mov-chevron {
+  display: inline-block;
+  transition: transform 0.18s ease;
+  color: var(--color-text-muted, #4a5568);
+  font-size: 0.9rem;
+  width: 1rem;
+}
+
+.patient-cash-movements .cash-mov-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+/* Botón "+" circular — mismo patrón que Citas y el viejo recuadro de Caja. */
+.patient-cash-movements .cash-mov-add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-full, 999px);
+  border: 2px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.patient-cash-movements .cash-mov-add-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.patient-cash-movements .cash-mov-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Contenido colapsable */
+.patient-cash-movements .cash-mov-content[hidden] {
+  display: none;
+}
+
+.patient-cash-movements .cash-mov-content {
+  margin-top: var(--spacing-md);
+}
+
+/* ── Totales ──────────────────────────────────────────────── */
+
+.patient-cash-movements .cash-mov-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.patient-cash-movements .cash-mov-total {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-soft, #f7f9fc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+}
+
+.patient-cash-movements .cash-mov-total__label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #4a5568);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.patient-cash-movements .cash-mov-total__value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.patient-cash-movements .cash-mov-total--income .cash-mov-total__value {
+  color: var(--color-success, #2f855a);
+}
+
+.patient-cash-movements .cash-mov-total--expense .cash-mov-total__value {
+  color: var(--color-danger, #c53030);
+}
+
+.patient-cash-movements .cash-mov-total--net .cash-mov-total__value {
+  color: var(--color-primary, #3182ce);
+}
+
+@media (max-width: 640px) {
+  .patient-cash-movements .cash-mov-totals {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Listado ──────────────────────────────────────────────── */
+
+.patient-cash-movements .cash-mov-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 500px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.patient-cash-movements .cash-mov-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patient-cash-movements .cash-mov-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #4a5568);
+  text-transform: capitalize;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.02em;
+}
+
+.patient-cash-movements .cash-mov-date-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patient-cash-movements .cash-mov-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-white, #fff);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-left: 3px solid var(--color-border-medium, #cbd5e0);
+}
+
+.patient-cash-movements .cash-mov-item--income {
+  border-left-color: var(--color-success, #38a169);
+}
+
+.patient-cash-movements .cash-mov-item--expense {
+  border-left-color: var(--color-danger, #e53e3e);
+}
+
+.patient-cash-movements .cash-mov-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.patient-cash-movements .cash-mov-item__concept {
+  font-weight: 500;
+  color: var(--color-text-primary, #1a202c);
+  overflow-wrap: anywhere;
+}
+
+.patient-cash-movements .cash-mov-item__meta {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #4a5568);
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.patient-cash-movements .cash-mov-item__sep {
+  opacity: 0.6;
+}
+
+.patient-cash-movements .cash-mov-item__amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.patient-cash-movements .cash-mov-item--income .cash-mov-item__amount {
+  color: var(--color-success, #2f855a);
+}
+
+.patient-cash-movements .cash-mov-item--expense .cash-mov-item__amount {
+  color: var(--color-danger, #c53030);
+}

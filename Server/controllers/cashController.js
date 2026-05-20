@@ -245,9 +245,20 @@ exports.getLastMovements = async (req, res) => {
       filter.boxSessionId = activeSession._id;
     }
 
-    const movements = await CashMovement.find(filter)
-      .sort({ date: -1 })
-      .limit(30)
+    // ?patientId=...: devuelve TODOS los movimientos del paciente
+    // (sin limit) para la vista de ficha. Validado como ObjectId arriba
+    // en la ruta. Cuando se filtra por paciente no aplicamos el cap de
+    // 30 porque queremos un historial completo, no la "última actividad".
+    const { patientId } = req.query;
+    if (patientId) {
+      filter.patientId = patientId;
+    }
+
+    let query = CashMovement.find(filter).sort({ date: -1 });
+    if (!patientId) {
+      query = query.limit(30);
+    }
+    const movements = await query
       .populate('patientId', 'primer_nombre apellido_paterno photoURL')
       .populate('creadoPor', 'nombre')
       .populate('edits.editedBy', 'nombre')

@@ -1,4 +1,5 @@
 import API from '../../../shared/services/axios-instance.js';
+import { normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
 
 // Configuración de timeouts
 const DEFAULT_TIMEOUT = 10000;
@@ -56,7 +57,9 @@ const handleApiError = (error) => {
   throw new Error('Error al configurar la petición');
 };
 
-// Utilidad para desnormalizar payloads al backend
+// Utilidad para desnormalizar payloads al backend.
+// Se usa SÓLO sobre arrays ya pasados por normalizeEntriesForEngine, así que
+// `damage` ya es un código numérico en formato string.
 function mapToBackend(entry) {
   return {
     tooth: entry.tooth ?? entry.diente ?? '',
@@ -64,6 +67,13 @@ function mapToBackend(entry) {
     surface: entry.surface ?? entry.superficie ?? '0',
     note: entry.note ?? entry.nota ?? ''
   };
+}
+
+// Garantiza que el payload al backend lleve `damage` como código numérico
+// (string '5') y NO como nombre localizado ("Caries") o fallback genérico
+// ("Daño aplicado"). Sin esto, al recargar el engine no reconoce el daño.
+function buildBackendEntries(rawEntries) {
+  return normalizeEntriesForEngine(rawEntries).map(mapToBackend);
 }
 
 // Utilidad para normalizar payloads del backend al frontend
@@ -113,9 +123,12 @@ const odontogramaService = {
    */
   async saveInitialOdontogram(patientId, entries, options = {}) {
     try {
-      const normalized = Array.isArray(entries) ? entries.map(mapToBackend) : [];
+      const normalized = buildBackendEntries(entries);
       const body = { entries: normalized };
       if (options.appointmentId) body.appointmentId = options.appointmentId;
+      // Concurrencia optimista: el server compara con su updatedAt actual y
+      // responde 409 ODONTOGRAMA_STALE si difieren.
+      if (options.expectedUpdatedAt) body.expectedUpdatedAt = options.expectedUpdatedAt;
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial`,
         body,
@@ -199,11 +212,12 @@ const odontogramaService = {
    */
   async saveClinicalOdontogramState(patientId, entryData, options = {}) {
     try {
-      // Normalizar entryData para asegurar que sea un array
-      const normalizedEntryData = Array.isArray(entryData) ? entryData : [];
-      const entries = normalizedEntryData.map(mapToBackend);
+      const entries = buildBackendEntries(entryData);
       const body = { entries };
       if (options.appointmentId) body.appointmentId = options.appointmentId;
+      // Concurrencia optimista: el server compara con su updatedAt actual y
+      // responde 409 ODONTOGRAMA_STALE si difieren.
+      if (options.expectedUpdatedAt) body.expectedUpdatedAt = options.expectedUpdatedAt;
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-clinico`,
         body,
@@ -212,7 +226,8 @@ const odontogramaService = {
       return {
         exists: data.exists ?? true,
         datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
-        history: Array.isArray(data.history) ? data.history : []
+        history: Array.isArray(data.history) ? data.history : [],
+        updatedAt: data.updatedAt || null
       };
     } catch (error) {
       throw handleApiError(error);
@@ -233,11 +248,12 @@ const odontogramaService = {
       return {
         exists: data.exists || false,
         datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
-        history: Array.isArray(data.history) ? data.history : []
+        history: Array.isArray(data.history) ? data.history : [],
+        updatedAt: data.updatedAt || null
       };
     } catch (error) {
       if (error.response?.status === 404) {
-        return { exists: false, datos: [], history: [] };
+        return { exists: false, datos: [], history: [], updatedAt: null };
       }
       throw handleApiError(error);
     }

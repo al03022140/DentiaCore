@@ -101,9 +101,33 @@ async function copyFirmaToSnapshot(sourceFilenameOrPath, destSegments) {
   const absPath = path.join(dir, filename);
   await fsExtra.copyFile(sourcePath, absPath);
 
-  const stats = await fsExtra.stat(absPath);
+  // Hash del PNG copiado para detectar tampering posterior. La firma
+  // sigue siendo una imagen opaca — esto no es PKI, sólo defensa-en-
+  // profundidad sobre la integridad del archivo (un script de auditoría
+  // periódica puede comparar el hash actual del PNG con el almacenado).
+  const buffer = await fsExtra.readFile(absPath);
+  const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
   const publicUrl = '/uploads/' + [...dirSegments, filename].join('/');
-  return { publicUrl, absPath, bytes: stats.size };
+  return { publicUrl, absPath, bytes: buffer.length, contentHash };
 }
 
-module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, MAX_BYTES };
+/**
+ * Verifica que el PNG en disco no haya sido alterado vs el hash almacenado.
+ * Devuelve { ok: bool, expected, actual } o lanza si el archivo no existe.
+ *
+ * @param {string} absPath - Ruta absoluta del archivo PNG.
+ * @param {string} expectedHash - Hash SHA-256 hex guardado al momento del firmado.
+ */
+async function verifySignatureImageHash(absPath, expectedHash) {
+  if (!absPath || !expectedHash) {
+    return { ok: false, expected: expectedHash, actual: null, reason: 'missing_inputs' };
+  }
+  if (!await fsExtra.pathExists(absPath)) {
+    return { ok: false, expected: expectedHash, actual: null, reason: 'file_not_found' };
+  }
+  const buffer = await fsExtra.readFile(absPath);
+  const actual = crypto.createHash('sha256').update(buffer).digest('hex');
+  return { ok: actual === expectedHash, expected: expectedHash, actual };
+}
+
+module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash, MAX_BYTES };

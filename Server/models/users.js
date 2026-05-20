@@ -93,6 +93,13 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Lockout temporal del PIN tras N intentos fallidos. signingController
+  // verifica este timestamp antes de comparar el hash para evitar brute-
+  // force trivial (4 dígitos = 10 000 combinaciones).
+  pinLockedUntil: {
+    type: Date,
+    default: null
+  },
   // ── Cédula profesional (NOM-004 Art. 5.10) ────────────────
   cedulaProfesional: {
     type: String,
@@ -168,10 +175,68 @@ userSchema.methods.setPin = async function(pin) {
   this.pinFailedAttempts = 0;
 };
 
-// **Método para verificar el PIN** (Modo Cortina + firma digital)
+// Lockout del PIN: 5 intentos fallidos → 15 min de bloqueo. Sin esto,
+// 4 dígitos = 10 000 combinaciones tras una sesión válida — brute-force
+// trivial. Mantener `verificarPin` retornando boolean por compatibilidad
+// con los callers existentes; quien necesite detalles consulta
+// `pinLockedUntil` o usa `verificarPinDetallado`.
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCKOUT_MS = 15 * 60 * 1000;
+
+// **Método para verificar el PIN** (Modo Cortina + firma digital).
+// Devuelve boolean para compatibilidad con código existente.
 userSchema.methods.verificarPin = async function(pinIngresado) {
-  if (!this.pinHash) return false;
-  return await bcrypt.compare(pinIngresado, this.pinHash);
+  const result = await this.verificarPinDetallado(pinIngresado);
+  return result.ok;
+};
+
+// Versión rica: { ok, locked, remainingMs, attemptsLeft, reason }.
+// signingController la usa para devolver al cliente cuánto falta del
+// lockout y cuántos intentos quedan.
+userSchema.methods.verificarPinDetallado = async function(pinIngresado) {
+  if (!this.pinHash) {
+    return { ok: false, locked: false, attemptsLeft: PIN_MAX_ATTEMPTS, remainingMs: 0, reason: 'no_pin' };
+  }
+
+  // Lockout activo: rechazar sin gastar intento ni revelar match/miss.
+  if (this.pinLockedUntil && this.pinLockedUntil > new Date()) {
+    return {
+      ok: false,
+      locked: true,
+      remainingMs: this.pinLockedUntil.getTime() - Date.now(),
+      attemptsLeft: 0,
+      reason: 'locked'
+    };
+  }
+
+  const ok = await bcrypt.compare(pinIngresado, this.pinHash);
+
+  if (ok) {
+    if (this.pinFailedAttempts !== 0 || this.pinLockedUntil) {
+      this.pinFailedAttempts = 0;
+      this.pinLockedUntil = null;
+      await this.save({ validateBeforeSave: false });
+    }
+    return { ok: true, locked: false, attemptsLeft: PIN_MAX_ATTEMPTS, remainingMs: 0 };
+  }
+
+  this.pinFailedAttempts = (this.pinFailedAttempts || 0) + 1;
+  let locked = false;
+  let remainingMs = 0;
+  if (this.pinFailedAttempts >= PIN_MAX_ATTEMPTS) {
+    this.pinLockedUntil = new Date(Date.now() + PIN_LOCKOUT_MS);
+    locked = true;
+    remainingMs = PIN_LOCKOUT_MS;
+  }
+  await this.save({ validateBeforeSave: false });
+
+  return {
+    ok: false,
+    locked,
+    remainingMs,
+    attemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - this.pinFailedAttempts),
+    reason: locked ? 'locked' : 'wrong'
+  };
 };
 
 module.exports = mongoose.model('Usuario', userSchema);

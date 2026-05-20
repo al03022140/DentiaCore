@@ -523,12 +523,20 @@ const PatientSchema = new mongoose.Schema({
         pacienteFirmaUrl: { type: String, default: null },
         pacienteFirmadoEn: { type: Date, default: null },
         pacienteFirmaContentHash: { type: String, default: null },
+        // SHA-256 del PNG capturado al firmar. Permite detectar swap del
+        // archivo en disco posterior a la firma (defensa-en-profundidad
+        // sobre la integridad del archivo de firma; no reemplaza una
+        // firma criptográfica real).
+        pacienteFirmaImageHash: { type: String, default: null },
         // ── Firma del doctor — siempre se guarda la URL mostrable: ──
         //   method='pad' → PNG capturado en el momento (snapshot inmutable)
         //   method='pin' → snapshot de signerDoctor.firmaDigitalUrl al firmar
         // Si el doctor luego cambia su firma, la histórica no se altera.
         doctorFirmaUrl: { type: String, default: null },
         doctorFirmaMethod: { type: String, enum: ['pin', 'pad', null], default: null },
+        // SHA-256 del PNG de firma del doctor — mismo propósito que
+        // pacienteFirmaImageHash.
+        doctorFirmaImageHash: { type: String, default: null },
         // Soft-delete (NOM-004 Art. 5.4)
         deletedAt: { type: Date, default: null },
         deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
@@ -544,6 +552,12 @@ const PatientSchema = new mongoose.Schema({
 
     // 📌 Ruta donde se almacenan los archivos del paciente
     ruta_archivos: { type: String, default: "" },
+
+    // Contador atómico de numero_procedimiento para notas de evolución.
+    // Antes se calculaba como notas_evolucion.length+1 fuera de cualquier
+    // lock → dos saves concurrentes podían generar el mismo número. Ahora
+    // addEvolutionNote hace $inc atómico y usa el resultado.
+    _evolutionNoteCounter: { type: Number, default: 0, select: false },
 
     // 📌 Soft-delete (NOM-004: expedientes clínicos no pueden destruirse)
     deletedAt: { type: Date, default: null },
@@ -738,6 +752,10 @@ PatientSchema.pre('save', async function(next) {
         // Nota: campos de auditoría (estadoRegistro, firmadoPor, etc.) NO se comparan
         // porque el flujo de firma/archivado debe poder modificarlos.
         // Matching by _id to support both push and unshift insertion patterns.
+        // EXCEPCIÓN: notas en BORRADOR sí pueden editar contenido — todavía
+        // no son OFICIAL/inmutables. La inmutabilidad NOM-024 entra en
+        // vigor sólo al firmar (estadoRegistro=OFICIAL). El endpoint
+        // updateDraftEvolutionNote es el único path autorizado.
         const fieldsToCheck = ['numero_procedimiento','procedimiento','observaciones','correcciones','fecha','fechaFormateada'];
         for (let i = 0; i < oldNotes.length; i++) {
             const oldN = oldNotes[i];
@@ -748,11 +766,14 @@ PatientSchema.pre('save', async function(next) {
             if (!newN) {
                 return next(new Error('No se pueden modificar las notas de evolución existentes.'));
             }
+            // Si la nota original ya era OFICIAL → inmutable (NOM-024).
+            // Si era BORRADOR → permitir edición de contenido.
+            if (oldN.estadoRegistro !== 'OFICIAL') continue;
             for (const f of fieldsToCheck) {
                 const oldVal = oldN && oldN[f] !== undefined && oldN[f] !== null ? (oldN[f] instanceof Date ? new Date(oldN[f]).toISOString() : String(oldN[f])) : '';
                 const newVal = newN && newN[f] !== undefined && newN[f] !== null ? (newN[f] instanceof Date ? new Date(newN[f]).toISOString() : String(newN[f])) : '';
                 if (oldVal !== newVal) {
-                    return next(new Error('Las notas de evolución no pueden editarse una vez creadas.'));
+                    return next(new Error('Las notas de evolución firmadas (OFICIAL) no pueden editarse.'));
                 }
             }
         }

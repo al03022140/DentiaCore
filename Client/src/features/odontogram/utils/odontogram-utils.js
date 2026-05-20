@@ -190,14 +190,107 @@ export const prepareDataSource = (data, prefix = 'ds') => {
     // en vez de inducir al usuario a creer que la entrada se guardó hoy.
     const fechaRaw   = item.fecha;
     const fecha      = fechaRaw ? formatDateToDDMMYYYY(fechaRaw) : '—';
+    // Key estable: incluye fecha en vez de idx para no remontar filas en
+    // AntD al reordenar la tabla (perdía estado de selección/scroll). El
+    // idx queda como fallback únicamente cuando no hay fecha registrada
+    // (no debería pasar tras el server pero defendemos por las dudas).
+    const fechaKey = fechaRaw ? (fechaRaw instanceof Date ? fechaRaw.toISOString() : String(fechaRaw)) : `idx${idx}`;
     return {
       diente,
       tipo,
       superficie,
       fecha,
-      key: `${prefix}-${diente}-${tipo}-${superficie}-${idx}`
+      key: `${prefix}-${diente}-${tipo}-${superficie}-${fechaKey}`
     };
   });
+};
+
+// Normaliza un texto para matching robusto: sin acentos, minúsculas, espacios colapsados.
+const normalizeText = (s) => String(s ?? '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// Mapa nombre→código construido desde DAMAGE_NAMES + variantes localizadas que produce
+// `getDamageNameByCode` (con tildes/acentos quitados via normalizeText).
+const DAMAGE_NAME_TO_CODE = (() => {
+  const map = {};
+  Object.entries(DAMAGE_NAMES).forEach(([code, name]) => {
+    map[normalizeText(name)] = Number(code);
+  });
+  const aliases = {
+    'corona definitiva': 2, 'corona temporal': 3, 'diente ausente': 4,
+    'diente extruido': 9, 'protesis removible': 12, 'giroversion': 14,
+    'remanente radicular': 16, 'impactacion': 19, 'diente intruido': 20,
+    'diente ectopico': 21, 'diente discromico': 22, 'diente en erupcion': 24,
+    'transposicion izquierda': 25, 'transposicion derecha': 26,
+    'pulpar': 28, 'perno munon': 30, 'edentulo total': 31,
+    'ortodontico fijo (extremo)': 32, 'ortodontico fijo (centro)': 33,
+    'protesis fija': 34, 'protesis fija (izquierda)': 34,
+    'protesis fija (centro)': 35, 'protesis fija (derecha)': 36,
+    'superficie desgastada': 37, 'semi-impactacion': 38,
+  };
+  Object.entries(aliases).forEach(([k, v]) => { map[normalizeText(k)] = v; });
+  return map;
+})();
+
+/**
+ * Convierte un valor de daño (código numérico o nombre localizado) al código numérico
+ * que entiende el engine. Devuelve null si no se puede mapear.
+ * @param {string|number} rawDamage
+ * @returns {number|null}
+ */
+export const damageToCode = (rawDamage) => {
+  if (rawDamage == null || rawDamage === '') return null;
+  const asString = String(rawDamage).trim();
+  if (!asString) return null;
+  // Ya es código numérico (o string que es número puro)
+  if (/^-?\d+$/.test(asString)) {
+    const n = parseInt(asString, 10);
+    return Number.isNaN(n) ? null : n;
+  }
+  // Buscar por nombre normalizado
+  const fromName = DAMAGE_NAME_TO_CODE[normalizeText(asString)];
+  return typeof fromName === 'number' ? fromName : null;
+};
+
+/**
+ * Normaliza un conjunto de entradas para alimentar `engine.loadOdontogramaData`:
+ *  - Acepta diente/tooth y daño/damage en código o nombre localizado.
+ *  - Filtra entradas inválidas (sin diente o daño irreconocible).
+ *  - Deduplica por (diente, código de daño, superficie).
+ *  - La fecha es opcional: si no viene, se omite y el engine usará la fecha actual.
+ *
+ * @param {Array} entries - Datos crudos (e.g. response del servidor, tabla UI, import).
+ * @returns {Array<{tooth:string, damage:string, surface:string, note:string, fecha?:string}>}
+ */
+export const normalizeEntriesForEngine = (entries) => {
+  if (!Array.isArray(entries)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of entries) {
+    if (!item || typeof item !== 'object') continue;
+    const tooth = String(item.tooth ?? item.diente ?? '').trim();
+    if (!tooth) continue;
+    const damageCode = damageToCode(item.damage ?? item.tipo);
+    if (damageCode == null) continue;
+    const surface = String(item.surface ?? item.superficie ?? '0').trim() || '0';
+    const dedupKey = `${tooth}|${damageCode}|${surface}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    const normalized = {
+      tooth,
+      damage: String(damageCode),
+      surface,
+      note: String(item.note ?? item.nota ?? ''),
+    };
+    const fecha = item.fecha ?? item.date;
+    if (fecha) normalized.fecha = fecha;
+    out.push(normalized);
+  }
+  return out;
 };
 
 /**
@@ -273,6 +366,8 @@ const utils = {
   prepareDataSource,
   includesEntry,
   mergeEntries,
+  damageToCode,
+  normalizeEntriesForEngine,
   disableInitialCheckPolling,
   patchEnginePrototype
 };

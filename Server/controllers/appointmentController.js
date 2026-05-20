@@ -2,11 +2,17 @@ const Appointment = require('../models/appointment.js');
 const PatientCharge = require('../models/patientCharge.js');
 const ClinicSettings = require('../models/clinicSettings.js');
 const Patient = require('../models/patient.js');
+const Usuario = require('../models/users.js');
 const Odontograma = require('../models/odontograma.js');
 const PeriodontogramHistory = require('../models/periodontogramHistory.js');
 const Exam = require('../models/exam.js');
 const CashMovement = require('../models/cashMovement.js');
 const mongoose = require('mongoose');
+
+// Roles que pueden ser titulares de una cita (atender pacientes). Solo
+// 'doctor' y 'doctor_admin' — administrador/superadmin gestionan pero no
+// atienden clínicamente. Alineado con GET /users/doctors.
+const DOCTOR_ROLES = new Set(['doctor', 'doctor_admin']);
 
 // ───────── Constantes ─────────
 const PATIENT_FIELDS = 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento sexo';
@@ -72,6 +78,58 @@ async function findConflict({ doctorId, fecha, duracion, excludeId = null }) {
         }
     }
     return null;
+}
+
+// Detección de conflictos del PACIENTE: un paciente no puede estar en dos
+// citas a la vez aunque sean con doctores distintos. Mismo algoritmo de
+// solapamiento que findConflict.
+async function findPatientConflict({ patientId, fecha, duracion, excludeId = null }) {
+    if (!patientId || !fecha || !duracion) return null;
+    const start = new Date(fecha);
+    const end = new Date(start.getTime() + duracion * 60_000);
+    const searchFrom = new Date(start.getTime() - 8 * 60 * 60_000);
+
+    const candidates = await Appointment.find({
+        _id: excludeId ? { $ne: excludeId } : { $exists: true },
+        paciente_id: patientId,
+        deletedAt: null,
+        estado: { $nin: ['Cancelada', 'NoShow', 'Pasada'] },
+        fecha_hora: { $gte: searchFrom, $lt: end }
+    }).select('fecha_hora duracion doctor_id motivo estado').lean();
+
+    for (const c of candidates) {
+        const cStart = new Date(c.fecha_hora).getTime();
+        const cEnd = cStart + ((c.duracion || 30) * 60_000);
+        if (cStart < end.getTime() && cEnd > start.getTime()) {
+            return c;
+        }
+    }
+    return null;
+}
+
+// Valida que el doctor exista, esté activo y tenga rol que pueda atender
+// citas. Devuelve { error: string|null } — null si todo OK.
+async function validateDoctor(doctorId) {
+    if (!doctorId || !mongoose.Types.ObjectId.isValid(doctorId)) {
+        return { error: 'doctor_id inválido' };
+    }
+    const doctor = await Usuario.findById(doctorId).select('rol active').lean();
+    if (!doctor) return { error: 'Doctor no encontrado' };
+    if (doctor.active === false) return { error: 'El doctor está desactivado' };
+    if (!DOCTOR_ROLES.has(doctor.rol)) {
+        return { error: 'El usuario seleccionado no puede atender citas' };
+    }
+    return { error: null };
+}
+
+// Valida que el paciente exista y no esté eliminado.
+async function validatePatient(patientId) {
+    if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+        return { error: 'paciente_id inválido' };
+    }
+    const patient = await Patient.findOne({ _id: patientId, deletedAt: null }).select('_id').lean();
+    if (!patient) return { error: 'Paciente no encontrado o eliminado' };
+    return { error: null };
 }
 
 // Lazy transition: marca como "Pasada" las Pendiente/Confirmada cuya hora
@@ -211,17 +269,47 @@ exports.createAppointment = async (req, res) => {
             return res.status(400).json({ message: 'No se pueden programar citas en el pasado.' });
         }
 
+        // Validar que paciente y doctor existan, estén activos y el doctor
+        // tenga rol válido para atender citas.
+        const patientCheck = await validatePatient(paciente_id);
+        if (patientCheck.error) return res.status(400).json({ message: patientCheck.error });
+
+        const doctorCheck = await validateDoctor(doctor_id);
+        if (doctorCheck.error) return res.status(400).json({ message: doctorCheck.error });
+
         const defaultDuration = await getDefaultDuration();
         const dur = Number.isFinite(Number(duracion)) && Number(duracion) >= 5
             ? Math.min(Number(duracion), 480)
             : defaultDuration;
 
-        // Conflict detection
+        // Detección de conflictos: doctor solapado Y paciente solapado.
+        // 'force' salta la del doctor (caso "agendar con conflicto") pero NO
+        // la del paciente — no tiene sentido que un paciente esté en dos
+        // citas a la vez bajo ninguna circunstancia.
+        const patientConflict = await findPatientConflict({
+            patientId: paciente_id,
+            fecha,
+            duracion: dur
+        });
+        if (patientConflict) {
+            return res.status(409).json({
+                message: 'El paciente ya tiene una cita en ese horario',
+                conflictType: 'patient',
+                conflict: {
+                    _id: patientConflict._id,
+                    fecha_hora: patientConflict.fecha_hora,
+                    duracion: patientConflict.duracion || defaultDuration,
+                    motivo: patientConflict.motivo
+                }
+            });
+        }
+
         if (!force) {
             const conflict = await findConflict({ doctorId: doctor_id, fecha, duracion: dur });
             if (conflict) {
                 return res.status(409).json({
                     message: 'El doctor ya tiene una cita en ese horario',
+                    conflictType: 'doctor',
                     conflict: {
                         _id: conflict._id,
                         fecha_hora: conflict.fecha_hora,
@@ -342,33 +430,69 @@ exports.updateAppointment = async (req, res) => {
             }
         }
 
-        // ── Validar conflicto si cambió fecha/doctor/duracion ──
+        // ── Validar existencia/rol si cambió paciente_id o doctor_id ──
+        if (allowedFields.paciente_id !== undefined) {
+            const patientCheck = await validatePatient(allowedFields.paciente_id);
+            if (patientCheck.error) return res.status(400).json({ message: patientCheck.error });
+        }
+        if (allowedFields.doctor_id !== undefined) {
+            const doctorCheck = await validateDoctor(allowedFields.doctor_id);
+            if (doctorCheck.error) return res.status(400).json({ message: doctorCheck.error });
+        }
+
+        // ── Validar conflictos si cambió fecha/doctor/paciente/duracion ──
         const checkConflict = (
             allowedFields.fecha_hora !== undefined ||
             allowedFields.doctor_id !== undefined ||
+            allowedFields.paciente_id !== undefined ||
             allowedFields.duracion !== undefined
         );
-        if (checkConflict && !force) {
+        if (checkConflict) {
             const fechaFinal = allowedFields.fecha_hora || existing.fecha_hora;
             const doctorFinal = allowedFields.doctor_id || existing.doctor_id;
+            const patientFinal = allowedFields.paciente_id || existing.paciente_id;
             const duracionFinal = allowedFields.duracion || existing.duracion || (await getDefaultDuration());
 
-            const conflict = await findConflict({
-                doctorId: doctorFinal,
+            // Conflicto de paciente: SIEMPRE se valida (force no aplica).
+            const patientConflict = await findPatientConflict({
+                patientId: patientFinal,
                 fecha: fechaFinal,
                 duracion: duracionFinal,
                 excludeId: existing._id
             });
-            if (conflict) {
+            if (patientConflict) {
                 return res.status(409).json({
-                    message: 'El doctor ya tiene una cita en ese horario',
+                    message: 'El paciente ya tiene una cita en ese horario',
+                    conflictType: 'patient',
                     conflict: {
-                        _id: conflict._id,
-                        fecha_hora: conflict.fecha_hora,
-                        duracion: conflict.duracion || 30,
-                        motivo: conflict.motivo
+                        _id: patientConflict._id,
+                        fecha_hora: patientConflict.fecha_hora,
+                        duracion: patientConflict.duracion || 30,
+                        motivo: patientConflict.motivo
                     }
                 });
+            }
+
+            // Conflicto de doctor: se puede saltar con force.
+            if (!force) {
+                const conflict = await findConflict({
+                    doctorId: doctorFinal,
+                    fecha: fechaFinal,
+                    duracion: duracionFinal,
+                    excludeId: existing._id
+                });
+                if (conflict) {
+                    return res.status(409).json({
+                        message: 'El doctor ya tiene una cita en ese horario',
+                        conflictType: 'doctor',
+                        conflict: {
+                            _id: conflict._id,
+                            fecha_hora: conflict.fecha_hora,
+                            duracion: conflict.duracion || 30,
+                            motivo: conflict.motivo
+                        }
+                    });
+                }
             }
         }
 
@@ -536,12 +660,15 @@ exports.updateAppointmentStatus = async (req, res) => {
         // consulta tardó más de lo planeado mantenemos la duración original
         // (la matriz de transición permite Pasada desde Pendiente/Confirmada/
         // EnCurso — en todos los casos aplica el mismo razonamiento).
+        // El schema tiene `duracion.min = 5`, así que respetamos ese piso:
+        // si el doctor termina la cita en menos de 5 min, dejamos la duración
+        // original en lugar de fallar la validación de mongoose.
         if (estado === 'Pasada' && existing.fecha_hora) {
             const now = new Date();
             const elapsedMs = now.getTime() - new Date(existing.fecha_hora).getTime();
             if (elapsedMs > 0) {
-                const elapsedMin = Math.max(1, Math.ceil(elapsedMs / 60_000));
-                if (!existing.duracion || elapsedMin < existing.duracion) {
+                const elapsedMin = Math.ceil(elapsedMs / 60_000);
+                if (elapsedMin >= 5 && (!existing.duracion || elapsedMin < existing.duracion)) {
                     existing.duracion = elapsedMin;
                 }
             }
@@ -570,7 +697,13 @@ exports.updateAppointmentStatus = async (req, res) => {
 
         res.status(200).json({ message: 'Estado actualizado', appointment: populated });
     } catch (error) {
-        res.status(400).json({ message: 'Error al cambiar estado', error: error.message });
+        console.error('Error en updateAppointmentStatus:', error);
+        // Devolvemos error.message en `message` para que el cliente lo vea.
+        // ValidationError de mongoose, errores de save(), etc. quedan visibles.
+        res.status(400).json({
+            message: error?.message || 'Error al cambiar estado',
+            error: error?.message
+        });
     }
 };
 

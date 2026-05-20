@@ -2,6 +2,7 @@ const Patient = require('../models/patient');
 const Periodontogram = require('../models/periodontogram');
 const PeriodontogramHistory = require('../models/periodontogramHistory');
 const mongoose = require('mongoose');
+const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { validatePeriodontogramData } = require('../schemas/unified-periodontogram-schema');
@@ -230,9 +231,8 @@ exports.createInitialPeriodontogram = async (req, res) => {
       const validUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
       const newPeriodontogram = await Periodontogram.createInitial(id, validUserId);
 
-      const reqAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
-        ? req.body.appointmentId
-        : null;
+      // Valida pertenencia al paciente — descarta cita ajena en silencio.
+      const reqAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, id);
       await PeriodontogramHistory.create({
         patient: newPeriodontogram.patient,
         periodontogram: newPeriodontogram._id,
@@ -605,10 +605,21 @@ exports.getPeriodontogramSchemas = [
  * PUT /api/patients/:id/periodontogram/data
  * Guarda el JSON completo de un periodontograma (teeth + statistics).
  */
+// Genera un versionName por defecto inequívoco. El formato previo
+// (`toISOString().replace(/[:.-]/g, '')`) repetía resolución de segundo y
+// chocaba con el índice único en (patient, versionName) bajo doble-click o
+// reintentos. Ahora incluye ms + sufijo random de 6 hex chars.
+const generateDefaultVersionName = () => {
+  const iso = new Date().toISOString().replace(/[:.-]/g, ''); // ej. 20260520T143012345Z
+  const suffix = Math.random().toString(16).slice(2, 8);
+  return `${iso}_${suffix}`;
+};
+
 exports.savePeriodontogramData = [
   validatePatientIdAsId,
   checkValidationErrors,
   async (req, res) => {
+    const session = await mongoose.startSession();
     try {
       const patientId = req.params.id;
       const userId = req.user?.id || null;
@@ -621,14 +632,14 @@ exports.savePeriodontogramData = [
 
       // ✅ ESQUEMA UNIFICADO - Validar datos sin transformaciones
       console.log('📋 Validando datos con esquema unificado:', payload);
-      
+
       const validatedData = validatePeriodontogramData({
         pacienteId: patientId,
         teeth: normalizedTeethInput,
         statistics: payload.statistics || {},
-        version: payload.versionName || payload.version || new Date().toISOString().replace(/[:.-]/g, '')
+        version: payload.versionName || payload.version || generateDefaultVersionName()
       });
-      
+
       console.log('✅ Datos validados correctamente:', validatedData);
 
       const periodontogram = await ensurePeriodontogramExists(patientId, userId);
@@ -651,12 +662,41 @@ exports.savePeriodontogramData = [
         }
       }
 
-      // Determinar estadoRegistro según permisos (asistente → BORRADOR)
-      const userPerms = getEffectivePermissions(req.user);
-      let estadoRegistro = 'OFICIAL';
-      if (!hasPermission(userPerms, ['periodontogram.create']) && hasPermission(userPerms, ['periodontogram.write.draft'])) {
-        estadoRegistro = 'BORRADOR';
+      // Concurrencia optimista: si el cliente envió expectedUpdatedAt y el
+      // doc fue tocado por otro usuario/pestaña → 409 para que recargue.
+      const expectedUpdatedAt = req.body?.expectedUpdatedAt;
+      if (expectedUpdatedAt) {
+        const currentTs = new Date(periodontogram.updatedAt).getTime();
+        const expectedTs = new Date(expectedUpdatedAt).getTime();
+        if (Number.isNaN(expectedTs) || currentTs !== expectedTs) {
+          return res.status(409).json({
+            success: false,
+            code: 'PERIODONTOGRAMA_STALE',
+            message: 'El periodontograma fue modificado por otro usuario. Recarga para ver los cambios antes de guardar.',
+            currentUpdatedAt: periodontogram.updatedAt
+          });
+        }
       }
+
+      // NO auto-OFICIAL: cada save mantiene/inicializa como BORRADOR. El
+      // tránsito a OFICIAL ocurre SÓLO al firmar vía POST /api/sign/
+      // periodontograma/:id (lo dispara signingController). Antes este
+      // controller marcaba OFICIAL cada save aunque no hubiera firma real,
+      // bloqueando ediciones legítimas.
+      const userPerms = getEffectivePermissions(req.user);
+      const hasFullCreate = hasPermission(userPerms, ['periodontogram.create']);
+      const hasDraftOnly = !hasFullCreate && hasPermission(userPerms, ['periodontogram.write.draft']);
+      // Mantener estado previo si ya era BORRADOR; nuevos docs → BORRADOR.
+      // Si por algún motivo había estado OFICIAL (no debería tras el cambio,
+      // pero por compatibilidad con docs viejos) y el usuario no es admin,
+      // se rechazó arriba. Si es admin re-guardando, lo dejamos como BORRADOR
+      // explícitamente — el admin tendrá que re-firmar.
+      let estadoRegistro = periodontogram.estadoRegistro === 'BORRADOR'
+        ? 'BORRADOR'
+        : (hasDraftOnly ? 'BORRADOR' : 'BORRADOR');
+      // Nota: el `if (hasDraftOnly)` queda redundante pero documenta que
+      // asistentes siempre quedan en BORRADOR. Si en el futuro queremos
+      // que `periodontogram.create` permita OFICIAL directo, ajustar aquí.
       periodontogram.estadoRegistro = estadoRegistro;
       periodontogram.creadoPor = periodontogram.creadoPor || (userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null);
       periodontogram.modificadoPor = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
@@ -667,7 +707,7 @@ exports.savePeriodontogramData = [
 
       const normalizedTeeth = normalizeFurcaInTeeth(validatedData.teeth || {});
       const versionNameFromPayload = typeof payload.versionName === 'string' ? payload.versionName.trim() : payload.versionName;
-      const versionName = versionNameFromPayload || validatedData.version || new Date().toISOString().replace(/[:.-]/g, '');
+      const versionName = versionNameFromPayload || validatedData.version || generateDefaultVersionName();
       const createdAt = validatedData.fechaCreacion ? new Date(validatedData.fechaCreacion) : new Date();
       const updatedAt = validatedData.fechaModificacion ? new Date(validatedData.fechaModificacion) : new Date();
       const validUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
@@ -684,39 +724,40 @@ exports.savePeriodontogramData = [
         periodontogram.markModified('initial.metadata');
       }
 
-      // Intentar crear historial primero para detectar duplicados ANTES de guardar el documento principal
       const plainTeethPreSave = mapTeethToPlain(periodontogram.current.teeth);
       const plainStatisticsPreSave = statisticsToPlain(periodontogram.current.statistics);
 
-      const saveAppointmentId = mongoose.Types.ObjectId.isValid(req.body?.appointmentId)
-        ? req.body.appointmentId
-        : null;
+      // Valida pertenencia al paciente — descarta cita ajena en silencio.
+      const saveAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
+      if (saveAppointmentId) {
+        periodontogram.appointmentId = saveAppointmentId;
+      }
+
+      // Transacción: History.create + periodontogram.save deben ser
+      // atómicos. Antes el History se persistía aunque el main fallara,
+      // dejando registros huérfanos apuntando a `current` desactualizado.
       try {
-        await PeriodontogramHistory.create({
-          patient: periodontogram.patient,
-          periodontogram: periodontogram._id,
-          versionName,
-          teeth: plainTeethPreSave,
-          statistics: plainStatisticsPreSave,
-          appointmentId: saveAppointmentId,
-          createdBy: validUserId
+        await session.withTransaction(async () => {
+          await PeriodontogramHistory.create([{
+            patient: periodontogram.patient,
+            periodontogram: periodontogram._id,
+            versionName,
+            teeth: plainTeethPreSave,
+            statistics: plainStatisticsPreSave,
+            appointmentId: saveAppointmentId,
+            createdBy: validUserId
+          }], { session });
+          await periodontogram.save({ session });
         });
-        if (saveAppointmentId) {
-          periodontogram.appointmentId = saveAppointmentId;
-        }
-      } catch (historyError) {
-        // E11000 = versionName duplicado en historial
-        if (historyError.code === 11000) {
+      } catch (txError) {
+        if (txError.code === 11000) {
           return res.status(409).json({
             success: false,
             message: `Ya existe una versión con el nombre '${versionName}'. Use un nombre diferente.`
           });
         }
-        throw historyError;
+        throw txError;
       }
-
-      // Solo guardar el documento principal si el historial se creó exitosamente
-      await periodontogram.save();
 
       const plainTeeth = mapTeethToPlain(periodontogram.current.teeth);
       const plainStatistics = statisticsToPlain(periodontogram.current.statistics);
@@ -727,12 +768,18 @@ exports.savePeriodontogramData = [
         version: versionName,
         versionName: versionName,
         statistics: plainStatistics,
-        arcadas: buildArcadasFromTeeth(normalizedTeeth)
+        arcadas: buildArcadasFromTeeth(normalizedTeeth),
+        // updatedAt actualizado — el cliente debe reenviarlo como
+        // expectedUpdatedAt en el siguiente save para el control 409.
+        updatedAt: periodontogram.updatedAt,
+        estadoRegistro: periodontogram.estadoRegistro
       });
     } catch (error) {
       console.error('❌ savePeriodontogramData:', error.message);
       const statusCode = error.name === 'ValidationError' ? 400 : 500;
       res.status(statusCode).json({ success: false, message: statusCode === 500 ? 'Error interno del servidor' : error.message });
+    } finally {
+      session.endSession();
     }
   }
 ];

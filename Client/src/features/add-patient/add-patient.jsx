@@ -521,7 +521,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
         otros_nombres: patientToEdit.otros_nombres || "",
         apellido_paterno: patientToEdit.apellido_paterno || "",
         apellido_materno: patientToEdit.apellido_materno || "",
-        fecha_nacimiento: patientToEdit.fecha_nacimiento || "",
+        // Backend devuelve ISO (1990-05-20T00:00:00.000Z) y <input type="date">
+        // sólo acepta YYYY-MM-DD: sin el slice queda vacío y al guardar se
+        // perdería el dato real.
+        fecha_nacimiento: (patientToEdit.fecha_nacimiento || "").slice(0, 10),
         sexo: patientToEdit.sexo || "",
         estado_civil: patientToEdit.estado_civil || "",
         nacionalidad: patientToEdit.nacionalidad || "",
@@ -831,7 +834,11 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   /** Maneja cambios en campos simples */
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // email se normaliza a lowercase para alinearse con el schema mongoose
+    // que tiene `lowercase: true` — antes el usuario veía 'User@x.com' en
+    // el form y al recargar aparecía 'user@x.com', confuso.
+    const normalized = name === 'email' ? value.toLowerCase() : value;
+    setFormData((prev) => ({ ...prev, [name]: normalized }));
   };
 
   /** Maneja cambios en campos anidados */
@@ -1032,6 +1039,14 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       }
     }
 
+    // Concurrencia optimista: si estamos editando, enviar el updatedAt que
+    // el backend nos devolvió al cargar para que detecte si otro usuario
+    // (u otra pestaña) modificó el paciente entre tanto y responda 409
+    // PATIENT_STALE en vez de pisar cambios.
+    if (patientToEdit?.updatedAt) {
+      patientData.expectedUpdatedAt = patientToEdit.updatedAt;
+    }
+
     // Agregar todos los datos del paciente como JSON string
     formDataToSend.append('patientData', JSON.stringify(patientData));
 
@@ -1064,9 +1079,18 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       }
 
       console.error("Error procesando paciente:", err);
-      const title = patientToEdit ? 'No se pudo actualizar el paciente' : 'No se pudo guardar el paciente';
+
+      // Concurrencia optimista del backend: PATIENT_STALE significa que el
+      // paciente fue modificado por otro usuario. Mostrar mensaje claro
+      // para que recargue antes de reintentar.
+      const errCode = err?.response?.data?.code;
+      const title = errCode === 'PATIENT_STALE'
+        ? 'El paciente fue modificado por otro usuario'
+        : (patientToEdit ? 'No se pudo actualizar el paciente' : 'No se pudo guardar el paciente');
       const status = err?.response?.status || err?.status;
-      const description = err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado.';
+      const description = errCode === 'PATIENT_STALE'
+        ? 'Recarga la página para ver los cambios más recientes antes de volver a guardar.'
+        : (err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado.');
 
       Modal.error({
         title,
@@ -1081,6 +1105,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
           </div>
         )
       });
+      // Propagar el error siempre — el modal padre necesita saber que
+      // NO se guardó (antes el padre podía cerrar pensando que el save
+      // fue exitoso si sólo veía el Modal.error sin nada más).
       throw err;
     }
   };

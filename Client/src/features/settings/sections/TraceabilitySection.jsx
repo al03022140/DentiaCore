@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAuditLogs, getAuditUsers, searchAuditPatients } from '../../../shared/services/auditService';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -60,6 +60,20 @@ const TraceabilitySection = () => {
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
   const patientSearchTimer = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Toggle para ocultar eventos de desbloqueo de pantalla (modo cortina).
+  // Suelen ser muchos y poco relevantes para auditar acciones clínicas.
+  const [hideUnlocks, setHideUnlocks] = useState(false);
+
+  // Logs después de aplicar el filtro de desbloqueos.
+  const filteredLogs = useMemo(
+    () => (hideUnlocks ? logs.filter((l) => l.evento !== 'pantalla_desbloqueada') : logs),
+    [logs, hideUnlocks]
+  );
+  const hiddenUnlocksCount = useMemo(
+    () => logs.filter((l) => l.evento === 'pantalla_desbloqueada').length,
+    [logs]
+  );
 
   // Cargar usuarios al montar
   useEffect(() => {
@@ -167,15 +181,22 @@ const TraceabilitySection = () => {
     if (loading) return <p className="trace-loading">Cargando registros…</p>;
     if (error) return <p className="trace-error">{error}</p>;
     if (logs.length === 0) return <p className="trace-empty">No hay registros para los filtros seleccionados.</p>;
+    if (filteredLogs.length === 0) {
+      return (
+        <p className="trace-empty">
+          Todos los registros visibles son desbloqueos de pantalla y están ocultos. Desactiva el filtro para verlos.
+        </p>
+      );
+    }
 
     if (tab === 'usuario') {
       // Agrupar por fecha
-      const grouped = groupBy(logs, (l) => fmtDate(l.timestamp));
+      const grouped = groupBy(filteredLogs, (l) => fmtDate(l.timestamp));
       return (
         <div className="trace-results">
           <div className="trace-user-header">
-            <strong>{logs[0]?.userName || 'Usuario'}</strong>
-            <span className="trace-role-badge">{ROL_LABELS[logs[0]?.userRole] || logs[0]?.userRole}</span>
+            <strong>{filteredLogs[0]?.userName || 'Usuario'}</strong>
+            <span className="trace-role-badge">{ROL_LABELS[filteredLogs[0]?.userRole] || filteredLogs[0]?.userRole}</span>
           </div>
           {[...grouped.entries()].map(([dateStr, items]) => (
             <div key={dateStr} className="trace-date-group">
@@ -196,7 +217,7 @@ const TraceabilitySection = () => {
 
     if (tab === 'fecha') {
       // Agrupar por usuario
-      const grouped = groupBy(logs, (l) => l.userName || 'Sistema');
+      const grouped = groupBy(filteredLogs, (l) => l.userName || 'Sistema');
       return (
         <div className="trace-results">
           <div className="trace-date-header">
@@ -224,7 +245,7 @@ const TraceabilitySection = () => {
 
     if (tab === 'paciente') {
       // Agrupar por usuario → fecha
-      const grouped = groupBy(logs, (l) => l.userName || 'Sistema');
+      const grouped = groupBy(filteredLogs, (l) => l.userName || 'Sistema');
       return (
         <div className="trace-results">
           <div className="trace-patient-header">
@@ -339,6 +360,25 @@ const TraceabilitySection = () => {
         )}
       </div>
 
+      {/* ── Toggle: ocultar desbloqueos de pantalla ── */}
+      {logs.length > 0 && (
+        <div className="trace-filter-toggle">
+          <label className="trace-toggle-label">
+            <input
+              type="checkbox"
+              checked={hideUnlocks}
+              onChange={(e) => setHideUnlocks(e.target.checked)}
+            />
+            <span>
+              Ocultar desbloqueos de pantalla
+              {hiddenUnlocksCount > 0 && (
+                <span className="trace-toggle-count"> ({hiddenUnlocksCount})</span>
+              )}
+            </span>
+          </label>
+        </div>
+      )}
+
       {/* ── Resultados ── */}
       {renderLogs()}
 
@@ -366,7 +406,12 @@ const TraceabilitySection = () => {
       {/* ── Total y export ── */}
       {logs.length > 0 && (
         <div className="trace-footer">
-          <span className="trace-total">{total} registro{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}</span>
+          <span className="trace-total">
+            {total} registro{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}
+            {hideUnlocks && hiddenUnlocksCount > 0 && (
+              <> · mostrando {filteredLogs.length}</>
+            )}
+          </span>
           <button className="settings-btn-primary" onClick={handleExportPDF}>
             Exportar PDF
           </button>

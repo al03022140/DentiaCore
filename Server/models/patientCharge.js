@@ -52,6 +52,48 @@ const patientChargeSchema = new mongoose.Schema({
 // Acelera el reverse-lookup CashMovement → PatientCharge
 patientChargeSchema.index({ 'pagos.cashMovementId': 1 });
 
+// Inmutabilidad de pagos existentes: una vez registrado un pago, no se
+// puede alterar su monto/método/fecha. Sólo se permite $push de pagos
+// nuevos (o cancelar el cobro completo vía `cancelado`). Esto protege
+// la integridad de saldoPendiente y previene fraude contable silencioso.
+patientChargeSchema.pre('save', async function (next) {
+  try {
+    if (this.isNew) return next();
+    if (!this.isModified('pagos')) return next();
+
+    const original = await this.constructor.findById(this._id).select('pagos').lean();
+    if (!original) return next();
+
+    const oldPagos = Array.isArray(original.pagos) ? original.pagos : [];
+    const newPagos = Array.isArray(this.pagos) ? this.pagos : [];
+
+    if (newPagos.length < oldPagos.length) {
+      return next(new Error('No se pueden eliminar pagos registrados de un cobro.'));
+    }
+
+    const fieldsToCheck = ['monto', 'fecha', 'paymentMethod', 'cashMovementId', 'registradoPor'];
+    for (const oldP of oldPagos) {
+      const oldId = oldP._id?.toString();
+      if (!oldId) continue;
+      const newP = newPagos.find(p => p._id?.toString() === oldId);
+      if (!newP) {
+        return next(new Error('No se puede eliminar un pago ya registrado.'));
+      }
+      for (const f of fieldsToCheck) {
+        const oldVal = oldP[f] != null ? (oldP[f] instanceof Date ? new Date(oldP[f]).toISOString() : String(oldP[f])) : '';
+        const newVal = newP[f] != null ? (newP[f] instanceof Date ? new Date(newP[f]).toISOString() : String(newP[f])) : '';
+        if (oldVal !== newVal) {
+          return next(new Error(`No se puede modificar el campo "${f}" de un pago ya registrado.`));
+        }
+      }
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Recalcular totales de pago antes de guardar
 patientChargeSchema.pre('save', function (next) {
   if (this.confirmado && this.isModified('items')) {

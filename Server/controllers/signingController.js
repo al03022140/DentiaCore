@@ -55,16 +55,32 @@ const signRecord = async (req, res, next) => {
       return res.status(400).json({ error: 'No tiene PIN configurado. Configure su PIN antes de firmar.' });
     }
 
-    const pinValido = await usuario.verificarPin(pin);
-    if (!pinValido) {
-      // Registrar intento fallido
+    const pinResult = await usuario.verificarPinDetallado(pin);
+    if (!pinResult.ok) {
+      // Registrar intento fallido (incluyendo si entró por lockout)
       await auditLogger.registrarManual(req, 'pin_fallo', {
         resourceType,
         resourceId,
-        detalles: { contexto: 'firma_electronica' },
+        detalles: {
+          contexto: 'firma_electronica',
+          locked: pinResult.locked,
+          reason: pinResult.reason
+        },
       });
 
-      return res.status(401).json({ error: 'PIN incorrecto' });
+      if (pinResult.locked) {
+        const minutos = Math.ceil(pinResult.remainingMs / 60000);
+        return res.status(429).json({
+          error: `PIN bloqueado por demasiados intentos fallidos. Reintenta en ${minutos} minuto(s).`,
+          locked: true,
+          remainingMs: pinResult.remainingMs
+        });
+      }
+
+      return res.status(401).json({
+        error: 'PIN incorrecto',
+        attemptsLeft: pinResult.attemptsLeft
+      });
     }
 
     // ── Buscar y firmar el documento ──────────────────────────
@@ -86,6 +102,17 @@ const signRecord = async (req, res, next) => {
     doc.firmadoEn = new Date();
     doc.contentHash = contentHash;
     doc.firmaDesactualizada = false;
+
+    // Promover a OFICIAL: la inmutabilidad de NOM-024 entra en vigor sólo
+    // tras la firma explícita. Antes los saves auto-marcaban OFICIAL aunque
+    // no hubiera firma real → bloqueaba ediciones legítimas. Diferentes
+    // modelos usan distintos nombres de campo (estadoRegistro vs estado).
+    if (doc.schema?.path('estadoRegistro')) {
+      doc.estadoRegistro = 'OFICIAL';
+    }
+    if (doc.schema?.path('estado')) {
+      doc.estado = 'OFICIAL';
+    }
 
     await doc.save();
 

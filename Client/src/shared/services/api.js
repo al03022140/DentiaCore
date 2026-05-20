@@ -85,9 +85,13 @@ export const updatePatient = async (id, patientData) => {
     }
 };
 
-export const deletePatient = async (id) => {
+// El backend exige deleteReason (>=10 chars). axios no serializa body en
+// DELETE salvo que se pase { data: ... }, por eso el config va explícito.
+export const deletePatient = async (id, deleteReason) => {
     try {
-        const response = await api.delete(`/patients/${id}`);
+        const response = await api.delete(`/patients/${id}`, {
+            data: { deleteReason }
+        });
         invalidatePatientsCache();
         return response.data;
     } catch (error) {

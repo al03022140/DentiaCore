@@ -14,22 +14,20 @@ const CHART_TYPE_MAP = {
   heatmap: 'bar'
 };
 
+// Paleta alineada con `Client/src/features/main-page/components/patient-stats.jsx`
+// para que las gráficas de Estadísticas se vean iguales que el widget del Home.
 const COLOR_PALETTE = [
-  { bg: 'rgba(8, 72, 136, 0.3)', border: 'rgba(8, 72, 136, 0.9)' },
-  { bg: 'rgba(39, 174, 96, 0.3)', border: 'rgba(39, 174, 96, 0.9)' },
-  { bg: 'rgba(231, 76, 60, 0.3)', border: 'rgba(231, 76, 60, 0.9)' },
-  { bg: 'rgba(243, 156, 18, 0.3)', border: 'rgba(243, 156, 18, 0.9)' },
-  { bg: 'rgba(52, 152, 219, 0.3)', border: 'rgba(52, 152, 219, 0.9)' },
-  { bg: 'rgba(155, 89, 182, 0.3)', border: 'rgba(155, 89, 182, 0.9)' }
+  { bg: 'rgba(75, 192, 192, 0.25)',  border: 'rgba(75, 192, 192, 1)'  },
+  { bg: 'rgba(54, 162, 235, 0.25)',  border: 'rgba(54, 162, 235, 1)'  },
+  { bg: 'rgba(255, 159, 64, 0.25)',  border: 'rgba(255, 159, 64, 1)'  },
+  { bg: 'rgba(153, 102, 255, 0.25)', border: 'rgba(153, 102, 255, 1)' }
 ];
 
 const PIE_PALETTE = [
-  'rgba(8, 72, 136, 0.85)',
-  'rgba(39, 174, 96, 0.85)',
-  'rgba(231, 76, 60, 0.85)',
-  'rgba(243, 156, 18, 0.85)',
-  'rgba(52, 152, 219, 0.85)',
-  'rgba(155, 89, 182, 0.85)'
+  'rgba(75, 192, 192, 0.85)',
+  'rgba(54, 162, 235, 0.85)',
+  'rgba(255, 159, 64, 0.85)',
+  'rgba(153, 102, 255, 0.85)'
 ];
 
 const buildParams = granularity => ({
@@ -44,17 +42,21 @@ const styleDatasets = (datasets, visualization) => {
       return {
         ...ds,
         backgroundColor: ds.data.map((_, i) => PIE_PALETTE[i % PIE_PALETTE.length]),
-        borderWidth: 0
+        borderColor: '#fff',
+        borderWidth: 2
       };
     }
 
+    const isLine = visualization === 'linea';
     return {
       ...ds,
       backgroundColor: color.bg,
       borderColor: color.border,
-      fill: visualization === 'linea',
-      tension: visualization === 'linea' ? 0.3 : 0,
-      borderWidth: visualization === 'linea' ? 2 : 1
+      fill: isLine,
+      tension: isLine ? 0.35 : 0,
+      borderWidth: isLine ? 2 : 1,
+      pointRadius: isLine ? 3 : 0,
+      pointHoverRadius: isLine ? 5 : 0
     };
   });
 };

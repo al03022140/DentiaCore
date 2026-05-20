@@ -1,84 +1,240 @@
-.patient-info-wrapper {
-  --patient-bg-color: var(--figma-bg-card);
-  --patient-text-color: var(--figma-text-secondary);
-  --patient-heading-color: var(--figma-text-primary);
-  --patient-border-radius: var(--figma-radius-lg);
-  --patient-box-shadow: var(--figma-shadow-card);
+/* ── Card siguiendo el patrón de patient-stats / clock ── */
+.next-patient-card {
+  background-color: var(--figma-bg-card);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-lg);
+  box-shadow: var(--figma-shadow-card);
+  padding: var(--figma-space-lg) var(--figma-space-2xl);
+  box-sizing: border-box;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
+  gap: var(--figma-space-md);
+  min-width: 0;
+  overflow: hidden;
 }
 
-.patient-info-wrapper .patient-info {
+/* ── Header ── */
+.next-patient-card_header {
   display: flex;
   align-items: center;
-  padding: var(--figma-space-lg) var(--figma-space-2xl);
-  border-radius: var(--patient-border-radius);
-  background-color: var(--patient-bg-color);
-  border: 1px solid var(--figma-border-default);
-  box-shadow: var(--patient-box-shadow);
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  min-height: 72px;
-  gap: var(--figma-space-lg);
-}
-
-.patient-info-wrapper.no-patient .patient-info {
-  min-height: 60px;
-  justify-content: center;
-}
-
-.patient-info-wrapper .patient-image img {
-  width: var(--figma-avatar-size);
-  height: var(--figma-avatar-size);
-  border-radius: var(--figma-radius-full);
-  object-fit: cover;
+  justify-content: space-between;
+  gap: var(--figma-space-md);
   flex-shrink: 0;
 }
 
-.patient-info-wrapper .patient-details {
+.next-patient-card_title {
+  font: var(--figma-text-heading-md);
+  letter-spacing: var(--figma-text-heading-md-tracking);
+  color: var(--figma-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Body horizontal: avatar a la izquierda + contenido a la derecha ── */
+.next-patient-card_body {
+  display: flex;
+  align-items: stretch;
+  gap: var(--figma-space-lg);
+  min-width: 0;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.next-patient-card_avatar {
+  flex-shrink: 0;
+  width: clamp(96px, 16vw, 132px);
+  aspect-ratio: 1 / 1;
+  align-self: center;
+}
+
+.next-patient-card_avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--figma-radius-full);
+  object-fit: cover;
+  display: block;
+  border: 2px solid var(--figma-bg-card);
+  box-shadow: 0 0 0 1px var(--figma-border-default), var(--figma-shadow-card);
+}
+
+.next-patient-card_content {
+  flex-grow: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--figma-space-xs);
+  justify-content: center;
+}
+
+/* ── Fila 1: nombre + status badge ── */
+.next-patient-card_name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--figma-space-md);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.next-patient-card_name {
+  font: var(--figma-fw-bold) 20px / 26px var(--figma-font-family);
+  letter-spacing: -0.31px;
+  color: var(--figma-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
   flex-grow: 1;
-  gap: 2px;
 }
 
-.patient-info-wrapper .patient-details p {
-  margin: 0;
-  color: var(--patient-text-color);
+/* Badge de estado autocontenido (no depende del CSS de Consultas). */
+.next-patient-card_status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--figma-radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.next-patient-card_status--confirmed {
+  background: rgba(76, 175, 80, 0.12);
+  color: var(--color-green-800, #2e7d32);
+}
+
+.next-patient-card_status--waiting {
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--color-warning, #b45309);
+}
+
+.next-patient-card_status--in-progress {
+  background: var(--consultas-brand-tint, rgba(37, 99, 235, 0.12));
+  color: var(--color-primary, #1d4ed8);
+}
+
+/* ── Fila 2: chips horizontales (hora, día, teléfono) ── */
+.next-patient-card_chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--figma-space-xs);
+}
+
+.next-patient-card_chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--figma-radius-full);
+  background: var(--figma-bg-neutral-alt, rgba(0, 0, 0, 0.04));
+  color: var(--figma-text-secondary);
   font: var(--figma-text-caption);
+  letter-spacing: var(--figma-text-caption-tracking);
+  white-space: nowrap;
 }
 
-.patient-info-wrapper .patient-details strong {
-  font: var(--figma-text-body);
-  color: var(--patient-heading-color);
+.next-patient-card_chip svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.next-patient-card_chip--time {
+  color: var(--figma-text-primary);
+  font-weight: var(--figma-fw-medium);
+}
+
+/* ── Fila 3: meta horizontal (motivo / comentario lado a lado) ── */
+.next-patient-card_meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--figma-space-md);
+  margin-top: var(--figma-space-xs);
+  padding-top: var(--figma-space-md);
+  border-top: 1px solid var(--figma-border-default);
+}
+
+.next-patient-card_meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-patient-card_meta-label {
+  font: var(--figma-text-small);
+  color: var(--figma-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.next-patient-card_meta-value {
+  font: var(--figma-text-body-regular);
+  color: var(--figma-text-primary);
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Estado vacío ── */
+.next-patient-card_empty {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 80px;
+}
+
+.next-patient-card_empty p {
   margin: 0;
+  font: var(--figma-text-body-regular);
+  color: var(--figma-text-secondary);
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .next-patient-card_avatar {
+    width: clamp(88px, 18vw, 112px);
+  }
+  .next-patient-card_name {
+    font: var(--figma-fw-bold) 18px / 24px var(--figma-font-family);
+  }
 }
 
 @media (max-width: 768px) {
-  .patient-info-wrapper .patient-info {
+  .next-patient-card {
     padding: var(--figma-space-md) var(--figma-space-lg);
   }
-  .patient-info-wrapper .patient-image img {
-    width: 36px;
-    height: 36px;
+  .next-patient-card_body {
+    gap: var(--figma-space-md);
+  }
+  .next-patient-card_avatar {
+    width: 80px;
   }
 }
 
 @media (max-width: 480px) {
-  .patient-info-wrapper .patient-info {
-    padding: var(--figma-space-xs) var(--figma-space-md);
-    gap: var(--figma-space-md);
+  .next-patient-card {
+    padding: var(--figma-space-md);
   }
-  .patient-info-wrapper .patient-image img {
-    width: 32px;
-    height: 32px;
+  .next-patient-card_avatar {
+    width: 64px;
   }
-  .patient-info-wrapper .patient-details strong {
+  .next-patient-card_name {
+    font: var(--figma-fw-bold) 16px / 22px var(--figma-font-family);
+  }
+  .next-patient-card_title {
     font: var(--figma-text-label);
   }
-  .patient-info-wrapper .patient-details p {
-    font: var(--figma-text-small-regular);
+  .next-patient-card_meta {
+    grid-template-columns: 1fr;
   }
 }

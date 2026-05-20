@@ -1,14 +1,19 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
 import { Skeleton } from 'antd';
 import "../styles/patient-stats.css";
 import API from '../../../shared/services/axios-instance';
 
+// Catálogo curado de Home — apunta a los MISMOS endpoints que la pantalla
+// de Estadísticas (Client/src/features/statistics/StatisticsPage.jsx) para
+// que los números coincidan entre las dos vistas.
+// Si quieres agregar/quitar métricas de Home, sólo modifica este array.
 const STAT_OPTIONS = [
-  { key: 'patients-trend',      label: 'Tendencia de pacientes',   yLabel: 'Pacientes',  type: 'bar'  },
-  { key: 'cashbox-performance', label: 'Rendimiento de caja',       yLabel: 'Ingresos',   type: 'bar'  },
-  { key: 'no-shows',            label: 'Citas no presentadas',      yLabel: 'Citas',      type: 'bar'  },
-  { key: 'productivity',        label: 'Productividad',             yLabel: 'Valor',      type: 'line' },
+  { key: 'total-revenue',       endpoint: '/stats/summary',             label: 'Ingresos Totales',       type: 'bar' },
+  { key: 'net-earnings',        endpoint: '/stats/net-earnings',        label: 'Ganancias Netas',        type: 'bar' },
+  { key: 'patient-type-trend',  endpoint: '/stats/patients-trend',      label: 'Nuevos vs Recurrentes',  type: 'bar' },
+  { key: 'no-shows',            endpoint: '/stats/no-shows',            label: 'No Shows y Cancelaciones', type: 'bar' },
+  { key: 'cashbox-performance', endpoint: '/stats/cashbox-performance', label: 'Caja por Turno',         type: 'bar' },
 ];
 
 const PALETTE = [
@@ -26,32 +31,16 @@ const PatientStats = () => {
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedKey, setSelectedKey] = useState(
-        () => localStorage.getItem('home_stat_key') || 'patients-trend'
-    );
+    const [selectedKey, setSelectedKey] = useState(() => {
+        const saved = localStorage.getItem('home_stat_key');
+        // Si la key guardada ya no está en el catálogo (ej. 'productivity' tras
+        // unificar con Estadísticas), volvemos al default.
+        if (saved && STAT_OPTIONS.some(o => o.key === saved)) return saved;
+        return STAT_OPTIONS[0].key;
+    });
     const [menuOpen, setMenuOpen] = useState(false);
 
     const selectedStat = STAT_OPTIONS.find(o => o.key === selectedKey) || STAT_OPTIONS[0];
-
-    const fetchStats = useCallback(async (key) => {
-        try {
-            setLoading(true);
-            setError(null);
-            const now = new Date();
-            const from = new Date(now.getFullYear(), 0, 1).toISOString();
-            const to = now.toISOString();
-            const { data } = await API.get(`/stats/${key}`, {
-                params: { from, to, group: 'month' }
-            });
-            setChartData(data);
-        } catch (err) {
-            console.error('Error fetching stats:', err);
-            setError('No se pudieron cargar las estadísticas');
-            setChartData(null);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
 
     // Fetch con AbortController para cancelar la request anterior cuando el
     // usuario cambia rápido de selectedKey (race condition: si la primera
@@ -66,7 +55,7 @@ const PatientStats = () => {
                 const now = new Date();
                 const from = new Date(now.getFullYear(), 0, 1).toISOString();
                 const to = now.toISOString();
-                const { data } = await API.get(`/stats/${selectedKey}`, {
+                const { data } = await API.get(selectedStat.endpoint, {
                     params: { from, to, group: 'month' },
                     signal: controller.signal,
                 });
@@ -85,7 +74,7 @@ const PatientStats = () => {
             cancelled = true;
             controller.abort();
         };
-    }, [selectedKey]);
+    }, [selectedStat]);
 
     // Close menu on outside click
     useEffect(() => {
@@ -139,7 +128,10 @@ const PatientStats = () => {
                         beginAtZero: true,
                         grace: '15%',
                         title: { display: false },
-                        ticks: { stepSize: 1, maxTicksLimit: 6 },
+                        // Sin stepSize fijo: Chart.js calcula el paso óptimo
+                        // según el rango. stepSize:1 rompía visualmente las
+                        // métricas con valores en miles (ingresos).
+                        ticks: { maxTicksLimit: 6, precision: 0 },
                         grid: { color: 'rgba(0,0,0,0.05)' },
                     },
                 },

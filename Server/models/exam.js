@@ -77,5 +77,10 @@ const examSchema = new mongoose.Schema({
     timestamps: true // 🔹 Agrega `createdAt` y `updatedAt` automáticamente
 });
 
+// Marca firmaDesactualizada = true automáticamente cuando se edita el
+// contenido firmado tras la firma.
+const { attachSignatureInvalidationHook } = require('../utils/signature-invalidation');
+attachSignatureInvalidationHook(examSchema, 'examen');
+
 // 🔹 Exportación correcta del modelo
 module.exports = mongoose.model('Examen', examSchema);

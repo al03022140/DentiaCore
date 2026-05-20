@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
+const { PERIODONTOGRAM_CONFIG, MEASUREMENT_LIMITS } = require('../config/periodontogram-config');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
 
 const FACE_KEYS = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
@@ -106,9 +106,13 @@ const caraSchema = new mongoose.Schema({
     type: [Number],
     validate: {
       validator: function(arr) {
-        return arr.length === 3 && arr.every(val => val >= -9 && val <= 9);
+        // Alineado con MEASUREMENT_LIMITS.GINGIVAL_MARGIN (config periodontograma):
+        // mantenemos misma fuente de verdad para evitar que un valor pase la
+        // validación unificada del schema y luego rebote acá con 500.
+        const { min, max } = MEASUREMENT_LIMITS.GINGIVAL_MARGIN;
+        return arr.length === 3 && arr.every(val => val >= min && val <= max);
       },
-      message: 'Margen gingival debe ser array de 3 elementos entre -9 y +9mm'
+      message: `Margen gingival debe ser array de 3 elementos entre ${MEASUREMENT_LIMITS.GINGIVAL_MARGIN.min} y ${MEASUREMENT_LIMITS.GINGIVAL_MARGIN.max}mm`
     },
     default: [0, 0, 0]
   },
@@ -116,9 +120,10 @@ const caraSchema = new mongoose.Schema({
     type: [Number],
     validate: {
       validator: function(arr) {
-        return arr.length === 3 && arr.every(val => val >= -9 && val <= 9);
+        const { min, max } = MEASUREMENT_LIMITS.PROBING_DEPTH;
+        return arr.length === 3 && arr.every(val => val >= min && val <= max);
       },
-      message: 'Profundidad sondaje debe ser array de 3 elementos entre -9 y +9mm'
+      message: `Profundidad sondaje debe ser array de 3 elementos entre ${MEASUREMENT_LIMITS.PROBING_DEPTH.min} y ${MEASUREMENT_LIMITS.PROBING_DEPTH.max}mm`
     },
     default: [0, 0, 0]
   }
@@ -126,16 +131,35 @@ const caraSchema = new mongoose.Schema({
 
 
 
+// Cross-check FDI: el primer dígito determina arcada.
+//   1xx, 2xx, 5xx, 6xx → superior
+//   3xx, 4xx, 7xx, 8xx → inferior
+const fdiArcadaFor = (numeroDiente) => {
+  const decena = Math.floor(numeroDiente / 10);
+  if ([1, 2, 5, 6].includes(decena)) return 'superior';
+  if ([3, 4, 7, 8].includes(decena)) return 'inferior';
+  return null;
+};
+
 // Esquema para datos clínicos por diente según normalización 4-caras
 const dienteSchema = new mongoose.Schema({
   numeroDiente: {
     type: Number,
-    required: true
+    required: true,
+    min: 11,
+    max: 85
   },
   arcada: {
     type: String,
     enum: ['superior', 'inferior'],
-    required: true
+    required: true,
+    validate: {
+      validator: function(arcada) {
+        const expected = fdiArcadaFor(this.numeroDiente);
+        return !expected || expected === arcada;
+      },
+      message: props => `Arcada '${props.value}' incompatible con numeroDiente según FDI.`
+    }
   },
   // Estado del diente: ausente (booleano). Alias 'absent' para compatibilidad.
   ausente: {
@@ -144,12 +168,15 @@ const dienteSchema = new mongoose.Schema({
     default: false,
     alias: 'absent'
   },
-  // anchuraEncia por diente (rango -99 a 99 según especificación actualizada)
+  // anchuraEncia alineada con MEASUREMENT_LIMITS.GUM_WIDTH (config periodontograma).
+  // Antes el modelo declaraba -99..99 pero `validatePeriodontogramData` usa 0..10
+  // → un valor en el medio (ej. 20) hubiera podido pasar mongoose y romper UIs
+  // que asumen el rango clínico. Una sola fuente de verdad.
   anchuraEncia: {
     type: Number,
-    min: -99,
-    max: 99,
-    default: 0
+    min: MEASUREMENT_LIMITS.GUM_WIDTH.min,
+    max: MEASUREMENT_LIMITS.GUM_WIDTH.max,
+    default: MEASUREMENT_LIMITS.GUM_WIDTH.default
   },
   implante: {
     type: Boolean,
@@ -573,5 +600,10 @@ PeriodontogramSchema.statics.clearCache = function() {
     UniversalToothValidator.invalidateCache();
   }
 };
+
+// Marca firmaDesactualizada = true automáticamente cuando se edita el
+// contenido firmado tras la firma.
+const { attachSignatureInvalidationHook } = require('../utils/signature-invalidation');
+attachSignatureInvalidationHook(PeriodontogramSchema, 'periodontograma');
 
 module.exports = mongoose.model('Periodontogram', PeriodontogramSchema);

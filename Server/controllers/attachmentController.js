@@ -3,8 +3,13 @@ const path = require('path');
 const fs = require('fs-extra');
 const PatientAttachment = require('../models/patientAttachment');
 const { getUploadsBase } = require('../utils/uploads');
+const { validateMimeByMagicBytes } = require('../utils/fileMagicBytes');
 
 const uploadsBase = getUploadsBase();
+
+// Cap de adjuntos por paciente. Evita que un paciente acumule miles de
+// archivos (cada uno hasta 15MB) saturando disco y backups.
+const MAX_ATTACHMENTS_PER_PATIENT = 100;
 
 // GET /api/patients/:id/attachments
 exports.listAttachments = async (req, res) => {
@@ -13,7 +18,9 @@ exports.listAttachments = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
       return res.status(400).json({ message: 'ID de paciente inválido' });
     }
-    const items = await PatientAttachment.find({ patientId })
+    // Filtrar soft-deleted: cascade desde deletePatient los marca con
+    // deletedAt. Antes seguían apareciendo en la UI del expediente.
+    const items = await PatientAttachment.find({ patientId, deletedAt: null })
       .sort({ createdAt: -1 })
       .populate('subidoPor', 'nombre')
       .lean();
@@ -33,6 +40,26 @@ exports.createAttachment = async (req, res) => {
     }
     if (!req.file) {
       return res.status(400).json({ message: 'No se recibió archivo' });
+    }
+
+    // Cap de cantidad por paciente. Limpiar el upload si rechazamos.
+    const activeCount = await PatientAttachment.countDocuments({ patientId, deletedAt: null });
+    if (activeCount >= MAX_ATTACHMENTS_PER_PATIENT) {
+      if (req.file?.path) fs.remove(req.file.path).catch(() => {});
+      return res.status(409).json({
+        message: `Este paciente ya alcanzó el límite de ${MAX_ATTACHMENTS_PER_PATIENT} adjuntos. Elimine alguno antes de agregar otro.`
+      });
+    }
+
+    // Magic bytes sniff: bloquea archivos con MIME spoofeado (ej. .exe
+    // renombrado a .pdf con Content-Type falsificado). Multer ya validó
+    // contra ALLOWED_MIME_TYPES pero confía en lo que dice el cliente.
+    const mimeCheck = await validateMimeByMagicBytes(req.file.path, req.file.mimetype);
+    if (!mimeCheck.ok) {
+      await fs.remove(req.file.path).catch(() => {});
+      return res.status(415).json({
+        message: `El contenido del archivo no coincide con el tipo declarado (${mimeCheck.declared}). Posible MIME spoofing.`
+      });
     }
 
     const { categoria, descripcion } = req.body || {};

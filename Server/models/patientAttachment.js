@@ -19,7 +19,14 @@ const patientAttachmentSchema = new mongoose.Schema({
   // Categoría libre (radiografia, receta, identificacion, otro). Opcional.
   categoria: { type: String, trim: true, default: 'otro', maxlength: 50 },
   descripcion: { type: String, trim: true, default: '', maxlength: 500 },
-  subidoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null }
+  subidoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  // Soft-delete: cascadeado al borrar paciente para alinearse con LFPDPPP
+  // (derecho de cancelación). Antes los adjuntos quedaban activos y la
+  // URL pública seguía sirviendo el archivo aunque el paciente estuviera
+  // dado de baja.
+  deletedAt: { type: Date, default: null },
+  deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  deleteReason: { type: String, default: null }
 }, { timestamps: true });
 
 patientAttachmentSchema.index({ patientId: 1, createdAt: -1 });

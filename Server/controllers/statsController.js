@@ -24,12 +24,31 @@ const GRANULARITY_MAP = {
 
 const normalizeGranularity = raw => GRANULARITY_MAP[raw] || raw || 'month';
 
-const parseDateRange = (from, to) => {
+// Ventana por defecto según la granularidad. Con "diaria" sobre 1 año se
+// generan ~365 puntos casi todos en cero — las líneas/barras quedan ilegibles.
+// Estos defaults mantienen entre ~12 y ~60 puntos por gráfica.
+const DEFAULT_WINDOW_BY_GRANULARITY = {
+  day:   { field: 'date',  amount: 30 },
+  week:  { field: 'date',  amount: 12 * 7 },
+  month: { field: 'month', amount: 12 },
+  year:  { field: 'year',  amount: 5 }
+};
+
+const parseDateRange = (from, to, granularity = 'month') => {
   const now = new Date();
-  const end = to ? new Date(to) : now;
-  const start = from
-    ? new Date(from)
-    : new Date(end.getFullYear() - 1, end.getMonth(), end.getDate());
+  let end = to ? new Date(to) : now;
+  // Fechas inválidas (ej. ?to=abc) caen al default en vez de NaN time.
+  if (Number.isNaN(end.getTime())) end = new Date(now);
+
+  let start = from ? new Date(from) : null;
+  if (start && Number.isNaN(start.getTime())) start = null;
+  if (!start) {
+    const window = DEFAULT_WINDOW_BY_GRANULARITY[granularity] || DEFAULT_WINDOW_BY_GRANULARITY.month;
+    start = new Date(end);
+    if (window.field === 'date')  start.setDate(start.getDate() - window.amount);
+    if (window.field === 'month') start.setMonth(start.getMonth() - window.amount);
+    if (window.field === 'year')  start.setFullYear(start.getFullYear() - window.amount);
+  }
 
   end.setHours(23, 59, 59, 999);
   start.setHours(0, 0, 0, 0);
@@ -40,6 +59,56 @@ const buildDateGroup = (dateField, format) => ({
   $dateToString: { format, date: dateField }
 });
 
+// ISO week number (lunes-domingo, semana 1 = la que contiene el primer jueves).
+// Coincide con MongoDB %V.
+const isoWeekString = (date) => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+};
+
+// Genera los labels completos del rango según la granularidad, para que
+// los gráficos NO salten periodos sin datos. El llamador hace map sobre
+// estos labels y rellena con 0 los que no estén en su map de resultados.
+const buildPeriodLabels = (start, end, granularity) => {
+  const labels = [];
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const stop = new Date(end);
+
+  // Tope defensivo: 5 años de días = 1825 puntos. Evita loops infinitos
+  // por bugs y limita la respuesta.
+  const MAX_POINTS = 1825;
+
+  while (cursor <= stop && labels.length < MAX_POINTS) {
+    if (granularity === 'day') {
+      const yyyy = cursor.getFullYear();
+      const mm = String(cursor.getMonth() + 1).padStart(2, '0');
+      const dd = String(cursor.getDate()).padStart(2, '0');
+      labels.push(`${yyyy}-${mm}-${dd}`);
+      cursor.setDate(cursor.getDate() + 1);
+    } else if (granularity === 'week') {
+      labels.push(isoWeekString(cursor));
+      cursor.setDate(cursor.getDate() + 7);
+    } else if (granularity === 'year') {
+      labels.push(String(cursor.getFullYear()));
+      cursor.setFullYear(cursor.getFullYear() + 1);
+    } else {
+      // month (default)
+      const yyyy = cursor.getFullYear();
+      const mm = String(cursor.getMonth() + 1).padStart(2, '0');
+      labels.push(`${yyyy}-${mm}`);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  // Dedupe defensivo (week puede repetirse en bordes de año).
+  return Array.from(new Set(labels));
+};
+
 // ─── 1. Resumen general ─────────────────────────────────
 
 exports.getSummary = async (req, res) => {
@@ -47,7 +116,7 @@ exports.getSummary = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     const dateFilter = { $gte: start, $lte: end };
 
@@ -79,11 +148,15 @@ exports.getSummary = async (req, res) => {
     const statusMap = {};
     appointmentsByStatus.forEach(item => { statusMap[item._id] = item.count; });
 
+    const revenueMap = {};
+    revenueTrend.forEach(item => { revenueMap[item._id] = item.total; });
+    const summaryLabels = buildPeriodLabels(start, end, granularity);
+
     res.json({
       period: { from: start, to: end, granularity },
       revenue: {
-        labels: revenueTrend.map(item => item._id),
-        data: revenueTrend.map(item => item.total),
+        labels: summaryLabels,
+        data: summaryLabels.map(l => revenueMap[l] || 0),
         totalAmount: revenueTrend.reduce((sum, item) => sum + item.total, 0),
         totalMovements: revenueTrend.reduce((sum, item) => sum + item.count, 0)
       },
@@ -106,7 +179,7 @@ exports.getRevenueByService = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     const pipeline = [
       { $match: { date: { $gte: start, $lte: end }, type: 'INCOME' } },
@@ -157,7 +230,7 @@ exports.getPatientsTrend = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     // Pacientes nuevos por periodo (basado en createdAt)
     const newPatients = await Patient.aggregate([
@@ -193,16 +266,11 @@ exports.getPatientsTrend = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    // Unificar labels
-    const labelsSet = new Set();
-    newPatients.forEach(item => labelsSet.add(item._id));
-    returningPatients.forEach(item => labelsSet.add(item._id));
-    const labels = Array.from(labelsSet).sort();
-
     const newMap = {};
     newPatients.forEach(item => { newMap[item._id] = item.count; });
     const retMap = {};
     returningPatients.forEach(item => { retMap[item._id] = item.count; });
+    const labels = buildPeriodLabels(start, end, granularity);
 
     res.json({
       labels,
@@ -235,13 +303,16 @@ exports.getNoShows = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
+    // 'NoShow' es el estado real para "no asistió". 'Pasada' se asigna
+    // automáticamente a TODA cita pasada sin cerrar (incluso asistidas),
+    // así que NO debe contarse aquí.
     const pipeline = [
       { $match: {
         fecha_hora: { $gte: start, $lte: end },
         deletedAt: null,
-        estado: { $in: ['Cancelada', 'Pasada'] }
+        estado: { $in: ['Cancelada', 'NoShow'] }
       }},
       { $group: {
         _id: {
@@ -261,21 +332,19 @@ exports.getNoShows = async (req, res) => {
       deletedAt: null
     });
 
-    const labelsSet = new Set();
     const cancelledMap = {};
-    const passedMap = {};
+    const noShowMap = {};
 
     result.forEach(item => {
       const period = item._id.period;
-      labelsSet.add(period);
       if (item._id.status === 'Cancelada') {
         cancelledMap[period] = item.count;
       } else {
-        passedMap[period] = item.count;
+        noShowMap[period] = item.count;
       }
     });
 
-    const labels = Array.from(labelsSet).sort();
+    const labels = buildPeriodLabels(start, end, granularity);
 
     res.json({
       labels,
@@ -285,14 +354,14 @@ exports.getNoShows = async (req, res) => {
           data: labels.map(label => cancelledMap[label] || 0)
         },
         {
-          label: 'No asistieron (Pasada)',
-          data: labels.map(label => passedMap[label] || 0)
+          label: 'No asistieron',
+          data: labels.map(label => noShowMap[label] || 0)
         }
       ],
       granularity,
       totalAppointments: totalInRange,
       cancelledTotal: Object.values(cancelledMap).reduce((s, v) => s + v, 0),
-      passedTotal: Object.values(passedMap).reduce((s, v) => s + v, 0)
+      noShowTotal: Object.values(noShowMap).reduce((s, v) => s + v, 0)
     });
   } catch (error) {
     console.error('Error en getNoShows:', error);
@@ -307,7 +376,7 @@ exports.getCashboxPerformance = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     // Sesiones cerradas en el rango
     const sessions = await BoxSession.aggregate([
@@ -339,29 +408,33 @@ exports.getCashboxPerformance = async (req, res) => {
       { $sort: { '_id.period': 1 } }
     ]);
 
-    const labels = sessions.map(s => s._id);
+    const sessionMap = {};
+    sessions.forEach(s => { sessionMap[s._id] = s; });
+    const labels = buildPeriodLabels(start, end, granularity);
 
-    // Calcular discrepancias (diferencia entre final e initial + ingresos - gastos)
-    const discrepancies = sessions.map(session => {
-      const expected = session.totalFinal;
-      const diff = expected - session.totalInitial;
-      return { period: session._id, diff: Math.round(diff * 100) / 100 };
-    });
+    // Calcular discrepancias (diferencia entre final e initial)
+    const discrepancies = labels
+      .filter(l => sessionMap[l])
+      .map(l => {
+        const s = sessionMap[l];
+        const diff = s.totalFinal - s.totalInitial;
+        return { period: l, diff: Math.round(diff * 100) / 100 };
+      });
 
     res.json({
       labels,
       datasets: [
         {
           label: 'Sesiones cerradas',
-          data: sessions.map(s => s.sessionCount)
+          data: labels.map(l => sessionMap[l]?.sessionCount || 0)
         },
         {
           label: 'Monto inicial total',
-          data: sessions.map(s => s.totalInitial)
+          data: labels.map(l => sessionMap[l]?.totalInitial || 0)
         },
         {
           label: 'Monto final total',
-          data: sessions.map(s => s.totalFinal)
+          data: labels.map(l => sessionMap[l]?.totalFinal || 0)
         }
       ],
       discrepancies,
@@ -387,7 +460,7 @@ exports.getProductivity = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     const [appointmentsByPeriod, revenueByPeriod] = await Promise.all([
       Appointment.aggregate([
@@ -445,7 +518,7 @@ exports.getNetEarnings = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     const movements = await CashMovement.aggregate([
       { $match: { date: { $gte: start, $lte: end } } },
@@ -459,17 +532,15 @@ exports.getNetEarnings = async (req, res) => {
       { $sort: { '_id.period': 1 } }
     ]);
 
-    const labelsSet = new Set();
     const incomeMap = {};
     const expenseMap = {};
 
     movements.forEach(item => {
-      labelsSet.add(item._id.period);
       if (item._id.type === 'INCOME') incomeMap[item._id.period] = item.total;
       else expenseMap[item._id.period] = item.total;
     });
 
-    const labels = Array.from(labelsSet).sort();
+    const labels = buildPeriodLabels(start, end, granularity);
 
     res.json({
       labels,
@@ -493,7 +564,7 @@ exports.getTreatmentStatus = async (req, res) => {
     const { from, to, group } = req.query;
     const granularity = normalizeGranularity(group);
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
-    const { start, end } = parseDateRange(from, to);
+    const { start, end } = parseDateRange(from, to, granularity);
 
     const result = await Tratamiento.aggregate([
       { $match: { deletedAt: null } },
@@ -509,23 +580,21 @@ exports.getTreatmentStatus = async (req, res) => {
       { $sort: { '_id.period': 1 } }
     ]);
 
-    const labelsSet = new Set();
     const statusMap = { 'Pendiente': {}, 'En proceso': {}, 'Finalizado': {} };
 
     result.forEach(item => {
-      labelsSet.add(item._id.period);
       if (statusMap[item._id.estado] !== undefined) {
         statusMap[item._id.estado][item._id.period] = item.count;
       }
     });
 
-    const labels = Array.from(labelsSet).sort();
+    const labels = buildPeriodLabels(start, end, granularity);
 
     res.json({
       labels,
       datasets: [
         { label: 'Pendiente', data: labels.map(l => statusMap['Pendiente'][l] || 0) },
-        { label: 'En Proceso', data: labels.map(l => statusMap['En proceso'][l] || 0) },
+        { label: 'En proceso', data: labels.map(l => statusMap['En proceso'][l] || 0) },
         { label: 'Finalizado', data: labels.map(l => statusMap['Finalizado'][l] || 0) }
       ],
       granularity

@@ -60,4 +60,27 @@ PeriodontogramHistorySchema.index({ periodontogram: 1, createdAt: -1 });
 // Nota: antes de activar en producción, ejecutar script de limpieza si ya hay duplicados.
 PeriodontogramHistorySchema.index({ patient: 1, versionName: 1 }, { unique: true });
 
+// ── Inmutabilidad a nivel app (NOM-024) ───────────────────────────────
+// El historial NO se puede modificar ni borrar una vez creado. Sólo
+// inserts vía .create() están permitidos. Los hooks bloquean rutas
+// internas de Mongoose; un admin con acceso directo a la BD aún puede
+// alterar, pero al menos no por la API.
+const blockMutation = function (next) {
+  return next(new Error('PeriodontogramHistory es inmutable — no se permite modificar ni borrar versiones del historial.'));
+};
+PeriodontogramHistorySchema.pre('updateOne',        blockMutation);
+PeriodontogramHistorySchema.pre('updateMany',       blockMutation);
+PeriodontogramHistorySchema.pre('findOneAndUpdate', blockMutation);
+PeriodontogramHistorySchema.pre('replaceOne',       blockMutation);
+PeriodontogramHistorySchema.pre('deleteOne',        blockMutation);
+PeriodontogramHistorySchema.pre('deleteMany',       blockMutation);
+PeriodontogramHistorySchema.pre('findOneAndDelete', blockMutation);
+PeriodontogramHistorySchema.pre('findOneAndRemove', blockMutation);
+// pre('save') aplica a .save() de un doc ya existente — bloqueamos sólo si
+// no es nuevo. Permite .create() (que emite save con isNew=true).
+PeriodontogramHistorySchema.pre('save', function (next) {
+  if (this.isNew) return next();
+  return next(new Error('PeriodontogramHistory es inmutable — no se puede re-guardar una versión existente.'));
+});
+
 module.exports = mongoose.model('PeriodontogramHistory', PeriodontogramHistorySchema);

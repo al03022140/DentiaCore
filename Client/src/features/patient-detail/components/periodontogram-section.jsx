@@ -9,6 +9,7 @@ import { UniversalToothValidator } from '../../../shared/validators/universal-to
 import { MEASUREMENT_LIMITS } from '../../../shared/config/periodontogram-config';
 import PeriodontogramService from '../../../shared/services/periodontogram-service.js';
 import { toTriple, pickFaceTriplesFromFourFaces } from '../../../shared/utils/periodontogram-helpers.js';
+import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import '../styles/periodontogram-section.css';
 
 const FIELD_ALIAS_MAP = {
@@ -62,6 +63,11 @@ const PeriodontogramSection = ({ patientId }) => {
   // Tracking de cambios sin guardar para advertir al usuario antes de
   // navegar/cambiar versión y para el listener beforeunload.
   const isDirtyRef = useRef(false);
+  // Context global de cambios sin guardar: bloquea navegación SPA al
+  // cambiar de paciente si quedan cambios pendientes.
+  const { markDirty: ctxMarkDirty, markClean: ctxMarkClean } = useUnsavedChanges();
+  const dirtyKey = `periodontogram-${patientId || 'no-patient'}`;
+  useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
   // Dedupe de warnings de validación: evita spam si el usuario tipea fuera de rango.
   const lastValidationWarnRef = useRef({ key: null, time: 0 });
 
@@ -430,7 +436,7 @@ const PeriodontogramSection = ({ patientId }) => {
 
       return updated;
     });
-    isDirtyRef.current = true;
+    isDirtyRef.current = true; ctxMarkDirty(dirtyKey);
   }, [editMode, validateMeasurementValue, warnValidation]);
 
   // Limpiar periodontograma (dejar en blanco)
@@ -460,7 +466,7 @@ const PeriodontogramSection = ({ patientId }) => {
       });
 
       setSelectedTooth(null);
-      isDirtyRef.current = true;
+      isDirtyRef.current = true; ctxMarkDirty(dirtyKey);
     } catch (e) {
       console.error('Error limpiando periodontograma:', e);
     }
@@ -490,7 +496,7 @@ const PeriodontogramSection = ({ patientId }) => {
         'Hay cambios sin guardar. Si cambias a Visualización se perderán. ¿Continuar?'
       );
       if (!confirmed) return;
-      isDirtyRef.current = false;
+      isDirtyRef.current = false; ctxMarkClean(dirtyKey);
     }
     const newMode = editMode === 'guardado' ? 'visualizacion' : 'guardado';
     setEditMode(newMode);
@@ -503,7 +509,7 @@ const PeriodontogramSection = ({ patientId }) => {
         'Hay cambios sin guardar. Cambiar de versión los descartará. ¿Continuar?'
       );
       if (!confirmed) return;
-      isDirtyRef.current = false;
+      isDirtyRef.current = false; ctxMarkClean(dirtyKey);
     }
 
     if (!ver || ver === '') {
@@ -786,7 +792,7 @@ const PeriodontogramSection = ({ patientId }) => {
       setVersionList(orderedVersions);
       setSelectedVersion(nextVersionName ?? orderedVersions[0] ?? null);
       setPreviousData(null);
-      isDirtyRef.current = false;
+      isDirtyRef.current = false; ctxMarkClean(dirtyKey);
       message.success('Periodontograma guardado');
 
       if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma guardado exitosamente');

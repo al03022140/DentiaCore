@@ -5,6 +5,9 @@ import { getToothNumberButtonProps } from './periodontograma-functions/index.js'
 import { VALIDATION_RANGES, ZONE_CONFIG, SELECT_OPTIONS, ROW_DEFINITIONS, FIELD_TYPE_MAP, RESPONSIVE_CONFIG } from './constants/periodontogram-constants';
 import { LINEAR_GRAPHICS_CONFIG } from './utils/config';
 import BleedingMultiStateCheckbox from './components/bleeding-multi-state-checkbox';
+import MeasurementInput from './components/measurement-input';
+import MiniInputCell from './components/mini-input-cell';
+import TextInputCell from './components/text-input-cell';
 import usePeriodontogramLinearGraphics from './hooks/use-periodontogram-linear-graphics';
 import { getToothAvailability } from './utils/periodontogram-state-manager.js';
 import './styles/periodontogram-design.css';
@@ -70,11 +73,31 @@ const normalizeFurcaData = (rawFurca) => {
 };
 
 /**
+ * Celda de datos memoizada. Vive fuera del componente padre para que la
+ * referencia se mantenga estable y React.memo realmente evite re-renders
+ * cuando los props no cambian.
+ *
+ * Recibe renderCell y getToothData como props (estables, gracias al ref
+ * pattern del padre). El equality check de memo es por defecto (referencial),
+ * lo cual es suficiente: renderCell solo cambia cuando cambia readOnly,
+ * systemStatus.initialized u otra dep poco frecuente; cuando eso ocurre se
+ * espera que todas las celdas se actualicen.
+ */
+const DataCell = memo(function DataCell({ toothNumber, row, side, renderCell, getToothData }) {
+  const toothData = getToothData(toothNumber);
+  return (
+    <div className={`data-cell-container ${toothData.absent ? 'absent' : ''}`}>
+      <div className="data-cell">{renderCell(toothNumber, row, side)}</div>
+    </div>
+  );
+});
+
+/**
  * Componente de Periodontograma con diseño específico según prototipo
  * SUPERIOR: 12 filas vestibular + imágenes vestibular + imágenes palatino + 6 filas palatino
  * INFERIOR: 6 filas lingual + imágenes lingual + imágenes vestibular + 12 filas vestibular
  */
-const PeriodontogramDesign = ({ 
+const PeriodontogramDesign = ({
   periodontogramData = {}, 
   onToothUpdate, 
   selectedTooth, 
@@ -89,13 +112,19 @@ const PeriodontogramDesign = ({
 }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [inputValues, setInputValues] = useState({});
-  const [manuallyEdited, setManuallyEdited] = useState({});
   const [pendingFocusRequest, setPendingFocusRequest] = useState(null);
   const measurementInputRefs = useRef(new Map());
   const autoAdvanceTimersRef = useRef(new Map());
   const programmaticFocusRef = useRef(null);
   const pendingFocusKeysRef = useRef(new Set());
+
+  // Ref espejo de periodontogramData. Usado por los callbacks (updateToothData,
+  // getToothData, resolveMeasurementNeighbor) para que mantengan referencias
+  // estables a través de renders y memo() en los hijos funcione.
+  const periodontogramDataRef = useRef(periodontogramData);
+  useEffect(() => {
+    periodontogramDataRef.current = periodontogramData;
+  }, [periodontogramData]);
   
   // Referencias para gráficas lineales
   const canvasRef = useRef(null);
@@ -177,14 +206,6 @@ const PeriodontogramDesign = ({
     prognosis: SELECT_OPTIONS.PROGNOSIS,
     furca: SELECT_OPTIONS.FURCA
   }), []);
-
-  // Cache de datos normalizados por diente para evitar trabajo repetido y favorecer React.memo
-  const toothCacheRef = useRef(new Map());
-
-  // Invalida cache cuando cambia la referencia principal de datos
-  useEffect(() => {
-    toothCacheRef.current.clear();
-  }, [periodontogramData]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -280,7 +301,7 @@ const PeriodontogramDesign = ({
 
     while (position >= 0 && position < sequence.length) {
       const nextTooth = sequence[position];
-      const nextToothData = periodontogramData?.teeth?.[nextTooth];
+      const nextToothData = periodontogramDataRef.current?.teeth?.[nextTooth];
       const isAbsent = nextToothData?.ausente ?? nextToothData?.absent;
 
       if (!isAbsent) {
@@ -299,7 +320,7 @@ const PeriodontogramDesign = ({
     }
 
     return null;
-  }, [upperTeeth, lowerTeeth, periodontogramData]);
+  }, [upperTeeth, lowerTeeth]);
 
   const focusSiblingMeasurementInput = useCallback((toothNumber, rowKey, side, _faceKey, index, offset) => {
     const neighbor = resolveMeasurementNeighbor(toothNumber, rowKey, side, index, offset);
@@ -438,21 +459,20 @@ const PeriodontogramDesign = ({
 
   // Usar función centralizada para determinar si necesita doble entrada de furca
 
-  // Obtener datos normalizados de un diente (temporalmente sin cache para debug)
+  // Obtener datos normalizados de un diente. Lee desde periodontogramDataRef
+  // para que la referencia de getToothData sea estable y memo() de los hijos
+  // no se invalide en cada cambio del objeto root de datos.
   const getToothData = useCallback((toothNumber) => {
-    // TEMPORAL: Removemos cache para evitar problemas con mini inputs
-    const raw = periodontogramData?.teeth?.[toothNumber] || {};
-    const normalized = {
+    const raw = periodontogramDataRef.current?.teeth?.[toothNumber] || {};
+    return {
       ...raw,
-      // Preferir claves canónicas del backend (es) y caer a alias (en)
       absent: (raw.ausente ?? raw.absent ?? false),
       implant: (raw.implante ?? raw.implant ?? false),
       mobility: (raw.movilidad ?? raw.mobility ?? 0),
       gumWidth: (raw.anchuraEncia ?? raw.gumWidth ?? 0),
       prognosis: String(raw.pronostico ?? raw.prognosis ?? 'bueno').toLowerCase()
     };
-    return normalized;
-  }, [periodontogramData]);
+  }, []);
 
   // Actualizar datos de un diente con soporte a estructuras nuevas y legacy
   const updateToothData = useCallback((toothNumber, field, value, side = null, index = null) => {
@@ -464,7 +484,7 @@ const PeriodontogramDesign = ({
       return;
     }
 
-    const rawTooth = periodontogramData?.teeth?.[toothNumber] || {};
+    const rawTooth = periodontogramDataRef.current?.teeth?.[toothNumber] || {};
 
     // Campos de caras múltiples con 4 superficies
     const multiFaceFields = ['bleeding', 'suppuration', 'plaque', 'gingivalMargin', 'probingDepth'];
@@ -525,7 +545,7 @@ const PeriodontogramDesign = ({
       if (field === 'absent') onToothUpdate?.(toothNumber, 'ausente', value);
       if (field === 'ausente') onToothUpdate?.(toothNumber, 'absent', value);
     }
-  }, [readOnly, onToothUpdate, periodontogramData, systemStatus.initialized, linearGraphicsDerivedOptions.enableLinearGraphics, updateToothLinearGraphics]);
+  }, [readOnly, onToothUpdate, systemStatus.initialized, linearGraphicsDerivedOptions.enableLinearGraphics, updateToothLinearGraphics]);
 
   // Renderizar celda según tipo
   const toggleToothAbsentHandler = useCallback((toothNumber) => {
@@ -659,169 +679,51 @@ const PeriodontogramDesign = ({
         );
       }
 
-      case 'triple-input':
-        // Determinar la cara específica basándose en el side y si es diente superior o inferior
+      case 'triple-input': {
         const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
-        let faceKey;
-        
-        if (isUpperTooth) {
-          faceKey = side === 'palatine' ? 'palatinoSuperior' : 'vestibularSuperior';
-        } else {
-          faceKey = side === 'lingual' ? 'lingualInferior' : 'vestibularInferior';
-        }
-        
-        // Obtener los valores de la cara específica
-        const fieldData = toothData[row.key] || {};
-        const tripleInputValues = fieldData[faceKey] || [0, 0, 0];
-        
+        const tripleFaceKey = isUpperTooth
+          ? (side === 'palatine' ? 'palatinoSuperior' : 'vestibularSuperior')
+          : (side === 'lingual' ? 'lingualInferior' : 'vestibularInferior');
+
+        const tripleFieldData = toothData[row.key] || {};
+        const tripleValues = tripleFieldData[tripleFaceKey] || [0, 0, 0];
+        const range = row.key === 'gingivalMargin' ? VALIDATION_RANGES.GINGIVAL_MARGIN : VALIDATION_RANGES.PROBING_DEPTH;
+        const triEnableHover = ['gingivalMargin', 'probingDepth'].includes(row.key) && systemStatus.initialized;
+        const triDisabled = readOnly || toothData.absent;
+
         return (
           <div className="triple-input">
-            {tripleInputValues.map((value, index) => {
-              const tripleInputKey = `${toothNumber}-${row.key}-${side}-${faceKey}-${index}`;
-              const isTripleEditing = inputValues[tripleInputKey] !== undefined;
-              
-              // Asegurar que siempre tenemos un valor válido para mostrar
-              let tripleDisplayValue;
-              if (isTripleEditing) {
-                tripleDisplayValue = inputValues[tripleInputKey];
-              } else if (value !== undefined && value !== null) {
-                tripleDisplayValue = value.toString();
-              } else {
-                tripleDisplayValue = '';
-              }
-              
+            {tripleValues.map((triValue, idx) => {
+              const tripleInputKey = `${toothNumber}-${row.key}-${side}-${tripleFaceKey}-${idx}`;
               return (
-                <input
-                  key={index}
-                  ref={(node) => registerMeasurementInput(tripleInputKey, node)}
-                  type="number"
-                  inputMode="numeric"
-                  min={row.key === 'gingivalMargin' ? VALIDATION_RANGES.GINGIVAL_MARGIN.min : VALIDATION_RANGES.PROBING_DEPTH.min}
-                  max={row.key === 'gingivalMargin' ? VALIDATION_RANGES.GINGIVAL_MARGIN.max : VALIDATION_RANGES.PROBING_DEPTH.max}
-                  value={tripleDisplayValue}
-                  onFocus={(e) => {
-                    cancelAutoAdvance(tripleInputKey);
-                    const isProgrammatic = programmaticFocusRef.current === tripleInputKey;
-                    const numericValue = Number(value);
-                    const shouldAutoSelect = isProgrammatic || (!isTripleEditing && (!Number.isFinite(numericValue) || numericValue === 0));
-
-                    if (shouldAutoSelect) {
-                      requestAnimationFrame(() => {
-                        if (e.target && typeof e.target.select === 'function') {
-                          e.target.select();
-                        }
-                        if (isProgrammatic && programmaticFocusRef.current === tripleInputKey) {
-                          programmaticFocusRef.current = null;
-                        }
-                      });
-                    } else if (isProgrammatic && programmaticFocusRef.current === tripleInputKey) {
-                      programmaticFocusRef.current = null;
-                    }
-
-                    if (['gingivalMargin', 'probingDepth'].includes(row.key) && systemStatus.initialized) {
-                      addHoverEffect(toothNumber, index);
-                    }
-                  }}
-                  onChange={(e) => {
-                    const inputValue = e.target.value;
-                    
-                    // Marcar como editado manualmente
-                    setManuallyEdited(prev => ({
-                      ...prev,
-                      [tripleInputKey]: true
-                    }));
-                    // Actualizar el estado local durante la edición
-                    setInputValues(prev => ({
-                      ...prev,
-                      [tripleInputKey]: inputValue
-                    }));
-                    
-                    // Actualizar datos solo si el valor es numérico válido (evitar forzar 0 en estados temporales como '-')
-                    if (inputValue === '' || inputValue === '-' || inputValue === '+') {
-                      cancelAutoAdvance(tripleInputKey);
-                      return;
-                    }
-                    const numValue = Number(inputValue);
-                    if (!Number.isFinite(numValue)) {
-                      cancelAutoAdvance(tripleInputKey);
-                      return;
-                    }
-                    updateToothData(toothNumber, row.key, numValue, side, index);
-                    const advanceImmediately = shouldAutoAdvanceImmediately(row.key, inputValue);
-                    scheduleAutoAdvance(tripleInputKey, {
-                      toothNumber,
-                      rowKey: row.key,
-                      side,
-                      faceKey,
-                      index
-                    }, { delay: advanceImmediately ? 0 : 220 });
-                  }}
-                  onBlur={(e) => {
-                    const inputValue = e.target.value.trim();
-                    
-                    cancelAutoAdvance(tripleInputKey);
-
-                    if (inputValue === '') {
-                      updateToothData(toothNumber, row.key, 0, side, index);
-                    } else {
-                      const numValue = Number(inputValue);
-                      if (Number.isFinite(numValue)) {
-                        updateToothData(toothNumber, row.key, numValue, side, index);
-                      }
-                    }
-
-                    setInputValues(prev => {
-                      const newState = { ...prev };
-                      delete newState[tripleInputKey];
-                      return newState;
-                    });
-                    setManuallyEdited(prev => {
-                      const newState = { ...prev };
-                      delete newState[tripleInputKey];
-                      return newState;
-                    });
-                    
-                    // EXTENSIÓN: Remover efecto hover para gráficas lineales
-                    if (['gingivalMargin', 'probingDepth'].includes(row.key) && systemStatus.initialized) {
-                      removeHoverEffect(toothNumber, index);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' && !e.shiftKey && !e.altKey && !e.metaKey) {
-                      e.preventDefault();
-                      focusSiblingMeasurementInput(toothNumber, row.key, side, faceKey, index, 1);
-                      return;
-                    }
-                    if (e.key === 'ArrowLeft' && !e.shiftKey && !e.altKey && !e.metaKey) {
-                      e.preventDefault();
-                      focusSiblingMeasurementInput(toothNumber, row.key, side, faceKey, index, -1);
-                      return;
-                    }
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (!focusSiblingMeasurementInput(toothNumber, row.key, side, faceKey, index, 1)) {
-                        e.currentTarget.blur();
-                      }
-                      return;
-                    }
-                    if (e.key === 'Backspace' && !e.shiftKey && !e.altKey && !e.metaKey) {
-                      const { selectionStart, selectionEnd, value: currentValue } = e.currentTarget;
-                      const cursorAtStart = selectionStart === 0 && selectionEnd === 0;
-                      const isEmpty = !currentValue || currentValue.length === 0;
-                      if (cursorAtStart || isEmpty) {
-                        if (focusSiblingMeasurementInput(toothNumber, row.key, side, faceKey, index, -1)) {
-                          e.preventDefault();
-                        }
-                      }
-                    }
-                  }}
-                  disabled={readOnly || toothData.absent}
-                  className="mini-input"
+                <MeasurementInput
+                  key={idx}
+                  value={triValue}
+                  inputKey={tripleInputKey}
+                  toothNumber={toothNumber}
+                  rowKey={row.key}
+                  side={side}
+                  faceKey={tripleFaceKey}
+                  index={idx}
+                  min={range.min}
+                  max={range.max}
+                  disabled={triDisabled}
+                  onCommit={(numValue) => updateToothData(toothNumber, row.key, numValue, side, idx)}
+                  onAutoAdvance={scheduleAutoAdvance}
+                  cancelAutoAdvance={cancelAutoAdvance}
+                  shouldAutoAdvanceImmediately={shouldAutoAdvanceImmediately}
+                  registerRef={registerMeasurementInput}
+                  programmaticFocusRef={programmaticFocusRef}
+                  focusSibling={focusSiblingMeasurementInput}
+                  addHoverEffect={addHoverEffect}
+                  removeHoverEffect={removeHoverEffect}
+                  enableHoverEffects={triEnableHover}
                 />
               );
             })}
           </div>
         );
+      }
 
       case 'select': {
         const options = selectOptionSets[row.key] || [];
@@ -987,278 +889,37 @@ const PeriodontogramDesign = ({
           </div>
         );
 
-      case 'mini-input':
-          const isDisabled = readOnly || toothData.absent;
-          const validationRange = row.key === 'gumWidth' ? VALIDATION_RANGES.GUM_WIDTH : VALIDATION_RANGES.PROBING_DEPTH;
-        
-        // Lógica especial para gumWidth: aceptar valores del 0-3
-        if (row.key === 'gumWidth') {
-          const currentValue = toothData[row.key];
-          const inputKey = `${toothNumber}-${row.key}`;
-          const isEditing = inputValues[inputKey] !== undefined;
-          
-          // FIXME: Asegurar que siempre tenemos un valor válido para mostrar
-          let displayValue;
-          if (isEditing) {
-            displayValue = inputValues[inputKey];
-          } else if (currentValue !== undefined && currentValue !== null) {
-            displayValue = currentValue.toString();
-          } else {
-            displayValue = '0';
-          }
-          
-          // Determinar si debe ser rojo basándose en el valor que se está mostrando
-          const valueToCheck = isEditing ? parseInt(inputValues[inputKey]) : currentValue;
-          const isRedValue = valueToCheck !== undefined && !isNaN(valueToCheck) && valueToCheck >= 0 && valueToCheck <= 2;
-          
-          return (
-            <div className="mini-input-cell">
-              <input
-                ref={(node) => registerMeasurementInput(inputKey, node)}
-                type="text"
-                inputMode="numeric"
-                value={displayValue}
-                onFocus={(e) => {
-                  const isProgrammatic = programmaticFocusRef.current === inputKey;
-                  const shouldAutoSelect = isProgrammatic || (!isEditing && (Number(currentValue) === 0 || currentValue === '0'));
+      case 'mini-input': {
+        const miniDisabled = readOnly || toothData.absent;
+        const miniRange = row.key === 'gumWidth' ? VALIDATION_RANGES.GUM_WIDTH : VALIDATION_RANGES.PROBING_DEPTH;
+        const miniInputKey = `${toothNumber}-${row.key}`;
+        const miniValue = toothData[row.key];
 
-                  if (shouldAutoSelect) {
-                    requestAnimationFrame(() => {
-                      if (e.target && typeof e.target.select === 'function') {
-                        e.target.select();
-                      }
-                      if (isProgrammatic && programmaticFocusRef.current === inputKey) {
-                        programmaticFocusRef.current = null;
-                      }
-                    });
-                  } else if (isProgrammatic && programmaticFocusRef.current === inputKey) {
-                    programmaticFocusRef.current = null;
-                  }
-                }}
-                onChange={(e) => {
-                  const inputValue = e.target.value;
-                  // Marcar como editado manualmente
-                  setManuallyEdited(prev => ({
-                    ...prev,
-                    [inputKey]: true
-                  }));
-                  // Actualizar el estado local durante la edición
-                  setInputValues(prev => ({
-                    ...prev,
-                    [inputKey]: inputValue
-                  }));
-                  
-                  // Actualizar datos solo si el valor es numérico válido (no forzar 0)
-                  if (inputValue === '') {
-                    return;
-                  }
-                  const numValue = parseInt(inputValue);
-                  if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
-                    updateToothData(toothNumber, row.key, numValue);
-                  }
-                }}
-                onBlur={(e) => {
-                  const inputValue = e.target.value.trim();
-                  
-                  // Validar y actualizar al perder el foco
-                  if (inputValue === '') {
-                    updateToothData(toothNumber, row.key, 0);
-                  } else {
-                    const numValue = parseInt(inputValue);
-                    if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
-                      updateToothData(toothNumber, row.key, numValue);
-                    }
-                  }
-                  // Limpiar estados locales tras confirmar el valor
-                  setInputValues(prev => {
-                    const newState = { ...prev };
-                    delete newState[inputKey];
-                    return newState;
-                  });
-                  setManuallyEdited(prev => {
-                    const newState = { ...prev };
-                    delete newState[inputKey];
-                    return newState;
-                  });
-                }}
-                onKeyDown={(e) => {
-                  const digitKeys = ['0','1','2','3','4','5','6','7','8','9'];
-                  const utilityKeys = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight'];
-                  const hasSelection = e.target.selectionStart !== e.target.selectionEnd;
-
-                  if (digitKeys.includes(e.key)) {
-                    // Permitir sobrescribir cuando todo el texto está seleccionado
-                    if (e.target.value.length >= 2 && !hasSelection) {
-                      e.preventDefault();
-                    }
-                    return;
-                  }
-
-                  if (!utilityKeys.includes(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-                disabled={isDisabled}
-                className={`mini-input ${isRedValue ? 'gum-width-red' : ''}`}
-                title="La anchura de la encía debe ser un número del 0-10mm. Si no pone nada, por defecto se pone en 0"
-                maxLength="2"
-              />
-            </div>
-          );
-        }
-        
-        // Para otros campos mini-input, usar la misma lógica de estado local
-        const currentValue = toothData[row.key];
-        const inputKey = `${toothNumber}-${row.key}`;
-        const isEditing = inputValues[inputKey] !== undefined;
-        
-        // Asegurar que siempre tenemos un valor válido para mostrar
-        let displayValue;
-        if (isEditing) {
-          displayValue = inputValues[inputKey];
-        } else if (currentValue !== undefined && currentValue !== null) {
-          displayValue = currentValue.toString();
-        } else {
-          displayValue = '0';
-        }
-        
         return (
           <div className="mini-input-cell">
-            <input
-              ref={(node) => registerMeasurementInput(inputKey, node)}
-              type="number"
-              min={validationRange.min}
-              max={validationRange.max}
-              value={displayValue}
-              onMouseDown={(e) => {
-                // Prevenir el comportamiento por defecto para controlar el foco manualmente
-                e.preventDefault();
-                
-                // Enfocar el input inmediatamente
-                e.target.focus();
-                
-                // Seleccionar después del render
-                requestAnimationFrame(() => {
-                  if (e.target && typeof e.target.select === 'function') {
-                    e.target.select();
-                  }
-                });
-              }}
-              onFocus={(e) => {
-                const isProgrammatic = programmaticFocusRef.current === inputKey;
-                if (isProgrammatic) {
-                  programmaticFocusRef.current = null;
-                  // Seleccionar cuando es programático
-                  requestAnimationFrame(() => {
-                    if (e.target && typeof e.target.select === 'function') {
-                      e.target.select();
-                    }
-                  });
-                }
-              }}
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                // Marcar como editado manualmente
-                setManuallyEdited(prev => ({
-                  ...prev,
-                  [inputKey]: true
-                }));
-                // Actualizar el estado local durante la edición
-                setInputValues(prev => ({
-                  ...prev,
-                  [inputKey]: inputValue
-                }));
-                
-                // Actualizar datos solo si el valor es numérico válido
-                if (inputValue === '' || inputValue === '-' || inputValue === '+') {
-                  return;
-                }
-                const numValue = Number(inputValue);
-                if (!Number.isFinite(numValue)) {
-                  return;
-                }
-                updateToothData(toothNumber, row.key, numValue);
-              }}
-              onBlur={(e) => {
-                const inputValue = e.target.value.trim();
-                
-                if (inputValue === '') {
-                  updateToothData(toothNumber, row.key, 0);
-                } else {
-                  const numValue = Number(inputValue);
-                  if (Number.isFinite(numValue)) {
-                    updateToothData(toothNumber, row.key, numValue);
-                  }
-                }
-
-                setInputValues(prev => {
-                  const newState = { ...prev };
-                  delete newState[inputKey];
-                  return newState;
-                });
-                setManuallyEdited(prev => {
-                  const newState = { ...prev };
-                  delete newState[inputKey];
-                  return newState;
-                });
-              }}
-              disabled={isDisabled}
-              className="mini-input"
+            <MiniInputCell
+              value={miniValue}
+              inputKey={miniInputKey}
+              rowKey={row.key}
+              min={miniRange.min}
+              max={miniRange.max}
+              disabled={miniDisabled}
+              onCommit={(numValue) => updateToothData(toothNumber, row.key, numValue)}
+              registerRef={registerMeasurementInput}
+              programmaticFocusRef={programmaticFocusRef}
+              variant={row.key === 'gumWidth' ? 'gumWidth' : 'standard'}
             />
           </div>
         );
+      }
 
       case 'text':
-        const currentTextValue = toothData[row.key];
-        const textInputKey = `${toothNumber}-${row.key}`;
-        const isTextEditing = inputValues[textInputKey] !== undefined;
-        const textDisplayValue = isTextEditing ? inputValues[textInputKey] : (currentTextValue || '');
-        
         return (
           <div className="text-cell">
-            <input
-              type="text"
-              value={textDisplayValue}
-              onFocus={(e) => {
-                // Asegurar que tenemos el valor correcto en el estado local antes de seleccionar
-                const currentVal = toothData[row.key] || '';
-                
-                // Establecer el valor en el estado local si no existe
-                if (inputValues[textInputKey] === undefined) {
-                  setInputValues(prev => ({
-                    ...prev,
-                    [textInputKey]: currentVal
-                  }));
-                }
-                
-                // Seleccionar todo el texto después de un pequeño delay para asegurar que el valor está establecido
-                setTimeout(() => {
-                  e.target.select();
-                }, 0);
-              }}
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                // Marcar como editado manualmente
-                setManuallyEdited(prev => ({
-                  ...prev,
-                  [textInputKey]: true
-                }));
-                // Actualizar el estado local durante la edición
-                setInputValues(prev => ({
-                  ...prev,
-                  [textInputKey]: inputValue
-                }));
-                
-                // Actualizar inmediatamente los datos del diente
-                updateToothData(toothNumber, row.key, inputValue);
-              }}
-              onBlur={(e) => {
-                // No limpiar el estado local inmediatamente para mantener persistencia
-                // El estado se limpiará solo cuando sea necesario
-              }}
+            <TextInputCell
+              value={toothData[row.key]}
               disabled={readOnly || toothData.absent}
-              className="mini-text"
-              placeholder="..."
+              onCommit={(textValue) => updateToothData(toothNumber, row.key, textValue)}
             />
           </div>
         );
@@ -1266,7 +927,7 @@ const PeriodontogramDesign = ({
       default:
         return <div className="empty-cell"></div>;
     }
-  }, [getToothData, updateToothData, toggleToothAbsentHandler, readOnly, inputValues, manuallyEdited, systemStatus, linearGraphicsDerivedOptions, updateToothLinearGraphics, addHoverEffect, removeHoverEffect, selectedTooth, onToothSelect, selectOptionSets, registerMeasurementInput, cancelAutoAdvance, scheduleAutoAdvance, focusSiblingMeasurementInput, setPendingFocusRequest, programmaticFocusRef, pendingFocusKeysRef, shouldAutoAdvanceImmediately]);
+  }, [getToothData, updateToothData, toggleToothAbsentHandler, readOnly, systemStatus.initialized, addHoverEffect, removeHoverEffect, selectedTooth, selectOptionSets, registerMeasurementInput, cancelAutoAdvance, scheduleAutoAdvance, focusSiblingMeasurementInput, shouldAutoAdvanceImmediately]);
 
   // Renderizar imagen de diente
   const renderToothImage = useCallback((toothNumber, side) => {
@@ -1363,19 +1024,12 @@ const PeriodontogramDesign = ({
   useEffect(() => { perfMonitor.enable(debugPerformance); }, [debugPerformance]);
   if (debugPerformance) { perfMonitor.countRender('PeriodontogramDesign'); }
 
-  // Sub-componente memoizado para cada celda de datos (reduce trabajo en renders globales)
-  // FIXME: Removemos useMemo porque estaba bloqueando los re-renders necesarios para inputValues/manuallyEdited
-  const DataCell = memo(({ toothNumber, row, side, iv, me }) => {
-    const toothData = getToothData(toothNumber);
-    return (
-      <div className={`data-cell-container ${toothData.absent ? 'absent' : ''}`}> 
-        <div className="data-cell">{renderCell(toothNumber, row, side)}</div>
-      </div>
-    );
-  });
-
-  // Envolver DataCell con contador de renders si debug
-  const InstrumentedDataCell = debugPerformance ? withRenderCount(DataCell, 'DataCell') : DataCell;
+  // Envolver DataCell con contador de renders si debug. Mantener la referencia
+  // estable entre renders para que React.memo no se invalide.
+  const InstrumentedDataCell = useMemo(
+    () => debugPerformance ? withRenderCount(DataCell, 'DataCell') : DataCell,
+    [debugPerformance]
+  );
 
   return (
     <div 
@@ -1396,7 +1050,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" iv={inputValues} me={manuallyEdited} />
+                <InstrumentedDataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} getToothData={getToothData} />
               ))}
             </div>
           ))}
@@ -1432,7 +1086,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-pal-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" iv={inputValues} me={manuallyEdited} />
+                <InstrumentedDataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" renderCell={renderCell} getToothData={getToothData} />
               ))}
             </div>
           ))}
@@ -1451,7 +1105,7 @@ const PeriodontogramDesign = ({
             <div key={`lower-ling-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" iv={inputValues} me={manuallyEdited} />
+                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" renderCell={renderCell} getToothData={getToothData} />
                   ))}
             </div>
           ))}
@@ -1487,7 +1141,7 @@ const PeriodontogramDesign = ({
             <div key={`lower-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" iv={inputValues} me={manuallyEdited} />
+                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} getToothData={getToothData} />
                   ))}
             </div>
           ))}

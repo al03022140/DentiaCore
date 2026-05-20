@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body, query, validationResult } = require('express-validator');
 const router = express.Router();
 const cashController = require('../controllers/cashController');
 const { authorize } = require('../middlewares/authorize');
@@ -60,7 +60,17 @@ router.post(
 	]),
 	cashController.addMovement
 );
-router.get('/movements', readLimiter, authorize(['cash.read']), cashController.getLastMovements);
+router.get(
+	'/movements',
+	readLimiter,
+	authorize(['cash.read']),
+	withValidation([
+		query('patientId')
+			.optional()
+			.isMongoId().withMessage('patientId debe ser un ObjectId válido')
+	]),
+	cashController.getLastMovements
+);
 router.put(
 	'/movements/:id',
 	writeLimiter,
