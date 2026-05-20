@@ -497,7 +497,9 @@ class DentiaCoreLauncher:
         self._make_outline_button(qbtns, '🗓   Configurar Google', command=self.configure_google).grid(
             row=1, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         self._make_outline_button(qbtns, '🔍   Auditar legacy data', command=self.audit_legacy_data).grid(
-            row=2, column=0, columnspan=2, padx=0, sticky='ew')
+            row=2, column=0, padx=(0, 6), pady=(0, 6), sticky='ew')
+        self._make_outline_button(qbtns, '💾   Respaldar PNGs legacy', command=self.backup_legacy_uploads).grid(
+            row=2, column=1, padx=(6, 0), pady=(0, 6), sticky='ew')
         qbtns.columnconfigure(0, weight=1)
         qbtns.columnconfigure(1, weight=1)
 
@@ -1752,6 +1754,54 @@ class DentiaCoreLauncher:
                 create_btn.config(state='normal'),
                 cancel_btn.config(state='normal')
             ))
+
+    def backup_legacy_uploads(self):
+        """Respalda PNGs legacy del odontograma inicial a tar.gz.
+
+        No modifica originales — solo los empaqueta en
+        Server/backups/legacy-odontograma-inicial-YYYY-MM-DD-HHmmss.tar.gz
+        """
+        threading.Thread(target=self._backup_legacy_thread, daemon=True).start()
+
+    def _backup_legacy_thread(self):
+        try:
+            result = subprocess.run(
+                ['node', 'scripts/backup-legacy-uploads.js'],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                shell=(sys.platform == 'win32'),
+                timeout=300
+            )
+            stdout = (result.stdout or '').strip()
+            stderr = (result.stderr or '').strip()
+            body = stdout if stdout else stderr
+
+            if result.returncode == 0:
+                self.root.after(0, lambda: messagebox.showinfo(
+                    'Backup creado', body[:1500] or 'Backup completado.'
+                ))
+            elif result.returncode == 1:
+                # No había archivos legacy — no es error, solo informativo
+                self.root.after(0, lambda: messagebox.showinfo(
+                    'Sin archivos legacy',
+                    'No se encontraron PNGs legacy del odontograma inicial.\nTu instalación ya está limpia.'
+                ))
+            else:
+                self.root.after(0, lambda: messagebox.showerror(
+                    'Backup — Error', (stderr or stdout or 'Error desconocido')[:1500]
+                ))
+        except subprocess.TimeoutExpired:
+            self.root.after(0, lambda: messagebox.showerror(
+                'Backup — Timeout', 'El backup tardó más de 5 minutos. ¿Demasiados archivos?'
+            ))
+        except FileNotFoundError:
+            self.root.after(0, lambda: messagebox.showerror(
+                'Backup — Falta Node', 'No se encontró Node.js. Instálalo desde nodejs.org.'
+            ))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda: messagebox.showerror('Backup — Error', err))
 
     def audit_legacy_data(self):
         """Ejecuta scripts/audit-legacy-data.js (read-only) y muestra el reporte.
