@@ -230,10 +230,12 @@ class PeriodontogramService {
 
   static async saveData(patientId, periodontogramData, options = {}) {
     try {
-      console.log('💾 Guardando datos JSON del periodontograma:', {
-        patientId,
-        versionName: periodontogramData?.versionName
-      });
+      if (ADVANCED_LOGGING_CONFIG.enabled) {
+        console.log('💾 Guardando datos JSON del periodontograma:', {
+          patientId,
+          versionName: periodontogramData?.versionName
+        });
+      }
 
       const body = options.appointmentId
         ? { ...periodontogramData, appointmentId: options.appointmentId }
@@ -243,14 +245,17 @@ class PeriodontogramService {
         `/patients/${patientId}/periodontogram/data`,
         body,
         {
-          timeout: DEFAULT_TIMEOUT
+          timeout: DEFAULT_TIMEOUT,
+          signal: options.signal
         }
       );
 
-      console.log('✅ Datos JSON guardados exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Datos JSON guardados exitosamente');
       return response.data;
     } catch (error) {
-      console.error('❌ Error guardando datos JSON:', error);
+      if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+        console.error('❌ Error guardando datos JSON:', error);
+      }
       handleApiError(error);
     }
   }
@@ -261,28 +266,31 @@ class PeriodontogramService {
    * @param {string|null} version - Nombre de versión (opcional). Si es null se devuelve la última.
    * @returns {Promise<Object>} - Objeto con { teeth, statistics, versionName }
    */
-  static async getData(patientId, version = null) {
+  static async getData(patientId, version = null, options = {}) {
     try {
-      console.log('📄 Obteniendo datos JSON del periodontograma:', {
-        patientId,
-        version
-      });
+      if (ADVANCED_LOGGING_CONFIG.enabled) {
+        console.log('📄 Obteniendo datos JSON del periodontograma:', {
+          patientId,
+          version
+        });
+      }
 
       const url = version
         ? `/patients/${patientId}/periodontogram/data?version=${encodeURIComponent(version)}`
         : `/patients/${patientId}/periodontogram/data`;
 
       const response = await API.get(url, {
-        timeout: DEFAULT_TIMEOUT
+        timeout: DEFAULT_TIMEOUT,
+        signal: options.signal
       });
 
-      console.log('✅ Datos JSON obtenidos exitosamente');
-      // Extraer los datos de la respuesta del backend
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Datos JSON obtenidos exitosamente');
       const result = response.data?.data || response.data;
-      // Normalización de compatibilidad legacy (plaque/suppuration y palatino/lingualPalatino)
       return normalizeLegacyTeethData(result);
     } catch (error) {
-      console.error('❌ Error obteniendo datos JSON:', error);
+      if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+        console.error('❌ Error obteniendo datos JSON:', error);
+      }
       handleApiError(error);
     }
   }
@@ -292,18 +300,21 @@ class PeriodontogramService {
    * @param {string} patientId - ID del paciente
    * @returns {Promise<string[]>} - Lista de nombres de versión
    */
-  static async getDataVersions(patientId) {
+  static async getDataVersions(patientId, options = {}) {
     try {
-      console.log('📚 Obteniendo lista de versiones JSON del periodontograma:', patientId);
+      if (ADVANCED_LOGGING_CONFIG.enabled) {
+        console.log('📚 Obteniendo lista de versiones JSON del periodontograma:', patientId);
+      }
 
       const response = await API.get(
         `/patients/${patientId}/periodontogram/data?listVersions=true`,
         {
-          timeout: DEFAULT_TIMEOUT
+          timeout: DEFAULT_TIMEOUT,
+          signal: options.signal
         }
       );
 
-      console.log('✅ Lista de versiones obtenida exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Lista de versiones obtenida exitosamente');
       const rawVersions = response.data?.versions || [];
 
       // Solo aceptar versiones con versionName válido (no otros campos como id, name, etc.)
@@ -351,7 +362,9 @@ class PeriodontogramService {
 
       return deduped;
     } catch (error) {
-      console.error('❌ Error obteniendo lista de versiones JSON:', error);
+      if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+        console.error('❌ Error obteniendo lista de versiones JSON:', error);
+      }
       handleApiError(error);
     }
   }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message, Skeleton } from 'antd';
 import './styles/patient-list.css';
@@ -9,7 +9,6 @@ import filtroIcon from '../../assets/images/icons/filter.svg';
 import arrowIcon from '../../assets/images/icons/arrow.png';
 import arrowLeft from '../../assets/images/icons/arrow-left.png';
 import arrowRight from '../../assets/images/icons/arrow-right.png';
-import plusIcon from '../../assets/images/icons/plus.svg';
 import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 
 // Utilidades y API
@@ -32,15 +31,165 @@ const VisitIcon = () => (
   </svg>
 );
 
+/**
+ * Card individual del paciente, memoizada. Vive fuera del padre para que
+ * React.memo pueda evitar re-renders cuando el usuario cambia búsqueda,
+ * orden o página y solo unas pocas cards realmente cambian.
+ */
+const PatientCard = memo(function PatientCard({ patient, onClick }) {
+  const formattedName = formatName(
+    patient.apellido_paterno,
+    patient.apellido_materno,
+    patient.primer_nombre,
+    patient.segundo_nombre
+  );
+
+  const fullName = [
+    patient.apellido_paterno,
+    patient.apellido_materno,
+    patient.primer_nombre,
+    patient.segundo_nombre
+  ].filter(Boolean).join(' ');
+
+  const patientId = patient.paciente_id || patient._id;
+  const lastVisit = patient.ultimaVisita || 'Sin dato';
+  const age = formatAgeYearsOnly(patient.fecha_nacimiento) || '—';
+  const photoURL = patient.photoURL || userNot;
+  const isDefaultPhoto = !patient.photoURL;
+
+  const handleClick = useCallback(() => {
+    onClick(patient._id);
+  }, [onClick, patient._id]);
+
+  const handleImgError = useCallback((e) => {
+    e.target.onerror = null;
+    e.target.src = userNot;
+    e.target.classList.add('profile-default-avatar');
+  }, []);
+
+  return (
+    <div
+      className="patient-card"
+      onClick={handleClick}
+      title={fullName}
+    >
+      <div className="patient-photo">
+        <img
+          src={photoURL}
+          alt="Foto del paciente"
+          loading="lazy"
+          decoding="async"
+          className={isDefaultPhoto ? 'profile-default-avatar' : undefined}
+          onError={handleImgError}
+        />
+      </div>
+      <div className="patient-info">
+        <div className="patient-top">
+          <span className="patient-id">{patientId}</span>
+          <span className="patient-name-container">
+            {formattedName}
+            <span className="tooltip">{fullName}</span>
+          </span>
+        </div>
+        <div className="patient-bottom">
+          <span className="patient-age" title="Edad">
+            <AgeIcon />
+            {age}
+          </span>
+          <span className="patient-visit" title="Última visita">
+            <VisitIcon />
+            {lastVisit}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+/**
+ * Construye la ventana de páginas a mostrar (máx 7 botones + elipsis).
+ * Ejemplos:
+ *   total=5,  current=3 -> [1,2,3,4,5]
+ *   total=20, current=1 -> [1,2,3,4,5,'…',20]
+ *   total=20, current=10-> [1,'…',9,10,11,'…',20]
+ *   total=20, current=20-> [1,'…',16,17,18,19,20]
+ */
+const buildPageWindow = (current, total) => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, '…', total];
+  }
+  if (current >= total - 3) {
+    return [1, '…', total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, '…', current - 1, current, current + 1, '…', total];
+};
+
+/**
+ * Paginación memoizada. Si hay miles de pacientes, esto evita renderizar
+ * cientos de spans (uno por página) y los re-renders correspondientes.
+ */
+const Pagination = memo(function Pagination({ currentPage, totalPages, onPageChange, onPrev, onNext }) {
+  const pages = useMemo(() => buildPageWindow(currentPage, totalPages), [currentPage, totalPages]);
+
+  if (totalPages <= 0) return null;
+
+  return (
+    <div className="pagination">
+      {currentPage > 1 && (
+        <img
+          src={arrowLeft}
+          alt="Anterior"
+          className="pagination-arrow left"
+          onClick={onPrev}
+        />
+      )}
+      {pages.map((page, i) =>
+        page === '…' ? (
+          <span key={`ellipsis-${i}`} className="page-number page-number--ellipsis">…</span>
+        ) : (
+          <span
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`page-number ${currentPage === page ? 'active' : ''}`}
+          >
+            {page}
+          </span>
+        )
+      )}
+      {currentPage < totalPages && (
+        <img
+          src={arrowRight}
+          alt="Siguiente"
+          className="pagination-arrow right"
+          onClick={onNext}
+        />
+      )}
+    </div>
+  );
+});
+
+const SORT_KEYS = {
+  apellido: 'apellido_paterno',
+  edad: 'edad',
+  ultimaVisita: 'ultimaVisita'
+};
+const PATIENTS_PER_PAGE = 16;
+
 const PatientList = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const patientsPerPage = 16;
   const navigate = useNavigate();
 
   // Estados para búsqueda y orden
   const [searchTerm, setSearchTerm] = useState('');
+  // useDeferredValue mantiene el input responsive: el campo se actualiza
+  // inmediatamente, pero el filtrado pesado de la lista se hace con un
+  // valor diferido. Reemplaza un debounce manual sin perder reactividad.
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const [sortType, setSortType] = useState(null);
@@ -85,14 +234,14 @@ const PatientList = () => {
     };
   }, [isMenuOpen]);
 
-  const handleSearchChange = (e) => {
+  const handleSearchChange = useCallback((e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
-  // Filtrado memoizado para evitar recálculos innecesarios
+  // Filtrado memoizado sobre el término diferido para no bloquear el input
   const filteredPatients = useMemo(() => {
-    const normalized = removeAccents(searchTerm).toLowerCase().trim();
+    const normalized = removeAccents(deferredSearchTerm).toLowerCase().trim();
     if (!normalized) return patients;
 
     return patients.filter((patient) => {
@@ -115,22 +264,35 @@ const PatientList = () => {
 
       return nombreCompleto.includes(normalized);
     });
-  }, [patients, searchTerm]);
+  }, [patients, deferredSearchTerm]);
 
-  // Ordenar pacientes
-  const handleSortBy = (type) => {
-    if (!patients.length) return;
+  // Ordenar pacientes: actualiza solo la config; el sort real se aplica
+  // sobre el resultado del filtro en un useMemo derivado para no mutar
+  // `patients` (lo cual antes hacía que limpiar el filtro mostrara un
+  // orden distinto al original cargado).
+  const handleSortBy = useCallback((type) => {
+    if (!SORT_KEYS[type]) return;
+    setSortType((prev) => {
+      const nextAscending = type === prev ? !isAscending : true;
+      setIsAscending(nextAscending);
+      return type;
+    });
+  }, [isAscending]);
 
-    // Si cambia el tipo de orden, resetear a ascendente; si es el mismo, alternar
-    const nextAscending = type === sortType ? !isAscending : true;
+  // Sort derivado sobre los pacientes filtrados (no muta `patients`).
+  const sortedFilteredPatients = useMemo(() => {
+    if (!sortType) return filteredPatients;
+    const key = SORT_KEYS[sortType];
+    if (!key) return filteredPatients;
+    const isDate = sortType === 'ultimaVisita';
 
-    const compareValues = (a, b, key, isDate = false) => {
+    const compareValues = (a, b) => {
       const valueA = a[key];
       const valueB = b[key];
 
       if (valueA == null && valueB == null) return 0;
-      if (valueA == null) return nextAscending ? 1 : -1;
-      if (valueB == null) return nextAscending ? -1 : 1;
+      if (valueA == null) return isAscending ? 1 : -1;
+      if (valueB == null) return isAscending ? -1 : 1;
 
       if (isDate) {
         const dateA = new Date(valueA);
@@ -139,47 +301,41 @@ const PatientList = () => {
         const isValidB = !isNaN(dateB.getTime());
 
         if (!isValidA && !isValidB) return 0;
-        if (!isValidA) return nextAscending ? 1 : -1;
-        if (!isValidB) return nextAscending ? -1 : 1;
+        if (!isValidA) return isAscending ? 1 : -1;
+        if (!isValidB) return isAscending ? -1 : 1;
 
-        return nextAscending ? dateA - dateB : dateB - dateA;
+        return isAscending ? dateA - dateB : dateB - dateA;
       }
 
       if (typeof valueA === 'string' && typeof valueB === 'string') {
-        return nextAscending ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        return isAscending ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
       }
 
-      return nextAscending ? valueA - valueB : valueB - valueA;
+      return isAscending ? valueA - valueB : valueB - valueA;
     };
 
-    const sortedPatients = [...patients];
-    const sortKeys = { apellido: 'apellido_paterno', edad: 'edad', ultimaVisita: 'ultimaVisita' };
-    const key = sortKeys[type];
-    if (!key) return;
-
-    const isDate = type === 'ultimaVisita';
-    sortedPatients.sort((a, b) => compareValues(a, b, key, isDate));
-
-    setPatients(sortedPatients);
-    setSortType(type);
-    setIsAscending(nextAscending);
-  };
+    return [...filteredPatients].sort(compareValues);
+  }, [filteredPatients, sortType, isAscending]);
 
   // Calcular paginación
-  const indexOfLastPatient = currentPage * patientsPerPage;
-  const indexOfFirstPatient = indexOfLastPatient - patientsPerPage;
-  const currentPatients = filteredPatients.slice(indexOfFirstPatient, indexOfLastPatient);
-  const totalPages = Math.ceil(filteredPatients.length / patientsPerPage);
+  const totalPages = Math.ceil(sortedFilteredPatients.length / PATIENTS_PER_PAGE);
+  const currentPatients = useMemo(() => {
+    const indexOfLastPatient = currentPage * PATIENTS_PER_PAGE;
+    const indexOfFirstPatient = indexOfLastPatient - PATIENTS_PER_PAGE;
+    return sortedFilteredPatients.slice(indexOfFirstPatient, indexOfLastPatient);
+  }, [sortedFilteredPatients, currentPage]);
 
-  // Manejo de paginación
-  const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
-  const handlePrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
-  const handleNextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
+  // Manejo de paginación (estables para la Pagination memoizada)
+  const handlePageChange = useCallback((pageNumber) => setCurrentPage(pageNumber), []);
+  const handlePrevPage = useCallback(() => setCurrentPage((p) => Math.max(1, p - 1)), []);
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((p) => Math.min(totalPages || 1, p + 1));
+  }, [totalPages]);
 
-  // Navegar a detalle del paciente
-  const handlePatientClick = (patientId) => {
+  // Navegar a detalle del paciente (estable para PatientCard memoizada)
+  const handlePatientClick = useCallback((patientId) => {
     navigate(`/patient/${patientId}`);
-  };
+  }, [navigate]);
 
   if (loading) {
     return (
@@ -201,7 +357,7 @@ const PatientList = () => {
     <div className="patient-list-wrapper">
       <div className="patient-list-container">
         <div className="search-container">
-          <input 
+          <input
             type="text"
             placeholder="Buscar paciente..."
             value={searchTerm}
@@ -270,101 +426,27 @@ const PatientList = () => {
               {searchTerm ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados.'}
             </p>
           )}
-          {currentPatients.map((patient) => {
-            if (!patient) return null;
-
-            const formattedName = formatName(
-              patient.apellido_paterno,
-              patient.apellido_materno,
-              patient.primer_nombre,
-              patient.segundo_nombre
-            );
-
-            const fullName = [patient.apellido_paterno, patient.apellido_materno, patient.primer_nombre, patient.segundo_nombre]
-              .filter(Boolean).join(' ');
-
-            const patientId = patient.paciente_id || patient._id;
-            const lastVisit = patient.ultimaVisita || "Sin dato";
-            const age = formatAgeYearsOnly(patient.fecha_nacimiento) || "—";
-            const photoURL = patient.photoURL || userNot;
-
-            return (
-              <div
+          {currentPatients.map((patient) => (
+            patient ? (
+              <PatientCard
                 key={patient._id}
-                className="patient-card"
-                onClick={() => handlePatientClick(patient._id)}
-                title={fullName}
-              >
-                <div className="patient-photo">
-                  <img
-                    src={photoURL}
-                    alt="Foto del paciente"
-                    className={photoURL === userNot ? 'profile-default-avatar' : undefined}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = userNot;
-                      e.target.classList.add('profile-default-avatar');
-                    }}
-                  />
-                </div>
-                <div className="patient-info">
-                  <div className="patient-top">
-                    <span className="patient-id">{patientId}</span>
-                    {/* Nombre con Tooltip */}
-                    <span className="patient-name-container">
-                      {formattedName}
-                      <span className="tooltip">{fullName}</span>
-                    </span>
-                  </div>
-                  <div className="patient-bottom">
-                    <span className="patient-age" title="Edad">
-                      <AgeIcon />
-                      {age}
-                    </span>
-                    <span className="patient-visit" title="Última visita">
-                      <VisitIcon />
-                      {lastVisit}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                patient={patient}
+                onClick={handlePatientClick}
+              />
+            ) : null
+          ))}
         </div>
 
-        {/* Paginación */}
-        {totalPages > 0 && (
-          <div className="pagination">
-            {currentPage > 1 && (
-              <img
-                src={arrowLeft}
-                alt="Anterior"
-                className="pagination-arrow left"
-                onClick={handlePrevPage}
-              />
-            )}
-            {Array.from({ length: totalPages }, (_, i) => (
-              <span
-                key={i}
-                onClick={() => handlePageChange(i + 1)}
-                className={`page-number ${currentPage === i + 1 ? 'active' : ''}`}
-              >
-                {i + 1}
-              </span>
-            ))}
-            {currentPage < totalPages && (
-              <img
-                src={arrowRight}
-                alt="Siguiente"
-                className="pagination-arrow right"
-                onClick={handleNextPage}
-              />
-            )}
-          </div>
-        )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+        />
       </div>
     </div>
   );
 };
 
-export default PatientList;
+export default memo(PatientList);

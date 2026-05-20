@@ -13,6 +13,10 @@ const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../
 const { saveSignatureDataUrl, copyFirmaToSnapshot } = require('../utils/saveSignatureImage');
 const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
 
+// Logs informativos sólo en desarrollo (los errores siempre se loggean).
+const DEBUG_LOGS = process.env.NODE_ENV !== 'production';
+const debugLog = (...args) => { if (DEBUG_LOGS) console.log(...args); };
+
 // Utilidad compartida: calcular edad a partir de fecha de nacimiento
 const calcularEdad = (fechaNacimiento) => {
     const nacimiento = fechaNacimiento instanceof Date ? fechaNacimiento : new Date(fechaNacimiento);
@@ -69,37 +73,59 @@ exports.deleteAllPatients = async (req, res) => {
 
 
 /** 🔹 Obtener todos los pacientes */
+// Campos que necesita la lista de pacientes / selects de paciente. NO incluye
+// historia clínica, encuestas, periodontogramas, etc. — el detalle individual
+// se obtiene con GET /patients/:id. Reduce el payload ~15-25x con muchos
+// pacientes.
+const PATIENT_LIST_FIELDS = [
+    '_id',
+    'paciente_id',
+    'primer_nombre', 'segundo_nombre', 'otros_nombres',
+    'apellido_paterno', 'apellido_materno',
+    'fecha_nacimiento', 'edad', 'sexo',
+    'photoURL',
+    'ultimaVisita',
+    'documento',
+    'contacto',
+    'createdAt', 'updatedAt',
+].join(' ');
+
 exports.getAllPatients = async (req, res) => {
     try {
-        console.log("📡 Solicitando todos los pacientes...");
+        debugLog("📡 Solicitando todos los pacientes...");
 
         // Implementar paginación opcional
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 0; // 0 significa sin límite
         const skip = (page - 1) * limit;
 
-        // Construir la consulta base (excluir pacientes dados de baja)
-        let query = Patient.find({ deletedAt: null }, { __v: 0 });
+        // Construir la consulta base (excluir pacientes dados de baja).
+        // .select() limita los campos al subset que necesita la lista.
+        // .lean() devuelve POJOs en vez de docs Mongoose hidratados (más rápido).
+        let query = Patient.find({ deletedAt: null })
+            .select(PATIENT_LIST_FIELDS)
+            .lean();
 
         // Aplicar paginación si se especifica un límite
         if (limit > 0) {
             query = query.skip(skip).limit(limit);
         }
 
-        // Ejecutar la consulta
-        const patients = await query.exec();
-
-        // Contar el total de pacientes para la paginación (excluyendo dados de baja)
-        const total = await Patient.countDocuments({ deletedAt: null });
+        // Ejecutar la consulta en paralelo con el conteo total
+        const [patients, total] = await Promise.all([
+            query.exec(),
+            Patient.countDocuments({ deletedAt: null })
+        ]);
 
         if (!patients.length) {
-            console.log("⚠️ No se encontraron pacientes.");
+            debugLog("⚠️ No se encontraron pacientes.");
         }
 
-        // Verificar que todos los pacientes tengan un `paciente_id` generado correctamente
+        // Verificar que todos los pacientes tengan un `paciente_id` generado correctamente.
+        // Con .lean() ya son POJOs, no necesitamos .toObject().
         let patientsWithId = patients.map(patient => ({
-            ...patient.toObject(),
-            paciente_id: patient.paciente_id || "No asignado" // Si no tiene un ID, muestra "No asignado"
+            ...patient,
+            paciente_id: patient.paciente_id || "No asignado"
         }));
 
         // Filtrar datos clínicos si el usuario solo tiene patients.read.basic
@@ -166,7 +192,7 @@ exports.searchPatients = async (req, res) => {
 exports.getPatientById = async (req, res) => {
     try {
       const { id } = req.params;
-      console.log("🔍 Buscando paciente con _id:", id);
+      debugLog("🔍 Buscando paciente con _id:", id);
   
       if (!id) {
         return res.status(400).json({ message: "El ID del paciente es obligatorio" });
@@ -181,7 +207,7 @@ exports.getPatientById = async (req, res) => {
       const patient = await Patient.findOne({ _id: id, deletedAt: null }).exec();
   
       if (!patient) {
-        console.log("⚠️ Paciente no encontrado en la base de datos.");
+        debugLog("⚠️ Paciente no encontrado en la base de datos.");
         return res.status(404).json({ message: "Paciente no encontrado" });
       }
 
@@ -393,12 +419,12 @@ exports.createPatient = async (req, res) => {
         // Guardar con retry ante colisión de paciente_id (rango 1000-9999)
         await savePatientWithRetry(newPatient);
         savedSuccessfully = true;
-        console.log("✅ Paciente guardado exitosamente con ID:", newPatient._id);
+        debugLog("✅ Paciente guardado exitosamente con ID:", newPatient._id);
 
         // Periodontograma inicial (best-effort, no aborta la creación)
         try {
             const initialPeriodontogram = await Periodontogram.createInitial(newPatient._id);
-            console.log("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
+            debugLog("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
         } catch (periodontogramError) {
             console.error("⚠️ Error al crear periodontograma inicial:", periodontogramError.message);
         }
@@ -585,6 +611,39 @@ exports.updatePatient = async (req, res) => {
                 if (p === 'Otros') return !!esp;
                 return true;
             });
+        }
+
+        // Control de concurrencia optimista: si el cliente envía
+        // `expectedUpdatedAt` (timestamp del documento en su última lectura),
+        // validamos que el documento no haya cambiado en BD entre tanto. Si
+        // cambió, devolvemos 409 para que el cliente pueda recargar y
+        // resolver el conflicto en lugar de pisar cambios ajenos. El campo
+        // es opcional para no romper clientes existentes.
+        const expectedUpdatedAtRaw = updateData.expectedUpdatedAt;
+        if (expectedUpdatedAtRaw !== undefined && expectedUpdatedAtRaw !== null) {
+            const expectedDate = new Date(expectedUpdatedAtRaw);
+            if (Number.isNaN(expectedDate.getTime())) {
+                return res.status(400).json({
+                    message: 'expectedUpdatedAt no es una fecha válida',
+                    code: 'INVALID_EXPECTED_UPDATED_AT'
+                });
+            }
+            const current = await Patient.findOne(
+                { _id: req.params.id, deletedAt: null }
+            ).select('updatedAt').lean();
+            if (!current) {
+                return res.status(404).json({ message: 'Paciente no encontrado' });
+            }
+            const currentMs = new Date(current.updatedAt).getTime();
+            const expectedMs = expectedDate.getTime();
+            // 1s de tolerancia para round-trips de serialización JSON.
+            if (Math.abs(currentMs - expectedMs) > 1000) {
+                return res.status(409).json({
+                    message: 'El paciente fue modificado por otra sesión. Recarga para ver los cambios antes de guardar.',
+                    code: 'PATIENT_STALE',
+                    serverUpdatedAt: current.updatedAt
+                });
+            }
         }
 
         // Whitelist: el cliente sólo puede tocar campos clínicos/demográficos.

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { message } from 'antd';
 import { ADVANCED_LOGGING_CONFIG } from '../../periodontogram/utils/config.js';
 import PeriodontogramDesign from '../../periodontogram/periodontogram-design';
 import StatisticsPanel from '../../periodontogram/statistics-panel';
@@ -57,6 +58,12 @@ const PeriodontogramSection = ({ patientId }) => {
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [previousData, setPreviousData] = useState(null); // Para rollback
   const [selectedTooth, setSelectedTooth] = useState(null);
+
+  // Tracking de cambios sin guardar para advertir al usuario antes de
+  // navegar/cambiar versión y para el listener beforeunload.
+  const isDirtyRef = useRef(false);
+  // Dedupe de warnings de validación: evita spam si el usuario tipea fuera de rango.
+  const lastValidationWarnRef = useRef({ key: null, time: 0 });
 
   const createEmptyPeriodontogram = useCallback(() => ({
     teeth: {},
@@ -164,20 +171,24 @@ const PeriodontogramSection = ({ patientId }) => {
   const validateMeasurementValue = useCallback((field, value) => {
     const limits = MEASUREMENT_LIMITS[field];
     if (!limits) return { valid: true, value };
-    
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) {
-      return { valid: false, value: limits.default, error: `Valor debe ser numérico` };
+
+    if (value === null || value === undefined || value === '') {
+      return { valid: true, value: limits.default };
     }
-    
+
+    const numValue = parseFloat(value);
+    if (!Number.isFinite(numValue)) {
+      return { valid: false, value: limits.default, error: 'Valor debe ser numérico' };
+    }
+
     if (numValue < limits.min) {
       return { valid: false, value: limits.min, error: `Valor mínimo: ${limits.min}${limits.unit || ''}` };
     }
-    
+
     if (numValue > limits.max) {
       return { valid: false, value: limits.max, error: `Valor máximo: ${limits.max}${limits.unit || ''}` };
     }
-    
+
     return { valid: true, value: numValue };
   }, []);
 
@@ -210,8 +221,13 @@ const PeriodontogramSection = ({ patientId }) => {
 
    /* -------------------- ROLLBACK DE DATOS -------------------- */
    const saveStateForRollback = useCallback(() => {
+     // structuredClone preserva Dates, undefined, NaN — a diferencia de
+     // JSON.parse(JSON.stringify(...)) que las pierde silenciosamente.
+     const snapshot = periodontogramData
+       ? structuredClone(periodontogramData)
+       : null;
      setPreviousData({
-       periodontogramData: JSON.parse(JSON.stringify(periodontogramData)),
+       periodontogramData: snapshot,
        selectedVersion,
        editMode
      });
@@ -223,14 +239,14 @@ const PeriodontogramSection = ({ patientId }) => {
        setSelectedVersion(previousData.selectedVersion);
        setEditMode(previousData.editMode);
        setPreviousData(null);
-       console.log('Datos restaurados al estado anterior');
+       if (ADVANCED_LOGGING_CONFIG.enabled) console.log('Datos restaurados al estado anterior');
      }
    }, [previousData]);
 
   // (definido arriba para evitar TDZ)
 
   /* -------------------------- CARGA INICIAL -------------------------- */
-  const loadPeriodontogram = useCallback(async () => {
+  const loadPeriodontogram = useCallback(async (signal) => {
     if (!patientId) {
       setPeriodontogramData(createEmptyPeriodontogram());
       setPeriodontogramExists(false);
@@ -239,37 +255,38 @@ const PeriodontogramSection = ({ patientId }) => {
       return;
     }
 
+    const isAborted = () => signal?.aborted === true;
+
     setIsLoading(true);
     setError(null);
     setErrorType(null);
 
     try {
-      // Solo cargar la lista de versiones para saber si existen periodontogramas guardados
-      const versionsResponse = await PeriodontogramService.getDataVersions(patientId).catch((err) => {
+      const versionsResponse = await PeriodontogramService.getDataVersions(patientId, { signal }).catch((err) => {
         if (err?.status === 404) {
           return [];
         }
         throw err;
       });
+      if (isAborted()) return;
 
       const orderedVersions = sortVersionsDesc(versionsResponse || []);
-      
-      // Verificar si existe periodontograma guardado
       const exists = orderedVersions.length > 0;
-      
+
       setPeriodontogramExists(exists);
       setVersionList(orderedVersions);
       setPreviousData(null);
 
-      // Si hay versiones guardadas, cargar automáticamente la más reciente
       if (exists && orderedVersions.length > 0) {
         try {
           const latestVersion = orderedVersions[0];
-          const backendData = await PeriodontogramService.getData(patientId, latestVersion);
+          const backendData = await PeriodontogramService.getData(patientId, latestVersion, { signal });
+          if (isAborted()) return;
           const normalizedData = convertBackendDataToFrontend(backendData);
           setPeriodontogramData(normalizedData);
           setSelectedVersion(latestVersion);
         } catch (loadErr) {
+          if (isAborted() || loadErr?.code === 'ERR_CANCELED' || loadErr?.name === 'CanceledError') return;
           console.warn('No se pudo cargar la última versión, iniciando vacío:', loadErr);
           setPeriodontogramData(createEmptyPeriodontogram());
           setSelectedVersion(null);
@@ -283,64 +300,69 @@ const PeriodontogramSection = ({ patientId }) => {
         UniversalToothValidator.invalidateCache();
       }
     } catch (err) {
+      if (isAborted() || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return;
       handleError(err, 'carga inicial');
       setPeriodontogramData(createEmptyPeriodontogram());
       setPeriodontogramExists(false);
       setVersionList([]);
       setSelectedVersion(null);
     } finally {
-      setIsLoading(false);
+      if (!isAborted()) {
+        setIsLoading(false);
+      }
     }
   }, [patientId, sortVersionsDesc, createEmptyPeriodontogram, handleError, convertBackendDataToFrontend]);
 
-  // Cargamos el periodontograma SOLO al cambiar de paciente. Antes la dep
-  // era `loadPeriodontogram` (useCallback con 5 deps que recreaba la fn en
-  // cada render), y el efecto re-disparaba GET /versions + GET /data una y
-  // otra vez. Ignoramos la regla de exhaustive-deps porque las funciones
-  // internas no se necesitan recargar — sólo el patientId define qué cargar.
-  // El flag `cancelled` evita setState tras unmount en StrictMode.
+  // Cargamos el periodontograma SOLO al cambiar de paciente. AbortController
+  // aborta el fetch en curso si el usuario cambia de paciente antes de que
+  // termine — evita que la respuesta del paciente A pise los datos del B.
+  // eslint-disable-next-line react-hooks/exhaustive-deps porque las funciones
+  // internas no necesitan recargar — sólo el patientId define qué cargar.
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      // Wrapper que ignora setStates si el componente desmonta a la mitad.
-      const guardedLoad = () => {
-        if (cancelled) return;
-        return loadPeriodontogram();
-      };
-      await guardedLoad();
-    };
-    run();
-    return () => { cancelled = true; };
+    const controller = new AbortController();
+    loadPeriodontogram(controller.signal);
+    return () => { controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId]);
 
   /* ---------------------- ACTUALIZAR DIENTE ---------------------- */
+  // Warning con dedupe: si el usuario tipea fuera de rango varias veces
+  // seguidas en el mismo campo, no spameamos message.warning.
+  const warnValidation = useCallback((toothNumber, field, errorText) => {
+    const key = `${toothNumber}:${field}`;
+    const now = Date.now();
+    const last = lastValidationWarnRef.current;
+    if (last.key === key && now - last.time < 1500) return;
+    lastValidationWarnRef.current = { key, time: now };
+    message.warning({
+      content: `Diente ${toothNumber} · ${field}: ${errorText}. Valor ajustado.`,
+      key: `validation-${key}`,
+      duration: 2.5
+    });
+  }, []);
+
   const handleToothUpdate = useCallback((toothNumber, field, value, side = null, index = null) => {
     if (editMode !== 'guardado') return;
-    
+
     // Validar rangos para campos de medición
     let validatedValue = value;
     if (['profundidadSondaje', 'margenGingival', 'mobility'].includes(field)) {
-      const validation = validateMeasurementValue(field === 'profundidadSondaje' ? 'probingDepth' : 
-                                                 field === 'margenGingival' ? 'gingivalMargin' : field, value);
-      
+      const validatorField = field === 'profundidadSondaje' ? 'probingDepth' :
+                             field === 'margenGingival' ? 'gingivalMargin' : field;
+      const validation = validateMeasurementValue(validatorField, value);
       if (!validation.valid) {
-        console.warn(`Validación fallida para ${field} en diente ${toothNumber}: ${validation.error}`);
-        validatedValue = validation.value; // Usar valor corregido
-      } else {
-        validatedValue = validation.value;
+        warnValidation(toothNumber, field, validation.error);
       }
+      validatedValue = validation.value;
     }
-    
+
     // Validación específica para anchuraEncia como valor único
     if (field === 'anchuraEncia') {
       const validation = validateMeasurementValue('gumWidth', value);
       if (!validation.valid) {
-        console.warn(`Validación fallida para ${field} en diente ${toothNumber}: ${validation.error}`);
-        validatedValue = validation.value;
-      } else {
-        validatedValue = validation.value;
+        warnValidation(toothNumber, field, validation.error);
       }
+      validatedValue = validation.value;
     }
     
     setPeriodontogramData(prev => {
@@ -405,39 +427,44 @@ const PeriodontogramSection = ({ patientId }) => {
       
       // Agregar timestamp para forzar detección de cambios
       updated.lastModified = Date.now();
-      
+
       return updated;
     });
-  }, [editMode]);
+    isDirtyRef.current = true;
+  }, [editMode, validateMeasurementValue, warnValidation]);
 
   // Limpiar periodontograma (dejar en blanco)
   const handleClear = useCallback(() => {
     if (editMode !== 'guardado') return;
 
+    if (isDirtyRef.current) {
+      const confirmed = window.confirm(
+        'Hay cambios sin guardar en el periodontograma. ¿Seguro que deseas limpiar?'
+      );
+      if (!confirmed) return;
+    }
+
     try {
-      // Invalidar cachés para evitar estadísticos obsoletos
       if (typeof UniversalToothValidator.invalidateCache === 'function') {
         UniversalToothValidator.invalidateCache();
       }
 
-      setPeriodontogramData(prev => ({
-        teeth: {},
-        statistics: typeof UniversalToothValidator.getDefaultStatistics === 'function'
-          ? UniversalToothValidator.getDefaultStatistics()
-          : { placaTotal: 0, sangradoTotal: 0, supuracionTotal: 0, profundidadPromedio: 0 },
-        metadata: {
-          version: '4.0.0',
-          createdAt: prev?.metadata?.createdAt || new Date().toISOString(),
-          lastModified: new Date().toISOString()
-        },
-        versionName: null
-      }));
+      // Reutiliza createEmptyPeriodontogram para mantener una sola fuente de
+      // verdad del estado vacío (mismas claves, misma forma de statistics).
+      setPeriodontogramData(prev => {
+        const empty = createEmptyPeriodontogram();
+        if (prev?.metadata?.createdAt) {
+          empty.metadata = { ...empty.metadata, createdAt: prev.metadata.createdAt };
+        }
+        return empty;
+      });
 
       setSelectedTooth(null);
+      isDirtyRef.current = true;
     } catch (e) {
       console.error('Error limpiando periodontograma:', e);
     }
-  }, [editMode]);
+  }, [editMode, createEmptyPeriodontogram]);
 
     /* -------------------- OPTIMIZACIÓN DE RENDIMIENTO -------------------- */
    // Eliminado: useDebounce ya no es necesario
@@ -458,30 +485,42 @@ const PeriodontogramSection = ({ patientId }) => {
 
    /* -------------------- CAMBIO DE MODO -------------------- */
   const handleModeChange = useCallback(() => {
+    if (editMode === 'guardado' && isDirtyRef.current) {
+      const confirmed = window.confirm(
+        'Hay cambios sin guardar. Si cambias a Visualización se perderán. ¿Continuar?'
+      );
+      if (!confirmed) return;
+      isDirtyRef.current = false;
+    }
     const newMode = editMode === 'guardado' ? 'visualizacion' : 'guardado';
     setEditMode(newMode);
   }, [editMode]);
 
    /* -------------------- GESTIÓN DE VERSIONES -------------------- */
   const handleSelectVersion = useCallback(async (ver) => {
-    // Si no hay versión seleccionada (cadena vacía), volver a periodontograma limpio
+    if (isDirtyRef.current) {
+      const confirmed = window.confirm(
+        'Hay cambios sin guardar. Cambiar de versión los descartará. ¿Continuar?'
+      );
+      if (!confirmed) return;
+      isDirtyRef.current = false;
+    }
+
     if (!ver || ver === '') {
       setSelectedVersion(null);
       setPeriodontogramData(createEmptyPeriodontogram());
-      
-      // Invalidar cachés de estadísticas
+
       if (typeof UniversalToothValidator.invalidateCache === 'function') {
         UniversalToothValidator.invalidateCache();
       }
       return;
     }
-    
+
     setSelectedVersion(ver);
     setIsLoading(true);
     setError(null);
     setErrorType(null);
-    
-    // Guardar estado para rollback
+
     saveStateForRollback();
     
     try {
@@ -514,23 +553,23 @@ const PeriodontogramSection = ({ patientId }) => {
         try {
           await PeriodontogramService.createPeriodontogram(patientId);
           setPeriodontogramExists(true);
-          console.log('✅ Periodontograma creado exitosamente en el backend');
+          if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma creado exitosamente en el backend');
         } catch (createError) {
-          // Si el error es 409 (ya existe), continuar con el guardado
           if (createError.response?.status === 409) {
-            console.log('📝 Periodontograma ya existe, continuando con guardado');
+            if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📝 Periodontograma ya existe, continuando con guardado');
             setPeriodontogramExists(true);
           } else {
             throw createError;
           }
         }
       }
-      
-      // Transformar datos al formato backend antes de guardar
-      console.log('🔍 DATOS ANTES DE TRANSFORMAR:', {
-        periodontogramData: periodontogramData,
-        teeth: periodontogramData.teeth
-      });
+
+      if (ADVANCED_LOGGING_CONFIG.enabled) {
+        console.log('🔍 DATOS ANTES DE TRANSFORMAR:', {
+          periodontogramData,
+          teeth: periodontogramData.teeth
+        });
+      }
       
       // ✅ ESQUEMA UNIFICADO - Helper para generar caras y normalizar números
       const createEmptyFace = () => ({
@@ -715,7 +754,7 @@ const PeriodontogramSection = ({ patientId }) => {
         version: new Date().toISOString().replace(/[:.-]/g, '')
       });
       
-      console.log('📋 Datos unificados y validados:', validatedData);
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📋 Datos unificados y validados:', validatedData);
       
       // Recalcular estadísticas para asegurar consistencia
   // Calcular estadísticas desde la estructura de UI (campos ingleses con 4-caras)
@@ -747,8 +786,10 @@ const PeriodontogramSection = ({ patientId }) => {
       setVersionList(orderedVersions);
       setSelectedVersion(nextVersionName ?? orderedVersions[0] ?? null);
       setPreviousData(null);
+      isDirtyRef.current = false;
+      message.success('Periodontograma guardado');
 
-      console.log('✅ Periodontograma guardado exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma guardado exitosamente');
     } catch (err) {
         rollbackData(); // Restaurar estado anterior en caso de error
         handleError(err, 'guardado de datos');
@@ -756,6 +797,19 @@ const PeriodontogramSection = ({ patientId }) => {
       setIsSaving(false);
     }
   }, [patientId, periodontogramData, periodontogramExists, saveStateForRollback, rollbackData, handleError, sortVersionsDesc]);
+
+  // beforeunload: bloquear navegación nativa del navegador (cerrar pestaña,
+  // recargar) si hay cambios sin guardar. No previene cambios de ruta SPA;
+  // esos los cubrimos con confirms en handleModeChange/handleSelectVersion.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
 
 
