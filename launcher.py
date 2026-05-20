@@ -99,6 +99,7 @@ class DentiaCoreLauncher:
         try:
             project_dir = Path(__file__).parent
             for candidate in (
+                project_dir / 'Client' / 'src' / 'assets' / 'images' / 'icons' / 'dentiacoreblanco.png',
                 project_dir / 'Client' / 'public' / 'android-chrome-192x192.png',
                 project_dir / 'Client' / 'public' / 'android-chrome-512x512.png',
             ):
@@ -305,7 +306,7 @@ class DentiaCoreLauncher:
         outer.pack(fill='both', expand=True)
 
         # ── Brand header strip (full width, color corporativo) ──
-        brand_bar = tk.Frame(outer, bg=C['primary'], height=82)
+        brand_bar = tk.Frame(outer, bg=C['primary'], height=96)
         brand_bar.pack(fill='x', side='top')
         brand_bar.pack_propagate(False)
 
@@ -315,21 +316,39 @@ class DentiaCoreLauncher:
         brand_inner = tk.Frame(brand_bar, bg=C['primary'])
         brand_inner.pack(fill='both', expand=True, padx=24, pady=14)
 
-        tk.Label(
-            brand_inner, text='🦷', font=('Segoe UI Emoji', 30),
-            bg=C['primary'], fg='white',
-        ).pack(side='left', padx=(0, 12))
-
         title_block = tk.Frame(brand_inner, bg=C['primary'])
         title_block.pack(side='left')
-        tk.Label(
-            title_block, text='DentiaCore',
-            font=('Montserrat', 20, 'bold'), fg='white', bg=C['primary'],
-        ).pack(anchor='w')
+
+        # Intenta cargar el logo PNG (Tk 8.6+); si falla, cae al emoji + texto.
+        self._brand_logo = None
+        try:
+            logo_path = self.project_dir / 'Client' / 'src' / 'assets' / 'images' / 'icons' / 'dentiacoreblanco.png'
+            if logo_path.is_file():
+                full = tk.PhotoImage(file=str(logo_path))
+                self._brand_logo = full.subsample(4, 4)
+        except Exception:
+            self._brand_logo = None
+
+        if self._brand_logo is not None:
+            tk.Label(
+                title_block, image=self._brand_logo, bg=C['primary'],
+            ).pack(anchor='w')
+        else:
+            row = tk.Frame(title_block, bg=C['primary'])
+            row.pack(anchor='w')
+            tk.Label(
+                row, text='🦷', font=('Segoe UI Emoji', 26),
+                bg=C['primary'], fg='white',
+            ).pack(side='left', padx=(0, 10))
+            tk.Label(
+                row, text='DentiaCore',
+                font=('Montserrat', 20, 'bold'), fg='white', bg=C['primary'],
+            ).pack(side='left')
+
         tk.Label(
             title_block, text='Sistema de Gestión Dental',
             font=('Montserrat', 10), fg='#cfe1f5', bg=C['primary'],
-        ).pack(anchor='w')
+        ).pack(anchor='w', pady=(4, 0))
 
         # Version chip a la derecha del brand bar
         version_chip = tk.Frame(brand_inner, bg='white')
