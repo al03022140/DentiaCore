@@ -489,11 +489,13 @@ class DentiaCoreLauncher:
         qbtns.pack(padx=16, pady=(0, 8))
 
         self._make_outline_button(qbtns, '↗   Abrir en navegador', command=self.open_app).grid(
-            row=0, column=0, padx=(0, 6))
-        self._make_outline_button(qbtns, '✕   Limpiar pacientes', command=self.clear_patients).grid(
-            row=0, column=1, padx=6)
+            row=0, column=0, padx=(0, 6), pady=(0, 6))
         self._make_outline_button(qbtns, '⊕   Abrir carpeta', command=self.open_folder).grid(
-            row=0, column=2, padx=(6, 0))
+            row=0, column=1, padx=(6, 0), pady=(0, 6))
+        self._make_outline_button(qbtns, '👤   Crear administrador', command=self.create_admin).grid(
+            row=1, column=0, padx=(0, 6))
+        self._make_outline_button(qbtns, '✕   Limpiar pacientes', command=self.clear_patients).grid(
+            row=1, column=1, padx=(6, 0))
 
         # ── Footer ──
         tk.Label(
@@ -1519,15 +1521,170 @@ class DentiaCoreLauncher:
                 text=True,
                 shell=(sys.platform == 'win32')
             )
-            
+
             if result.returncode == 0:
                 self.root.after(0, lambda: messagebox.showinfo("Éxito", "Pacientes eliminados correctamente"))
             else:
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Error al eliminar pacientes: {result.stderr}"))
-                
+
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Error: {str(e)}"))
-            
+
+    def create_admin(self):
+        """Abrir diálogo para crear el primer usuario administrador.
+
+        Bootstrap del sistema: una instalación fresca no tiene usuarios en la
+        DB, así que nadie puede entrar a la app hasta crear el primer admin.
+        Este diálogo ejecuta `node create-admin.js` con los valores ingresados.
+        """
+        import re
+        C = self.colors
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title('Crear administrador')
+        dlg.configure(bg=C['bg_light'])
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+
+        # Centrar relativo a la ventana principal
+        self.root.update_idletasks()
+        pw, ph = 420, 460
+        rx = self.root.winfo_rootx() + (self.root.winfo_width() - pw) // 2
+        ry = self.root.winfo_rooty() + (self.root.winfo_height() - ph) // 2
+        dlg.geometry(f'{pw}x{ph}+{max(0, rx)}+{max(0, ry)}')
+
+        tk.Label(
+            dlg, text='Crear administrador',
+            font=('Montserrat', 14, 'bold'), bg=C['bg_light'], fg=C['text_primary']
+        ).pack(pady=(18, 4))
+        tk.Label(
+            dlg,
+            text='Primer usuario para entrar a la app.\nUsa una contraseña fuerte y guarda el PIN.',
+            font=('Montserrat', 9), bg=C['bg_light'], fg=C['text_secondary'],
+            justify='center'
+        ).pack(pady=(0, 14))
+
+        form = tk.Frame(dlg, bg=C['bg_light'])
+        form.pack(fill='x', padx=24)
+
+        def field(label_text):
+            tk.Label(form, text=label_text, font=('Montserrat', 9, 'bold'),
+                     bg=C['bg_light'], fg=C['text_primary'], anchor='w').pack(fill='x', pady=(8, 2))
+            e = tk.Entry(form, font=('Montserrat', 10), relief='flat',
+                         highlightthickness=1, highlightbackground=C['border_light'],
+                         highlightcolor=C['primary_light'])
+            e.pack(fill='x', ipady=6)
+            return e
+
+        nombre_e = field('Nombre completo')
+        nombre_e.insert(0, 'Administrador Local')
+        email_e = field('Email')
+        pass_e = field('Contraseña (mín. 8 caracteres)')
+        pass_e.config(show='•')
+        pin_e = field('PIN (4 dígitos)')
+
+        msg_var = tk.StringVar(value='')
+        tk.Label(dlg, textvariable=msg_var, font=('Montserrat', 9),
+                 bg=C['bg_light'], fg=C['danger'], wraplength=370).pack(pady=(10, 0))
+
+        btn_row = tk.Frame(dlg, bg=C['bg_light'])
+        btn_row.pack(pady=(10, 18))
+
+        def submit():
+            nombre = nombre_e.get().strip() or 'Administrador Local'
+            email = email_e.get().strip()
+            pwd = pass_e.get()
+            pin = pin_e.get().strip()
+
+            if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+                msg_var.set('Email inválido')
+                return
+            if len(pwd) < 8:
+                msg_var.set('La contraseña debe tener al menos 8 caracteres')
+                return
+            if not re.match(r'^\d{4}$', pin):
+                msg_var.set('El PIN debe ser exactamente 4 dígitos')
+                return
+
+            msg_var.set('Creando usuario…')
+            create_btn.config(state='disabled')
+            cancel_btn.config(state='disabled')
+            threading.Thread(
+                target=self._create_admin_thread,
+                args=(email, pwd, pin, nombre, dlg, msg_var, create_btn, cancel_btn),
+                daemon=True
+            ).start()
+
+        cancel_btn = tk.Button(
+            btn_row, text='Cancelar', command=dlg.destroy,
+            font=('Montserrat', 10), bg=C['bg_white'], fg=C['text_primary'],
+            relief='flat', padx=22, pady=8, bd=0,
+            highlightthickness=1, highlightbackground=C['border_card']
+        )
+        cancel_btn.pack(side='left', padx=(0, 8))
+
+        create_btn = tk.Button(
+            btn_row, text='Crear admin', command=submit,
+            font=('Montserrat', 10, 'bold'), bg=C['primary'], fg=C['bg_white'],
+            relief='flat', padx=22, pady=8, bd=0, activebackground=C['primary_hover']
+        )
+        create_btn.pack(side='left')
+
+        email_e.focus_set()
+        dlg.bind('<Return>', lambda _e: submit())
+
+    def _create_admin_thread(self, email, password, pin, nombre, dlg, msg_var, create_btn, cancel_btn):
+        """Hilo que ejecuta create-admin.js y reporta el resultado."""
+        try:
+            result = subprocess.run(
+                ['node', 'create-admin.js', email, password, pin, nombre],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                shell=(sys.platform == 'win32'),
+                timeout=60
+            )
+            stdout = (result.stdout or '').strip()
+            stderr = (result.stderr or '').strip()
+
+            if result.returncode == 0:
+                self.root.after(0, lambda: (
+                    dlg.destroy(),
+                    messagebox.showinfo(
+                        'Usuario creado',
+                        f'✅ Administrador creado correctamente.\n\nEmail: {email}\n'
+                        f'Ya puedes entrar a la app con ese email y tu contraseña.'
+                    )
+                ))
+            else:
+                # Mensaje útil incluso si create-admin.js no propaga errores
+                err = stderr or stdout or f'create-admin.js salió con código {result.returncode}'
+                self.root.after(0, lambda: (
+                    msg_var.set(err[:200]),
+                    create_btn.config(state='normal'),
+                    cancel_btn.config(state='normal')
+                ))
+        except subprocess.TimeoutExpired:
+            self.root.after(0, lambda: (
+                msg_var.set('Timeout — verifica que MongoDB esté corriendo'),
+                create_btn.config(state='normal'),
+                cancel_btn.config(state='normal')
+            ))
+        except FileNotFoundError:
+            self.root.after(0, lambda: (
+                msg_var.set('No se encontró Node.js. Instálalo desde nodejs.org'),
+                create_btn.config(state='normal'),
+                cancel_btn.config(state='normal')
+            ))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda: (
+                msg_var.set(err[:200]),
+                create_btn.config(state='normal'),
+                cancel_btn.config(state='normal')
+            ))
+
     def open_folder(self):
         """Abrir la carpeta del proyecto"""
         project_path = str(self.project_dir)

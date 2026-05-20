@@ -136,8 +136,11 @@ La IP se muestra en la ventana del launcher.
 
 Después de instalar y que funcione:
 
-1. Lee **SETUP_INSTRUCTIONS.md** completo
-2. Crea usuario admin: `node create-admin.js`
+1. **Crear usuario administrador** (obligatorio para poder entrar):
+   - Abre el launcher → "Accesos Rápidos" → **👤 Crear administrador**
+   - Llena email, contraseña (≥8 chars) y PIN (4 dígitos)
+   - O por línea de comandos: `node create-admin.js <email> <pass> <pin>`
+2. Lee **SETUP_INSTRUCTIONS.md** completo
 3. Configura Google Auth si lo necesitas
 4. Haz backup de la BD: `mongodump --db DentiaCore --out ~/backup`
 
