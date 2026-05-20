@@ -72,12 +72,77 @@ function Assert-Admin {
 }
 
 function Get-LocalIP {
-    $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | 
+    $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
           Where-Object { $_.InterfaceAlias -notlike "*Loopback*" -and $_.InterfaceAlias -notlike "*vEthernet*" } |
-          Sort-Object -Property InterfaceIndex | 
+          Sort-Object -Property InterfaceIndex |
           Select-Object -First 1 -ExpandProperty IPAddress
     if (-not $ip) { $ip = "127.0.0.1" }
     return $ip
+}
+
+function Assert-Winget {
+    # winget viene preinstalado en Windows 10 1809+ vía "App Installer".
+    # En Windows 7/8 o builds viejas no existe — el instalador debe avisar y abortar
+    # antes de fallar silenciosamente al intentar instalar Node/Python.
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Err "winget no encontrado. Esta versión de Windows no permite instalación automática."
+        Write-Err "Instala manualmente y reintenta:"
+        Write-Err "  • Node.js LTS: https://nodejs.org"
+        Write-Err "  • Python 3 (con tcl/tk): https://python.org"
+        Write-Err "  • Visual C++ Redistributable x64: https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        Write-Err "O actualiza 'App Installer' desde Microsoft Store."
+        throw "winget_not_found"
+    }
+}
+
+function Ensure-VCRedist {
+    # MongoDB y módulos nativos de Node (canvas, sharp) requieren Visual C++ Redistributable.
+    # Sin él, mongod.exe falla con "el programa no puede iniciarse" o error 0xc000007b.
+    $RegPath = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64'
+    $Installed = $false
+    try {
+        $val = Get-ItemProperty -Path $RegPath -ErrorAction SilentlyContinue
+        if ($val -and $val.Installed -eq 1) { $Installed = $true }
+    } catch { $Installed = $false }
+
+    if ($Installed) {
+        Write-Ok "Visual C++ Redistributable ya instalado."
+        return
+    }
+
+    Write-Step "Instalando Visual C++ Redistributable (requerido por MongoDB y módulos nativos)..."
+    winget install -e --id Microsoft.VCRedist.2015+.x64 --accept-source-agreements --accept-package-agreements --silent 2>$null | Out-Null
+    Start-Sleep -Seconds 2
+    Write-Ok "Visual C++ Redistributable instalado."
+}
+
+function Ensure-Python {
+    # El launcher.py necesita Python 3 + tkinter. Sin esto el usuario queda
+    # bloqueado al terminar el instalador (no puede abrir el launcher).
+    $py = (Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if (-not $py) {
+        $py = (Get-Command pythonw.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    }
+
+    if ($py) {
+        $PyVer = (& $py -V 2>&1)
+        Write-Ok "Python detectado: $PyVer"
+        return
+    }
+
+    Write-Step "Instalando Python 3 (requerido por el Launcher)..."
+    # Python.Python.3.12 instala con tk/tcl incluido por default
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent 2>$null | Out-Null
+    Start-Sleep -Seconds 3
+    # Refrescar PATH desde el registry (winget modifica el PATH del sistema pero no de la sesión actual)
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
+
+    $py = (Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if (-not $py) {
+        Write-Warn "Python instalado pero no aparece en PATH de esta sesión. Cierra y vuelve a abrir la terminal antes de correr el launcher."
+    } else {
+        Write-Ok "Python instalado: $(& $py -V 2>&1)"
+    }
 }
 
 try {
@@ -89,6 +154,11 @@ try {
     $ServerDir = Join-Path $RepoRoot "Server"
     $ClientDir = Join-Path $RepoRoot "Client"
     $ToolsDir = Join-Path $RepoRoot "tools" 
+
+    Write-Header "0. VALIDANDO DEPENDENCIAS DEL SISTEMA"
+    Assert-Winget
+    Ensure-VCRedist
+    Ensure-Python
 
     Write-Header "1. CONFIGURACION DE RED"
     $DetectedIP = Get-LocalIP
@@ -122,12 +192,15 @@ try {
 
             if ($LocalMongoBin -and (Test-Path $LocalMongoBin)) {
                 $ConfigPath = Join-Path $RepoRoot "mongod.cfg"
-                
+
                 $LogFile = "$LogDir\mongod.log"
                 $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
-                
+
                 Set-Content -Path $ConfigPath -Value $ConfigContent -Encoding UTF8
-                $BinPathCmd = $LocalMongoBin + ' --config ' + $ConfigPath + ' --service'
+                # Quotear paths para soportar rutas con espacios (ej. C:\Program Files\...).
+                # Sin esto, sc.exe/New-Service trunca el binPath en el primer espacio
+                # y el servicio falla silenciosamente al iniciar.
+                $BinPathCmd = '"' + $LocalMongoBin + '" --config "' + $ConfigPath + '" --service'
                 New-Service -Name "MongoDB" -BinaryPathName $BinPathCmd -DisplayName "MongoDB Server (DentiaCore)" -StartupType Automatic -ErrorAction SilentlyContinue
                 Start-Service "MongoDB" -ErrorAction SilentlyContinue
                 Write-Ok "Servicio instalado e iniciado."
@@ -328,11 +401,55 @@ try {
         }
     }
 
+    if ($RunSmokeTest) {
+        Write-Header "6. VERIFICACION FINAL (SMOKE TEST)"
+        $errors = @()
+
+        # Check MongoDB service y puerto
+        $svc = Get-Service "MongoDB" -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -eq 'Running') { Write-Ok "MongoDB service: Running" }
+        else { $errors += "MongoDB service no esta Running"; Write-Err "MongoDB service: $($svc.Status)" }
+
+        # Check Node
+        try {
+            $nv = & node -v 2>$null
+            if ($nv) { Write-Ok "Node: $nv" } else { $errors += "node no responde" }
+        } catch { $errors += "node falla al ejecutar" }
+
+        # Check Python (necesario para el launcher)
+        $py = (Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+        if ($py) { Write-Ok "Python: $(& $py -V 2>&1)" }
+        else { $errors += "python no encontrado en PATH (reinicia terminal y vuelve a verificar)" }
+
+        # Check archivos críticos
+        if (Test-Path (Join-Path $ServerDir '.env')) { Write-Ok "Server/.env existe" }
+        else { $errors += "Server/.env faltante" }
+
+        if (Test-Path (Join-Path $ClientDir '.env')) { Write-Ok "Client/.env existe" }
+        else { $errors += "Client/.env faltante" }
+
+        if (Test-Path (Join-Path $ServerDir 'node_modules')) { Write-Ok "Server/node_modules existe" }
+        else { $errors += "Server/node_modules faltante (corre 'npm install' en Server/)" }
+
+        if (Test-Path (Join-Path $ClientDir 'node_modules')) { Write-Ok "Client/node_modules existe" }
+        else { $errors += "Client/node_modules faltante (corre 'npm install' en Client/)" }
+
+        if (Test-Path (Join-Path $RepoRoot 'DB')) { Write-Ok "DB/ existe" }
+        else { $errors += "DB/ faltante" }
+
+        if ($errors.Count -eq 0) {
+            Write-Ok "Smoke test: TODO OK"
+        } else {
+            Write-Warn "Smoke test detecto $($errors.Count) problema(s):"
+            foreach ($e in $errors) { Write-Err "  - $e" }
+        }
+    }
+
     Write-Header "INSTALACION EXITOSA"
     Write-Host "Sistema listo para LAN." -ForegroundColor Green
     Write-Host "IP del Servidor: $DetectedIP" -ForegroundColor Cyan
     Write-Host "NOTA: Si usas Google Auth, agrega http://$DetectedIP`:5002 en Google Cloud Console." -ForegroundColor Yellow
-    
+
 } catch {
     Write-Header "ERROR"
     Write-Err $_.Exception.Message
