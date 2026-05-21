@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
-import { List, Avatar, Typography, Tag, Button, Modal, Form, InputNumber, Input, Radio, Tooltip, message } from 'antd';
+import { List, Avatar, Typography, Tag, Button, Modal, Form, InputNumber, Input, Radio, Tooltip, message, Select } from 'antd';
 import {
   UserOutlined,
   DollarCircleOutlined,
   AuditOutlined,
   EditOutlined,
   HistoryOutlined,
-  LockOutlined
+  LockOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { getLastMovements, updateMovement } from '../../shared/services/cashService';
+import { getAllPatients } from '../../shared/services/api';
 
 import { formatMoney } from '../../shared/utils/money';
 
@@ -47,7 +49,25 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // movement object o null
   const [saving, setSaving] = useState(false);
+  const [patients, setPatients] = useState([]);
+  const [patientsLoading, setPatientsLoading] = useState(false);
   const [form] = Form.useForm();
+
+  // Carga perezosa de pacientes la primera vez que se abre el modal de
+  // edición; se cachea en memoria para subsecuentes ediciones en la misma sesión.
+  const ensurePatientsLoaded = useCallback(async () => {
+    if (patients.length > 0 || patientsLoading) return;
+    setPatientsLoading(true);
+    try {
+      const data = await getAllPatients();
+      const list = data?.patients ?? data ?? [];
+      setPatients(Array.isArray(list) ? list : []);
+    } catch {
+      setPatients([]);
+    } finally {
+      setPatientsLoading(false);
+    }
+  }, [patients.length, patientsLoading]);
 
   const load = useCallback(async () => {
     try {
@@ -72,8 +92,10 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
       amount: movement.amount,
       paymentMethod: movement.paymentMethod,
       concept: movement.concept,
+      patientId: movement.patientId?._id || null,
       reason: ''
     });
+    ensurePatientsLoaded();
   };
 
   const closeEditModal = () => {
@@ -84,6 +106,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
 
   const handleSubmit = async () => {
     if (!editing) return;
+    if (saving) return; // guard contra doble submit
     try {
       const values = await form.validateFields();
       setSaving(true);
@@ -91,6 +114,9 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
         amount: values.amount,
         paymentMethod: values.paymentMethod,
         concept: values.concept?.trim(),
+        // A7: incluimos patientId en el payload. `null` significa "desvincular";
+        // `undefined` (no enviado) deja el valor anterior. El backend ya soporta ambos.
+        patientId: values.patientId === undefined ? undefined : (values.patientId || null),
         reason: values.reason.trim()
       };
       await updateMovement(editing._id, payload);
@@ -99,6 +125,13 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
       form.resetFields();
       await load();
       onMovementUpdated?.();
+      // Notifica a otras vistas (CashDashboard, patient-cash-movements) que
+      // refresquen sus cifras.
+      try {
+        window.dispatchEvent(new CustomEvent('cash:movement-changed', {
+          detail: { source: 'movements-list', kind: 'update' }
+        }));
+      } catch { /* no-op */ }
     } catch (err) {
       if (err?.errorFields) return; // validation
       message.error(err.response?.data?.message || 'No se pudo editar el movimiento');
@@ -270,9 +303,35 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
             <Form.Item
               name="concept"
               label="Concepto"
-              rules={[{ required: true, message: 'Concepto obligatorio' }]}
+              rules={[
+                { required: true, message: 'Concepto obligatorio' },
+                { max: 200, message: 'Máximo 200 caracteres' }
+              ]}
             >
-              <Input />
+              <Input maxLength={200} />
+            </Form.Item>
+
+            {/* A7: permitir vincular/desvincular un paciente al movimiento. El
+                backend ya soporta este cambio y lo audita en `edits.changes.patientId`. */}
+            <Form.Item
+              name="patientId"
+              label="Paciente"
+              tooltip="Para desvincular el paciente, deja el campo vacío"
+            >
+              <Select
+                allowClear
+                showSearch
+                placeholder="Sin paciente"
+                loading={patientsLoading}
+                suffixIcon={<SearchOutlined />}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={patients.map((p) => ({
+                  value: p._id,
+                  label: `${p.primer_nombre || ''} ${p.apellido_paterno || ''}`.trim() || 'Paciente'
+                }))}
+              />
             </Form.Item>
 
             <Form.Item
@@ -281,10 +340,11 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
               tooltip="Quedará registrado en el historial del movimiento"
               rules={[
                 { required: true, message: 'El motivo es obligatorio' },
-                { min: 3, message: 'Mínimo 3 caracteres' }
+                { min: 3, message: 'Mínimo 3 caracteres' },
+                { max: 500, message: 'Máximo 500 caracteres' }
               ]}
             >
-              <Input.TextArea rows={2} placeholder="Ej. Se cobró $5.000 de más por error" maxLength={200} showCount />
+              <Input.TextArea rows={2} placeholder="Ej. Se cobró $5.000 de más por error" maxLength={500} showCount />
             </Form.Item>
 
             {Array.isArray(editing.edits) && editing.edits.length > 0 && (

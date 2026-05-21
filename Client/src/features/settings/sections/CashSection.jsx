@@ -1,7 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Popconfirm } from 'antd';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
+import { formatMoney } from '../../../shared/utils/money';
+
+// Tope superior del precio default — alineado con el schema del servidor
+// (clinicSettings.MAX_SERVICE_PRICE). Si se baja en el back, ajustar aquí.
+const MAX_SERVICE_PRICE = 100_000_000;
+const MAX_SERVICE_NAME = 80;
+const MAX_CATEGORY_NAME = 60;
+
+// Monedas soportadas — debe coincidir con clinicSettings.SUPPORTED_CURRENCIES
+// en el servidor. Si se agregan/quitan opciones, sincronizar ambos lados.
+const SUPPORTED_CURRENCIES = [
+  { code: 'MXN', label: 'MXN — Peso mexicano' },
+  { code: 'USD', label: 'USD — Dólar estadounidense' },
+  { code: 'EUR', label: 'EUR — Euro' },
+  { code: 'COP', label: 'COP — Peso colombiano' },
+  { code: 'ARS', label: 'ARS — Peso argentino' },
+  { code: 'CLP', label: 'CLP — Peso chileno' },
+  { code: 'PEN', label: 'PEN — Sol peruano' }
+];
+
+// Compara contenidos por estructura — usado para detectar dirty state.
+const isEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const CashSection = () => {
+  // initial preserva el snapshot servidor para diff y restore
+  const [initial, setInitial] = useState({ cashCategories: [], currency: 'MXN', serviceCatalog: [] });
   const [categories, setCategories] = useState([]);
   const [currency, setCurrency] = useState('MXN');
   const [serviceCatalog, setServiceCatalog] = useState([]);
@@ -15,17 +40,62 @@ const CashSection = () => {
   useEffect(() => {
     getSettings()
       .then((s) => {
-        setCategories(s.cashCategories || []);
-        setCurrency(s.currency || 'MXN');
-        setServiceCatalog(s.serviceCatalog || []);
+        const cats = Array.isArray(s.cashCategories) ? s.cashCategories : [];
+        const svcs = Array.isArray(s.serviceCatalog) ? s.serviceCatalog : [];
+        const cur = s.currency || 'MXN';
+        setCategories(cats);
+        setCurrency(cur);
+        setServiceCatalog(svcs);
+        setInitial({ cashCategories: cats, currency: cur, serviceCatalog: svcs });
       })
       .catch(() => setMsg({ type: 'error', text: 'Error al cargar configuración' }))
       .finally(() => setLoading(false));
   }, []);
 
+  const isDirty = useMemo(() => (
+    !isEqual(initial.cashCategories, categories)
+    || initial.currency !== currency
+    || !isEqual(initial.serviceCatalog, serviceCatalog)
+  ), [initial, categories, currency, serviceCatalog]);
+
+  // Aviso de salir sin guardar — protege contra pérdida accidental de cambios.
+  useEffect(() => {
+    if (!isDirty) return undefined;
+    const handler = (e) => {
+      e.preventDefault();
+      // El mensaje real depende del browser (string ignorado en Chrome moderno).
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Resta el msg al modificar para no mostrar "guardado" tras nuevos cambios.
+  useEffect(() => { if (msg) setMsg(null); }, [categories, currency, serviceCatalog]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Normaliza nombre: trim + colapsar espacios. Compara case-insensitive para
+  // detectar duplicados pero preserva el casing introducido por el usuario.
+  const normalizeName = (raw) => String(raw || '').trim().replace(/\s+/g, ' ');
+  const isDupCategory = (name) => {
+    const k = name.toLowerCase();
+    return categories.some((c) => c.toLowerCase() === k);
+  };
+  const isDupService = (name) => {
+    const k = name.toLowerCase();
+    return serviceCatalog.some((s) => s.nombre.toLowerCase() === k);
+  };
+
   const addCategory = () => {
-    const trimmed = newCat.trim();
-    if (!trimmed || categories.includes(trimmed)) return;
+    const trimmed = normalizeName(newCat);
+    if (!trimmed) return;
+    if (trimmed.length > MAX_CATEGORY_NAME) {
+      setMsg({ type: 'error', text: `La categoría no puede superar ${MAX_CATEGORY_NAME} caracteres` });
+      return;
+    }
+    if (isDupCategory(trimmed)) {
+      setMsg({ type: 'error', text: `Ya existe la categoría "${trimmed}"` });
+      return;
+    }
     setCategories((prev) => [...prev, trimmed]);
     setNewCat('');
   };
@@ -35,28 +105,70 @@ const CashSection = () => {
   };
 
   const addService = () => {
-    const nombre = newServiceName.trim();
+    const nombre = normalizeName(newServiceName);
     const precio = parseFloat(newServicePrice);
-    if (!nombre || isNaN(precio) || precio < 0) return;
-    if (serviceCatalog.some(s => s.nombre === nombre)) return;
-    setServiceCatalog(prev => [...prev, { nombre, precioDefault: precio }]);
+    if (!nombre) {
+      setMsg({ type: 'error', text: 'El nombre del servicio es obligatorio' });
+      return;
+    }
+    if (nombre.length > MAX_SERVICE_NAME) {
+      setMsg({ type: 'error', text: `El nombre no puede superar ${MAX_SERVICE_NAME} caracteres` });
+      return;
+    }
+    if (!Number.isFinite(precio) || precio < 0) {
+      setMsg({ type: 'error', text: 'El precio debe ser un número ≥ 0' });
+      return;
+    }
+    if (precio > MAX_SERVICE_PRICE) {
+      setMsg({ type: 'error', text: `El precio excede el máximo permitido (${formatMoney(MAX_SERVICE_PRICE)})` });
+      return;
+    }
+    if (isDupService(nombre)) {
+      setMsg({ type: 'error', text: `Ya existe el servicio "${nombre}"` });
+      return;
+    }
+    setServiceCatalog((prev) => [...prev, {
+      nombre,
+      precioDefault: Math.round(precio * 100) / 100
+    }]);
     setNewServiceName('');
     setNewServicePrice('');
   };
 
   const removeService = (nombre) => {
-    setServiceCatalog(prev => prev.filter(s => s.nombre !== nombre));
+    setServiceCatalog((prev) => prev.filter((s) => s.nombre !== nombre));
+  };
+
+  const resetChanges = () => {
+    setCategories(initial.cashCategories);
+    setCurrency(initial.currency);
+    setServiceCatalog(initial.serviceCatalog);
+    setNewCat('');
+    setNewServiceName('');
+    setNewServicePrice('');
+    setMsg(null);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (saving || !isDirty) return;
     setSaving(true);
     setMsg(null);
     try {
-      await updateSettings({ cashCategories: categories, currency, serviceCatalog });
+      const saved = await updateSettings({ cashCategories: categories, currency, serviceCatalog });
+      // Sincronizar snapshot con lo que efectivamente persistió (incluye dedup/normalize del server)
+      setInitial({
+        cashCategories: saved.cashCategories || [],
+        currency: saved.currency || 'MXN',
+        serviceCatalog: saved.serviceCatalog || []
+      });
+      setCategories(saved.cashCategories || []);
+      setCurrency(saved.currency || 'MXN');
+      setServiceCatalog(saved.serviceCatalog || []);
       setMsg({ type: 'success', text: 'Configuración de caja actualizada' });
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });
+      const detail = err?.response?.data?.errors?.[0]?.msg;
+      setMsg({ type: 'error', text: detail || err?.response?.data?.message || 'Error al guardar' });
     } finally {
       setSaving(false);
     }
@@ -67,14 +179,22 @@ const CashSection = () => {
   return (
     <form onSubmit={handleSave}>
       {msg && <div className={`settings-message ${msg.type}`}>{msg.text}</div>}
+      {isDirty && !msg && (
+        <div className="settings-message info">
+          Hay cambios sin guardar.
+        </div>
+      )}
 
       <div className="settings-form-group">
         <label>Moneda</label>
         <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-          <option value="MXN">MXN — Peso mexicano</option>
-          <option value="USD">USD — Dólar estadounidense</option>
-          <option value="EUR">EUR — Euro</option>
+          {SUPPORTED_CURRENCIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.label}</option>
+          ))}
         </select>
+        <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: 4 }}>
+          Esta moneda se aplica a todos los importes mostrados en Caja y en la ficha del paciente.
+        </p>
       </div>
 
       <div className="settings-form-group">
@@ -90,13 +210,21 @@ const CashSection = () => {
               }}
             >
               {cat}
-              <button
-                type="button"
-                onClick={() => removeCategory(cat)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)' }}
+              <Popconfirm
+                title="¿Quitar esta categoría?"
+                description="Los movimientos existentes con esta categoría no se modifican."
+                okText="Quitar"
+                cancelText="Cancelar"
+                onConfirm={() => removeCategory(cat)}
               >
-                ×
-              </button>
+                <button
+                  type="button"
+                  aria-label={`Quitar categoría ${cat}`}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)' }}
+                >
+                  ×
+                </button>
+              </Popconfirm>
             </span>
           ))}
         </div>
@@ -105,6 +233,7 @@ const CashSection = () => {
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
             placeholder="Nueva categoría"
+            maxLength={MAX_CATEGORY_NAME}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }}
           />
           <button type="button" className="settings-btn-secondary settings-btn--with-icon" onClick={addCategory}>
@@ -132,14 +261,22 @@ const CashSection = () => {
                   borderRadius: 'var(--border-radius-md)', fontSize: '0.9rem',
                 }}
               >
-                <span><strong>{svc.nombre}</strong> — ${svc.precioDefault.toLocaleString()}</span>
-                <button
-                  type="button"
-                  onClick={() => removeService(svc.nombre)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)', fontSize: '1rem' }}
+                <span><strong>{svc.nombre}</strong> — {formatMoney(svc.precioDefault)}</span>
+                <Popconfirm
+                  title="¿Quitar este servicio del catálogo?"
+                  description="Los cobros que ya lo usaron no se modifican."
+                  okText="Quitar"
+                  cancelText="Cancelar"
+                  onConfirm={() => removeService(svc.nombre)}
                 >
-                  ×
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`Quitar servicio ${svc.nombre}`}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)', fontSize: '1rem' }}
+                  >
+                    ×
+                  </button>
+                </Popconfirm>
               </div>
             ))}
           </div>
@@ -149,6 +286,7 @@ const CashSection = () => {
             value={newServiceName}
             onChange={(e) => setNewServiceName(e.target.value)}
             placeholder="Nombre del servicio"
+            maxLength={MAX_SERVICE_NAME}
             style={{ flex: '2 1 140px' }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
           />
@@ -158,6 +296,7 @@ const CashSection = () => {
             onChange={(e) => setNewServicePrice(e.target.value)}
             placeholder="Precio"
             min="0"
+            max={MAX_SERVICE_PRICE}
             step="0.01"
             style={{ flex: '1 1 88px' }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
@@ -171,10 +310,23 @@ const CashSection = () => {
         </div>
       </div>
 
-      <div className="settings-actions">
-        <button type="submit" className="settings-btn-primary" disabled={saving}>
+      <div className="settings-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+        <button type="submit" className="settings-btn-primary" disabled={saving || !isDirty}>
           {saving ? 'Guardando…' : 'Guardar configuración de caja'}
         </button>
+        {isDirty && (
+          <Popconfirm
+            title="¿Descartar cambios?"
+            description="Se restaurarán los valores guardados previamente."
+            okText="Descartar"
+            cancelText="Volver"
+            onConfirm={resetChanges}
+          >
+            <button type="button" className="settings-btn-secondary" disabled={saving}>
+              Descartar
+            </button>
+          </Popconfirm>
+        )}
       </div>
     </form>
   );

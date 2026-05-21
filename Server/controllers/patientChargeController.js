@@ -240,7 +240,7 @@ exports.addPayment = async (req, res) => {
         amount,
         type: 'INCOME',
         paymentMethod,
-        concept: `Pago cobro · ${firstItem}${extra}`,
+        concept,
         date: now,
         patientId: charge.patientId,
         boxSessionId: activeSession._id,

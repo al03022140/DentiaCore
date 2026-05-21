@@ -287,20 +287,20 @@ const PatientChargesCard = ({ patientId }) => {
                     {charge.items.map((item, idx) => (
                       <li key={idx}>
                         <span>{item.nombre}{item.cantidad > 1 ? ` x ${item.cantidad}` : ''}</span>
-                        <span>${item.subtotal.toLocaleString()}</span>
+                        <span>{formatMoney(item.subtotal)}</span>
                       </li>
                     ))}
                   </ul>
                   <div className="charge-card__footer">
-                    <span className="charge-card__total">Total: ${charge.total.toLocaleString()}</span>
+                    <span className="charge-card__total">Total: {formatMoney(charge.total)}</span>
                     {charge.cancelado ? (
                       <span className="charge-card__balance charge-card__balance--cancelled">
                         Cancelado{charge.canceladoMotivo ? `: ${charge.canceladoMotivo}` : ''}
                       </span>
                     ) : charge.saldoPendiente > 0 ? (
                       <span className="charge-card__balance charge-card__balance--pending">
-                        Pendiente: ${charge.saldoPendiente.toLocaleString()}
-                        {charge.totalPagado > 0 && ` (pagado: $${charge.totalPagado.toLocaleString()})`}
+                        Pendiente: {formatMoney(charge.saldoPendiente)}
+                        {charge.totalPagado > 0 && ` (pagado: ${formatMoney(charge.totalPagado)})`}
                       </span>
                     ) : (
                       <span className="charge-card__balance charge-card__balance--paid">Pagado</span>
@@ -338,11 +338,15 @@ const PatientChargesCard = ({ patientId }) => {
       <Modal
         title="Nuevo Cobro"
         open={showAddModal}
-        onCancel={() => setShowAddModal(false)}
+        onCancel={() => { if (!creatingCharge) setShowAddModal(false); }}
         onOk={handleCreateCharge}
         okText="Registrar"
         cancelText="Cancelar"
-        okButtonProps={{ disabled: chargeConfirmText.trim() !== CONFIRM_PHRASE || chargeItems.length === 0 }}
+        confirmLoading={creatingCharge}
+        maskClosable={!creatingCharge}
+        keyboard={!creatingCharge}
+        okButtonProps={{ disabled: chargeConfirmText.trim() !== CONFIRM_PHRASE || chargeItems.length === 0 || creatingCharge }}
+        cancelButtonProps={{ disabled: creatingCharge }}
         width={600}
       >
         <div style={{ marginBottom: '0.75rem' }}>
@@ -380,7 +384,7 @@ const PatientChargesCard = ({ patientId }) => {
                   cursor: chargeItems.some(i => i.nombre === svc.nombre) ? 'default' : 'pointer',
                 }}
               >
-                {svc.nombre} — ${svc.precioDefault.toLocaleString()}
+                {svc.nombre} — {formatMoney(svc.precioDefault)}
               </button>
             ))}
             {serviceCatalog.length === 0 && (
@@ -427,7 +431,7 @@ const PatientChargesCard = ({ patientId }) => {
                       />
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>
-                      ${round2((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0)).toLocaleString()}
+                      {formatMoney(round2((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0)))}
                     </td>
                     <td>
                       <button type="button" className="remove-item-btn" onClick={() => removeItem(idx)}>×</button>
@@ -436,7 +440,7 @@ const PatientChargesCard = ({ patientId }) => {
                 ))}
               </tbody>
             </table>
-            <div className="add-charge-modal__total">Total: ${chargeTotal.toLocaleString()}</div>
+            <div className="add-charge-modal__total">Total: {formatMoney(chargeTotal)}</div>
           </>
         )}
 
@@ -454,19 +458,23 @@ const PatientChargesCard = ({ patientId }) => {
       <Modal
         title="Registrar Pago"
         open={showPayModal}
-        onCancel={() => setShowPayModal(false)}
+        onCancel={() => { if (!registeringPayment) setShowPayModal(false); }}
         onOk={handleAddPayment}
         okText="Registrar Pago"
         cancelText="Cancelar"
-        okButtonProps={{ disabled: payConfirmText.trim() !== CONFIRM_PHRASE || !payAmount }}
+        confirmLoading={registeringPayment}
+        maskClosable={!registeringPayment}
+        keyboard={!registeringPayment}
+        okButtonProps={{ disabled: payConfirmText.trim() !== CONFIRM_PHRASE || !payAmount || registeringPayment }}
+        cancelButtonProps={{ disabled: registeringPayment }}
       >
         {selectedCharge && (
           <>
             <div className="payment-modal__summary">
-              <p><strong>Total del cobro:</strong> ${selectedCharge.total.toLocaleString()}</p>
-              <p><strong>Ya pagado:</strong> ${selectedCharge.totalPagado.toLocaleString()}</p>
+              <p><strong>Total del cobro:</strong> {formatMoney(selectedCharge.total)}</p>
+              <p><strong>Ya pagado:</strong> {formatMoney(selectedCharge.totalPagado)}</p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
-                <strong>Saldo pendiente:</strong> ${selectedCharge.saldoPendiente.toLocaleString()}
+                <strong>Saldo pendiente:</strong> {formatMoney(selectedCharge.saldoPendiente)}
               </p>
             </div>
 
@@ -480,7 +488,7 @@ const PatientChargesCard = ({ patientId }) => {
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
                 onBlur={e => setPayAmount(String(round2(parseFloat(e.target.value) || 0)))}
-                placeholder={`Máximo: $${selectedCharge.saldoPendiente.toLocaleString()}`}
+                placeholder={`Máximo: ${formatMoney(selectedCharge.saldoPendiente)}`}
               />
             </div>
 
@@ -508,19 +516,49 @@ const PatientChargesCard = ({ patientId }) => {
       <Modal
         title="Cancelar Cobro"
         open={showCancelModal}
-        onCancel={() => setShowCancelModal(false)}
+        onCancel={() => { if (!cancelingCharge) setShowCancelModal(false); }}
         onOk={handleCancelCharge}
         okText="Cancelar Cobro"
         okType="danger"
         cancelText="Volver"
-        okButtonProps={{ disabled: cancelConfirmText.trim() !== CONFIRM_PHRASE || cancelMotivo.trim().length < 3 }}
+        confirmLoading={cancelingCharge}
+        maskClosable={!cancelingCharge}
+        keyboard={!cancelingCharge}
+        okButtonProps={{ disabled: cancelConfirmText.trim() !== CONFIRM_PHRASE || cancelMotivo.trim().length < 3 || cancelingCharge }}
+        cancelButtonProps={{ disabled: cancelingCharge }}
       >
         {selectedCharge && (
           <>
             <p style={{ marginBottom: '0.75rem' }}>
-              Esta acción marcará el cobro como cancelado. Los pagos ya registrados
-              quedarán en la caja (no se devuelven automáticamente).
+              Esta acción marcará el cobro como cancelado.
+              {Array.isArray(selectedCharge.pagos) && selectedCharge.pagos.length > 0 ? (
+                <> El cobro tiene <strong>{formatMoney(selectedCharge.totalPagado || 0)}</strong> pagado.</>
+              ) : null}
             </p>
+            {Array.isArray(selectedCharge.pagos) && selectedCharge.pagos.length > 0 && (
+              <div
+                style={{
+                  marginBottom: '0.75rem',
+                  padding: '8px 10px',
+                  border: '1px solid var(--color-warning-border, #ffd591)',
+                  borderRadius: 6,
+                  background: 'var(--color-warning-bg, #fffbe6)'
+                }}
+              >
+                <Checkbox
+                  checked={reversePayments}
+                  onChange={(e) => setReversePayments(e.target.checked)}
+                  disabled={cancelingCharge}
+                >
+                  Revertir los pagos a caja
+                </Checkbox>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                  {reversePayments
+                    ? 'Se generará un EGRESO compensatorio por cada pago en la caja abierta actual.'
+                    : 'Los pagos quedarán en caja como ingresos reales (comportamiento por defecto).'}
+                </div>
+              </div>
+            )}
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: 4 }}>
                 Motivo de cancelación
@@ -532,6 +570,7 @@ const PatientChargesCard = ({ patientId }) => {
                 placeholder="Ej. Cobro duplicado, paciente solicitó anulación..."
                 maxLength={300}
                 showCount
+                disabled={cancelingCharge}
               />
             </div>
             <div className="add-charge-modal__confirm-section">
@@ -540,6 +579,7 @@ const PatientChargesCard = ({ patientId }) => {
                 value={cancelConfirmText}
                 onChange={e => setCancelConfirmText(e.target.value)}
                 placeholder={CONFIRM_PHRASE}
+                disabled={cancelingCharge}
               />
             </div>
           </>

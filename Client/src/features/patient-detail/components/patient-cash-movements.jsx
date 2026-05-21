@@ -67,6 +67,15 @@ const PatientCashMovements = ({ patientId }) => {
     return () => controller.abort();
   }, [patientId, loadMovements]);
 
+  // A6: refresca cuando otro componente notifica un cambio en caja (e.g. un
+  // pago registrado desde patient-charges-card del mismo paciente).
+  useEffect(() => {
+    if (!patientId) return undefined;
+    const handler = () => { loadMovements(); };
+    window.addEventListener('cash:movement-changed', handler);
+    return () => window.removeEventListener('cash:movement-changed', handler);
+  }, [patientId, loadMovements]);
+
   const totals = useMemo(() => {
     let income = 0;
     let expense = 0;
