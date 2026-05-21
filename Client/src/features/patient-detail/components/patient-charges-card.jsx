@@ -1,13 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Input, Select, message, Popconfirm } from 'antd';
+import { Modal, Input, Select, message, Popconfirm, Checkbox } from 'antd';
 import { getChargesByPatient, createCharge, addPayment, cancelCharge } from '../../../shared/services/patientChargeService';
 import { getSettings } from '../../../shared/services/settingsService';
 import { getSessionStatus } from '../../../shared/services/cashService';
+import { formatMoney } from '../../../shared/utils/money';
 import API from '../../../shared/services/axios-instance';
 import '../styles/patient-charges-card.css';
 
 const CONFIRM_PHRASE = 'CONFIRMO';
 const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
+
+// Notifica al resto de la app que algo cambió en caja para que CashPage,
+// CashDashboard y patient-cash-movements refresquen sin que el usuario
+// tenga que navegar manualmente entre vistas.
+const broadcastCashChange = (detail) => {
+  try {
+    window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail }));
+  } catch { /* no-op en entornos sin window (SSR/tests) */ }
+};
 
 const PatientChargesCard = ({ patientId }) => {
   const [charges, setCharges] = useState([]);
@@ -17,6 +27,13 @@ const PatientChargesCard = ({ patientId }) => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedCharge, setSelectedCharge] = useState(null);
+
+  // C1: flags de "en curso" para bloquear doble submit en cada modal.
+  // Sin esto, un doble-click crea dos cobros idénticos o registra el mismo
+  // pago dos veces (riesgo contable real).
+  const [creatingCharge, setCreatingCharge] = useState(false);
+  const [registeringPayment, setRegisteringPayment] = useState(false);
+  const [cancelingCharge, setCancelingCharge] = useState(false);
 
   const [serviceCatalog, setServiceCatalog] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -30,6 +47,10 @@ const PatientChargesCard = ({ patientId }) => {
 
   const [cancelMotivo, setCancelMotivo] = useState('');
   const [cancelConfirmText, setCancelConfirmText] = useState('');
+  // C4: opción de revertir los pagos a caja al cancelar (genera EXPENSE
+  // compensatorios en el servidor). Por defecto false para preservar el
+  // comportamiento legacy de "los pagos quedan en caja".
+  const [reversePayments, setReversePayments] = useState(false);
 
   const loadCharges = useCallback(async () => {
     try {
@@ -41,16 +62,6 @@ const PatientChargesCard = ({ patientId }) => {
       setLoading(false);
     }
   }, [patientId]);
-
-  // Refresca también el estado de caja para decidir si los botones se habilitan
-  const refreshBoxStatus = useCallback(async () => {
-    try {
-      const status = await getSessionStatus();
-      setIsBoxOpen(!!status?.isOpen);
-    } catch {
-      setIsBoxOpen(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!patientId) return undefined;
@@ -85,18 +96,17 @@ const PatientChargesCard = ({ patientId }) => {
 
   const openAddModal = async () => {
     try {
+      // BUG-B7: filtramos en server (?paciente_id=...) en lugar de traer TODAS
+      // las citas y filtrar en cliente. Limit alto para citas pasadas también.
       const [settings, appointmentsRes] = await Promise.all([
         getSettings(),
-        API.get('/appointments').then(r => r.data).catch(() => [])
+        API.get('/appointments', { params: { paciente_id: patientId, limit: 500 } })
+          .then(r => r.data)
+          .catch(() => [])
       ]);
       setServiceCatalog(settings.serviceCatalog || []);
-      const patientAppts = (Array.isArray(appointmentsRes) ? appointmentsRes : [])
-        .filter(a => {
-          // paciente_id puede venir como string o como objeto populado.
-          const pid = a.paciente_id?._id || a.paciente_id;
-          return String(pid) === String(patientId);
-        });
-      setAppointments(patientAppts);
+      const list = Array.isArray(appointmentsRes) ? appointmentsRes : (appointmentsRes?.items || []);
+      setAppointments(list);
     } catch {
       setServiceCatalog([]);
       setAppointments([]);
@@ -131,10 +141,12 @@ const PatientChargesCard = ({ patientId }) => {
   }, 0));
 
   const handleCreateCharge = async () => {
+    if (creatingCharge) return; // C1: bloquea doble submit
     if (chargeItems.length === 0) {
       message.warning('Agrega al menos un servicio');
       return;
     }
+    setCreatingCharge(true);
     try {
       await createCharge(patientId, {
         items: chargeItems.map(item => ({
@@ -148,16 +160,20 @@ const PatientChargesCard = ({ patientId }) => {
       message.success('Cobro registrado correctamente');
       setShowAddModal(false);
       loadCharges();
+      // BUG-B12: sincronizar CashPage si está montado
+      window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail: { source: 'patient-charges', kind: 'create', patientId } }));
     } catch (err) {
       message.error(err.response?.data?.message || 'Error al registrar cobro');
+    } finally {
+      setCreatingCharge(false);
     }
   };
 
   const openPayModal = async (charge) => {
-    // BUG-7: revalidar estado de caja al momento (puede haber cambiado
-    // desde el load inicial). Evita modal abierto contra caja cerrada.
-    await refreshBoxStatus();
+    // BUG-B9: una sola llamada a getSessionStatus (antes se llamaba 2 veces).
+    // Revalida el estado de caja porque puede haber cambiado desde el load inicial.
     const status = await getSessionStatus().catch(() => ({ isOpen: false }));
+    setIsBoxOpen(!!status?.isOpen);
     if (!status?.isOpen) {
       message.warning('La caja está cerrada. Ábrela desde el módulo de Caja para registrar pagos.');
       return;
@@ -170,12 +186,14 @@ const PatientChargesCard = ({ patientId }) => {
   };
 
   const handleAddPayment = async () => {
+    if (registeringPayment) return; // C1: bloquea doble submit
     if (!selectedCharge) return;
     const monto = round2(parseFloat(payAmount));
     if (!Number.isFinite(monto) || monto <= 0) {
       message.warning('Ingresa un monto válido');
       return;
     }
+    setRegisteringPayment(true);
     try {
       await addPayment(selectedCharge._id, {
         monto,
@@ -185,8 +203,11 @@ const PatientChargesCard = ({ patientId }) => {
       message.success('Pago registrado correctamente');
       setShowPayModal(false);
       loadCharges();
+      window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail: { source: 'patient-charges', kind: 'payment', patientId } }));
     } catch (err) {
       message.error(err.response?.data?.message || 'Error al registrar pago');
+    } finally {
+      setRegisteringPayment(false);
     }
   };
 
@@ -194,25 +215,40 @@ const PatientChargesCard = ({ patientId }) => {
     setSelectedCharge(charge);
     setCancelMotivo('');
     setCancelConfirmText('');
+    setReversePayments(false);
     setShowCancelModal(true);
   };
 
   const handleCancelCharge = async () => {
+    if (cancelingCharge) return; // C1: bloquea doble submit
     if (!selectedCharge) return;
     if (cancelMotivo.trim().length < 3) {
       message.warning('Indica un motivo (mínimo 3 caracteres)');
       return;
     }
+    setCancelingCharge(true);
     try {
-      await cancelCharge(selectedCharge._id, {
+      const result = await cancelCharge(selectedCharge._id, {
         motivo: cancelMotivo.trim(),
-        confirmacion: cancelConfirmText.trim()
+        confirmacion: cancelConfirmText.trim(),
+        reversePayments
       });
-      message.success('Cobro cancelado');
+      // C4: feedback contextual sobre la reversa de pagos.
+      if (result?.reverseStatus === 'reversed') {
+        const n = Array.isArray(result?.reversedMovementIds) ? result.reversedMovementIds.length : 0;
+        message.success(`Cobro cancelado y ${n} pago(s) revertido(s) en caja`);
+      } else if (result?.reverseStatus === 'skipped') {
+        message.warning(result?.reverseMessage || 'Cobro cancelado, reversa pendiente');
+      } else {
+        message.success('Cobro cancelado');
+      }
       setShowCancelModal(false);
       loadCharges();
+      window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail: { source: 'patient-charges', kind: 'cancel', patientId } }));
     } catch (err) {
       message.error(err.response?.data?.message || 'Error al cancelar cobro');
+    } finally {
+      setCancelingCharge(false);
     }
   };
 

@@ -13,7 +13,9 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
       message.success('Caja abierta correctamente');
       onOpenSuccess();
     } catch (error) {
-      message.error('Error al abrir la caja');
+      // BUG-B8: surface el mensaje específico (ej. "Ya existe una caja abierta",
+      // "Hay una sesión con cierre incompleto", etc.).
+      message.error(error?.response?.data?.message || 'Error al abrir la caja');
     } finally {
       setLoading(false);
     }

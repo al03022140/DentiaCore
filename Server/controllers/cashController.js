@@ -6,6 +6,10 @@ const Patient = require('../models/patient');
 const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 const safeNum = (n) => (Number.isFinite(n) ? n : 0);
 
+// Sesiones CLOSING > este umbral se consideran huérfanas (un cierre que
+// crasheó a la mitad). Bloquean apertura de nueva caja hasta que se resuelvan.
+const CLOSING_STALE_MS = 60 * 60 * 1000; // 1h
+
 // Resume un set de movimientos en buckets (income/expense × cash/digital + neto)
 const summarizeMovements = (movements, initialAmount = 0) => {
   let cashIncome = 0;
@@ -72,12 +76,97 @@ exports.getMonthlyBalance = async (req, res) => {
       cash: summary.cashNet,
       digital: summary.digitalNet,
       total: summary.net,
+      // BUG-B4: breakdown completo para reportes mensuales
+      cashIncome: summary.cashIncome,
+      cashExpense: summary.cashExpense,
+      digitalIncome: summary.digitalIncome,
+      digitalExpense: summary.digitalExpense,
+      totalIncome: summary.totalIncome,
+      totalExpense: summary.totalExpense,
+      movementCount: summary.movementCount,
+      excludedOrphanCount: movements.length - valid.length,
       month: now.getMonth() + 1,
       year: now.getFullYear()
     });
   } catch (error) {
     console.error('Error getting monthly balance:', error);
     res.status(500).json({ message: 'Error al obtener el balance mensual' });
+  }
+};
+
+// GET /cash/sessions/stale — sesiones huérfanas (OPEN > 24h o CLOSING > 1h)
+// que el usuario debe resolver. Sirve para el banner de "caja olvidada" y
+// para que openBox pueda informar exactamente cuál bloquea la apertura.
+exports.getStaleSessions = async (req, res) => {
+  try {
+    const HOURS_24 = 24 * 60 * 60 * 1000;
+    const staleOpenCutoff = new Date(Date.now() - HOURS_24);
+    const staleClosingCutoff = new Date(Date.now() - CLOSING_STALE_MS);
+
+    const [staleOpen, staleClosing] = await Promise.all([
+      BoxSession.find({ status: 'OPEN', startTime: { $lt: staleOpenCutoff } })
+        .populate('openedBy', 'nombre')
+        .sort({ startTime: 1 })
+        .lean(),
+      BoxSession.find({ status: 'CLOSING', updatedAt: { $lt: staleClosingCutoff } })
+        .populate('openedBy', 'nombre')
+        .sort({ updatedAt: 1 })
+        .lean()
+    ]);
+
+    res.json({ staleOpen, staleClosing });
+  } catch (error) {
+    console.error('Error getting stale sessions:', error);
+    res.status(500).json({ message: 'Error al detectar sesiones huérfanas' });
+  }
+};
+
+// POST /cash/sessions/:id/force-resolve — recupera una sesión colgada.
+// CLOSING → re-ejecuta el cálculo de cierre y la marca CLOSED.
+// OPEN huérfana → forza el cierre con timestamp actual.
+// Reservado a cash.manage; queda registrado quién lo hizo.
+exports.forceResolveSession = async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: 'Usuario requerido' });
+    }
+    const { id } = req.params;
+    const session = await BoxSession.findById(id);
+    if (!session) {
+      return res.status(404).json({ message: 'Sesión no encontrada' });
+    }
+    if (session.status === 'CLOSED') {
+      return res.status(400).json({ message: 'La sesión ya está cerrada' });
+    }
+
+    const movements = await CashMovement.find({ boxSessionId: session._id });
+    const summary = summarizeMovements(movements, session.initialAmount);
+
+    session.status = 'CLOSED';
+    session.endTime = new Date();
+    session.finalAmount = summary.cashOnHand;
+    session.closedBy = req.user.id;
+    await session.save();
+
+    res.json({
+      session,
+      summary: {
+        initialAmount: session.initialAmount,
+        finalCashAmount: summary.cashOnHand,
+        totalIncome: summary.totalIncome,
+        totalExpense: summary.totalExpense,
+        cashIncome: summary.cashIncome,
+        digitalIncome: summary.digitalIncome,
+        cashExpense: summary.cashExpense,
+        digitalExpense: summary.digitalExpense,
+        movementCount: summary.movementCount,
+        net: summary.net,
+        forced: true
+      }
+    });
+  } catch (error) {
+    console.error('Error force-resolving session:', error);
+    res.status(500).json({ message: 'Error al forzar cierre de sesión' });
   }
 };
 
@@ -195,6 +284,20 @@ exports.openBox = async (req, res) => {
       return res.status(400).json({ message: 'Monto inicial inválido' });
     }
 
+    // BUG-B3: bloquear apertura si hay sesiones CLOSING huérfanas (cierre que
+    // crasheó a la mitad). El índice único parcial sólo cubre OPEN; sin este
+    // guard se pueden acumular múltiples sesiones CLOSING.
+    const staleClosing = await BoxSession.findOne({
+      status: 'CLOSING',
+      updatedAt: { $lt: new Date(Date.now() - CLOSING_STALE_MS) }
+    }).select('_id startTime updatedAt');
+    if (staleClosing) {
+      return res.status(409).json({
+        message: 'Hay una sesión de caja con cierre incompleto. Resuélvala desde "Sesiones colgadas" antes de abrir una nueva.',
+        staleSessionId: staleClosing._id
+      });
+    }
+
     const newSession = new BoxSession({
       initialAmount: amount,
       status: 'OPEN',
@@ -309,9 +412,11 @@ exports.addMovement = async (req, res) => {
       return res.status(400).json({ message: 'Debe abrir la caja antes de registrar movimientos' });
     }
 
-    // Si se pasó patientId, verificar que el paciente exista (BUG-12)
+    // Si se pasó patientId, verificar que el paciente exista y no esté
+    // soft-deleted. Vincular movimientos a pacientes eliminados degrada
+    // la trazabilidad (los reportes por paciente no los muestran).
     if (patientId) {
-      const exists = await Patient.exists({ _id: patientId });
+      const exists = await Patient.exists({ _id: patientId, deletedAt: null });
       if (!exists) {
         return res.status(400).json({ message: 'Paciente no encontrado' });
       }
@@ -340,6 +445,20 @@ exports.addMovement = async (req, res) => {
       creadoPor: req.user.id
     });
 
+    // BUG-B2: cerrar race contra closeBox. Si la sesión pasó a CLOSING/CLOSED
+    // entre la lectura y el insert, el movimiento queda asignado a una sesión
+    // cerrada y no cuenta. Revertimos.
+    const sessionStillOpen = await BoxSession.exists({
+      _id: activeSession._id,
+      status: 'OPEN'
+    });
+    if (!sessionStillOpen) {
+      await CashMovement.deleteOne({ _id: movement._id });
+      return res.status(409).json({
+        message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
+      });
+    }
+
     // Saga compensatoria: post-insert recalcula cashOnHand incluyendo este
     // movimiento. Si quedó negativo, otro EXPENSE concurrente metió el
     // retiro antes — revertimos.
@@ -364,13 +483,18 @@ exports.addMovement = async (req, res) => {
 // GET /cash/movements
 // Por defecto: últimos 30 SIN filtro de sesión (permite editar movimientos
 // antiguos). ?onlyActiveSession=true filtra por sesión abierta. ?patientId
-// devuelve TODOS los movimientos del paciente (vista de ficha).
+// devuelve TODOS los movimientos del paciente (vista de ficha) paginados.
+// ?withTotal=true devuelve { items, total, limit, skip } para paginación UI.
 exports.getLastMovements = async (req, res) => {
   try {
     const filter = {};
     if (req.query.onlyActiveSession === 'true') {
       const activeSession = await BoxSession.findOne({ status: 'OPEN' });
-      if (!activeSession) return res.json([]);
+      if (!activeSession) {
+        return req.query.withTotal === 'true'
+          ? res.json({ items: [], total: 0, limit: 0, skip: 0 })
+          : res.json([]);
+      }
       filter.boxSessionId = activeSession._id;
     }
 
@@ -379,20 +503,28 @@ exports.getLastMovements = async (req, res) => {
       filter.patientId = patientId;
     }
 
-    let query = CashMovement.find(filter).sort({ date: -1 });
-    if (!patientId) {
-      query = query.limit(30);
-    } else {
-      // Hard cap para evitar leak de memoria con pacientes muy antiguos
-      query = query.limit(500);
-    }
-    const movements = await query
+    // BUG-B10: paginación con skip + límite tope de 200 (default 30 sin
+    // patientId, 100 con patientId; hard cap 200 para evitar leak).
+    const defaultLimit = patientId ? 100 : 30;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || defaultLimit, 1), 200);
+    const skip = Math.max(parseInt(req.query.skip, 10) || 0, 0);
+
+    const baseQuery = () => CashMovement.find(filter);
+    const items = await baseQuery()
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate('patientId', 'primer_nombre apellido_paterno photoURL')
       .populate('creadoPor', 'nombre')
       .populate('edits.editedBy', 'nombre')
       .lean();
 
-    res.json(movements);
+    if (req.query.withTotal === 'true') {
+      const total = await CashMovement.countDocuments(filter);
+      return res.json({ items, total, limit, skip });
+    }
+
+    res.json(items);
   } catch (_error) {
     res.status(500).json({ message: 'Error fetching movements' });
   }
@@ -456,7 +588,7 @@ exports.updateMovement = async (req, res) => {
       if (fromId !== toId) {
         // Si está vinculando un paciente nuevo, validar que existe
         if (toId) {
-          const exists = await Patient.exists({ _id: toId });
+          const exists = await Patient.exists({ _id: toId, deletedAt: null });
           if (!exists) {
             return res.status(400).json({ message: 'Paciente no encontrado' });
           }

@@ -6,7 +6,8 @@ const mongoose = require('mongoose');
 const cashMovementEditSchema = new mongoose.Schema({
   editedAt: { type: Date, default: Date.now, required: true },
   editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
-  reason: { type: String, required: true, trim: true, minlength: 3 },
+  // BUG-B5: cap a 500 chars
+  reason: { type: String, required: true, trim: true, minlength: 3, maxlength: 500 },
   changes: { type: mongoose.Schema.Types.Mixed, required: true }
 }, { _id: true });
 
@@ -29,7 +30,9 @@ const cashMovementSchema = new mongoose.Schema({
   },
   concept: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    maxlength: 200
   },
   date: {
     type: Date,
@@ -40,6 +43,11 @@ const cashMovementSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient'
   },
+  // boxSessionId NO se marca required a nivel schema para no bloquear
+  // updates sobre movimientos legacy sin sesión (Mongoose valida todo el
+  // doc en save()). La invariante "todo movimiento nuevo debe tener
+  // sesión" se garantiza en addMovement (cashController) y se preserva
+  // legacy-tolerance en getMonthlyBalance.
   boxSessionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BoxSession'

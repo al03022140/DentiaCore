@@ -1,4 +1,5 @@
 import API from './axios-instance';
+import { setActiveCurrency } from '../utils/money';
 
 // Cache para configuración (3 min) — usada en varios modales y secciones
 const SETTINGS_CACHE_TTL_MS = 3 * 60 * 1000;
@@ -6,6 +7,15 @@ let settingsCache = { data: null, ts: 0 };
 
 export const invalidateSettingsCache = () => {
   settingsCache = { data: null, ts: 0 };
+};
+
+// Sincroniza el módulo de formato de moneda con el valor actual de settings,
+// para que `formatMoney(amount)` use la moneda configurada en cualquier
+// componente sin que cada uno tenga que pasársela.
+const syncCurrency = (settings) => {
+  if (settings && typeof settings.currency === 'string') {
+    setActiveCurrency(settings.currency);
+  }
 };
 
 // ── Clinic Settings ──────────────────────────────────────────
@@ -18,12 +28,14 @@ export const getSettings = async (options = {}) => {
   }
   const { data } = await API.get('/settings');
   settingsCache = { data, ts: now };
+  syncCurrency(data);
   return data;
 };
 
 export const updateSettings = async (updates) => {
   const { data } = await API.patch('/settings', updates);
   invalidateSettingsCache();
+  syncCurrency(data);
   return data;
 };
 

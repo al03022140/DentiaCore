@@ -40,6 +40,16 @@ const PatientEvolutionNote = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notes, setNotes] = useState(Array.isArray(initialEvolutionNotes) ? initialEvolutionNotes : []);
+  const [expandedNotes, setExpandedNotes] = useState(() => new Set());
+
+  const toggleNoteExpanded = (key) => {
+    setExpandedNotes(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // Flujo de firma:
   //   null     → estado inicial (form editable)
@@ -262,92 +272,139 @@ const PatientEvolutionNote = ({
 
       <div className="patient-evolution-note__history">
         <h3>Historial</h3>
-        <div className="patient-evolution-note__table-wrapper">
-          <table className="patient-evolution-note__table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Fecha</th>
-                <th>Procedimiento</th>
-                <th>Observaciones</th>
-                <th>Correcciones</th>
-                <th>Firma doctor</th>
-                <th>Firma paciente</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.isArray(notes) && notes.length > 0 ? (
-                notes.map((n, idx) => (
-                  <tr key={n._id || idx}>
-                    <td>{n.numero_procedimiento ?? idx + 1}</td>
-                    <td>{n.fechaFormateada || n.fecha || ''}</td>
-                    <td>{n.procedimiento || ''}</td>
-                    <td>{n.observaciones || ''}</td>
-                    <td>{n.correcciones || ''}</td>
-                    <td>
-                      {n.doctorFirmaUrl ? (
-                        <a
-                          href={n.doctorFirmaUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="doctor-sig-link"
-                          title={[
-                            n.firmadoPor?.nombre ? `Firmada por ${n.firmadoPor.nombre}` : 'Firmada',
-                            n.firmadoEn ? `el ${new Date(n.firmadoEn).toLocaleString()}` : '',
-                            n.doctorFirmaMethod === 'pin' ? '(firmada con PIN)' : '(firmada con pad)',
-                          ].filter(Boolean).join(' ')}
-                        >
-                          <img
-                            src={n.doctorFirmaUrl}
-                            alt="Firma del doctor"
-                            className="doctor-sig-thumb"
+        <div className="patient-evolution-note__cards">
+          {Array.isArray(notes) && notes.length > 0 ? (
+            notes.map((n, idx) => {
+              const noteKey = n._id || `note-${idx}`;
+              const isExpanded = expandedNotes.has(noteKey);
+              const num = n.numero_procedimiento ?? idx + 1;
+              const date = n.fechaFormateada || n.fecha || '';
+              const hasProcedimiento = !!(n.procedimiento && n.procedimiento.trim());
+              const hasObservaciones = !!(n.observaciones && n.observaciones.trim());
+              const hasCorrecciones = !!(n.correcciones && n.correcciones.trim());
+              const isLong = (n.procedimiento || '').length > 110
+                || (n.observaciones || '').length > 110;
+              const showToggle = hasCorrecciones || isLong;
+
+              return (
+                <article
+                  key={noteKey}
+                  className={`evolution-note-card${isExpanded ? ' is-expanded' : ''}`}
+                >
+                  <header className="evolution-note-card__header">
+                    <div className="evolution-note-card__id">
+                      <span className="evolution-note-card__num">#{num}</span>
+                      {date && <span className="evolution-note-card__date">{date}</span>}
+                    </div>
+                    <div className="evolution-note-card__sigs">
+                      <div className="evolution-note-card__sig-slot">
+                        <span className="evolution-note-card__sig-label">Doctor</span>
+                        {n.doctorFirmaUrl ? (
+                          <a
+                            href={n.doctorFirmaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="doctor-sig-link"
+                            title={[
+                              n.firmadoPor?.nombre ? `Firmada por ${n.firmadoPor.nombre}` : 'Firmada',
+                              n.firmadoEn ? `el ${new Date(n.firmadoEn).toLocaleString()}` : '',
+                              n.doctorFirmaMethod === 'pin' ? '(firmada con PIN)' : '(firmada con pad)',
+                            ].filter(Boolean).join(' ')}
+                          >
+                            <img
+                              src={n.doctorFirmaUrl}
+                              alt="Firma del doctor"
+                              className="doctor-sig-thumb"
+                            />
+                            {n.firmaDesactualizada && (
+                              <span className="doctor-sig-stale" title="La nota fue modificada tras firmar — firma desactualizada">⚠</span>
+                            )}
+                          </a>
+                        ) : (
+                          <SignatureBadge
+                            firmadoPor={n.firmadoPor}
+                            firmadoEn={n.firmadoEn}
+                            firmaDesactualizada={n.firmaDesactualizada}
+                            contentHash={n.contentHash}
+                            canSign={canSignOfficial}
+                            onSignClick={() => {
+                              setSignTarget({ noteId: n._id, index: idx });
+                              setSignModalOpen(true);
+                            }}
                           />
-                          {n.firmaDesactualizada && (
-                            <span className="doctor-sig-stale" title="La nota fue modificada tras firmar — firma desactualizada">⚠</span>
-                          )}
-                        </a>
-                      ) : (
-                        <SignatureBadge
-                          firmadoPor={n.firmadoPor}
-                          firmadoEn={n.firmadoEn}
-                          firmaDesactualizada={n.firmaDesactualizada}
-                          contentHash={n.contentHash}
-                          canSign={canSignOfficial}
-                          onSignClick={() => {
-                            setSignTarget({ noteId: n._id, index: idx });
-                            setSignModalOpen(true);
-                          }}
-                        />
-                      )}
-                    </td>
-                    <td>
-                      {n.pacienteFirmaUrl ? (
-                        <a
-                          href={n.pacienteFirmaUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="patient-sig-link"
-                          title={`Firmada ${n.pacienteFirmadoEn ? new Date(n.pacienteFirmadoEn).toLocaleString() : ''}`}
-                        >
-                          <img
-                            src={n.pacienteFirmaUrl}
-                            alt="Firma del paciente"
-                            className="patient-sig-thumb"
-                          />
-                        </a>
-                      ) : (
-                        <span className="patient-sig-missing">— sin firma —</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="no-data">Sin notas registradas</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                        )}
+                      </div>
+                      <div className="evolution-note-card__sig-slot">
+                        <span className="evolution-note-card__sig-label">Paciente</span>
+                        {n.pacienteFirmaUrl ? (
+                          <a
+                            href={n.pacienteFirmaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="patient-sig-link"
+                            title={`Firmada ${n.pacienteFirmadoEn ? new Date(n.pacienteFirmadoEn).toLocaleString() : ''}`}
+                          >
+                            <img
+                              src={n.pacienteFirmaUrl}
+                              alt="Firma del paciente"
+                              className="patient-sig-thumb"
+                            />
+                          </a>
+                        ) : (
+                          <span className="patient-sig-missing">— sin firma —</span>
+                        )}
+                      </div>
+                    </div>
+                  </header>
+
+                  <div className="evolution-note-card__body">
+                    {hasProcedimiento && (
+                      <div className="evolution-note-card__field">
+                        <span className="evolution-note-card__field-label">Procedimiento</span>
+                        <p className={`evolution-note-card__field-text${isExpanded ? '' : ' is-clamped'}`}>
+                          {n.procedimiento}
+                        </p>
+                      </div>
+                    )}
+                    {hasObservaciones && (
+                      <div className="evolution-note-card__field">
+                        <span className="evolution-note-card__field-label">Observaciones</span>
+                        <p className={`evolution-note-card__field-text${isExpanded ? '' : ' is-clamped'}`}>
+                          {n.observaciones}
+                        </p>
+                      </div>
+                    )}
+                    {isExpanded && hasCorrecciones && (
+                      <div className="evolution-note-card__field evolution-note-card__field--correcciones">
+                        <span className="evolution-note-card__field-label">Correcciones</span>
+                        <p className="evolution-note-card__field-text">
+                          {n.correcciones}
+                        </p>
+                      </div>
+                    )}
+                    {!hasProcedimiento && !hasObservaciones && !hasCorrecciones && (
+                      <p className="evolution-note-card__empty">Nota sin contenido registrado.</p>
+                    )}
+                  </div>
+
+                  {showToggle && (
+                    <button
+                      type="button"
+                      className="evolution-note-card__toggle"
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleNoteExpanded(noteKey)}
+                    >
+                      {isExpanded ? 'Ver menos ▴' : 'Ver más ▾'}
+                    </button>
+                  )}
+                </article>
+              );
+            })
+          ) : (
+            <div className="evolution-note-card evolution-note-card--empty-state">
+              Sin notas registradas
+            </div>
+          )}
         </div>
       </div>
 

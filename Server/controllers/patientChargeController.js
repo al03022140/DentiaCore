@@ -103,13 +103,20 @@ exports.createCharge = async (req, res) => {
     // Validar y calcular subtotales con redondeo a 2 decimales
     const processedItems = [];
     for (const item of items) {
+      const nombre = typeof item.nombre === 'string' ? item.nombre.trim() : '';
       const cantidad = Number(item.cantidad);
       const precioUnitario = round2(Number(item.precioUnitario));
-      if (!item.nombre || !Number.isFinite(cantidad) || cantidad < 1 || !Number.isFinite(precioUnitario) || precioUnitario < 0) {
-        return res.status(400).json({ message: `Item inválido: ${item.nombre || 'sin nombre'}` });
+      if (!nombre || nombre.length > 120) {
+        return res.status(400).json({ message: `Nombre de item inválido (1-120 caracteres): ${nombre || 'sin nombre'}` });
+      }
+      if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 1000) {
+        return res.status(400).json({ message: `Cantidad inválida en "${nombre}" (debe ser entre 1 y 1000)` });
+      }
+      if (!Number.isFinite(precioUnitario) || precioUnitario < 0 || precioUnitario > 100_000_000) {
+        return res.status(400).json({ message: `Precio inválido en "${nombre}"` });
       }
       processedItems.push({
-        nombre: String(item.nombre).trim(),
+        nombre,
         cantidad,
         precioUnitario,
         subtotal: round2(cantidad * precioUnitario)
@@ -117,6 +124,9 @@ exports.createCharge = async (req, res) => {
     }
 
     const total = round2(processedItems.reduce((sum, item) => sum + item.subtotal, 0));
+    if (total <= 0) {
+      return res.status(400).json({ message: 'El total del cobro debe ser mayor a $0' });
+    }
     if (total > 100_000_000) {
       return res.status(400).json({ message: 'Total del cobro excede el límite permitido' });
     }
@@ -203,8 +213,22 @@ exports.addPayment = async (req, res) => {
       return res.status(400).json({ message: 'Debe abrir la caja antes de registrar pagos' });
     }
 
-    const firstItem = charge.items[0]?.nombre || 'Servicios';
-    const extra = charge.items.length > 1 ? ` +${charge.items.length - 1}` : '';
+    // Concepto del movimiento. Para 1 item incluimos el nombre; para 2 mostramos
+    // ambos; para 3+ resumimos con el primero + "y N más". El sufijo con el
+    // ID corto del cobro permite cuadrar contra el cobro de origen.
+    const chargeRef = `#${String(charge._id).slice(-6)}`;
+    let concept;
+    if (charge.items.length === 0) {
+      concept = `Pago cobro ${chargeRef}`;
+    } else if (charge.items.length === 1) {
+      concept = `Pago · ${charge.items[0].nombre} ${chargeRef}`;
+    } else if (charge.items.length === 2) {
+      concept = `Pago · ${charge.items[0].nombre} + ${charge.items[1].nombre} ${chargeRef}`;
+    } else {
+      concept = `Pago · ${charge.items[0].nombre} y ${charge.items.length - 1} más ${chargeRef}`;
+    }
+    // Cap a 200 chars (alineado con cashMovement.concept maxlength).
+    if (concept.length > 200) concept = concept.slice(0, 197) + '...';
     const now = new Date();
 
     // Saga compensatoria (BUG-5: no usamos Mongo tx porque la instalación
@@ -226,6 +250,22 @@ exports.addPayment = async (req, res) => {
     } catch (movErr) {
       console.error('Error creando CashMovement de pago:', movErr);
       return res.status(500).json({ message: 'Error al registrar pago (movimiento)' });
+    }
+
+    // BUG-B2: cerrar race contra closeBox. Entre que leímos la sesión OPEN y
+    // creamos el CashMovement, otro request pudo cerrar la caja. Si pasó a
+    // CLOSING/CLOSED, el movimiento quedó asignado a una sesión cerrada y no
+    // cuenta en el corte. Revertimos.
+    const sessionStillOpen = await BoxSession.exists({
+      _id: activeSession._id,
+      status: 'OPEN'
+    });
+    if (!sessionStillOpen) {
+      try { await CashMovement.deleteOne({ _id: movement._id }); }
+      catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+      return res.status(409).json({
+        message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
+      });
     }
 
     try {
@@ -266,12 +306,15 @@ exports.addPayment = async (req, res) => {
 };
 
 // POST /patient-charges/:chargeId/cancel
-// Soft-delete: marca el cobro como cancelado preservando los pagos ya
-// registrados (los CashMovement no se tocan — fueron operaciones reales
-// que entraron a la caja). Después de cancelado:
-//  - El cobro deja de aparecer en getAllCharges (cancelado != true)
-//  - Los pagos asociados quedan editables (updateMovement)
-//  - addPayment rechaza nuevos pagos
+// Soft-delete del cobro. Comportamiento sobre los pagos ya registrados:
+//   - reversePayments=false (default, legacy): los CashMovement NO se tocan.
+//     Los pagos quedan en caja como ingresos reales y los movimientos quedan
+//     editables manualmente para que el operador decida.
+//   - reversePayments=true: por cada pago se genera un CashMovement EXPENSE
+//     compensatorio (mismo amount, mismo paymentMethod) en la caja OPEN
+//     actual, dejando trazabilidad de la reversa en el audit trail.
+// Idempotencia: usa findOneAndUpdate con condición `cancelado != true` para
+// evitar que dos cancelaciones concurrentes sobreescriban canceladoPor/Motivo.
 exports.cancelCharge = async (req, res) => {
   try {
     if (!req.user?.id) {
@@ -282,7 +325,7 @@ exports.cancelCharge = async (req, res) => {
       return res.status(400).json({ message: 'ID de cobro inválido' });
     }
 
-    const { motivo, confirmacion } = req.body;
+    const { motivo, confirmacion, reversePayments } = req.body;
     if (!confirmacion || confirmacion.trim() !== CONFIRM_PHRASE) {
       return res.status(400).json({ message: 'Debe escribir CONFIRMO para cancelar el cobro' });
     }
@@ -290,19 +333,65 @@ exports.cancelCharge = async (req, res) => {
       return res.status(400).json({ message: 'Debe indicar el motivo de cancelación (mínimo 3 caracteres)' });
     }
 
-    const charge = await PatientCharge.findById(chargeId);
+    const motivoTrim = motivo.trim();
+    const wantsReverse = reversePayments === true || reversePayments === 'true';
+
+    // Cancelar de forma idempotente: el doc sólo se modifica si aún no estaba
+    // cancelado. Si pierde el race, devuelve null y respondemos 400.
+    const charge = await PatientCharge.findOneAndUpdate(
+      { _id: chargeId, cancelado: { $ne: true } },
+      {
+        $set: {
+          cancelado: true,
+          canceladoEn: new Date(),
+          canceladoPor: req.user.id,
+          canceladoMotivo: motivoTrim
+        }
+      },
+      { new: true }
+    );
     if (!charge) {
-      return res.status(404).json({ message: 'Cobro no encontrado' });
-    }
-    if (charge.cancelado) {
+      // Diferenciar 404 vs 400 (ya cancelado).
+      const existed = await PatientCharge.exists({ _id: chargeId });
+      if (!existed) return res.status(404).json({ message: 'Cobro no encontrado' });
       return res.status(400).json({ message: 'El cobro ya está cancelado' });
     }
 
-    charge.cancelado = true;
-    charge.canceladoEn = new Date();
-    charge.canceladoPor = req.user.id;
-    charge.canceladoMotivo = motivo.trim();
-    await charge.save();
+    // Reverso opcional de los pagos a la caja OPEN actual.
+    const reversedMovementIds = [];
+    if (wantsReverse && Array.isArray(charge.pagos) && charge.pagos.length > 0) {
+      const activeSession = await BoxSession.findOne({ status: 'OPEN' });
+      if (!activeSession) {
+        // Ya cancelamos el cobro; informamos al operador que el reverso quedó
+        // pendiente. No revertimos la cancelación porque eso sería peor UX.
+        return res.json({
+          charge,
+          reverseStatus: 'skipped',
+          reverseMessage: 'Cobro cancelado pero los pagos NO se revirtieron a caja (no hay sesión abierta).'
+        });
+      }
+
+      const chargeRef = `#${String(charge._id).slice(-6)}`;
+      for (const pago of charge.pagos) {
+        try {
+          const expense = await CashMovement.create({
+            amount: round2(pago.monto),
+            type: 'EXPENSE',
+            paymentMethod: pago.paymentMethod,
+            concept: `Reverso pago ${chargeRef} · ${motivoTrim}`.slice(0, 200),
+            date: new Date(),
+            patientId: charge.patientId,
+            boxSessionId: activeSession._id,
+            linkedChargeId: charge._id,
+            creadoPor: req.user.id
+          });
+          reversedMovementIds.push(expense._id);
+        } catch (revErr) {
+          // Loguear y continuar — los pagos restantes deben intentar revertirse.
+          console.error('[cancelCharge] Error revirtiendo pago:', { chargeId, pagoId: pago._id, revErr });
+        }
+      }
+    }
 
     const populated = await PatientCharge.findById(charge._id)
       .populate('appointmentId', 'fecha_hora motivo estado')
@@ -310,7 +399,11 @@ exports.cancelCharge = async (req, res) => {
       .populate('creadoPor', 'nombre')
       .populate('canceladoPor', 'nombre');
 
-    res.json(populated);
+    res.json({
+      charge: populated,
+      reverseStatus: wantsReverse ? (reversedMovementIds.length > 0 ? 'reversed' : 'not_needed') : 'kept',
+      reversedMovementIds
+    });
   } catch (error) {
     console.error('Error al cancelar cobro:', error);
     res.status(500).json({ message: 'Error al cancelar el cobro' });

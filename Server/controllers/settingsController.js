@@ -1,5 +1,6 @@
 const ClinicSettings = require('../models/clinicSettings');
 const Usuario = require('../models/users');
+const AuditLog = require('../models/auditLog');
 const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
@@ -19,19 +20,79 @@ exports.getSettings = async (req, res) => {
   }
 };
 
+const SETTINGS_ALLOWED_KEYS = [
+  'clinicName', 'address', 'phone', 'logoUrl',
+  'inactivityTimeout', 'maxLoginAttempts', 'lockDuration',
+  'defaultAppointmentDuration', 'businessHours', 'workDays',
+  'cashCategories', 'currency', 'serviceCatalog'
+];
+
+// Resume cambios en un diff campo-a-campo para el audit log. Compara
+// valores serializados — para arrays/objetos basta detectar inequalidad
+// estructural; no hace falta deep-diff en este nivel.
+const diffSettings = (before, after) => {
+  const camposEditados = [];
+  const changes = {};
+  for (const key of SETTINGS_ALLOWED_KEYS) {
+    const a = JSON.stringify(before?.[key] ?? null);
+    const b = JSON.stringify(after?.[key] ?? null);
+    if (a !== b) {
+      camposEditados.push(key);
+      changes[key] = { from: before?.[key] ?? null, to: after?.[key] ?? null };
+    }
+  }
+  return { camposEditados, changes };
+};
+
 exports.updateSettings = async (req, res) => {
   try {
-    const allowed = [
-      'clinicName', 'address', 'phone', 'logoUrl',
-      'inactivityTimeout', 'maxLoginAttempts', 'lockDuration',
-      'defaultAppointmentDuration', 'businessHours', 'workDays',
-      'cashCategories', 'currency', 'serviceCatalog'
-    ];
     const updates = {};
-    for (const key of allowed) {
+    for (const key of SETTINGS_ALLOWED_KEYS) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
-    const settings = await ClinicSettings.updateSettings(updates);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No hay cambios para aplicar' });
+    }
+
+    const before = (await ClinicSettings.getSettings()).toObject();
+    let settings;
+    try {
+      settings = await ClinicSettings.updateSettings(updates);
+    } catch (err) {
+      // Errores de validación del schema (enum currency, min/max, required)
+      if (err?.name === 'ValidationError') {
+        const firstField = Object.keys(err.errors || {})[0];
+        const msg = firstField ? err.errors[firstField].message : err.message;
+        return res.status(400).json({ message: msg || 'Datos inválidos' });
+      }
+      throw err;
+    }
+
+    const after = settings.toObject();
+    const { camposEditados, changes } = diffSettings(before, after);
+
+    // Audit log de cambios en configuración (NOM-024). Sólo lo escribimos
+    // si hubo cambios reales para no inundar la colección con no-ops.
+    if (camposEditados.length > 0 && req.user?.id) {
+      try {
+        await AuditLog.registrar({
+          userId: req.user.id,
+          userName: req.user.nombre || null,
+          userRole: req.user.role || null,
+          evento: 'modificacion_registro',
+          resourceType: 'configuracion',
+          resourceId: settings._id,
+          camposEditados,
+          detalles: { changes },
+          motivo: typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : null,
+          ip: req.ip || null
+        });
+      } catch (auditErr) {
+        // Audit failure no debe bloquear la operación — sólo loguear.
+        console.error('[settings] Error registrando audit log:', auditErr.message);
+      }
+    }
+
     res.json(settings);
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar configuración', error: error.message });

@@ -3,10 +3,13 @@ import { Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descri
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, SearchOutlined, LockOutlined } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
 import { getAllPatients } from '../../shared/services/api';
+import { formatMoney } from '../../shared/utils/money';
 
 const { confirm } = Modal;
 
-const formatCOP = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+// BUG-B1: moneda centralizada en shared/utils/money. Se ajusta a la divisa
+// configurada en Settings → Caja (default MXN).
+const formatMXN = (value) => formatMoney(value, { showDecimals: false });
 
 const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBox }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,7 +77,8 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
           setCloseSummary(result.summary);
           setSummaryVisible(true);
         } catch (error) {
-          message.error('Error al cerrar la caja');
+          // BUG-B8: mostrar el error real (ej. "No hay caja abierta para cerrar")
+          message.error(error?.response?.data?.message || 'Error al cerrar la caja');
         }
       },
     });
@@ -204,14 +208,14 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
       >
         {closeSummary && (
           <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="Monto Inicial">{formatCOP(closeSummary.initialAmount)}</Descriptions.Item>
-            <Descriptions.Item label="Efectivo Final">{formatCOP(closeSummary.finalCashAmount)}</Descriptions.Item>
+            <Descriptions.Item label="Monto Inicial">{formatMXN(closeSummary.initialAmount)}</Descriptions.Item>
+            <Descriptions.Item label="Efectivo Final">{formatMXN(closeSummary.finalCashAmount)}</Descriptions.Item>
             <Descriptions.Item label="Total Ingresos"><Statistic value={closeSummary.totalIncome} prefix="$" valueStyle={{ color: '#4caf50', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
             <Descriptions.Item label="Total Egresos"><Statistic value={closeSummary.totalExpense} prefix="$" valueStyle={{ color: '#e53e3e', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
-            <Descriptions.Item label="Ing. Efectivo">{formatCOP(closeSummary.cashIncome)}</Descriptions.Item>
-            <Descriptions.Item label="Ing. Digital">{formatCOP(closeSummary.digitalIncome)}</Descriptions.Item>
-            <Descriptions.Item label="Egr. Efectivo">{formatCOP(closeSummary.cashExpense)}</Descriptions.Item>
-            <Descriptions.Item label="Egr. Digital">{formatCOP(closeSummary.digitalExpense)}</Descriptions.Item>
+            <Descriptions.Item label="Ing. Efectivo">{formatMXN(closeSummary.cashIncome)}</Descriptions.Item>
+            <Descriptions.Item label="Ing. Digital">{formatMXN(closeSummary.digitalIncome)}</Descriptions.Item>
+            <Descriptions.Item label="Egr. Efectivo">{formatMXN(closeSummary.cashExpense)}</Descriptions.Item>
+            <Descriptions.Item label="Egr. Digital">{formatMXN(closeSummary.digitalExpense)}</Descriptions.Item>
             <Descriptions.Item label="Movimientos">{closeSummary.movementCount}</Descriptions.Item>
             <Descriptions.Item label="Balance Neto"><Statistic value={closeSummary.net} prefix="$" valueStyle={{ color: closeSummary.net >= 0 ? '#4caf50' : '#e53e3e', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
           </Descriptions>

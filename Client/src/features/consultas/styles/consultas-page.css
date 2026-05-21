@@ -384,6 +384,25 @@
   justify-content: center;
 }
 
+/* Modo "sin selección" — el header queda arriba como siempre, y el cuerpo
+   muestra un placeholder centrado en el espacio restante. */
+.selected-detail-panel--no-selection .detail-header-info {
+  margin-bottom: 0.85rem;
+}
+
+.selected-detail-panel__placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+}
+
+.selected-detail-panel__placeholder .consultas-empty-state__text {
+  max-width: 24rem;
+}
+
 .consultas-empty-state {
   text-align: center;
   padding: 1.25rem 1rem;

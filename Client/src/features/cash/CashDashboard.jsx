@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Radio, Skeleton, Button, Segmented } from 'antd';
-import { EyeOutlined, EyeInvisibleOutlined, ReloadOutlined } from '@ant-design/icons';
-import { getSessionBalance } from '../../shared/services/cashService';
+import { Radio, Skeleton, Button, Segmented, Alert, Popconfirm, message } from 'antd';
+import { EyeOutlined, EyeInvisibleOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
+import { getSessionBalance, getStaleSessions, forceResolveSession } from '../../shared/services/cashService';
+import { formatMoney } from '../../shared/utils/money';
 
-const formatCOP = (amount) =>
-  new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0
-  }).format(amount || 0);
+// Format compacto sin decimales para el dashboard (montos suelen ser redondos).
+const formatMXN = (amount) => formatMoney(amount, { showDecimals: false });
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '—';
@@ -25,12 +22,19 @@ const CashDashboard = () => {
   // method (sólo aplica a 'balance'): cash | digital | total
   const [method, setMethod] = useState('total');
   const [loading, setLoading] = useState(true);
+  // BUG-B14: sesiones huérfanas (OPEN > 24h, CLOSING > 1h)
+  const [stale, setStale] = useState({ staleOpen: [], staleClosing: [] });
+  const [resolvingId, setResolvingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getSessionBalance();
+      const [res, staleRes] = await Promise.all([
+        getSessionBalance(),
+        getStaleSessions().catch(() => ({ staleOpen: [], staleClosing: [] }))
+      ]);
       setData(res);
+      setStale(staleRes || { staleOpen: [], staleClosing: [] });
     } catch (error) {
       console.error('Error loading session balance:', error);
       setData(null);
@@ -39,7 +43,28 @@ const CashDashboard = () => {
     }
   }, []);
 
+  const resolveSession = async (sessionId) => {
+    setResolvingId(sessionId);
+    try {
+      await forceResolveSession(sessionId);
+      message.success('Sesión cerrada correctamente');
+      await load();
+      window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail: { source: 'force-resolve', sessionId } }));
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'No se pudo forzar el cierre');
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
   useEffect(() => { load(); }, [load]);
+
+  // Escucha eventos globales para refrescar si la caja cambió desde otra vista
+  useEffect(() => {
+    const handler = () => { load(); };
+    window.addEventListener('cash:movement-changed', handler);
+    return () => window.removeEventListener('cash:movement-changed', handler);
+  }, [load]);
 
   const summary = data?.summary || {};
   const session = data?.session || null;
@@ -48,19 +73,19 @@ const CashDashboard = () => {
 
   const getDisplayAmount = () => {
     if (!isVisible) return '••••••';
-    if (!hasSession) return formatCOP(0);
+    if (!hasSession) return formatMXN(0);
 
     if (view === 'onHand') {
       // Dinero en caja: efectivo físico + saldo digital (informativo)
-      if (method === 'cash') return formatCOP(summary.cashOnHand);
-      if (method === 'digital') return formatCOP(summary.digitalNet);
-      return formatCOP((summary.cashOnHand || 0) + (summary.digitalNet || 0));
+      if (method === 'cash') return formatMXN(summary.cashOnHand);
+      if (method === 'digital') return formatMXN(summary.digitalNet);
+      return formatMXN((summary.cashOnHand || 0) + (summary.digitalNet || 0));
     }
 
     // balance: ingresos − egresos por método
-    if (method === 'cash') return formatCOP(summary.cashNet);
-    if (method === 'digital') return formatCOP(summary.digitalNet);
-    return formatCOP(summary.net);
+    if (method === 'cash') return formatMXN(summary.cashNet);
+    if (method === 'digital') return formatMXN(summary.digitalNet);
+    return formatMXN(summary.net);
   };
 
   const getDisplayLabel = () => {
@@ -102,6 +127,66 @@ const CashDashboard = () => {
         </div>
       </div>
 
+      {(stale.staleClosing?.length > 0 || stale.staleOpen?.length > 0) && (
+        <div className="cash-dashboard__stale-banner">
+          {stale.staleClosing?.map((s) => (
+            <Alert
+              key={s._id}
+              type="error"
+              showIcon
+              icon={<WarningOutlined />}
+              message="Sesión con cierre incompleto"
+              description={
+                <span>
+                  Una caja quedó en estado <strong>CLOSING</strong> (probable crash a la mitad). Hasta resolverla no se puede abrir una nueva.
+                  {s.openedBy?.nombre && <> · Abierta por <strong>{s.openedBy.nombre}</strong></>}
+                </span>
+              }
+              action={
+                <Popconfirm
+                  title="¿Forzar cierre de esta sesión?"
+                  description="Se recalculará el saldo final con los movimientos existentes y se marcará como cerrada."
+                  okText="Forzar cierre"
+                  cancelText="Cancelar"
+                  onConfirm={() => resolveSession(s._id)}
+                >
+                  <Button danger size="small" loading={resolvingId === s._id}>Forzar cierre</Button>
+                </Popconfirm>
+              }
+              style={{ marginBottom: 8 }}
+            />
+          ))}
+          {stale.staleOpen?.map((s) => (
+            <Alert
+              key={s._id}
+              type="warning"
+              showIcon
+              icon={<WarningOutlined />}
+              message="Caja olvidada (abierta > 24h)"
+              description={
+                <span>
+                  Esta caja lleva más de 24 horas abierta — los reportes mensuales podrían
+                  excluir sus movimientos a partir de las 48h. Cierra desde el botón "Cerrar Caja" o fuérzalo aquí.
+                  {s.openedBy?.nombre && <> · Abierta por <strong>{s.openedBy.nombre}</strong></>}
+                </span>
+              }
+              action={
+                <Popconfirm
+                  title="¿Forzar cierre de esta caja?"
+                  description="Se cerrará con el efectivo calculado a partir de los movimientos registrados."
+                  okText="Forzar cierre"
+                  cancelText="Cancelar"
+                  onConfirm={() => resolveSession(s._id)}
+                >
+                  <Button size="small" loading={resolvingId === s._id}>Forzar cierre</Button>
+                </Popconfirm>
+              }
+              style={{ marginBottom: 8 }}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="cash-dashboard__view-toggle">
         <Segmented
           block
@@ -128,13 +213,13 @@ const CashDashboard = () => {
       {hasSession && (
         <div className="cash-dashboard__breakdown">
           <span>
-            Inicio: <strong>{formatCOP(session.initialAmount)}</strong>
+            Inicio: <strong>{formatMXN(session.initialAmount)}</strong>
           </span>
           <span>
-            Ingresos: <strong className="cash-dashboard__income">{formatCOP(summary.totalIncome)}</strong>
+            Ingresos: <strong className="cash-dashboard__income">{formatMXN(summary.totalIncome)}</strong>
           </span>
           <span>
-            Egresos: <strong className="cash-dashboard__expense">{formatCOP(summary.totalExpense)}</strong>
+            Egresos: <strong className="cash-dashboard__expense">{formatMXN(summary.totalExpense)}</strong>
           </span>
         </div>
       )}

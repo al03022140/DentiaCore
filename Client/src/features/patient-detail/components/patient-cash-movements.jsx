@@ -7,10 +7,8 @@ import {
   addMovement,
   getSessionStatus,
 } from '../../../shared/services/cashService';
+import { formatMoney } from '../../../shared/utils/money';
 import '../styles/patient-cash-movements.css';
-
-const formatMoney = (n) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(n) || 0);
 
 const formatDateGroup = (iso) =>
   new Date(iso).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -119,6 +117,9 @@ const PatientCashMovements = ({ patientId }) => {
       message.success(values.type === 'INCOME' ? 'Ingreso registrado' : 'Egreso registrado');
       closeModal();
       await loadMovements();
+      // BUG-B12: avisa al CashDashboard/MovementsList/PendingChargesPanel
+      // globales que la caja cambió, para que recarguen sin esperar nav.
+      window.dispatchEvent(new CustomEvent('cash:movement-changed', { detail: { source: 'patient-detail', patientId } }));
     } catch (err) {
       if (err?.errorFields) return; // validación de antd, no es un error de red
       const msg = err?.response?.data?.message || 'No se pudo registrar el movimiento';

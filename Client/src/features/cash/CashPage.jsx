@@ -6,6 +6,7 @@ import MovementsList from './MovementsList';
 import OpenBoxModal from './OpenBoxModal';
 import PendingChargesPanel from './PendingChargesPanel';
 import { getSessionStatus } from '../../shared/services/cashService';
+import { getSettings } from '../../shared/services/settingsService';
 import './styles/cash-page.css';
 
 const CashPage = () => {
@@ -28,6 +29,21 @@ const CashPage = () => {
   }, []);
 
   useEffect(() => { checkStatus(); }, [checkStatus]);
+
+  // Sincroniza la moneda activa en el helper de formato (formatMoney).
+  // El cache de settingsService evita refetch innecesario. Idempotente.
+  useEffect(() => { getSettings().catch(() => { /* no-op: usa moneda default */ }); }, []);
+
+  // BUG-B12: si la caja cambió desde otra pantalla (ficha de paciente),
+  // recargamos sin esperar a que el usuario navegue de vuelta.
+  useEffect(() => {
+    const handler = () => {
+      setRefreshTrigger((prev) => prev + 1);
+      checkStatus();
+    };
+    window.addEventListener('cash:movement-changed', handler);
+    return () => window.removeEventListener('cash:movement-changed', handler);
+  }, [checkStatus]);
 
   const handleOpenSuccess = () => {
     setIsBoxOpen(true);

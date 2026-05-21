@@ -24,6 +24,9 @@ router.get('/balance/monthly', readLimiter, authorize(['cash.read']), cashContro
 router.get('/session/balance', readLimiter, authorize(['cash.read']), cashController.getSessionBalance);
 router.get('/session/status', readLimiter, authorize(['cash.read']), cashController.getSessionStatus);
 router.get('/sessions', readLimiter, authorize(['cash.read']), cashController.getSessionHistory);
+// BUG-B3: detectar y resolver sesiones huérfanas (OPEN > 24h / CLOSING > 1h)
+router.get('/sessions/stale', readLimiter, authorize(['cash.read']), cashController.getStaleSessions);
+router.post('/sessions/:id/force-resolve', writeLimiter, authorize(['cash.manage']), cashController.forceResolveSession);
 router.post(
 	'/session/open',
 	writeLimiter,
@@ -54,7 +57,8 @@ router.post(
 		body('concept')
 			.isString().withMessage('Concepto debe ser texto')
 			.trim()
-			.notEmpty().withMessage('Concepto es obligatorio'),
+			.notEmpty().withMessage('Concepto es obligatorio')
+				.isLength({ max: 200 }).withMessage('Concepto demasiado largo (máx 200 caracteres)'),
 		body('patientId')
 			.optional({ values: 'falsy' })
 			.isMongoId().withMessage('patientId debe ser un ObjectId válido')
@@ -68,7 +72,12 @@ router.get(
 	withValidation([
 		query('patientId')
 			.optional()
-			.isMongoId().withMessage('patientId debe ser un ObjectId válido')
+			.isMongoId().withMessage('patientId debe ser un ObjectId válido'),
+		// BUG-B10: paginación
+		query('skip').optional().isInt({ min: 0, max: 100000 }).toInt(),
+		query('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
+		query('withTotal').optional().isIn(['true', 'false']),
+		query('onlyActiveSession').optional().isIn(['true', 'false'])
 	]),
 	cashController.getLastMovements
 );

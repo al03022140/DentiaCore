@@ -9,7 +9,8 @@ const paymentSchema = new mongoose.Schema({
 }, { _id: true });
 
 const chargeItemSchema = new mongoose.Schema({
-  nombre: { type: String, required: true, trim: true },
+  // BUG-B5: cap a 150 chars (consistente con el catálogo de servicios)
+  nombre: { type: String, required: true, trim: true, maxlength: 150 },
   cantidad: { type: Number, required: true, min: 1 },
   precioUnitario: { type: Number, required: true, min: 0 },
   subtotal: { type: Number, required: true, min: 0 }
@@ -41,7 +42,8 @@ const patientChargeSchema = new mongoose.Schema({
   cancelado: { type: Boolean, default: false, index: true },
   canceladoEn: { type: Date, default: null },
   canceladoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
-  canceladoMotivo: { type: String, default: null, trim: true },
+  // BUG-B5: cap a 500 chars (UI ya limita a 300 — defensa en profundidad)
+  canceladoMotivo: { type: String, default: null, trim: true, maxlength: 500 },
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',

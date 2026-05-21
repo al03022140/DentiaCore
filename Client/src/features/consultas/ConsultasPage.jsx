@@ -149,12 +149,16 @@ const ConsultasPage = () => {
     );
     const closed = agenda.filter(a => ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado));
 
+    // Conserva la selección del usuario si la cita sigue en la agenda, pero
+    // siempre toma la versión fresca (puede haber cambiado de estado, motivo, etc.).
+    const refreshed = (prev) => prev ? agenda.find(a => a._id === prev._id) : null;
+
     if (upcoming.length > 0) {
       setNextPatient(upcoming[0]);
-      setSelectedConsultation(prev => prev && agenda.find(a => a._id === prev._id) ? prev : upcoming[0]);
+      setSelectedConsultation(prev => refreshed(prev) || upcoming[0]);
     } else if (closed.length > 0) {
       setNextPatient(null);
-      setSelectedConsultation(prev => prev && agenda.find(a => a._id === prev._id) ? prev : closed[0]);
+      setSelectedConsultation(prev => refreshed(prev) || closed[0]);
     } else {
       setNextPatient(null);
       setSelectedConsultation(null);
@@ -169,14 +173,19 @@ const ConsultasPage = () => {
   useEffect(() => {
     if (!selectedConsultation) {
       setActivity(null);
+      setActivityLoading(false);
       return;
     }
     const showActivity = ['EnCurso', 'Pasada', 'NoShow', 'Cancelada'].includes(selectedConsultation.estado);
     if (!showActivity) {
       setActivity(null);
+      setActivityLoading(false);
       return;
     }
     let cancelled = false;
+    // Limpiar de inmediato para evitar que se muestre la actividad de la
+    // cita anterior mientras llega la nueva (parece "no actualiza").
+    setActivity(null);
     setActivityLoading(true);
     (async () => {
       try {
@@ -503,22 +512,40 @@ const ConsultasPage = () => {
           </div>
         )}
 
-        {/* Panel Inferior: Detalle de Selección */}
-        {selectedConsultation ? (
-          <div className="selected-detail-panel">
-            <div className="detail-header-info">
-              <div>
-                <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Cita</h3>
-                <small>Seleccionada: {getPatientName(selectedConsultation)}</small>
-              </div>
+        {/* Panel Inferior: Detalle de Selección — siempre visible con el mismo marco */}
+        <div
+          key={selectedConsultation?._id || 'empty'}
+          className={`selected-detail-panel${selectedConsultation ? '' : ' selected-detail-panel--no-selection'}`}
+        >
+          <div className="detail-header-info">
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Cita</h3>
+              <small>
+                {selectedConsultation
+                  ? `Seleccionada: ${getPatientName(selectedConsultation)}`
+                  : (agendaIsEmpty ? 'No hay citas para este día' : 'Sin cita seleccionada')}
+              </small>
+            </div>
+            {selectedConsultation && (
               <div className="patient-tags">
                 <span>{calculateAge(selectedConsultation.paciente_id?.fecha_nacimiento)} años</span>
                 {selectedConsultation.duracion && (
                   <span className="patient-tags__duration">{selectedConsultation.duracion} min</span>
                 )}
               </div>
-            </div>
+            )}
+          </div>
 
+          {!selectedConsultation ? (
+            <div className="selected-detail-panel__placeholder">
+              <p className="consultas-empty-state__text">
+                {agendaIsEmpty
+                  ? 'Cuando agregues citas, podrás ver aquí motivo, servicios, totales e historial.'
+                  : 'Selecciona una cita de la agenda (pasada o futura) para ver su información completa.'}
+              </p>
+            </div>
+          ) : (
+            <>
             {/* Motivo + Procedimiento: si la cita seleccionada es la misma
                 que ya se muestra arriba en la card "Próxima/Siguiente", los
                 ocultamos aquí para no duplicar info. */}
@@ -743,19 +770,9 @@ const ConsultasPage = () => {
                 Ver Expediente Completo
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="selected-detail-panel selected-detail-panel--empty">
-            <div className="consultas-empty-state">
-              <h3 className="consultas-empty-state__title">Detalle de cita</h3>
-              <p className="consultas-empty-state__text">
-                {agendaIsEmpty
-                  ? 'Cuando agregues citas, podrás ver aquí motivo, servicios y totales.'
-                  : 'Selecciona una cita para ver su información completa.'}
-              </p>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* --- COLUMNA DERECHA --- */}

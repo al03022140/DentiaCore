@@ -180,7 +180,7 @@ exports.getAllAppointments = async (req, res) => {
     try {
         await transitionPastDue();
 
-        const { from, to, doctor_id, estado } = req.query;
+        const { from, to, doctor_id, paciente_id, estado } = req.query;
         const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
         const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
@@ -192,6 +192,10 @@ exports.getAllAppointments = async (req, res) => {
         }
         if (doctor_id && mongoose.Types.ObjectId.isValid(doctor_id)) {
             filter.doctor_id = doctor_id;
+        }
+        // BUG-B7: filtro por paciente (evita traer todas las citas al cliente)
+        if (paciente_id && mongoose.Types.ObjectId.isValid(paciente_id)) {
+            filter.paciente_id = paciente_id;
         }
         if (estado && ESTADOS_VALIDOS.includes(estado)) {
             filter.estado = estado;

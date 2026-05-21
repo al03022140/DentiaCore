@@ -50,29 +50,41 @@
 .patient-evolution-note__form {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr; /* Procedimiento | Observaciones | Correcciones */
-  gap: 12px;
+  gap: var(--spacing-md);
   align-items: stretch;
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-lg);
 }
 
-/* Each form-row uses Montserrat and full width inside its grid cell */
+/* Each form-row is its own subtle card to separate the three fields visually */
 .patient-evolution-note__form .form-row {
   font-family: var(--font-family-primary);
   min-width: 0; /* allow shrinking without overflow */
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.patient-evolution-note__form .form-row:focus-within {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12);
 }
 
 .patient-evolution-note__form .form-row label {
   display: block;
-  font: var(--pd-font-label-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-black);
-  margin-bottom: 4px;
+  font: var(--pd-font-label-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--spacing-xs);
 }
 
-/* Ensure textareas and inputs use Montserrat and wrap text */
+/* Textareas: Montserrat, wrap text, capped height with internal scroll */
 .patient-evolution-note__form .form-row .ant-input,
 .patient-evolution-note__form .form-row .ant-input-textarea,
 .patient-evolution-note__form .form-row .ant-input-textarea textarea {
@@ -80,9 +92,34 @@
   white-space: pre-wrap;
   word-wrap: break-word;
   word-break: break-word;
-  min-height: 120px;
+  min-height: 110px;
+  max-height: 220px;
   height: 100%;
   flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  resize: none;
+  box-shadow: none !important;
+  overflow-y: auto;
+}
+
+.patient-evolution-note__form .form-row .ant-input-textarea textarea:focus,
+.patient-evolution-note__form .form-row .ant-input:focus {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Custom scrollbar for textareas — subtle so it doesn't clutter */
+.patient-evolution-note__form .form-row .ant-input-textarea textarea::-webkit-scrollbar {
+  width: 6px;
+}
+.patient-evolution-note__form .form-row .ant-input-textarea textarea::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 999px;
+}
+.patient-evolution-note__form .form-row .ant-input-textarea textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-light);
 }
 
 /* Actions aligned to the right under the grid (span full row) */
@@ -90,6 +127,8 @@
   grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 /* History */
@@ -101,48 +140,187 @@
   padding-bottom: var(--spacing-sm);
 }
 
-/* Prevent horizontal overflow on table, but prefer vertical growth */
-.patient-evolution-note__table-wrapper {
-  overflow-x: auto;
+/* ---------------------------------------------------------------------
+   Historial como tarjetas expandibles
+   Reemplaza la tabla densa para que notas largas sean fáciles de leer.
+   --------------------------------------------------------------------- */
+.patient-evolution-note__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
 }
 
-.patient-evolution-note__table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed; /* enable cell wrapping and fixed layout */
-}
-
-.patient-evolution-note__table th,
-.patient-evolution-note__table td {
+.evolution-note-card {
+  background: var(--color-bg-white);
   border: 1px solid var(--color-border-light);
-  padding: 8px;
-  text-align: left;
+  border-left: 3px solid var(--color-primary-light);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.evolution-note-card:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 2px 8px rgba(8, 72, 136, 0.06);
+}
+
+.evolution-note-card.is-expanded {
+  border-left-color: var(--color-primary);
+  box-shadow: 0 2px 12px rgba(8, 72, 136, 0.08);
+}
+
+/* Header: # + fecha en izquierda · firmas en derecha */
+.evolution-note-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px dashed var(--color-border-light);
+}
+
+.evolution-note-card__id {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  flex: 1;
+}
+
+.evolution-note-card__num {
+  font: var(--pd-font-body-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.evolution-note-card__date {
+  font: var(--pd-font-label-sm);
+  color: var(--color-text-muted);
+  letter-spacing: 0.01em;
+}
+
+.evolution-note-card__sigs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.evolution-note-card__sig-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.evolution-note-card__sig-label {
+  font: var(--pd-font-label-sm);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Body: lista de campos (procedimiento, observaciones, correcciones) */
+.evolution-note-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.evolution-note-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evolution-note-card__field--correcciones {
+  padding-top: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+  border-top: 1px dashed var(--color-border-light);
+}
+
+.evolution-note-card__field-label {
+  font: var(--pd-font-label-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.evolution-note-card__field-text {
+  font: var(--pd-font-body-md);
+  color: var(--color-text-primary);
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+/* Truncado a 2 líneas en estado colapsado */
+.evolution-note-card__field-text.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.evolution-note-card__empty {
   font: var(--pd-font-body-md);
+  color: var(--color-text-light);
+  font-style: italic;
+  margin: 0;
 }
 
-.patient-evolution-note__table thead th {
-  background: var(--color-neutral-50);
+/* Toggle Ver más / Ver menos */
+.evolution-note-card__toggle {
+  margin-top: var(--spacing-sm);
+  background: transparent;
+  border: none;
+  padding: var(--spacing-xs) 0;
+  color: var(--color-primary);
+  font: var(--pd-font-label-md);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-black);
+  cursor: pointer;
+  align-self: flex-start;
+  border-radius: var(--border-radius-sm);
+  transition: color 0.15s ease;
 }
 
-/* Hacer más bolder la información del historial (manteniendo color) */
-.patient-evolution-note__table tbody td {
-  font-weight: var(--font-weight-normal);
-  color: var(--color-neutral-680); /* color para datos guardados */
+.evolution-note-card__toggle:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
 }
 
-/* Mantener el mensaje de "sin datos" con peso normal */
-.patient-evolution-note__table tbody td.no-data {
-  font-weight: var(--font-weight-normal);
+.evolution-note-card__toggle:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
 }
 
-.patient-evolution-note__table .no-data {
+/* Estado vacío */
+.evolution-note-card--empty-state {
   text-align: center;
   color: var(--color-text-light);
+  font: var(--pd-font-body-md);
+  border-left-color: var(--color-border-light);
+  padding: var(--spacing-xl);
+}
+
+/* Responsive: en pantallas pequeñas el header se apila */
+@media (max-width: 640px) {
+  .evolution-note-card {
+    padding: var(--spacing-md);
+  }
+  .evolution-note-card__sigs {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* Responsive: stack fields vertically on small screens */

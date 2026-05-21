@@ -63,3 +63,15 @@ export const getSessionHistory = async ({ skip = 0, limit = 30, from, to } = {})
   const { data } = await API.get(`/cash/sessions${qs ? `?${qs}` : ''}`);
   return data;
 };
+
+// BUG-B14: detectar sesiones huérfanas (OPEN > 24h, CLOSING > 1h)
+export const getStaleSessions = async () => {
+  const { data } = await API.get('/cash/sessions/stale');
+  return data;
+};
+
+// BUG-B3: forzar cierre de sesión colgada
+export const forceResolveSession = async (sessionId) => {
+  const { data } = await API.post(`/cash/sessions/${encodeURIComponent(sessionId)}/force-resolve`);
+  return data;
+};

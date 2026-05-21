@@ -10,14 +10,11 @@ import {
 } from '@ant-design/icons';
 import { getLastMovements, updateMovement } from '../../shared/services/cashService';
 
+import { formatMoney } from '../../shared/utils/money';
+
 const { Text } = Typography;
 
-const formatCOP = (amount) =>
-  new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0
-  }).format(amount || 0);
+const formatMXN = (amount) => formatMoney(amount, { showDecimals: false });
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';
@@ -36,7 +33,7 @@ const describeChanges = (changes) => {
   };
   const formatVal = (field, val) => {
     if (val === null || val === undefined || val === '') return '—';
-    if (field === 'amount') return formatCOP(val);
+    if (field === 'amount') return formatMXN(val);
     if (field === 'paymentMethod') return val === 'CASH' ? 'Efectivo' : 'Digital';
     return String(val);
   };
@@ -194,7 +191,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
                       </span>
                       <span className={item.type === 'INCOME' ? 'movement-amount-income' : 'movement-amount-expense'}>
                         {item.type === 'INCOME' ? '+' : '−'}
-                        {formatCOP(item.amount)}
+                        {formatMXN(item.amount)}
                       </span>
                     </div>
                   }
