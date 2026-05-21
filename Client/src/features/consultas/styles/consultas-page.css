@@ -25,18 +25,14 @@
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
   padding: 0;
-  /* Antes: height:100% + overflow:hidden hacían que cuando la card de
-     "Próxima cita" crecía, el panel "Detalle de Cita" quedaba empujado
-     fuera de la columna y nunca se veía. Ahora dejamos que la página
-     crezca a su contenido y el .content padre hace scroll vertical. */
-  min-height: 100%;
+  height: 100%;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   font: var(--figma-text-body-regular);
   color: var(--figma-text-primary);
   background-color: transparent;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* ── COLUMNA IZQUIERDA ── */
@@ -44,6 +40,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  height: 100%;
+  overflow: hidden;
   min-width: 0;
 }
 
@@ -71,12 +69,18 @@
   border-radius: var(--figma-radius-lg); /* 14px */
   border: 1px solid var(--figma-border-default);
   box-shadow: var(--figma-shadow-card);
-  padding: 1.1rem 1.25rem;
+  padding: 0.75rem 1rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.5rem;
   flex-shrink: 0;
+  /* Tope duro: la card nunca ocupa más del 42 % de la columna.
+     El porcentaje resuelve contra .consultas-left que tiene height:100%.
+     Si el contenido excede el tope la card scrollea internamente y el
+     panel "Detalle de Cita" siempre recibe el 58 % restante. */
+  max-height: 42%;
+  overflow-y: auto;
   transition:
     box-shadow var(--figma-transition-fast),
     border-color var(--figma-transition-fast);
@@ -131,9 +135,9 @@
 }
 
 .next-patient-avatar {
-  width: 64px;   /* spec: avatar de patient card */
-  height: 64px;
-  border-radius: var(--figma-radius-full); /* 9999px */
+  width: 48px;
+  height: 48px;
+  border-radius: var(--figma-radius-full);
   object-fit: cover;
   flex-shrink: 0;
   background: var(--figma-bg-input);
@@ -146,17 +150,17 @@
 
 .next-patient-info h2 {
   font-family: var(--font-family-primary);
-  font-size: 1.25rem; /* 20px — H2 */
+  font-size: 1.0625rem; /* 17px */
   font-weight: var(--font-weight-medium);
-  color: var(--color-primary); /* Acento #084888 */
+  color: var(--color-primary);
   letter-spacing: -0.01em;
-  margin: 0 0 0.2rem 0;
-  line-height: 1.3;
+  margin: 0 0 0.1rem 0;
+  line-height: 1.25;
 }
 
 .next-patient-time {
   font-family: var(--font-family-primary);
-  font-size: 0.875rem; /* 14px label */
+  font-size: 0.75rem; /* 12px */
   font-weight: var(--font-weight-medium);
   color: var(--figma-text-secondary);
   display: block;
@@ -167,14 +171,14 @@
 .badge-status {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.7rem;
-  border-radius: var(--figma-radius-full); /* 9999px */
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--figma-radius-full);
   font-family: var(--font-family-primary);
-  font-size: 0.6875rem; /* 11px — caption micro */
+  font-size: 0.6875rem; /* 11px */
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-top: 0.45rem;
+  margin-top: 0.15rem;
   line-height: 1.4;
 }
 
@@ -214,34 +218,40 @@
 /* ── Bloque "motivo / procedimiento" ── */
 .next-patient-reason {
   background: var(--figma-bg-input);
-  padding: 0.7rem 0.85rem;
-  border-radius: var(--figma-radius-sm); /* 8px */
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--figma-radius-sm);
   font-family: var(--font-family-primary);
-  font-size: 0.875rem; /* 14px body */
+  font-size: 0.8125rem; /* 13px */
   color: var(--figma-text-secondary);
-  line-height: 1.5;
+  line-height: 1.4;
+  /* Clamp a 2 líneas para evitar bloques muy altos con texto largo */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .next-patient-reason strong {
-  display: block;
-  margin-bottom: 0.2rem;
+  /* Label inline con el texto — ahorra la línea extra de la etiqueta */
+  display: inline;
+  margin-right: 0.25rem;
   color: var(--figma-text-primary);
   font-weight: var(--font-weight-semibold);
-  font-size: 0.75rem; /* 12px label */
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 /* ── CTA primaria: INICIAR CONSULTA ── */
 .start-consultation-btn {
-  background-color: var(--color-primary); /* #084888 */
+  background-color: var(--color-primary);
   color: var(--figma-text-on-dark);
   border: none;
-  padding: 0.65rem 1.25rem;
-  border-radius: var(--figma-radius-md); /* 10px — botón hero */
+  padding: 0.45rem 1rem;
+  border-radius: var(--figma-radius-md);
   cursor: pointer;
   font-family: var(--font-family-primary);
-  font-size: 0.875rem; /* 14px label */
+  font-size: 0.8125rem; /* 13px */
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -250,7 +260,7 @@
     box-shadow var(--figma-transition-fast),
     background-color var(--figma-transition-fast);
   width: 100%;
-  margin-top: 0.35rem;
+  margin-top: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
@@ -267,8 +277,8 @@
 
 .next-patient-actions {
   display: flex;
-  gap: 0.65rem;
-  margin-top: 0.4rem;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
 }
 
 .next-patient-actions .start-consultation-btn {
@@ -280,12 +290,12 @@
 .confirm-appointment-btn {
   background: var(--figma-bg-card);
   color: var(--color-primary);
-  border: 2px solid var(--color-primary); /* spec: outline 2px botones secundarios */
-  padding: 0.5rem 1.1rem;
+  border: 2px solid var(--color-primary);
+  padding: 0.35rem 0.9rem;
   border-radius: var(--figma-radius-md);
   cursor: pointer;
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: var(--font-weight-medium);
   transition: all var(--figma-transition-fast);
   letter-spacing: 0.01em;
@@ -309,11 +319,11 @@
   background: var(--figma-bg-card);
   color: var(--color-primary);
   border: 2px solid var(--color-primary);
-  padding: 0.5rem 1.1rem;
+  padding: 0.35rem 0.9rem;
   border-radius: var(--figma-radius-md);
   cursor: pointer;
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.01em;
   transition: all var(--figma-transition-fast);
@@ -368,12 +378,11 @@
   box-shadow: var(--figma-shadow-card);
   padding: 1.25rem;
   box-sizing: border-box;
-  flex: 1 0 auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  /* min-height fijo para que el panel nunca colapse a cero cuando la card
-     de "Próxima cita" crece y la columna izquierda tenga que scrollear. */
-  min-height: 18rem;
+  min-height: 0;
+  overflow-y: auto;
   transition: box-shadow var(--figma-transition-fast);
 }
 
@@ -1061,12 +1070,12 @@
   }
 
   .next-patient-avatar {
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
   }
 
   .next-patient-info h2 {
-    font-size: 1.0625rem;
+    font-size: 1rem;
   }
 }
 
