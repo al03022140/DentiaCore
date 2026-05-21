@@ -177,12 +177,18 @@ export const prepareDataSource = (data, prefix = 'ds') => {
     return [];
   }
   return data.map((item, idx) => {
-    const rawDiente  = item.diente ?? item.tooth ?? 'N/A';
+    // Para entradas de espacios inter-dentales el identificador viene en
+    // `space:`; si no, usamos `tooth/diente`. `formatToothNumber` se
+    // encarga de transformar "1817" → "18-17" en ambos casos.
+    const rawDiente  = item.space ?? item.diente ?? item.tooth ?? 'N/A';
     const diente     = formatToothNumber(rawDiente);
     const rawTipo    = item.tipo   ?? item.damage ?? '';
+    const rawNote    = item.note   ?? item.nota   ?? '';
+    // Entrada sólo-nota (sin daño): mostramos la nota como tipo en lugar
+    // de "No especificado" para que el clínico vea qué hay en esa pieza.
     const tipo       = rawTipo
                         ? getDamageNameByCode(rawTipo)
-                        : 'No especificado';
+                        : (rawNote ? `Nota: ${rawNote}` : 'No especificado');
     const rawSurface = item.superficie ?? item.surface ?? 'O';
     const superficie = getSurfaceNameByCode(rawSurface);
     // La fecha la provee el servidor por entrada (savedAt del momento del guardado).
@@ -213,26 +219,83 @@ const normalizeText = (s) => String(s ?? '')
   .replace(/\s+/g, ' ')
   .trim();
 
-// Mapa nombre→código construido desde DAMAGE_NAMES + variantes localizadas que produce
-// `getDamageNameByCode` (con tildes/acentos quitados via normalizeText).
+// Tabla maestra: cada código tiene TODAS sus variantes de nombre que el
+// sistema haya podido escribir alguna vez. Se construye el mapa nombre→código
+// pasando cada string por `normalizeText` (lowercase + sin acentos), para
+// matchear contra lo que viene de BD sin importar capitalización ni tildes.
+//
+// Fuentes incluidas:
+//  - Menú del engine (`createMenuButton` en public/js/engine.js).
+//  - DAMAGE_NAMES local (nombres "cortos").
+//  - getDamageNameByCode (nombres "largos" cuando Constants está disponible).
+//  - commonDamageNames en odontogram-clinical-section.jsx.
+//  - Auto-formato `key.replace(/_/g,' ').toLowerCase()...` que la sección
+//    clínica aplica a constantes — esto genera nombres con los typos
+//    preservados de las constantes originales (EDENTULOA_TOTAL → "Edentuloa
+//    Total"; DIENTE_DISCR0MICO → "Diente Discr0Mico"; SEMI_IMPACTACI0N →
+//    "Semi Impactaci0N").
+//  - Variantes razonables con/sin tilde, con/sin punto, plural/singular.
+const DAMAGE_ALIASES_BY_CODE = {
+  1:  ['Caries'],
+  2:  ['Corona', 'Corona Def.', 'Corona Def', 'Corona Definitiva'],
+  3:  ['Corona Temp.', 'Corona Temp', 'Corona Temporal', 'Corona (Temp)'],
+  4:  ['Ausente', 'Diente Ausente'],
+  5:  ['Fractura'],
+  6:  ['Implante'],
+  8:  ['Diastema'],
+  9:  ['Extrusión', 'Extrusion', 'Diente Extruido', 'Extruido'],
+  11: ['Empaste', 'Curación', 'Curacion'],
+  12: ['Prótesis Rem.', 'Prótesis Rem', 'Protesis Rem', 'Prótesis Removible', 'Protesis Removible'],
+  13: ['Migración', 'Migracion'],
+  14: ['Rotación', 'Rotacion', 'Giroversión', 'Giroversion'],
+  15: ['Fusión', 'Fusion'],
+  16: ['Remanente R.', 'Remanente R', 'Remanente Radicular'],
+  17: ['Macrodoncia'],
+  18: ['Microdoncia'],
+  19: ['Impactado', 'Impactación', 'Impactacion'],
+  20: ['Intrusión', 'Intrusion', 'Diente Intruido', 'Intruido'],
+  21: ['Ectópico', 'Ectopico', 'Diente Ectópico', 'Diente Ectopico'],
+  // DISCROMICO en la constante está escrita como DIENTE_DISCR0MICO (con cero),
+  // así que el formateo automático produce "Diente Discr0Mico".
+  22: ['Discrómico', 'Discromico', 'Diente Discrómico', 'Diente Discromico',
+       'Diente Discr0mico', 'Discr0mico'],
+  23: ['Endodoncia'],
+  24: ['No Erupcionado', 'Diente en Erupción', 'Diente en Erupcion', 'Diente En Erupcion'],
+  25: ['Transposición', 'Transposicion', 'Transposición Izquierda',
+       'Transposicion Izquierda', 'Transposicion Left'],
+  26: ['Transposición Derecha', 'Transposicion Derecha', 'Transposicion Right'],
+  27: ['Supernumerario', 'Super Numerario'],
+  28: ['Daño Pulpar', 'Dano Pulpar', 'Pulpar'],
+  29: ['Carilla'],
+  30: ['Poste', 'Perno Muñón', 'Perno Munon'],
+  // EDENTULOA_TOTAL (con typo en la constante) → "Edentuloa Total"
+  31: ['Edéntulo', 'Edentulo', 'Edéntulismo', 'Edentulismo',
+       'Edéntulo Total', 'Edentulo Total', 'Edentuloa Total'],
+  32: ['Orto. Fijo', 'Orto Fijo', 'Ortodóntico Fijo', 'Ortodontico Fijo',
+       'Ortodóntico Fijo (Extremo)', 'Ortodontico Fijo (Extremo)',
+       'Ortodontico Fijo End'],
+  33: ['Ortodóntico Fijo (Centro)', 'Ortodontico Fijo (Centro)',
+       'Ortodontico Fijo Center'],
+  34: ['Prótesis Fija', 'Protesis Fija',
+       'Prótesis Fija (Izquierda)', 'Protesis Fija (Izquierda)',
+       'Protesis Fija Left'],
+  35: ['Prótesis Fija (Centro)', 'Protesis Fija (Centro)', 'Protesis Fija Center'],
+  36: ['Prótesis Fija (Derecha)', 'Protesis Fija (Derecha)', 'Protesis Fija Right'],
+  37: ['Desgastado', 'Superficie Desgastada'],
+  // SEMI_IMPACTACI0N (con cero) → "Semi Impactaci0N"
+  38: ['Semi-Impactado', 'Semi Impactado',
+       'Semi-Impactación', 'Semi-Impactacion',
+       'Semi Impactaci0n', 'Semi-Impactaci0n'],
+};
+
 const DAMAGE_NAME_TO_CODE = (() => {
   const map = {};
-  Object.entries(DAMAGE_NAMES).forEach(([code, name]) => {
-    map[normalizeText(name)] = Number(code);
+  Object.entries(DAMAGE_ALIASES_BY_CODE).forEach(([code, names]) => {
+    names.forEach(name => {
+      const key = normalizeText(name);
+      if (key) map[key] = Number(code);
+    });
   });
-  const aliases = {
-    'corona definitiva': 2, 'corona temporal': 3, 'diente ausente': 4,
-    'diente extruido': 9, 'protesis removible': 12, 'giroversion': 14,
-    'remanente radicular': 16, 'impactacion': 19, 'diente intruido': 20,
-    'diente ectopico': 21, 'diente discromico': 22, 'diente en erupcion': 24,
-    'transposicion izquierda': 25, 'transposicion derecha': 26,
-    'pulpar': 28, 'perno munon': 30, 'edentulo total': 31,
-    'ortodontico fijo (extremo)': 32, 'ortodontico fijo (centro)': 33,
-    'protesis fija': 34, 'protesis fija (izquierda)': 34,
-    'protesis fija (centro)': 35, 'protesis fija (derecha)': 36,
-    'superficie desgastada': 37, 'semi-impactacion': 38,
-  };
-  Object.entries(aliases).forEach(([k, v]) => { map[normalizeText(k)] = v; });
   return map;
 })();
 
@@ -259,12 +322,18 @@ export const damageToCode = (rawDamage) => {
 /**
  * Normaliza un conjunto de entradas para alimentar `engine.loadOdontogramaData`:
  *  - Acepta diente/tooth y daño/damage en código o nombre localizado.
- *  - Filtra entradas inválidas (sin diente o daño irreconocible).
- *  - Deduplica por (diente, código de daño, superficie).
+ *  - Soporta también el campo `space:` para daños inter-dentales (IDs de
+ *    4 dígitos como "1817" que el engine resuelve por `getSpaceById`).
+ *  - Conserva entradas sólo-nota (con `note` no vacío aunque `damage` sea
+ *    vacío o irreconocible): el engine las usa para repoblar el textBox
+ *    del diente.
+ *  - Filtra entradas que no tengan ni diente/espacio ni nada que aplicar
+ *    (sin daño, sin superficie y sin nota).
+ *  - Deduplica por (diente|espacio, código de daño, superficie, nota).
  *  - La fecha es opcional: si no viene, se omite y el engine usará la fecha actual.
  *
  * @param {Array} entries - Datos crudos (e.g. response del servidor, tabla UI, import).
- * @returns {Array<{tooth:string, damage:string, surface:string, note:string, fecha?:string}>}
+ * @returns {Array<{tooth?:string, space?:string, damage:string, surface:string, note:string, fecha?:string}>}
  */
 export const normalizeEntriesForEngine = (entries) => {
   if (!Array.isArray(entries)) return [];
@@ -272,20 +341,30 @@ export const normalizeEntriesForEngine = (entries) => {
   const out = [];
   for (const item of entries) {
     if (!item || typeof item !== 'object') continue;
-    const tooth = String(item.tooth ?? item.diente ?? '').trim();
-    if (!tooth) continue;
+    const rawSpace = String(item.space ?? '').trim();
+    const rawTooth = String(item.tooth ?? item.diente ?? '').trim();
+    // Una entrada debe identificar un objetivo: diente o espacio.
+    if (!rawSpace && !rawTooth) continue;
     const damageCode = damageToCode(item.damage ?? item.tipo);
-    if (damageCode == null) continue;
+    const note = String(item.note ?? item.nota ?? '');
     const surface = String(item.surface ?? item.superficie ?? '0').trim() || '0';
-    const dedupKey = `${tooth}|${damageCode}|${surface}`;
+    // Si no hay daño identificable y tampoco nota, no hay nada que aplicar.
+    if (damageCode == null && !note) continue;
+    const damageStr = damageCode == null ? '' : String(damageCode);
+    const targetKey = rawSpace ? `s:${rawSpace}` : `t:${rawTooth}`;
+    const dedupKey = `${targetKey}|${damageStr}|${surface}|${note}`;
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     const normalized = {
-      tooth,
-      damage: String(damageCode),
+      damage: damageStr,
       surface,
-      note: String(item.note ?? item.nota ?? ''),
+      note,
     };
+    if (rawSpace) {
+      normalized.space = rawSpace;
+    } else {
+      normalized.tooth = rawTooth;
+    }
     const fecha = item.fecha ?? item.date;
     if (fecha) normalized.fecha = fecha;
     out.push(normalized);

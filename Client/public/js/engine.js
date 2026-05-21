@@ -1554,15 +1554,20 @@ Engine.prototype.getData = function () {
         }
 
         // Helper function to process spaces data
+        // Importante: usamos `space:` (no `tooth:`) para que `loadOdontogramaData`
+        // pueda enrutar la entrada al lookup de espacios y no intente buscar
+        // un diente con ID de 4 dígitos. La normalización en
+        // `normalizeEntriesForEngine` preserva este campo intacto.
         const processSpaces = (spaces) => {
             spaces.forEach(space => {
                 space.damages.forEach(damage => {
                     list.push({
-                        tooth: space.id,
-                        damage: damage.id,
+                        space: space.id,
+                        damage: (damage && damage.id != null) ? damage.id.toString() : "",
                         diagnostic: "",
                         surface: "0",
-                        note: ""
+                        note: "",
+                        fecha: damage.fecha || getCurrentDateFormatted()
                     });
                 });
             });
@@ -1986,25 +1991,20 @@ Engine.prototype.start = function () {
  */
 Engine.prototype.getToothById = function (id) {
     "use strict";
-    var tooth;
-
-    for (var i = 0; i < this.mouth.length; i++) {
-
-        if (this.mouth[i].id === id) {
-
-            tooth = this.mouth[i];
-            // ---> DEBUG LOG <---
-            console.log(`[Engine.getToothById] Found tooth for ID: ${id}. Instance:`, tooth);
-            console.log(`[Engine.getToothById] Prototype of found tooth:`, Object.getPrototypeOf(tooth));
-            console.log(`[Engine.getToothById] tooth.refresh exists?`, typeof tooth?.refresh === 'function');
-            // ------------------
-            break;
-
+    // Buscar en ambas denticiones (adulta y deciduo). Los IDs FDI no se
+    // solapan entre permanentes (11-48) y temporales (51-85), así que la
+    // búsqueda es segura sin importar qué vista esté activa.
+    var pools = [this.mouth, this.odontAdult, this.odontChild];
+    for (var p = 0; p < pools.length; p++) {
+        var pool = pools[p];
+        if (!Array.isArray(pool)) continue;
+        for (var i = 0; i < pool.length; i++) {
+            if (pool[i] && pool[i].id === id) {
+                return pool[i];
+            }
         }
     }
-
-    return tooth;
-
+    return undefined;
 };
 
 /**
@@ -2014,20 +2014,20 @@ Engine.prototype.getToothById = function (id) {
  */
 Engine.prototype.getSpaceById = function (id) {
     "use strict";
-    var space;
-
-    for (var i = 0; i < this.spaces.length; i++) {
-
-        if (this.spaces[i].id === id) {
-
-            space = this.spaces[i];
-            break;
-
+    // Buscar en ambos sets de espacios (adulto y deciduo). Necesario al
+    // cargar registros guardados: un daño inter-dental puede pertenecer a
+    // cualquiera de las dos denticiones independientemente de la vista activa.
+    var pools = [this.spaces, this.odontSpacesAdult, this.odontSpacesChild];
+    for (var p = 0; p < pools.length; p++) {
+        var pool = pools[p];
+        if (!Array.isArray(pool)) continue;
+        for (var i = 0; i < pool.length; i++) {
+            if (pool[i] && pool[i].id === id) {
+                return pool[i];
+            }
         }
     }
-
-    return space;
-
+    return undefined;
 };
 
 /**
@@ -2278,8 +2278,19 @@ Engine.prototype.loadOdontogramaData = function(data) {
                     return;
                 }
 
-                const targetTooth = this.getToothById(toothId);
+                let targetTooth = this.getToothById(toothId);
+                // Fallback a espacio inter-dental: registros legacy o emitidos
+                // por una versión previa del engine podían guardar daños de
+                // espacios bajo `tooth:` con IDs de 4 dígitos (p. ej. "1817").
+                // Reencaminamos esos casos al espacio correspondiente para
+                // que no se pierdan silenciosamente en la carga.
                 if (!targetTooth) {
+                    const candidateSpace = this.getSpaceById(toothId);
+                    if (candidateSpace) {
+                        this.processSpace({ space: toothId, damage: item.damage });
+                        itemsProcessed++;
+                        return;
+                    }
                     console.warn(`[loadOdontogramaData] Tooth not found for ID ${toothId} in item ${index}`);
                     errors++;
                     return;
@@ -2291,6 +2302,17 @@ Engine.prototype.loadOdontogramaData = function(data) {
                 const note = item.note || "";
                 // Asegurarse de preservar la fecha original
                 const fecha = item.fecha || item.date;
+
+                // Sólo Caries (1) y Empaste (11) son daños de superficie reales —
+                // son los únicos estados que `drawCheckBoxes` sabe pintar. Datos
+                // legacy podían quedar con `surface: 'O'` por el default del schema
+                // (ver Server/models/odontograma.js); si tratábamos esos como
+                // superficie, el daño se marcaba en el checkbox y `drawCheckBoxes`
+                // no lo dibujaba — el daño desaparecía visualmente (ej: Edéntulo
+                // 31, Pulpar 28). Para evitarlo, decidimos por código de daño,
+                // no por presencia de `surface`.
+                const damageCodeForRouting = parseInt(damageType, 10);
+                const isSurfaceLevelDamage = damageCodeForRouting === 1 || damageCodeForRouting === 11;
 
                 // Prioridad: Nota si existe y no hay daño específico
                 if (note && !damageType) {
@@ -2304,14 +2326,15 @@ Engine.prototype.loadOdontogramaData = function(data) {
                         targetTooth.textBox.fecha = getCurrentDateFormatted();
                     }
                     itemsProcessed++;
-                } 
-                // Daño de superficie (incluyendo Empaste)
-                else if (surface && surface !== "0") {
+                }
+                // Daño de superficie real: sólo Caries y Empaste, y sólo cuando
+                // la superficie es una de las 5 válidas (no "0" ni 'O' por default).
+                else if (isSurfaceLevelDamage && surface && surface !== "0") {
                     console.log(`[loadOdontogramaData] Applying surface damage to tooth ${toothId}, surface ${surface}, type ${damageType}`);
                     this.processSurfaceDamage(targetTooth, toothId, surface, damageType, fecha);
                     itemsProcessed++;
-                } 
-                // Daño general del diente (solo si no es Empaste)
+                }
+                // Daño general del diente (todo lo que no sea Empaste de superficie)
                 else if (damageType && damageType !== "11") {
                     console.log(`[loadOdontogramaData v4] Applying general tooth damage to tooth ${toothId}, type ${damageType}`);
                     
