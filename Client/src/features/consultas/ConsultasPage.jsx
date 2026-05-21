@@ -419,39 +419,48 @@ const ConsultasPage = () => {
           </div>
         ) : nextPatient ? (
           <div className="next-patient-card">
+            {/* ── Fila 1: avatar · nombre · badge ── */}
             <div className="next-patient-header">
               <img
                 src={getPatientImage(nextPatient) || userNot}
                 alt={getPatientName(nextPatient)}
                 className={`next-patient-avatar${getPatientImage(nextPatient) ? '' : ' profile-default-avatar'}`}
+                width="40" height="40"
                 onError={e => {
                   e.target.src = userNot;
                   e.target.classList.add('profile-default-avatar');
                 }}
               />
               <div className="next-patient-info">
+                <div className="next-patient-info-row">
+                  <h2>{getPatientName(nextPatient)}</h2>
+                  <span className={`badge-status ${statusMap[nextPatient.estado]?.cssClass || 'waiting'}`}>
+                    {statusMap[nextPatient.estado]?.label || nextPatient.estado}
+                  </span>
+                </div>
                 <span className="next-patient-time">
-                  {nextPatient.estado === 'EnCurso' ? 'En curso' : 'Siguiente'}: {formatTime(nextPatient.fecha_hora)} hrs
-                </span>
-                <h2>{getPatientName(nextPatient)}</h2>
-                <span className={`badge-status ${statusMap[nextPatient.estado]?.cssClass || 'waiting'}`}>
-                  {statusMap[nextPatient.estado]?.label || nextPatient.estado}
+                  {nextPatient.estado === 'EnCurso' ? 'En curso' : 'Siguiente'} · {formatTime(nextPatient.fecha_hora)} hrs
                 </span>
               </div>
             </div>
 
-            <div className="next-patient-reason">
-              <strong>Motivo de visita:</strong>
-              {nextPatient.motivo}
-            </div>
-
-            {nextPatient.comentarioProcedimiento && (
-              <div className="next-patient-reason">
-                <strong>Procedimiento:</strong>
-                {nextPatient.comentarioProcedimiento}
+            {/* ── Fila 2: chips motivo / procedimiento ── */}
+            {(nextPatient.motivo || nextPatient.comentarioProcedimiento) && (
+              <div className="next-patient-chips">
+                {nextPatient.motivo && (
+                  <span className="next-patient-chip">
+                    <strong>Motivo:</strong> {nextPatient.motivo}
+                  </span>
+                )}
+                {nextPatient.comentarioProcedimiento && (
+                  <span className="next-patient-chip">
+                    <strong>Proc.:</strong> {nextPatient.comentarioProcedimiento}
+                  </span>
+                )}
               </div>
             )}
 
+            {/* ── Fila 3: acciones ── */}
             <div className="next-patient-actions">
               {(nextPatient.estado === 'Pendiente' || nextPatient.estado === 'Confirmada' || nextPatient.estado === 'EnCurso') && (
                 <button
@@ -460,7 +469,7 @@ const ConsultasPage = () => {
                   onClick={() => handleStartConsultation(nextPatient)}
                   disabled={busyId === nextPatient._id}
                 >
-                  {nextPatient.estado === 'EnCurso' ? 'CONTINUAR CONSULTA' : 'INICIAR CONSULTA AHORA'}
+                  {nextPatient.estado === 'EnCurso' ? 'Continuar consulta' : 'Iniciar consulta'}
                 </button>
               )}
               {nextPatient.estado === 'EnCurso' && (
@@ -470,7 +479,7 @@ const ConsultasPage = () => {
                   onClick={() => openEndConsultation(nextPatient)}
                   disabled={busyId === nextPatient._id}
                 >
-                  Terminar consulta
+                  Terminar
                 </button>
               )}
               {nextPatient.estado === 'Pendiente' && (

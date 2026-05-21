@@ -131,40 +131,99 @@
 .next-patient-header {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.75rem;
 }
 
+/* Avatar: forzamos tamaño vía atributos HTML + CSS para ganar sobre el
+   SVG que tiene width="100" height="100" en el archivo fuente */
 .next-patient-avatar {
-  width: 48px;
-  height: 48px;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
   border-radius: var(--figma-radius-full);
   object-fit: cover;
   flex-shrink: 0;
   background: var(--figma-bg-input);
+  display: block;
 }
 
 .next-patient-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
-.next-patient-info h2 {
+/* Nombre + badge en la misma fila */
+.next-patient-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.next-patient-info-row h2 {
   font-family: var(--font-family-primary);
-  font-size: 1.0625rem; /* 17px */
-  font-weight: var(--font-weight-medium);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
   letter-spacing: -0.01em;
-  margin: 0 0 0.1rem 0;
-  line-height: 1.25;
+  margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Badge en la misma fila que el nombre — quitar margin-top */
+.next-patient-info-row .badge-status {
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 .next-patient-time {
   font-family: var(--font-family-primary);
   font-size: 0.75rem; /* 12px */
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-normal);
   color: var(--figma-text-secondary);
   display: block;
   letter-spacing: -0.005em;
+}
+
+/* ── Chips motivo / procedimiento ── */
+.next-patient-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.next-patient-chip {
+  display: block;
+  background: var(--figma-bg-input);
+  border-radius: var(--figma-radius-sm);
+  padding: 0.3rem 0.65rem;
+  font-family: var(--font-family-primary);
+  font-size: 0.8125rem;
+  color: var(--figma-text-secondary);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.next-patient-chip strong {
+  color: var(--figma-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.2rem;
 }
 
 /* ── Badges de estado (pill full-rounded) ── */
@@ -215,32 +274,7 @@
   opacity: 0.8;
 }
 
-/* ── Bloque "motivo / procedimiento" ── */
-.next-patient-reason {
-  background: var(--figma-bg-input);
-  padding: 0.45rem 0.75rem;
-  border-radius: var(--figma-radius-sm);
-  font-family: var(--font-family-primary);
-  font-size: 0.8125rem; /* 13px */
-  color: var(--figma-text-secondary);
-  line-height: 1.4;
-  /* Clamp a 2 líneas para evitar bloques muy altos con texto largo */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.next-patient-reason strong {
-  /* Label inline con el texto — ahorra la línea extra de la etiqueta */
-  display: inline;
-  margin-right: 0.25rem;
-  color: var(--figma-text-primary);
-  font-weight: var(--font-weight-semibold);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
+/* .next-patient-reason eliminado — reemplazado por .next-patient-chips/.next-patient-chip */
 
 /* ── CTA primaria: INICIAR CONSULTA ── */
 .start-consultation-btn {
