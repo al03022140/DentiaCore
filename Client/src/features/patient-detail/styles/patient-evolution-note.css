@@ -142,63 +142,61 @@
 
 /* ---------------------------------------------------------------------
    Historial como tarjetas expandibles
-   Reemplaza la tabla densa para que notas largas sean fáciles de leer.
+   Replica el lenguaje visual de .patient-detail__subsection (mismo
+   estilo que las cards de Evaluación ATM / Oclusal) — fondo blanco,
+   borde sutil, sin acentos de color. La jerarquía sale de la tipografía.
    --------------------------------------------------------------------- */
 .patient-evolution-note__cards {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
   margin-top: var(--spacing-sm);
 }
 
 .evolution-note-card {
   background: var(--color-bg-white);
-  border: 1px solid var(--color-border-light);
-  border-left: 3px solid var(--color-primary-light);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  border: 1px solid var(--color-neutral-500, var(--color-border-light));
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
 }
 
-.evolution-note-card:hover {
-  border-color: var(--color-primary-light);
-  box-shadow: 0 2px 8px rgba(8, 72, 136, 0.06);
-}
-
-.evolution-note-card.is-expanded {
-  border-left-color: var(--color-primary);
-  box-shadow: 0 2px 12px rgba(8, 72, 136, 0.08);
-}
-
-/* Header: # + fecha en izquierda · firmas en derecha */
+/* Header: título de la nota a la izquierda · firmas a la derecha */
 .evolution-note-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
   flex-wrap: wrap;
-  margin-bottom: var(--spacing-sm);
-  padding-bottom: var(--spacing-sm);
-  border-bottom: 1px dashed var(--color-border-light);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
-.evolution-note-card__id {
-  display: flex;
+.evolution-note-card__title {
+  font: var(--pd-font-section-h3);
+  color: var(--color-text-secondary);
+  margin: 0;
+  display: inline-flex;
   align-items: baseline;
   gap: var(--spacing-sm);
-  min-width: 0;
+  flex-wrap: wrap;
   flex: 1;
+  min-width: 0;
 }
 
 .evolution-note-card__num {
-  font: var(--pd-font-body-lg);
+  color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-primary);
-  line-height: 1;
+}
+
+.evolution-note-card__sep {
+  color: var(--color-text-light);
+  font-weight: var(--font-weight-normal);
 }
 
 .evolution-note-card__date {
-  font: var(--pd-font-label-sm);
+  font-size: 0.9em;
+  font-weight: var(--font-weight-normal);
   color: var(--color-text-muted);
   letter-spacing: 0.01em;
 }
@@ -226,44 +224,48 @@
   letter-spacing: 0.04em;
 }
 
-/* Body: lista de campos (procedimiento, observaciones, correcciones) */
+/* Body — patrón <p><strong>Label:</strong> texto</p>, igual que las
+   subsecciones de Evaluación ATM / Oclusal. Cada campo está separado del
+   siguiente por una línea gris sutil para diferenciarlos visualmente. */
 .evolution-note-card__body {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
 }
 
 .evolution-note-card__field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.evolution-note-card__field--correcciones {
-  padding-top: var(--spacing-sm);
-  margin-top: var(--spacing-xs);
-  border-top: 1px dashed var(--color-border-light);
-}
-
-.evolution-note-card__field-label {
-  font: var(--pd-font-label-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.evolution-note-card__field-text {
-  font: var(--pd-font-body-md);
+  font: var(--pd-font-section-body);
   color: var(--color-text-primary);
   margin: 0;
+  line-height: 1.55;
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.evolution-note-card__field:first-child {
+  padding-top: 0;
+}
+
+.evolution-note-card__field:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.evolution-note-card__field strong {
+  color: var(--color-text-black);
+  font-weight: var(--font-weight-semibold);
+  margin-right: 5px;
+}
+
+.evolution-note-card__value {
+  display: inline;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
-/* Truncado a 2 líneas en estado colapsado */
-.evolution-note-card__field-text.is-clamped {
+/* Truncado a 2 líneas en estado colapsado — aplicado al <p> entero
+   para que el <strong>Label:</strong> quede inline con el texto. */
+.evolution-note-card__field.is-clamped {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -271,8 +273,27 @@
   overflow: hidden;
 }
 
+/* Al expandir el valor crece pero con tope + scroll interno. */
+.evolution-note-card.is-expanded .evolution-note-card__field {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.evolution-note-card.is-expanded .evolution-note-card__field::-webkit-scrollbar {
+  width: 6px;
+}
+
+.evolution-note-card.is-expanded .evolution-note-card__field::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 999px;
+}
+
+.evolution-note-card.is-expanded .evolution-note-card__field::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-light);
+}
+
 .evolution-note-card__empty {
-  font: var(--pd-font-body-md);
+  font: var(--pd-font-section-body);
   color: var(--color-text-light);
   font-style: italic;
   margin: 0;
@@ -280,7 +301,7 @@
 
 /* Toggle Ver más / Ver menos */
 .evolution-note-card__toggle {
-  margin-top: var(--spacing-sm);
+  margin-top: var(--spacing-md);
   background: transparent;
   border: none;
   padding: var(--spacing-xs) 0;
@@ -307,8 +328,7 @@
 .evolution-note-card--empty-state {
   text-align: center;
   color: var(--color-text-light);
-  font: var(--pd-font-body-md);
-  border-left-color: var(--color-border-light);
+  font: var(--pd-font-section-body);
   padding: var(--spacing-xl);
 }
 
@@ -355,21 +375,27 @@
   color: #fff !important;
 }
 
-/* Miniaturas de firma en el historial — paciente y doctor */
+/* Miniaturas de firma en el historial — paciente y doctor
+   Dimensiones IDÉNTICAS en ambas. La caja siempre mide igual; la firma
+   interna se ajusta con object-fit: contain para que no se deforme aunque
+   las imágenes tengan distinta proporción nativa. */
 .patient-sig-thumb,
 .doctor-sig-thumb {
-  max-width: 90px;
-  max-height: 36px;
+  width: 140px;
+  height: 48px;
   display: block;
   border: 1px solid var(--color-border-light, #e2e8f0);
   background: #fff;
   padding: 2px;
+  object-fit: contain;
+  box-sizing: border-box;
 }
 
 .patient-sig-link,
 .doctor-sig-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
   position: relative;
 }

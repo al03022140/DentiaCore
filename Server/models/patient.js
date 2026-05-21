@@ -537,6 +537,12 @@ const PatientSchema = new mongoose.Schema({
         // SHA-256 del PNG de firma del doctor — mismo propósito que
         // pacienteFirmaImageHash.
         doctorFirmaImageHash: { type: String, default: null },
+        // Motivo de rechazo si un doctor rechaza la nota BORRADOR (vía
+        // draftController.rejectDraft). Persistido para que el creador
+        // (asistente) pueda ver por qué le rechazaron la nota.
+        rechazadoEn: { type: Date, default: null },
+        rechazadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+        rechazoMotivo: { type: String, default: null, trim: true, maxlength: 500 },
         // Soft-delete (NOM-004 Art. 5.4)
         deletedAt: { type: Date, default: null },
         deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },

@@ -548,17 +548,22 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             savedBy: req.user?.id || null
         };
 
-    // NOM-024: Los registros firmados son inmutables — solo se permiten addenda
+    // NOM-024: la inmutabilidad aplica a registros REALMENTE firmados
+    // (firmadoEn != null), no al campo `estado` que antes se auto-marcaba
+    // OFICIAL en cada save. El odontograma clínico es longitudinal: el
+    // doctor sigue agregando hallazgos durante la consulta y cada save
+    // queda en `history[]`. Solo al firmar con PIN vía signingController
+    // se cierra el registro.
     const existingClinic = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_CLINIC, deletedAt: null });
-    if (existingClinic && existingClinic.estado === 'OFICIAL') {
+    if (existingClinic && existingClinic.firmadoEn) {
       return res.status(403).json({
         success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico en estado OFICIAL. Use addendum para correcciones.' }
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico firmado. Use addendum para correcciones.' }
       });
     }
 
     // BORRADOR: solo el creador o un admin pueden modificar
-    if (existingClinic && existingClinic.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+    if (existingClinic && !isAdminRole(req.user?.role)) {
       if (existingClinic.creadoPor && existingClinic.creadoPor.toString() !== req.user?.id) {
         return res.status(403).json({
           success: false,
@@ -588,15 +593,13 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       }
     }
 
-    // Determinar estadoRegistro según permisos (asistente → BORRADOR)
-    const userPerms = getEffectivePermissions(req.user);
-    let estadoRegistro = 'OFICIAL';
-    if (!hasPermission(userPerms, ['odontogram.create']) && hasPermission(userPerms, ['odontogram.write.draft'])) {
-      estadoRegistro = 'BORRADOR';
-    }
-
+    // NO auto-OFICIAL: cada save mantiene/inicializa como BORRADOR. El
+    // tránsito a OFICIAL ocurre SÓLO al firmar con PIN vía POST /api/sign/
+    // (signingController), que es quien setea firmadoEn/firmadoPor/contentHash.
+    // Antes el controller marcaba OFICIAL en cada save aunque no hubiera
+    // firma real → disparaba 403 IMMUTABLE_RECORD al segundo guardado.
     const auditUpdate = {
-      estado: estadoRegistro,
+      estado: 'BORRADOR',
       modificadoPor: req.user?.id || null,
       modificadoEn: new Date()
     };
@@ -730,16 +733,18 @@ const deleteClinicalOdontogramState = async (req, res, next) => {
       });
     }
 
-    // NOM-024: Los registros OFICIAL no se pueden eliminar
-    if (doc.estado === 'OFICIAL') {
+    // NOM-024: los registros realmente firmados no se pueden eliminar.
+    // Antes el guard usaba `estado === 'OFICIAL'` pero ese campo se
+    // auto-marcaba en cada save sin firma real (ver saveClinicalHistoryEntries).
+    if (doc.firmadoEn) {
       return res.status(403).json({
         success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede eliminar un odontograma clínico en estado OFICIAL' }
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede eliminar un odontograma clínico firmado' }
       });
     }
 
     // BORRADOR: solo el creador o un admin pueden eliminar
-    if (doc.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+    if (!isAdminRole(req.user?.role)) {
       if (doc.creadoPor && doc.creadoPor.toString() !== req.user?.id) {
         return res.status(403).json({
           success: false,

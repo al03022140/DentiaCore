@@ -38,9 +38,12 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
     setError(null);
   };
 
-  // Función para confirmar y guardar el plan de tratamiento
+  // Función para confirmar y guardar el plan de tratamiento.
+  // Aceptamos "Confirmar" / "confirmar" indistintamente — el server
+  // normaliza con toLowerCase() así que ambos pasan. El placeholder sigue
+  // mostrando "Confirmar" para mantener la pista visual.
   const handleConfirmOk = async () => {
-    if (confirmationText !== 'Confirmar') {
+    if (confirmationText.trim().toLowerCase() !== 'confirmar') {
       message.warning("Debes escribir 'Confirmar' para guardar.");
       return;
     }
@@ -59,7 +62,12 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        confirmar: 'confirmar',
+        // El servidor exige `confirmar === 'confirmar'` (lowercase) tras
+        // trim+lowercase. Enviamos exactamente lo que el usuario escribió
+        // — no hardcodeamos, así la doble confirmación es real (antes el
+        // modal pedía "Confirmar" pero el payload llevaba siempre el string
+        // fijo, dejando la confirmación cosmética).
+        confirmar: confirmationText.trim(),
         ...(appointmentId ? { appointmentId } : {}),
       };
 

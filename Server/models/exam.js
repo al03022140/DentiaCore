@@ -64,6 +64,12 @@ const examSchema = new mongoose.Schema({
     firmaDesactualizada: { type: Boolean, default: false },
     integrityHash: { type: String, default: null },
     autorizadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    // Si un doctor rechaza un BORRADOR (vía draftController.rejectDraft) el
+    // motivo se persiste aquí para que el creador del borrador pueda verlo
+    // sin tener que bajar al AuditLog.
+    rechazadoEn: { type: Date, default: null },
+    rechazadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    rechazoMotivo: { type: String, default: null, trim: true, maxlength: 500 },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
     deleteReason: { type: String, default: null },

@@ -41,7 +41,10 @@ const MeasurementInput = memo(function MeasurementInput({
   } else if (value !== undefined && value !== null) {
     displayValue = value.toString();
   } else {
-    displayValue = '';
+    // Sin dato → '0'. Aplica a profundidad de sondaje y margen gingival:
+    // mantener consistencia visual con MiniInputCell (anchura encía) y evitar
+    // celdas en blanco cuando el diente nunca tuvo medición.
+    displayValue = '0';
   }
 
   const handleFocus = useCallback((e) => {
@@ -83,7 +86,15 @@ const MeasurementInput = memo(function MeasurementInput({
     const inputValue = e.target.value;
     setLocalValue(inputValue);
 
-    if (inputValue === '' || inputValue === '-' || inputValue === '+') {
+    if (inputValue === '') {
+      // Borrado completo: commitear 0 ya, no esperar al blur. Así, si el
+      // usuario hace clic en Guardar inmediatamente, se persiste el 0.
+      cancelAutoAdvance?.(inputKey);
+      onCommit?.(0);
+      return;
+    }
+    if (inputValue === '-' || inputValue === '+') {
+      // Estado intermedio de signo (rango -9..9): aún no commit.
       cancelAutoAdvance?.(inputKey);
       return;
     }

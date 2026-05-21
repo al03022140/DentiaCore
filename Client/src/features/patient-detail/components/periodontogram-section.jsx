@@ -373,68 +373,61 @@ const PeriodontogramSection = ({ patientId }) => {
     
     setPeriodontogramData(prev => {
       if (!prev) return prev;
-      
-      // CLONACIÓN PROFUNDA COMPLETA para garantizar nueva referencia
-      const updated = structuredClone(prev);
-      if (!updated.teeth) {
-        updated.teeth = {};
-      }
-      // Asegurar que el diente existe (inicialización perezosa, sin estructuras legacy ni 4-caras pre-creadas)
-      if (!updated.teeth[toothNumber]) {
-        updated.teeth[toothNumber] = {
-          available: true,
-          // Claves canónicas (es) y de UI (en) para visualizar y guardar sin perder datos
-          ausente: false,
-          absent: false,
-          implante: false,
-          implant: false,
-          pronostico: 'bueno',
-          prognosis: 'bueno',
-          mobility: MEASUREMENT_LIMITS.mobility.default,
-          movilidad: MEASUREMENT_LIMITS.mobility.default,
-          anchuraEncia: 0,
-          gumWidth: 0,
-          furca: { vestibular: 0, lingual: 0, mesial: 0 }
-          // Las métricas por cara se crearán solo cuando se editen (poda perezosa)
-        };
-      }
-      
-      // Manejar actualizaciones por cara y índice
-      if (side && index !== null) {
-        // Actualización de array específico en una cara (solo estructura de 4 caras por campo)
-        const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
-        const targetFace = side === 'vestibular'
-          ? (isUpperTooth ? 'vestibularSuperior' : 'vestibularInferior')
-          : (isUpperTooth ? 'palatinoSuperior' : 'lingualInferior');
-        if (!updated.teeth[toothNumber][field] || typeof updated.teeth[toothNumber][field] !== 'object') {
-          updated.teeth[toothNumber][field] = {};
-        }
-        if (!updated.teeth[toothNumber][field][targetFace]) {
-          updated.teeth[toothNumber][field][targetFace] = [0, 0, 0];
-        }
-        updated.teeth[toothNumber][field][targetFace][index] = validatedValue;
-        applyFieldAlias(updated.teeth[toothNumber], field);
-      } else if (side) {
-        // Actualización de campo completo en una cara (objeto con 4 caras para ese campo)
-        const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
-        const targetFace = side === 'vestibular'
-          ? (isUpperTooth ? 'vestibularSuperior' : 'vestibularInferior')
-          : (isUpperTooth ? 'palatinoSuperior' : 'lingualInferior');
-        if (!updated.teeth[toothNumber][field] || typeof updated.teeth[toothNumber][field] !== 'object') {
-          updated.teeth[toothNumber][field] = {};
-        }
-        updated.teeth[toothNumber][field][targetFace] = validatedValue;
-        applyFieldAlias(updated.teeth[toothNumber], field);
-      } else {
-        // Actualización de campo del diente (ausente, implante, etc.)
-        updated.teeth[toothNumber][field] = validatedValue;
-        applyFieldAlias(updated.teeth[toothNumber], field);
-      }
-      
-      // Agregar timestamp para forzar detección de cambios
-      updated.lastModified = Date.now();
 
-      return updated;
+      // Actualización inmutable POR DIENTE: sólo el diente editado obtiene una
+      // nueva referencia. Permite que React.memo de DataCell salte los dientes
+      // que no cambiaron, en vez de re-renderizar las ~384 celdas con cada
+      // tecleo (lo que hacía el structuredClone previo).
+      const prevTeeth = prev.teeth || {};
+      const prevTooth = prevTeeth[toothNumber] || {
+        available: true,
+        ausente: false,
+        absent: false,
+        implante: false,
+        implant: false,
+        pronostico: 'bueno',
+        prognosis: 'bueno',
+        mobility: MEASUREMENT_LIMITS.mobility.default,
+        movilidad: MEASUREMENT_LIMITS.mobility.default,
+        anchuraEncia: 0,
+        gumWidth: 0,
+        furca: { vestibular: 0, lingual: 0, mesial: 0 }
+      };
+
+      let updatedTooth;
+
+      if (side && index !== null) {
+        const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
+        const targetFace = side === 'vestibular'
+          ? (isUpperTooth ? 'vestibularSuperior' : 'vestibularInferior')
+          : (isUpperTooth ? 'palatinoSuperior' : 'lingualInferior');
+        const prevField = (prevTooth[field] && typeof prevTooth[field] === 'object' && !Array.isArray(prevTooth[field]))
+          ? prevTooth[field]
+          : {};
+        const prevFaceArr = Array.isArray(prevField[targetFace]) ? prevField[targetFace] : [0, 0, 0];
+        const nextFaceArr = [...prevFaceArr];
+        nextFaceArr[index] = validatedValue;
+        updatedTooth = { ...prevTooth, [field]: { ...prevField, [targetFace]: nextFaceArr } };
+      } else if (side) {
+        const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
+        const targetFace = side === 'vestibular'
+          ? (isUpperTooth ? 'vestibularSuperior' : 'vestibularInferior')
+          : (isUpperTooth ? 'palatinoSuperior' : 'lingualInferior');
+        const prevField = (prevTooth[field] && typeof prevTooth[field] === 'object' && !Array.isArray(prevTooth[field]))
+          ? prevTooth[field]
+          : {};
+        updatedTooth = { ...prevTooth, [field]: { ...prevField, [targetFace]: validatedValue } };
+      } else {
+        updatedTooth = { ...prevTooth, [field]: validatedValue };
+      }
+
+      applyFieldAlias(updatedTooth, field);
+
+      return {
+        ...prev,
+        teeth: { ...prevTeeth, [toothNumber]: updatedTooth },
+        lastModified: Date.now()
+      };
     });
     isDirtyRef.current = true; ctxMarkDirty(dirtyKey);
   }, [editMode, validateMeasurementValue, warnValidation]);

@@ -1144,6 +1144,10 @@ exports.addEvolutionNote = async (req, res) => {
     }
     patient.notas_evolucion.unshift(newEvolutionNote);
 
+    // Rastrea archivos de firma escritos a disco — si `patient.save()` falla
+    // los borramos para evitar dejar PNGs huérfanos (BUG-C3).
+    const writtenSignaturePaths = [];
+
     // Persistir firmas SOLO si la nota es OFICIAL (BORRADOR sin firma)
     if (estadoRegistro === 'OFICIAL') {
       const savedSubdoc = patient.notas_evolucion[0];
@@ -1158,11 +1162,14 @@ exports.addEvolutionNote = async (req, res) => {
         const patientSig = await saveSignatureDataUrl(patientSignature, [
           'pacientes', id, 'firmas-notas', `${noteId}_paciente.png`
         ]);
+        if (patientSig.absPath) writtenSignaturePaths.push(patientSig.absPath);
         savedSubdoc.pacienteFirmaUrl = patientSig.publicUrl;
         savedSubdoc.pacienteFirmadoEn = now;
         savedSubdoc.pacienteFirmaContentHash = contentHash;
         savedSubdoc.pacienteFirmaImageHash = patientSig.contentHash;
       } catch (e) {
+        // Rollback del counter — la nota no se va a guardar.
+        await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
         return res.status(400).json({
           success: false,
           error: `No se pudo guardar la firma del paciente: ${e.message}`
@@ -1176,9 +1183,13 @@ exports.addEvolutionNote = async (req, res) => {
           const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
             'pacientes', id, 'firmas-notas', `${noteId}_doctor.png`
           ]);
+          if (docSig.absPath) writtenSignaturePaths.push(docSig.absPath);
           savedSubdoc.doctorFirmaUrl = docSig.publicUrl;
           savedSubdoc.doctorFirmaImageHash = docSig.contentHash;
         } catch (e) {
+          // Rollback: borra la firma del paciente ya escrita + decrementa counter.
+          await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+          await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
           return res.status(400).json({
             success: false,
             error: `No se pudo guardar la firma del doctor: ${e.message}`
@@ -1195,10 +1206,13 @@ exports.addEvolutionNote = async (req, res) => {
           const snap = await copyFirmaToSnapshot(signerDoctor.firmaDigitalUrl, [
             'pacientes', id, 'firmas-notas', `${noteId}_doctor`
           ]);
+          if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
           savedSubdoc.doctorFirmaUrl = snap.publicUrl;
           savedSubdoc.doctorFirmaImageHash = snap.contentHash;
         } catch (e) {
           console.error('[addEvolutionNote] Fallo al copiar snapshot de firma:', e.message);
+          await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+          await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
           return res.status(500).json({
             success: false,
             error: 'No se pudo persistir el snapshot de la firma del doctor. La nota NO fue guardada. Intente nuevamente o contacte a soporte.'
@@ -1215,8 +1229,20 @@ exports.addEvolutionNote = async (req, res) => {
       savedSubdoc.firmaDesactualizada = false;
     }
 
-    // Guardar el paciente
-    await patient.save();
+    // Guardar el paciente. Si falla, rollback explícito: decrementa el
+    // counter $inc y borra los PNGs ya escritos para no dejar archivos
+    // huérfanos ni huecos en la numeración (NOM-024).
+    try {
+      await patient.save();
+    } catch (saveErr) {
+      console.error('[addEvolutionNote] patient.save() falló, ejecutando rollback:', saveErr);
+      await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+      await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
+      return res.status(500).json({
+        success: false,
+        error: 'No se pudo guardar la nota. Los cambios se revirtieron.'
+      });
+    }
 
     // Devolver el subdocumento guardado (con _id generado por Mongoose)
     const savedNote = patient.notas_evolucion[0];
@@ -1752,12 +1778,26 @@ exports.addTreatmentPlan = async (req, res) => {
 
         // Agregar el plan de tratamiento al array
         patient.planes_tratamiento.unshift(newTreatmentPlan);
-        
+
         // Guardar el paciente
         await patient.save();
 
         // Devolver el subdocumento guardado (con _id generado por Mongoose)
         const savedPlan = patient.planes_tratamiento[0];
+
+        // Audit log: trazabilidad NOM-024 — antes el create de plan no quedaba
+        // registrado (a diferencia de notas de evolución, que sí lo hacían).
+        auditLogger.registrarManual(req, 'plan_tratamiento_creado', {
+            resourceType: 'patient',
+            resourceId: patient._id,
+            patientId: patient._id,
+            detalles: {
+                planId: savedPlan._id,
+                estadoRegistro: savedPlan.estadoRegistro,
+                appointmentId: savedPlan.appointmentId || null
+            }
+        }).catch(() => {});
+
         res.status(201).json({
             success: true,
             message: 'Plan de tratamiento agregado correctamente',
@@ -1766,9 +1806,9 @@ exports.addTreatmentPlan = async (req, res) => {
 
     } catch (error) {
         console.error('Error al agregar plan de tratamiento:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Error interno del servidor al agregar el plan de tratamiento' 
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor al agregar el plan de tratamiento'
         });
     }
 };

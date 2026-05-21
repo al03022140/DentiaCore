@@ -77,17 +77,15 @@ const normalizeFurcaData = (rawFurca) => {
  * referencia se mantenga estable y React.memo realmente evite re-renders
  * cuando los props no cambian.
  *
- * Recibe renderCell y getToothData como props (estables, gracias al ref
- * pattern del padre). El equality check de memo es por defecto (referencial),
- * lo cual es suficiente: renderCell solo cambia cuando cambia readOnly,
- * systemStatus.initialized u otra dep poco frecuente; cuando eso ocurre se
- * espera que todas las celdas se actualicen.
+ * Recibe `toothData` por prop (no a través de un closure sobre un ref) para
+ * que la equality check por defecto de memo invalide sólo cuando el diente
+ * concreto cambia. `renderCell` también recibe `toothData` como parámetro y
+ * no depende de `periodontogramData`, así su referencia se mantiene estable.
  */
-const DataCell = memo(function DataCell({ toothNumber, row, side, renderCell, getToothData }) {
-  const toothData = getToothData(toothNumber);
+const DataCell = memo(function DataCell({ toothNumber, row, side, renderCell, toothData }) {
   return (
-    <div className={`data-cell-container ${toothData.absent ? 'absent' : ''}`}>
-      <div className="data-cell">{renderCell(toothNumber, row, side)}</div>
+    <div className={`data-cell-container ${toothData?.absent ? 'absent' : ''}`}>
+      <div className="data-cell">{renderCell(toothNumber, row, side, toothData)}</div>
     </div>
   );
 });
@@ -118,9 +116,9 @@ const PeriodontogramDesign = ({
   const programmaticFocusRef = useRef(null);
   const pendingFocusKeysRef = useRef(new Set());
 
-  // Ref espejo de periodontogramData. Usado por los callbacks (updateToothData,
-  // getToothData, resolveMeasurementNeighbor) para que mantengan referencias
-  // estables a través de renders y memo() en los hijos funcione.
+  // Ref espejo de periodontogramData. Usado por los event handlers
+  // (updateToothData, resolveMeasurementNeighbor) para que siempre lean el
+  // estado más reciente sin depender de la prop en sus deps de useCallback.
   const periodontogramDataRef = useRef(periodontogramData);
   useEffect(() => {
     periodontogramDataRef.current = periodontogramData;
@@ -128,9 +126,12 @@ const PeriodontogramDesign = ({
   
   // Referencias para gráficas lineales
   const canvasRef = useRef(null);
-  
+
   // Hook de gráficas lineales con contenedor principal
   const containerRef = useRef(null);
+  // Wrapper interno que recibe el transform: scale para ajustar el
+  // periodontograma al ancho del card sin scroll horizontal.
+  const scaleInnerRef = useRef(null);
   
   // Opciones derivadas de performanceMode (balanced | fast | minimal)
   const linearGraphicsDerivedOptions = useMemo(() => {
@@ -211,10 +212,41 @@ const PeriodontogramDesign = ({
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= RESPONSIVE_CONFIG.MOBILE_BREAKPOINT);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Ajustar el periodontograma al ancho del card mediante transform: scale.
+  // La rejilla interna mide ~1160px (120px label + 16×65px) y no es
+  // proporcional a su contenedor; sin esto el grid se sale o requiere scroll.
+  // Medimos el ancho disponible (containerRef) y el ancho natural del wrapper
+  // interno, calculamos el factor de escala y compensamos la altura del
+  // contenedor para que el flujo de la página no deje hueco bajo la rejilla.
+  useEffect(() => {
+    const container = containerRef.current;
+    const inner = scaleInnerRef.current;
+    if (!container || !inner || typeof ResizeObserver === 'undefined') return;
+
+    const apply = () => {
+      const available = container.clientWidth;
+      if (available <= 0) return;
+      // scrollWidth/offsetHeight no son afectados por transform, así que
+      // miden el tamaño "natural" del contenido antes de escalar.
+      const natural = inner.scrollWidth || 1;
+      const scale = Math.min(1, available / natural);
+      inner.style.transformOrigin = 'top left';
+      inner.style.transform = scale < 1 ? `scale(${scale})` : '';
+      const naturalHeight = inner.offsetHeight;
+      container.style.height = scale < 1 ? `${naturalHeight * scale}px` : '';
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(container);
+    ro.observe(inner);
+    return () => ro.disconnect();
   }, []);
 
   const registerMeasurementInput = useCallback((key, node) => {
@@ -459,12 +491,26 @@ const PeriodontogramDesign = ({
 
   // Usar función centralizada para determinar si necesita doble entrada de furca
 
-  // Obtener datos normalizados de un diente. Lee desde periodontogramDataRef
-  // para que la referencia de getToothData sea estable y memo() de los hijos
-  // no se invalide en cada cambio del objeto root de datos.
+  // Obtener datos normalizados de un diente. Cachea por referencia de raw en
+  // un WeakMap, de modo que dientes sin cambios devuelven SIEMPRE el mismo
+  // objeto normalizado entre renders. Eso es lo que permite a React.memo de
+  // DataCell saltar los dientes que no cambiaron cuando el usuario tipea.
+  const normalizedToothCacheRef = useRef(new WeakMap());
+  const emptyNormalizedTooth = useMemo(() => ({
+    absent: false,
+    implant: false,
+    mobility: 0,
+    gumWidth: 0,
+    prognosis: 'bueno'
+  }), []);
+
   const getToothData = useCallback((toothNumber) => {
-    const raw = periodontogramDataRef.current?.teeth?.[toothNumber] || {};
-    return {
+    const raw = periodontogramData?.teeth?.[toothNumber];
+    if (!raw) return emptyNormalizedTooth;
+    const cache = normalizedToothCacheRef.current;
+    const cached = cache.get(raw);
+    if (cached) return cached;
+    const normalized = {
       ...raw,
       absent: (raw.ausente ?? raw.absent ?? false),
       implant: (raw.implante ?? raw.implant ?? false),
@@ -472,7 +518,9 @@ const PeriodontogramDesign = ({
       gumWidth: (raw.anchuraEncia ?? raw.gumWidth ?? 0),
       prognosis: String(raw.pronostico ?? raw.prognosis ?? 'bueno').toLowerCase()
     };
-  }, []);
+    cache.set(raw, normalized);
+    return normalized;
+  }, [periodontogramData, emptyNormalizedTooth]);
 
   // Actualizar datos de un diente con soporte a estructuras nuevas y legacy
   const updateToothData = useCallback((toothNumber, field, value, side = null, index = null) => {
@@ -509,7 +557,9 @@ const PeriodontogramDesign = ({
       } else {
         updated = {};
       }
-      if (!updated[faceKey]) updated[faceKey] = [0,0,0];
+      // Clonar la cara antes de mutar: el spread previo fue shallow, así que
+      // el array de updated[faceKey] aún apunta al mismo del estado anterior.
+      updated[faceKey] = Array.isArray(updated[faceKey]) ? [...updated[faceKey]] : [0, 0, 0];
 
       if (['bleeding'].includes(field)) {
         updated[faceKey][index] = Number(value) || 0; // 0-3
@@ -556,8 +606,7 @@ const PeriodontogramDesign = ({
     updateToothData(toothNumber, 'absent', newAbsentValue);
   }, [getToothData, updateToothData, readOnly]);
 
-  const renderCell = useCallback((toothNumber, row, side = 'vestibular') => {
-    const toothData = getToothData(toothNumber);
+  const renderCell = useCallback((toothNumber, row, side = 'vestibular', toothData = emptyNormalizedTooth) => {
     const cellKey = `${toothNumber}-${row.key}-${side}`;
     const getOptionLabel = (fieldKey, option) => {
       if (fieldKey === 'mobility' || fieldKey === 'furca') {
@@ -927,7 +976,7 @@ const PeriodontogramDesign = ({
       default:
         return <div className="empty-cell"></div>;
     }
-  }, [getToothData, updateToothData, toggleToothAbsentHandler, readOnly, systemStatus.initialized, addHoverEffect, removeHoverEffect, selectedTooth, selectOptionSets, registerMeasurementInput, cancelAutoAdvance, scheduleAutoAdvance, focusSiblingMeasurementInput, shouldAutoAdvanceImmediately]);
+  }, [updateToothData, toggleToothAbsentHandler, readOnly, systemStatus.initialized, addHoverEffect, removeHoverEffect, selectedTooth, selectOptionSets, registerMeasurementInput, cancelAutoAdvance, scheduleAutoAdvance, focusSiblingMeasurementInput, shouldAutoAdvanceImmediately, emptyNormalizedTooth]);
 
   // Renderizar imagen de diente
   const renderToothImage = useCallback((toothNumber, side) => {
@@ -1032,11 +1081,12 @@ const PeriodontogramDesign = ({
   );
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={`periodontogram-container ${systemStatus.initialized ? 'linear-graphics-active' : ''} perf-${performanceMode}`}
       data-read-only={readOnly}
     >
+      <div ref={scaleInnerRef} className="periodontogram-scale-inner">
 
       {/* SECCIÓN SUPERIOR */}
       <div className="arch-section superior">
@@ -1050,7 +1100,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} getToothData={getToothData} />
+                <InstrumentedDataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
               ))}
             </div>
           ))}
@@ -1086,7 +1136,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-pal-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" renderCell={renderCell} getToothData={getToothData} />
+                <InstrumentedDataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" renderCell={renderCell} toothData={getToothData(toothNumber)} />
               ))}
             </div>
           ))}
@@ -1105,7 +1155,7 @@ const PeriodontogramDesign = ({
             <div key={`lower-ling-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" renderCell={renderCell} getToothData={getToothData} />
+                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" renderCell={renderCell} toothData={getToothData(toothNumber)} />
                   ))}
             </div>
           ))}
@@ -1141,15 +1191,15 @@ const PeriodontogramDesign = ({
             <div key={`lower-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} getToothData={getToothData} />
+                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
                   ))}
             </div>
           ))}
         </div>
       </div>
 
+      </div>
 
-      
       {/* Canvas overlay se renderiza específicamente en cada tooth-image-container */}
     </div>
   );

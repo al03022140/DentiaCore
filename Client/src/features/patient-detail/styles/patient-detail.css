@@ -305,8 +305,17 @@
 
 .odontograma-canvas-container--readonly .odontograma-canvas {
   /* El canvas mantiene su resolución interna (1200×700) — el engine renderiza igual,
-     sólo cambia la presentación visual. */
-  transform: scale(1.3);
+     sólo cambia la presentación visual.
+
+     `translateY(-40px)` compensa el sesgo natural de la dentadura dentro del
+     canvas: los arcos cubren y=200..620, centro y≈410, frente al centro
+     geométrico del canvas en y=350 — o sea la dentadura nace 60px abajo del
+     centro. Con scale 1.3 ese sesgo se amplifica y la dentadura "se ve abajo".
+     Subimos el canvas escalado para centrar visualmente los dientes.
+     Orden de transformaciones: CSS las aplica de derecha a izquierda, así que
+     primero traslada y luego escala — el -40px en coordenadas del elemento se
+     vuelve ~-52px visuales tras el scale. */
+  transform: scale(1.3) translateY(-40px);
   transform-origin: center center;
   /* Evita interpolación borrosa al ampliar: bordes nítidos como una imagen vectorial. */
   image-rendering: crisp-edges;

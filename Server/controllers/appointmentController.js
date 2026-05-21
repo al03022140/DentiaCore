@@ -20,6 +20,11 @@ const DOCTOR_FIELDS = 'nombre';
 const ESTADOS_VIVOS = ['Pendiente', 'Confirmada', 'EnCurso'];
 const ESTADOS_CERRADOS = ['Pasada', 'NoShow', 'Cancelada'];
 const ESTADOS_VALIDOS = [...ESTADOS_VIVOS, ...ESTADOS_CERRADOS];
+// Tope de agendamiento a futuro — 5 años desde hoy. Sin tope se podía
+// crear citas para el año 9999.
+const MAX_FUTURE_MS = 5 * 365 * 24 * 60 * 60 * 1000;
+// Mínimo de motivo para eliminar — alineado con el cliente (5 chars).
+const MIN_DELETE_REASON_LEN = 5;
 
 // Transiciones permitidas: clave = origen, valor = destinos válidos.
 const TRANSITION_MATRIX = {
@@ -272,6 +277,9 @@ exports.createAppointment = async (req, res) => {
         if (fecha <= new Date()) {
             return res.status(400).json({ message: 'No se pueden programar citas en el pasado.' });
         }
+        if (fecha.getTime() > Date.now() + MAX_FUTURE_MS) {
+            return res.status(400).json({ message: 'La fecha está demasiado lejos en el futuro (máx 5 años).' });
+        }
 
         // Validar que paciente y doctor existan, estén activos y el doctor
         // tenga rol válido para atender citas.
@@ -395,6 +403,16 @@ exports.createAppointment = async (req, res) => {
         });
 
     } catch (error) {
+        // E11000 del índice único parcial: el race TOCTOU se materializó.
+        // El controller ya hizo las validaciones de conflicto a nivel app,
+        // pero dos requests simultáneos pueden haberlas pasado ambas; aquí
+        // atrapamos el caso de minuto-exacto y devolvemos 409 consistente.
+        if (error?.code === 11000 && /doctor_slot_unique_active/.test(error.message || '')) {
+            return res.status(409).json({
+                message: 'El doctor ya tiene una cita exactamente a esa hora (índice único).',
+                conflictType: 'doctor'
+            });
+        }
         res.status(400).json({ message: 'Error al crear la cita', error: error.message });
     }
 };
@@ -423,6 +441,9 @@ exports.updateAppointment = async (req, res) => {
             const fechaCambia = newFecha.getTime() !== new Date(existing.fecha_hora).getTime();
             if (fechaCambia && newFecha <= new Date()) {
                 return res.status(400).json({ message: 'No se puede reagendar a una fecha en el pasado.' });
+            }
+            if (fechaCambia && newFecha.getTime() > Date.now() + MAX_FUTURE_MS) {
+                return res.status(400).json({ message: 'La fecha está demasiado lejos en el futuro (máx 5 años).' });
             }
             allowedFields.fecha_hora = newFecha;
         }
@@ -516,7 +537,12 @@ exports.updateAppointment = async (req, res) => {
             estadoTransicion = { from: existing.estado, to: estado };
         }
 
-        // ── Procesar items ──
+        // ── Procesar items (sin mutar PatientCharge aún) ──
+        // La sincronización con PatientCharge se hace DESPUÉS del save de la
+        // cita para evitar dejar el cobro modificado si el save falla
+        // (state transition inválida, validators, etc.). Aquí sólo validamos
+        // y armamos los valores que se van a aplicar.
+        let chargeOpAfterSave = null; // { type: 'cancel'|'updateItems', payload }
         if (Array.isArray(items)) {
             const existingCharge = await PatientCharge.findOne({
                 appointmentId: req.params.id,
@@ -530,17 +556,7 @@ exports.updateAppointment = async (req, res) => {
             if (items.length === 0) {
                 allowedFields.items = [];
                 allowedFields.totalEstimado = 0;
-                await PatientCharge.findOneAndUpdate(
-                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
-                    {
-                        $set: {
-                            cancelado: true,
-                            canceladoEn: new Date(),
-                            canceladoPor: req.user?.id || null,
-                            canceladoMotivo: 'Items de la cita removidos'
-                        }
-                    }
-                );
+                chargeOpAfterSave = { type: 'cancel' };
             } else {
                 const processedItems = [];
                 let totalEstimado = 0;
@@ -556,12 +572,7 @@ exports.updateAppointment = async (req, res) => {
                 }
                 allowedFields.items = processedItems;
                 allowedFields.totalEstimado = totalEstimado;
-
-                await PatientCharge.findOneAndUpdate(
-                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
-                    { $set: { items: processedItems, total: totalEstimado } },
-                    { runValidators: true }
-                );
+                chargeOpAfterSave = { type: 'updateItems', payload: { items: processedItems, total: totalEstimado } };
             }
         }
 
@@ -591,19 +602,59 @@ exports.updateAppointment = async (req, res) => {
             return res.status(404).json({ message: 'Cita no encontrada' });
         }
 
-        // Cancelar cobro si pasó a Cancelada/NoShow
-        if (allowedFields.estado === 'Cancelada' || allowedFields.estado === 'NoShow') {
-            await PatientCharge.findOneAndUpdate(
-                { appointmentId: updatedAppointment._id, confirmado: false, cancelado: { $ne: true } },
-                {
-                    $set: {
-                        cancelado: true,
-                        canceladoEn: new Date(),
-                        canceladoPor: req.user?.id || null,
-                        canceladoMotivo: allowedFields.estado === 'NoShow' ? 'Paciente no se presentó' : 'Cita cancelada'
+        // ── Sincronizar PatientCharge DESPUÉS del save exitoso ─────
+        // Si alguna de estas operaciones falla, devolvemos 207-like (200 con
+        // warning) — la cita ya quedó consistente y el cobro queda en estado
+        // anterior; el operador puede reintentar editando de nuevo.
+        const chargeWarnings = [];
+        if (chargeOpAfterSave?.type === 'cancel') {
+            try {
+                await PatientCharge.findOneAndUpdate(
+                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
+                    {
+                        $set: {
+                            cancelado: true,
+                            canceladoEn: new Date(),
+                            canceladoPor: req.user?.id || null,
+                            canceladoMotivo: 'Items de la cita removidos'
+                        }
                     }
-                }
-            );
+                );
+            } catch (chargeErr) {
+                console.error('[updateAppointment] Fallo al cancelar charge:', chargeErr);
+                chargeWarnings.push('Items actualizados pero el cobro asociado no se canceló — reintenta');
+            }
+        } else if (chargeOpAfterSave?.type === 'updateItems') {
+            try {
+                await PatientCharge.findOneAndUpdate(
+                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
+                    { $set: chargeOpAfterSave.payload },
+                    { runValidators: true }
+                );
+            } catch (chargeErr) {
+                console.error('[updateAppointment] Fallo al actualizar charge items:', chargeErr);
+                chargeWarnings.push('Items de la cita actualizados pero el cobro asociado no — reintenta');
+            }
+        }
+
+        // Cancelar cobro si pasó a Cancelada/NoShow (post-save)
+        if (allowedFields.estado === 'Cancelada' || allowedFields.estado === 'NoShow') {
+            try {
+                await PatientCharge.findOneAndUpdate(
+                    { appointmentId: updatedAppointment._id, confirmado: false, cancelado: { $ne: true } },
+                    {
+                        $set: {
+                            cancelado: true,
+                            canceladoEn: new Date(),
+                            canceladoPor: req.user?.id || null,
+                            canceladoMotivo: allowedFields.estado === 'NoShow' ? 'Paciente no se presentó' : 'Cita cancelada'
+                        }
+                    }
+                );
+            } catch (chargeErr) {
+                console.error('[updateAppointment] Fallo al cancelar charge tras transición:', chargeErr);
+                chargeWarnings.push('Cita cancelada pero el cobro asociado quedó vivo — cancélelo manualmente');
+            }
         }
 
         const populated = await Appointment.findById(updatedAppointment._id)
@@ -612,10 +663,19 @@ exports.updateAppointment = async (req, res) => {
 
         res.status(200).json({
             message: 'Cita modificada correctamente',
-            appointment: populated
+            appointment: populated,
+            ...(chargeWarnings.length > 0 ? { warnings: chargeWarnings } : {})
         });
 
     } catch (error) {
+        // E11000 del índice único parcial (doctor_slot_unique_active) — race
+        // que escapó la validación de conflicto: respondemos 409, no 400.
+        if (error?.code === 11000 && /doctor_slot_unique_active/.test(error.message || '')) {
+            return res.status(409).json({
+                message: 'El doctor ya tiene una cita exactamente a esa hora (índice único).',
+                conflictType: 'doctor'
+            });
+        }
         res.status(400).json({ message: 'Error al actualizar la cita', error: error.message });
     }
 };
@@ -667,15 +727,28 @@ exports.updateAppointmentStatus = async (req, res) => {
         // El schema tiene `duracion.min = 5`, así que respetamos ese piso:
         // si el doctor termina la cita en menos de 5 min, dejamos la duración
         // original en lugar de fallar la validación de mongoose.
+        let duracionOriginal = null;
         if (estado === 'Pasada' && existing.fecha_hora) {
             const now = new Date();
             const elapsedMs = now.getTime() - new Date(existing.fecha_hora).getTime();
             if (elapsedMs > 0) {
                 const elapsedMin = Math.ceil(elapsedMs / 60_000);
                 if (elapsedMin >= 5 && (!existing.duracion || elapsedMin < existing.duracion)) {
+                    duracionOriginal = existing.duracion;
                     existing.duracion = elapsedMin;
                 }
             }
+        }
+
+        // Si encogimos la duración, dejamos huella en el último item del
+        // historial para que el cambio quede auditado (NOM-024). La entrada
+        // del cambio de estado ya está pusheada arriba; le anexamos el detalle
+        // de la modificación de duración en `motivo`.
+        if (duracionOriginal !== null) {
+            const last = existing.estadoHistorial[existing.estadoHistorial.length - 1];
+            const dur = existing.duracion;
+            const note = `Duración ajustada de ${duracionOriginal} a ${dur} min (consulta terminada antes)`;
+            last.motivo = last.motivo ? `${last.motivo} — ${note}` : note;
         }
 
         await existing.save();
@@ -857,12 +930,39 @@ exports.getAppointmentActivity = async (req, res) => {
 // DELETE /appointments/:id (soft)
 exports.deleteAppointment = async (req, res) => {
     try {
+        const motivoRaw = req.body?.motivo;
+        // Alineado con cliente: motivo obligatorio, mínimo 5 caracteres.
+        if (typeof motivoRaw !== 'string' || motivoRaw.trim().length < MIN_DELETE_REASON_LEN) {
+            return res.status(400).json({
+                message: `Debe indicar el motivo de eliminación (mínimo ${MIN_DELETE_REASON_LEN} caracteres)`
+            });
+        }
+        const motivo = motivoRaw.trim();
+
         const appointment = await Appointment.findById(req.params.id);
         if (!appointment) return res.status(404).json({ message: 'Cita no encontrada' });
+        if (appointment.deletedAt) return res.status(404).json({ message: 'Cita no encontrada' });
+
+        // Bloquea eliminar citas cerradas que tengan cobro CONFIRMADO — la
+        // contabilidad ya quedó consolidada y borrar la cita dejaría el cobro
+        // apuntando a un appointment huérfano (envenena auditoría). Para
+        // estos casos hay que cancelar el cobro primero.
+        if (ESTADOS_CERRADOS.includes(appointment.estado)) {
+            const confirmedCharge = await PatientCharge.findOne({
+                appointmentId: appointment._id,
+                confirmado: true,
+                cancelado: { $ne: true }
+            }).select('_id').lean();
+            if (confirmedCharge) {
+                return res.status(409).json({
+                    message: 'No se puede eliminar una cita cerrada con cobro confirmado. Cancela el cobro antes.'
+                });
+            }
+        }
 
         appointment.deletedAt = new Date();
         appointment.deletedBy = req.user?.id || null;
-        appointment.deleteReason = req.body?.motivo || 'Eliminada por usuario';
+        appointment.deleteReason = motivo;
         await appointment.save({ validateModifiedOnly: true });
 
         await PatientCharge.findOneAndUpdate(

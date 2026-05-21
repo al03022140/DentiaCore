@@ -283,8 +283,9 @@ const PatientEvolutionNote = ({
               const hasObservaciones = !!(n.observaciones && n.observaciones.trim());
               const hasCorrecciones = !!(n.correcciones && n.correcciones.trim());
               const isLong = (n.procedimiento || '').length > 110
-                || (n.observaciones || '').length > 110;
-              const showToggle = hasCorrecciones || isLong;
+                || (n.observaciones || '').length > 110
+                || (n.correcciones || '').length > 110;
+              const showToggle = isLong;
 
               return (
                 <article
@@ -292,10 +293,15 @@ const PatientEvolutionNote = ({
                   className={`evolution-note-card${isExpanded ? ' is-expanded' : ''}`}
                 >
                   <header className="evolution-note-card__header">
-                    <div className="evolution-note-card__id">
-                      <span className="evolution-note-card__num">#{num}</span>
-                      {date && <span className="evolution-note-card__date">{date}</span>}
-                    </div>
+                    <h3 className="evolution-note-card__title">
+                      Nota <span className="evolution-note-card__num">#{num}</span>
+                      {date && (
+                        <>
+                          <span className="evolution-note-card__sep" aria-hidden="true">·</span>
+                          <span className="evolution-note-card__date">{date}</span>
+                        </>
+                      )}
+                    </h3>
                     <div className="evolution-note-card__sigs">
                       <div className="evolution-note-card__sig-slot">
                         <span className="evolution-note-card__sig-label">Doctor</span>
@@ -359,28 +365,28 @@ const PatientEvolutionNote = ({
 
                   <div className="evolution-note-card__body">
                     {hasProcedimiento && (
-                      <div className="evolution-note-card__field">
-                        <span className="evolution-note-card__field-label">Procedimiento</span>
-                        <p className={`evolution-note-card__field-text${isExpanded ? '' : ' is-clamped'}`}>
+                      <p className={`evolution-note-card__field${isExpanded ? '' : ' is-clamped'}`}>
+                        <strong>Procedimiento:</strong>{' '}
+                        <span className="evolution-note-card__value">
                           {n.procedimiento}
-                        </p>
-                      </div>
+                        </span>
+                      </p>
                     )}
                     {hasObservaciones && (
-                      <div className="evolution-note-card__field">
-                        <span className="evolution-note-card__field-label">Observaciones</span>
-                        <p className={`evolution-note-card__field-text${isExpanded ? '' : ' is-clamped'}`}>
+                      <p className={`evolution-note-card__field${isExpanded ? '' : ' is-clamped'}`}>
+                        <strong>Observaciones:</strong>{' '}
+                        <span className="evolution-note-card__value">
                           {n.observaciones}
-                        </p>
-                      </div>
+                        </span>
+                      </p>
                     )}
-                    {isExpanded && hasCorrecciones && (
-                      <div className="evolution-note-card__field evolution-note-card__field--correcciones">
-                        <span className="evolution-note-card__field-label">Correcciones</span>
-                        <p className="evolution-note-card__field-text">
+                    {hasCorrecciones && (
+                      <p className={`evolution-note-card__field${isExpanded ? '' : ' is-clamped'}`}>
+                        <strong>Correcciones:</strong>{' '}
+                        <span className="evolution-note-card__value">
                           {n.correcciones}
-                        </p>
-                      </div>
+                        </span>
+                      </p>
                     )}
                     {!hasProcedimiento && !hasObservaciones && !hasCorrecciones && (
                       <p className="evolution-note-card__empty">Nota sin contenido registrado.</p>

@@ -2,6 +2,7 @@ const Exam = require('../models/exam.js');
 const Patient = require('../models/patient.js');
 const Doctor = require('../models/users.js');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
+const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 
 // 📌 Obtener todos los exámenes
 exports.getAllExams = async (req, res) => {
@@ -69,7 +70,9 @@ exports.createExam = async (req, res) => {
         }
 
         // Crear y guardar el examen (whitelist para prevenir inyección de deletedAt, modificadoPor, etc.)
-        const { paciente_id, doctor_id, tipo_examen, observaciones, archivo, tipo_archivo } = req.body;
+        const { paciente_id, doctor_id, tipo_examen, observaciones, archivo, tipo_archivo, appointmentId } = req.body;
+        // Valida pertenencia de la cita al paciente — evita cross-linking.
+        const validatedAppointmentId = await resolvePatientAppointmentId(appointmentId, paciente_id);
         const newExam = new Exam({
             paciente_id,
             doctor_id,
@@ -77,6 +80,7 @@ exports.createExam = async (req, res) => {
             observaciones,
             archivo,
             tipo_archivo,
+            appointmentId: validatedAppointmentId,
             creadoPor: req.user?.id || null,
             estadoRegistro
         });
@@ -136,7 +140,7 @@ exports.updateExam = async (req, res) => {
         }
 
         // Whitelist de campos permitidos para evitar inyección de campos internos
-        const { paciente_id, doctor_id, tipo_examen, estado, observaciones, fecha_resultado, archivo, tipo_archivo } = req.body;
+        const { paciente_id, doctor_id, tipo_examen, estado, observaciones, fecha_resultado, archivo, tipo_archivo, appointmentId } = req.body;
         const allowedFields = {};
         if (paciente_id !== undefined) allowedFields.paciente_id = paciente_id;
         if (doctor_id !== undefined) allowedFields.doctor_id = doctor_id;
@@ -146,6 +150,11 @@ exports.updateExam = async (req, res) => {
         if (fecha_resultado !== undefined) allowedFields.fecha_resultado = fecha_resultado;
         if (archivo !== undefined) allowedFields.archivo = archivo;
         if (tipo_archivo !== undefined) allowedFields.tipo_archivo = tipo_archivo;
+        if (appointmentId !== undefined) {
+            // Valida pertenencia (descarta silenciosamente si no pertenece al paciente)
+            const targetPaciente = paciente_id || exam.paciente_id;
+            allowedFields.appointmentId = await resolvePatientAppointmentId(appointmentId, targetPaciente);
+        }
 
         // Actualizar el examen
         exam = await Exam.findByIdAndUpdate(

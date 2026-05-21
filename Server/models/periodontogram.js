@@ -471,7 +471,11 @@ const PeriodontogramSchema = new mongoose.Schema({
   estadoRegistro: {
     type: String,
     enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
-    default: 'OFICIAL'
+    // Default BORRADOR — ningún doc debe nacer "oficial" sin firma real.
+    // El tránsito a OFICIAL ocurre SÓLO al firmar con PIN vía signingController
+    // (que setea `firmadoEn`, `firmadoPor`, `contentHash`). Default OFICIAL
+    // previo causaba que el segundo save fuera bloqueado por IMMUTABLE_RECORD.
+    default: 'BORRADOR'
   },
   creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
   modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
@@ -482,6 +486,11 @@ const PeriodontogramSchema = new mongoose.Schema({
   firmaDesactualizada: { type: Boolean, default: false },
   integrityHash: { type: String, default: null },
   autorizadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  // Motivo de rechazo de un BORRADOR (vía draftController.rejectDraft) —
+  // persistido para que el creador lo vea sin bajar a AuditLog.
+  rechazadoEn: { type: Date, default: null },
+  rechazadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+  rechazoMotivo: { type: String, default: null, trim: true, maxlength: 500 },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
   deleteReason: { type: String, default: null },
@@ -544,6 +553,8 @@ PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
   const emptyStatistics = computeCurrentStatistics(new Map());
   return this.create({
     patient: patientId,
+    estadoRegistro: 'BORRADOR',
+    creadoPor: userId || null,
     initial: {
       metadata: {
         version: '1.0.0',

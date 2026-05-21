@@ -174,6 +174,11 @@ const odontogramaSchema = new Schema({
   firmaDesactualizada: { type: Boolean, default: false },
   integrityHash: { type: String, default: null },
   autorizadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  // Motivo de rechazo de un BORRADOR (vía draftController.rejectDraft).
+  // Persistido en el doc para que el creador pueda verlo en su UI.
+  rechazadoEn: { type: Date, default: null },
+  rechazadoPor: { type: Types.ObjectId, ref: 'Usuario', default: null },
+  rechazoMotivo: { type: String, default: null, trim: true, maxlength: 500 },
   // Soft-delete (NOM-004 Art. 5.4)
   deletedAt: { type: Date, default: null },
   deletedBy: { type: Types.ObjectId, ref: 'Usuario', default: null },

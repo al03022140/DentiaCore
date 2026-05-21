@@ -3,7 +3,7 @@ const Periodontogram = require('../models/periodontogram');
 const PeriodontogramHistory = require('../models/periodontogramHistory');
 const mongoose = require('mongoose');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
-const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
+const { isAdminRole } = require('../utils/permissions');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { validatePeriodontogramData } = require('../schemas/unified-periodontogram-schema');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
@@ -313,16 +313,19 @@ exports.updateFullPeriodontogram = [
       let periodontogram = await Periodontogram.findOne({ patient: id });
       console.log('  - Periodontograma encontrado:', !!periodontogram);
 
-      // NOM-024: Los registros firmados son inmutables
-      if (periodontogram && periodontogram.estadoRegistro === 'OFICIAL') {
+      // NOM-024: la inmutabilidad aplica sólo a registros REALMENTE firmados
+      // (`firmadoEn != null`). Antes el guard usaba `estadoRegistro === 'OFICIAL'`
+      // pero el default del schema era OFICIAL → cualquier doc creado vía
+      // `createInitial` nacía bloqueado sin haberse firmado nunca.
+      if (periodontogram && periodontogram.firmadoEn) {
         return res.status(403).json({
           success: false,
-          message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
+          message: 'No se puede modificar un periodontograma firmado. Use addendum para correcciones.'
         });
       }
 
-      // BORRADOR: solo el creador o un admin pueden modificar
-      if (periodontogram && periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      // Borrador: solo el creador o un admin pueden modificar
+      if (periodontogram && !isAdminRole(req.user?.role)) {
         if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== req.user?.id) {
           return res.status(403).json({
             success: false,
@@ -330,7 +333,7 @@ exports.updateFullPeriodontogram = [
           });
         }
       }
-      
+
       if (!periodontogram) {
         console.log('  - Creando nuevo periodontograma...');
         try {
@@ -487,16 +490,16 @@ exports.deletePeriodontogram = [
         });
       }
 
-      // NOM-024: Los registros OFICIAL no se pueden eliminar
-      if (periodontogram.estadoRegistro === 'OFICIAL') {
+      // NOM-024: sólo los registros realmente firmados son inmutables.
+      if (periodontogram.firmadoEn) {
         return res.status(403).json({
           success: false,
-          message: 'No se puede eliminar un periodontograma en estado OFICIAL'
+          message: 'No se puede eliminar un periodontograma firmado'
         });
       }
 
-      // BORRADOR: solo el creador o un admin pueden eliminar
-      if (periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      // Borrador: solo el creador o un admin pueden eliminar
+      if (!isAdminRole(req.user?.role)) {
         if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== userId) {
           return res.status(403).json({
             success: false,
@@ -644,16 +647,18 @@ exports.savePeriodontogramData = [
 
       const periodontogram = await ensurePeriodontogramExists(patientId, userId);
 
-      // NOM-024: Los registros firmados son inmutables
-      if (periodontogram.estadoRegistro === 'OFICIAL') {
+      // NOM-024: la inmutabilidad aplica sólo a registros REALMENTE firmados
+      // (`firmadoEn != null`), no al campo `estadoRegistro` que antes podía
+      // auto-marcarse OFICIAL por el default del schema.
+      if (periodontogram.firmadoEn) {
         return res.status(403).json({
           success: false,
-          message: 'No se puede modificar un periodontograma en estado OFICIAL. Use addendum para correcciones.'
+          message: 'No se puede modificar un periodontograma firmado. Use addendum para correcciones.'
         });
       }
 
-      // BORRADOR: solo el creador o un admin pueden modificar
-      if (periodontogram.estadoRegistro === 'BORRADOR' && !isAdminRole(req.user?.role)) {
+      // Borrador: solo el creador o un admin pueden modificar
+      if (!isAdminRole(req.user?.role)) {
         if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== userId) {
           return res.status(403).json({
             success: false,
@@ -678,26 +683,13 @@ exports.savePeriodontogramData = [
         }
       }
 
-      // NO auto-OFICIAL: cada save mantiene/inicializa como BORRADOR. El
-      // tránsito a OFICIAL ocurre SÓLO al firmar vía POST /api/sign/
-      // periodontograma/:id (lo dispara signingController). Antes este
-      // controller marcaba OFICIAL cada save aunque no hubiera firma real,
-      // bloqueando ediciones legítimas.
-      const userPerms = getEffectivePermissions(req.user);
-      const hasFullCreate = hasPermission(userPerms, ['periodontogram.create']);
-      const hasDraftOnly = !hasFullCreate && hasPermission(userPerms, ['periodontogram.write.draft']);
-      // Mantener estado previo si ya era BORRADOR; nuevos docs → BORRADOR.
-      // Si por algún motivo había estado OFICIAL (no debería tras el cambio,
-      // pero por compatibilidad con docs viejos) y el usuario no es admin,
-      // se rechazó arriba. Si es admin re-guardando, lo dejamos como BORRADOR
-      // explícitamente — el admin tendrá que re-firmar.
-      let estadoRegistro = periodontogram.estadoRegistro === 'BORRADOR'
-        ? 'BORRADOR'
-        : (hasDraftOnly ? 'BORRADOR' : 'BORRADOR');
-      // Nota: el `if (hasDraftOnly)` queda redundante pero documenta que
-      // asistentes siempre quedan en BORRADOR. Si en el futuro queremos
-      // que `periodontogram.create` permita OFICIAL directo, ajustar aquí.
-      periodontogram.estadoRegistro = estadoRegistro;
+      // NO auto-OFICIAL: cada save deja el doc en BORRADOR. El tránsito a
+      // OFICIAL ocurre SÓLO al firmar con PIN vía POST /api/sign/
+      // periodontograma/:id (signingController), que es quien setea
+      // firmadoEn/firmadoPor/contentHash. Cualquier doc legacy con
+      // estadoRegistro:'OFICIAL' pero sin firmadoEn (default OFICIAL del
+      // schema antes del fix) se "auto-limpia" aquí.
+      periodontogram.estadoRegistro = 'BORRADOR';
       periodontogram.creadoPor = periodontogram.creadoPor || (userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null);
       periodontogram.modificadoPor = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
       periodontogram.modificadoEn = new Date();

@@ -255,13 +255,29 @@
   margin-bottom: 1rem;
 }
 
-/* Contenedor del diseño: sin caja extra; el marco lo da .periodontogram-section */
+/* Contenedor del diseño: sin caja extra; el marco lo da .periodontogram-section.
+   La rejilla interna mide ~1160px naturales. El wrapper .periodontogram-scale-inner
+   recibe un `transform: scale(...)` calculado en JS (ver useEffect en
+   periodontogram-design.jsx) para que el periodontograma se ajuste al ancho
+   del card. `overflow: hidden` recorta la caja de layout sin escalar (el
+   transform no afecta layout) para que no se vea fuera del card. */
 .periodontogram-container {
   background-color: transparent;
   padding: 0;
   border-radius: 0;
   box-shadow: none;
   width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Wrapper que recibe transform: scale. Mantiene el tamaño natural del
+   contenido (las arch-section + data-rows) y el JS lo escala. */
+.periodontogram-scale-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  width: fit-content;
 }
 
 /* Responsive design */
