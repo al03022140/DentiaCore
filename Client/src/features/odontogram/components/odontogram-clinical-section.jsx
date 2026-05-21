@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Table, Modal, message, Tabs } from 'antd';
 import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
+import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
@@ -102,6 +103,18 @@ const OdontogramClinicalSection = ({
     // Cleanup al desmontar — desregistrar para que un componente que
     // queda dirty no bloquee navegación después de que se desmonta.
     useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
+
+    // Persistencia local del borrador: sobrevive a timeouts de sesión.
+    const draft = useDraftPersistence({
+        key: `odontogram-clinical-${patientId || 'no-patient'}`,
+        enabled: !!patientId,
+        isDirty: () => isDirtyRef.current,
+        getSnapshot: () => engineManagerRef.current?.instance?.getData?.() || [],
+    });
+    const draftPromptedRef = useRef(false);
+    // Cambiar de paciente reinicia el engine; también el aviso de borrador
+    // debe re-evaluarse para el paciente nuevo.
+    useEffect(() => { draftPromptedRef.current = false; }, [patientId]);
 
     useEffect(() => {
         const handleBeforeUnload = (e) => {
@@ -253,6 +266,7 @@ const OdontogramClinicalSection = ({
             if (onDataSave && typeof onDataSave === 'function') {
                 await onDataSave(dataWithDates);
                 markClean();
+                draft.clearDraft();
                 message.success('Odontograma clínico guardado exitosamente');
                 await loadClinicalHistory();
             } else {
@@ -423,6 +437,42 @@ const OdontogramClinicalSection = ({
             };
             setIsEngineInitialized(true);
             setEngineError(null);
+
+            // Recuperación de borrador local — la sesión anterior pudo cerrarse
+            // antes de guardar (timeout JWT, crash). Si hay un draft válido en
+            // localStorage, ofrecemos recuperarlo.
+            if (!draftPromptedRef.current) {
+                const existing = draft.loadDraft();
+                const data = Array.isArray(existing?.data) ? existing.data : [];
+                if (data.length > 0) {
+                    draftPromptedRef.current = true;
+                    const minutes = Math.max(1, Math.round((Date.now() - existing.savedAt) / 60000));
+                    const when = minutes < 60
+                        ? `hace ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`
+                        : `hace ${Math.round(minutes / 60)} h`;
+                    Modal.confirm({
+                        title: 'Cambios sin guardar encontrados',
+                        content: `Detectamos cambios en el odontograma clínico de ${when} que no se llegaron a guardar. ¿Recuperarlos?`,
+                        okText: 'Recuperar',
+                        cancelText: 'Descartar',
+                        onOk: () => {
+                            try {
+                                const entries = normalizeEntriesForEngine(data);
+                                if (entries.length > 0 && engineManagerRef.current?.instance) {
+                                    engineManagerRef.current.instance.loadOdontogramaData(entries);
+                                    engineManagerRef.current.instance.update?.();
+                                    markDirty();
+                                    requestAnimationFrame(() => syncCanvasFromEngineRef.current());
+                                }
+                            } catch (err) {
+                                console.error('[OdontoClinical] Error recuperando borrador:', err);
+                                message.error('No se pudo recuperar el borrador.');
+                            }
+                        },
+                        onCancel: () => draft.clearDraft(),
+                    });
+                }
+            }
         } catch (error) {
             setEngineError(prevError => prevError || `Error motor odontograma: ${error.message}`);
             engineManagerRef.current = { ...engineManagerRef.current, initialized: false }; 
@@ -530,6 +580,7 @@ const OdontogramClinicalSection = ({
                 }
                 if (onDataSave) onDataSave(engineData);
                 markClean();
+                draft.clearDraft();
                 message.success('Guardado OK');
             } catch (err) {
                 message.error('Error guardando clínico');

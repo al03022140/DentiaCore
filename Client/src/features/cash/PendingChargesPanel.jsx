@@ -10,7 +10,7 @@ const calculateAge = (fechaNacimiento) => {
   return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
 };
 
-const PendingChargesPanel = ({ refreshTrigger }) => {
+const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   const navigate = useNavigate();
   const [charges, setCharges] = useState([]);
   const [total, setTotal] = useState(0);
@@ -25,10 +25,23 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
       // A4: filtrar cobros sin paciente (huérfanos por soft-delete del paciente).
       // No se navegar a ellos y confunden al usuario; los contamos aparte para
       // dejar rastro visible en la cabecera.
-      const visible = list.filter((c) => c?.patientId?._id);
+      const withPatient = list.filter((c) => c?.patientId?._id);
+      // Cada sesión de caja representa un día nuevo: en este panel sólo
+      // mostramos cobros de citas del día en curso. Los pendientes viejos
+      // siguen accesibles desde la ficha del paciente.
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      const visible = withPatient.filter((c) => {
+        const ts = c?.appointmentId?.fecha_hora || c?.fecha;
+        if (!ts) return false;
+        const t = new Date(ts).getTime();
+        return t >= startOfDay.getTime() && t <= endOfDay.getTime();
+      });
       setCharges(visible);
-      setOrphanCount(list.length - visible.length);
-      setTotal(typeof data?.total === 'number' ? data.total : list.length);
+      setOrphanCount(list.length - withPatient.length);
+      setTotal(visible.length);
     } catch {
       setCharges([]);
       setTotal(0);
@@ -38,7 +51,16 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
     }
   }, []);
 
-  useEffect(() => { fetchCharges(); }, [fetchCharges, refreshTrigger]);
+  useEffect(() => {
+    if (!isBoxOpen) {
+      setCharges([]);
+      setTotal(0);
+      setOrphanCount(0);
+      setLoading(false);
+      return;
+    }
+    fetchCharges();
+  }, [fetchCharges, refreshTrigger, isBoxOpen]);
 
   const goToPatient = (patientId) => {
     if (patientId) navigate(`/patient/${patientId}`);
@@ -65,8 +87,10 @@ const PendingChargesPanel = ({ refreshTrigger }) => {
 
       {loading ? (
         <p className="pending-charges-panel__empty">Cargando...</p>
+      ) : !isBoxOpen ? (
+        <p className="pending-charges-panel__empty">Caja cerrada — abre una sesión para ver los cobros del día.</p>
       ) : charges.length === 0 ? (
-        <p className="pending-charges-panel__empty">No hay cobros pendientes de citas.</p>
+        <p className="pending-charges-panel__empty">No hay cobros pendientes de citas para hoy.</p>
       ) : (
         <div className="pending-charges-panel__list">
           {charges.map((charge) => {

@@ -44,7 +44,7 @@ const describeChanges = (changes) => {
   ));
 };
 
-const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
+const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) => {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // movement object o null
@@ -72,7 +72,9 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getLastMovements();
+      // Solo movimientos de la sesión abierta: al cerrar/abrir una caja
+      // empezamos con cero, sin arrastrar los de la sesión anterior.
+      const data = await getLastMovements({ onlyActiveSession: true });
       setMovements(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching movements:', error);
@@ -82,7 +84,16 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load, refreshTrigger]);
+  // Con la caja cerrada, los movimientos de la sesión previa ya no aplican.
+  // Limpiamos el listado y evitamos el fetch hasta que se abra una nueva.
+  useEffect(() => {
+    if (!isBoxOpen) {
+      setMovements([]);
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [load, refreshTrigger, isBoxOpen]);
 
   const openEditModal = (movement) => {
     if (movement.linkedChargeId) return; // bloqueado: pago de cobro

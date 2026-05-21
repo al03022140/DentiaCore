@@ -13,6 +13,7 @@ import AccountsPermissionsSection from './sections/AccountsPermissionsSection';
 import SecuritySection from './sections/SecuritySection';
 import AppointmentsSection from './sections/AppointmentsSection';
 import CashSection from './sections/CashSection';
+import CashHistorySection from './sections/CashHistorySection';
 import TraceabilitySection from './sections/TraceabilitySection';
 import GoogleCalendarSection from './sections/GoogleCalendarSection';
 import './settings.css';
@@ -41,6 +42,7 @@ const SECTIONS = [
   { id: 'citas', name: 'Citas', icon: <img src={calendarIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Duración predeterminada, horarios de atención', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
   { id: 'google-calendar', name: 'Google Calendar', icon: <img src={calendarPlusIcon} alt="Google Calendar" width="36" height="36" className="theme-icon" />, desc: 'Conectar cuenta, elegir calendario destino', roles: null },
   { id: 'caja', name: 'Caja', icon: <img src={moneyIcon} alt="Caja" width="36" height="36" className="theme-icon" />, desc: 'Categorías de movimiento, moneda, defaults', roles: ['administrador', 'superadmin'], permission: 'settings.update' },
+  { id: 'historial-caja', name: 'Historial de Caja', icon: <img src={moneyIcon} alt="Historial de Caja" width="36" height="36" className="theme-icon" />, desc: 'Registros de caja por día — sesiones y movimientos', roles: ['administrador', 'superadmin'], permission: 'cash.read' },
   { id: 'trazabilidad', name: 'Trazabilidad', icon: <img src={trazability2Icon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Registro de acciones por usuario, fecha o paciente', roles: ['administrador', 'superadmin'], permission: 'audit.read.full' },
 ];
 
@@ -55,6 +57,7 @@ const SECTION_COMPONENTS = {
   'seguridad': SecuritySection,
   'citas': AppointmentsSection,
   'caja': CashSection,
+  'historial-caja': CashHistorySection,
   'trazabilidad': TraceabilitySection,
   'google-calendar': GoogleCalendarSection,
 };

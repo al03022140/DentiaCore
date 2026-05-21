@@ -92,9 +92,13 @@ const CashPage = () => {
 
         {/* Fila inferior ~60%: izq. Últimos movimientos, der. Cobros de citas */}
         <div className="cash-card cash-movements-card">
-          <MovementsList refreshTrigger={refreshTrigger} onMovementUpdated={handleMovementAdded} />
+          <MovementsList
+            refreshTrigger={refreshTrigger}
+            onMovementUpdated={handleMovementAdded}
+            isBoxOpen={isBoxOpen}
+          />
         </div>
-        <PendingChargesPanel refreshTrigger={refreshTrigger} />
+        <PendingChargesPanel refreshTrigger={refreshTrigger} isBoxOpen={isBoxOpen} />
       </div>
     </>
   );

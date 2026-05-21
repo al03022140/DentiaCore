@@ -10,6 +10,7 @@ import { MEASUREMENT_LIMITS } from '../../../shared/config/periodontogram-config
 import PeriodontogramService from '../../../shared/services/periodontogram-service.js';
 import { toTriple, pickFaceTriplesFromFourFaces } from '../../../shared/utils/periodontogram-helpers.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
+import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import '../styles/periodontogram-section.css';
 
 const FIELD_ALIAS_MAP = {
@@ -68,6 +69,19 @@ const PeriodontogramSection = ({ patientId }) => {
   const { markDirty: ctxMarkDirty, markClean: ctxMarkClean } = useUnsavedChanges();
   const dirtyKey = `periodontogram-${patientId || 'no-patient'}`;
   useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
+
+  // Snapshot completo del state del periodontograma para persistencia local.
+  // Si la sesión se corta antes de guardar, recuperamos el snapshot al volver.
+  const periodontogramRef = useRef(null);
+  useEffect(() => { periodontogramRef.current = periodontogramData; }, [periodontogramData]);
+  const draft = useDraftPersistence({
+    key: `periodontogram-${patientId || 'no-patient'}`,
+    enabled: !!patientId && editMode === 'guardado',
+    isDirty: () => isDirtyRef.current,
+    getSnapshot: () => periodontogramRef.current,
+  });
+  const draftPromptedRef = useRef(false);
+  useEffect(() => { draftPromptedRef.current = false; }, [patientId]);
   // Dedupe de warnings de validación: evita spam si el usuario tipea fuera de rango.
   const lastValidationWarnRef = useRef({ key: null, time: 0 });
 
@@ -786,6 +800,7 @@ const PeriodontogramSection = ({ patientId }) => {
       setSelectedVersion(nextVersionName ?? orderedVersions[0] ?? null);
       setPreviousData(null);
       isDirtyRef.current = false; ctxMarkClean(dirtyKey);
+      draft.clearDraft();
       message.success('Periodontograma guardado');
 
       if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma guardado exitosamente');
@@ -809,6 +824,50 @@ const PeriodontogramSection = ({ patientId }) => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
+
+  // Oferta de recuperación de borrador local. Se dispara cuando termina la
+  // carga inicial del paciente: si hay un draft en localStorage de una sesión
+  // anterior que se cortó, ofrecemos restaurarlo.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!patientId) return;
+    if (draftPromptedRef.current) return;
+    if (editMode !== 'guardado') return;
+
+    const existing = draft.loadDraft();
+    if (!existing || !existing.data || typeof existing.data !== 'object') return;
+    // Verificación mínima: que el borrador tenga teeth.
+    const hasTeeth = existing.data.teeth && Object.keys(existing.data.teeth).length > 0;
+    if (!hasTeeth) {
+      draft.clearDraft();
+      return;
+    }
+    draftPromptedRef.current = true;
+
+    const minutes = Math.max(1, Math.round((Date.now() - existing.savedAt) / 60000));
+    const when = minutes < 60
+      ? `hace ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`
+      : `hace ${Math.round(minutes / 60)} h`;
+
+    const ok = window.confirm(
+      `Detectamos cambios en el periodontograma de ${when} que no se llegaron a guardar. ¿Recuperarlos?\n\nAceptar = Recuperar borrador.\nCancelar = Descartarlo.`
+    );
+    if (ok) {
+      try {
+        setPeriodontogramData(existing.data);
+        isDirtyRef.current = true;
+        ctxMarkDirty(dirtyKey);
+        if (typeof UniversalToothValidator.invalidateCache === 'function') {
+          UniversalToothValidator.invalidateCache();
+        }
+      } catch (err) {
+        console.error('[Periodontogram] Error recuperando borrador:', err);
+        message.error('No se pudo recuperar el borrador.');
+      }
+    } else {
+      draft.clearDraft();
+    }
+  }, [isLoading, patientId, editMode, draft, ctxMarkDirty, dirtyKey]);
 
 
 

@@ -7,12 +7,21 @@ import { patchEnginePrototype } from './features/odontogram/utils/odontogram-uti
 import { AuthProvider } from './app/auth/AuthContext';
 import { LockScreenProvider } from './shared/components/LockScreen';
 import { ThemeProvider } from './shared/context/ThemeContext';
+import { useSessionKeepAlive } from './shared/hooks/useSessionKeepAlive';
 patchEnginePrototype();
+
+// Refresca el access token al recuperar foco/visibilidad y cada 10 min.
+// Evita el escenario "vuelvo de otra app y se cerró la sesión".
+const SessionKeepAlive = () => {
+  useSessionKeepAlive();
+  return null;
+};
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ThemeProvider>
       <AuthProvider>
+        <SessionKeepAlive />
         <LockScreenProvider>
           <App />
         </LockScreenProvider>

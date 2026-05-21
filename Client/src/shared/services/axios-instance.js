@@ -51,6 +51,30 @@ const refreshAccessToken = async () => {
   return accessToken;
 };
 
+// Refresh proactivo coordinado con el lock interno del interceptor:
+// si ya hay un refresh en vuelo, se engancha a esa misma promesa en lugar
+// de disparar uno paralelo (evita race conditions con el bloque del 401).
+export const triggerTokenRefresh = () => {
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      pendingRequests.push({ resolve, reject });
+    });
+  }
+  isRefreshing = true;
+  return refreshAccessToken()
+    .then((token) => {
+      processQueue(null, token);
+      return token;
+    })
+    .catch((err) => {
+      processQueue(err, null);
+      throw err;
+    })
+    .finally(() => {
+      isRefreshing = false;
+    });
+};
+
 // Interceptor para logging de peticiones (solo en desarrollo)
 if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
   API.interceptors.request.use(request => {

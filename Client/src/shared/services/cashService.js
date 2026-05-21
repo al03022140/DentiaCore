@@ -35,8 +35,13 @@ export const addMovement = async (movementData) => {
   return response.data;
 };
 
-export const getLastMovements = async () => {
-  const response = await API.get('/cash/movements');
+export const getLastMovements = async ({ onlyActiveSession = false, boxSessionId, limit } = {}) => {
+  const params = new URLSearchParams();
+  if (onlyActiveSession) params.set('onlyActiveSession', 'true');
+  if (boxSessionId) params.set('boxSessionId', boxSessionId);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  const response = await API.get(`/cash/movements${qs ? `?${qs}` : ''}`);
   return response.data;
 };
 
@@ -53,16 +58,20 @@ export const updateMovement = async (movementId, payload) => {
   return response.data;
 };
 
-export const getSessionHistory = async ({ skip = 0, limit = 30, from, to } = {}) => {
+export const getSessionHistory = async ({ skip = 0, limit = 30, from, to, day } = {}) => {
   const params = new URLSearchParams();
   if (skip) params.set('skip', String(skip));
   if (limit !== 30) params.set('limit', String(limit));
   if (from) params.set('from', from);
   if (to) params.set('to', to);
+  if (day) params.set('day', day);
   const qs = params.toString();
   const { data } = await API.get(`/cash/sessions${qs ? `?${qs}` : ''}`);
   return data;
 };
+
+// Conveniencia para el visualizador de caja por día — `day` formato YYYY-MM-DD.
+export const getSessionsByDay = (day) => getSessionHistory({ day, limit: 50 });
 
 // BUG-B14: detectar sesiones huérfanas (OPEN > 24h, CLOSING > 1h)
 export const getStaleSessions = async () => {

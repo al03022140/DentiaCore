@@ -73,7 +73,10 @@ const CashDashboard = () => {
 
   const getDisplayAmount = () => {
     if (!isVisible) return '••••••';
-    if (!hasSession) return formatMXN(0);
+    // Al cerrar la caja, las cifras de la sesión anterior dejan de ser
+    // relevantes hasta que se abra una nueva. Mostramos $0 en vez del último
+    // saldo cerrado para evitar confundirlo con un estado vigente.
+    if (!hasSession || !isOpen) return formatMXN(0);
 
     if (view === 'onHand') {
       // Dinero en caja: efectivo físico + saldo digital (informativo)
@@ -90,10 +93,9 @@ const CashDashboard = () => {
 
   const getDisplayLabel = () => {
     if (!hasSession) return 'Sin sesiones registradas';
+    if (!isOpen) return 'Caja cerrada — abre una sesión para ver el balance';
 
-    const sessionTag = isOpen
-      ? `Sesión abierta · ${formatDateTime(session.startTime)}`
-      : `Última sesión cerrada · ${formatDateTime(session.endTime)}`;
+    const sessionTag = `Sesión abierta · ${formatDateTime(session.startTime)}`;
 
     if (view === 'onHand') {
       if (method === 'cash') return `Efectivo en caja · ${sessionTag}`;
@@ -210,7 +212,7 @@ const CashDashboard = () => {
         <span className="balance-label">{getDisplayLabel()}</span>
       </div>
 
-      {hasSession && (
+      {hasSession && isOpen && (
         <div className="cash-dashboard__breakdown">
           <span>
             Inicio: <strong>{formatMXN(session.initialAmount)}</strong>

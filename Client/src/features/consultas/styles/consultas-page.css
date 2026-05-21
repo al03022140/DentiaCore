@@ -25,14 +25,17 @@
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
   padding: 0;
-  height: 100%;
+  /* Antes: height:100% + overflow:hidden hacían que cuando la card de
+     "Próxima cita" crecía, el panel "Detalle de Cita" quedaba empujado
+     fuera de la columna y nunca se veía. Ahora dejamos que la página
+     crezca a su contenido y el .content padre hace scroll vertical. */
+  min-height: 100%;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   font: var(--figma-text-body-regular);
   color: var(--figma-text-primary);
   background-color: transparent;
-  overflow: hidden;
   overflow-x: hidden;
 }
 
@@ -41,8 +44,6 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  height: 100%;
-  overflow-y: hidden;
   min-width: 0;
 }
 
@@ -367,11 +368,12 @@
   box-shadow: var(--figma-shadow-card);
   padding: 1.25rem;
   box-sizing: border-box;
-  flex: 1;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
+  /* min-height fijo para que el panel nunca colapse a cero cuando la card
+     de "Próxima cita" crece y la columna izquierda tenga que scrollear. */
+  min-height: 18rem;
   transition: box-shadow var(--figma-transition-fast);
 }
 

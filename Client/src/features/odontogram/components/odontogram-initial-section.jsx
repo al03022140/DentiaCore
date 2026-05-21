@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Table, Modal, message, Input } from 'antd';
 import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
+import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 
 /**
  * Odontograma inicial.
@@ -40,6 +41,18 @@ const OdontogramInitialSection = ({
   const { markDirty: ctxMarkDirty, markClean: ctxMarkClean } = useUnsavedChanges();
   const dirtyKey = `odontogram-initial-${patientId || 'no-patient'}`;
   useEffect(() => () => ctxMarkClean(dirtyKey), [ctxMarkClean, dirtyKey]);
+
+  // Persistencia local del borrador: si la sesión se cierra (timeout JWT,
+  // crash, cierre de app) los cambios sobreviven en localStorage hasta que
+  // el usuario vuelva a entrar y decida recuperarlos.
+  const draft = useDraftPersistence({
+    key: `odontogram-initial-${patientId || 'no-patient'}`,
+    enabled: mode === 'edit' && !!patientId,
+    isDirty: () => isDirtyRef.current,
+    getSnapshot: () => engineRef.current?.getData?.() || [],
+  });
+  // Flag para mostrar el modal de recuperación una sola vez por montaje.
+  const draftPromptedRef = useRef(false);
 
   const [saving, setSaving] = useState(false);
   const [engineError, setEngineError] = useState(null);
@@ -145,6 +158,41 @@ const OdontogramInitialSection = ({
       engineRef.current = engine;
       handlersRef.current = { click: clickHandler, move: moveHandler };
       setEngineError(null);
+
+      // Recuperación de borrador local: si la sesión anterior se cortó
+      // (timeout JWT, cierre brusco, crash) y quedaron cambios en
+      // localStorage, ofrecer recuperarlos al usuario.
+      if (mode === 'edit' && !draftPromptedRef.current) {
+        const existing = draft.loadDraft();
+        const data = Array.isArray(existing?.data) ? existing.data : [];
+        if (data.length > 0) {
+          draftPromptedRef.current = true;
+          const minutes = Math.max(1, Math.round((Date.now() - existing.savedAt) / 60000));
+          const when = minutes < 60
+            ? `hace ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`
+            : `hace ${Math.round(minutes / 60)} h`;
+          Modal.confirm({
+            title: 'Cambios sin guardar encontrados',
+            content: `Detectamos cambios en este odontograma de ${when} que no se llegaron a guardar. ¿Recuperarlos?`,
+            okText: 'Recuperar',
+            cancelText: 'Descartar',
+            onOk: () => {
+              try {
+                const entries = normalizeEntriesForEngine(data);
+                if (entries.length > 0 && engineRef.current) {
+                  engineRef.current.loadOdontogramaData(entries);
+                  isDirtyRef.current = true;
+                  ctxMarkDirty(dirtyKey);
+                }
+              } catch (err) {
+                console.error('[OdontogramInitial] Error recuperando borrador:', err);
+                message.error('No se pudo recuperar el borrador.');
+              }
+            },
+            onCancel: () => draft.clearDraft(),
+          });
+        }
+      }
     } catch (err) {
       console.error('[OdontogramInitial] Error inicializando engine:', err);
       setEngineError(`No se pudo inicializar el odontograma: ${err.message}`);
@@ -239,6 +287,7 @@ const OdontogramInitialSection = ({
       message.success('Odontograma inicial guardado.');
       isDirtyRef.current = false;
       ctxMarkClean(dirtyKey);
+      draft.clearDraft();
       onSaveSuccess?.(response.datos || [], response.history || []);
       // `savedOnceRef` queda en true: el componente cambiará a modo view por el
       // refresh del padre, y este ref impide cualquier disparo residual.
@@ -248,6 +297,7 @@ const OdontogramInitialSection = ({
       const status = err?.response?.status;
       if (status === 409) {
         message.warning('Este paciente ya tiene un odontograma inicial guardado. Refrescando…');
+        draft.clearDraft();
         onSaveSuccess?.([], []);
         return; // savedOnceRef queda true
       }

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const CashMovement = require('../models/cashMovement');
 const BoxSession = require('../models/boxSession');
 const PatientCharge = require('../models/patientCharge');
@@ -226,7 +227,17 @@ exports.getSessionHistory = async (req, res) => {
     const skip = Math.max(parseInt(req.query.skip) || 0, 0);
 
     const filter = { status: 'CLOSED' };
-    if (req.query.from || req.query.to) {
+    // ?day=YYYY-MM-DD — devuelve TODAS las sesiones (OPEN/CLOSING/CLOSED) cuyo
+    // startTime esté dentro de ese día. Usado por el visualizador de caja por día.
+    if (req.query.day) {
+      const day = new Date(`${req.query.day}T00:00:00`);
+      if (!isNaN(day)) {
+        const start = new Date(day); start.setHours(0, 0, 0, 0);
+        const end = new Date(day); end.setHours(23, 59, 59, 999);
+        delete filter.status;
+        filter.startTime = { $gte: start, $lte: end };
+      }
+    } else if (req.query.from || req.query.to) {
       filter.endTime = {};
       if (req.query.from) {
         const d = new Date(req.query.from);
@@ -238,9 +249,10 @@ exports.getSessionHistory = async (req, res) => {
       }
     }
 
+    const sortKey = req.query.day ? { startTime: -1 } : { endTime: -1 };
     const [sessions, total] = await Promise.all([
       BoxSession.find(filter)
-        .sort({ endTime: -1 })
+        .sort(sortKey)
         .skip(skip)
         .limit(limit)
         .populate('openedBy', 'nombre')
@@ -496,6 +508,12 @@ exports.getLastMovements = async (req, res) => {
           : res.json([]);
       }
       filter.boxSessionId = activeSession._id;
+    } else if (req.query.boxSessionId) {
+      // Filtra por una sesión específica (vista histórica por día).
+      if (!mongoose.isValidObjectId(req.query.boxSessionId)) {
+        return res.status(400).json({ message: 'boxSessionId inválido' });
+      }
+      filter.boxSessionId = req.query.boxSessionId;
     }
 
     const { patientId } = req.query;
