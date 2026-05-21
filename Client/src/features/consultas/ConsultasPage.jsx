@@ -449,12 +449,14 @@ const ConsultasPage = () => {
               <div className="next-patient-chips">
                 {nextPatient.motivo && (
                   <span className="next-patient-chip">
-                    <strong>Motivo:</strong> {nextPatient.motivo}
+                    <strong>Motivo</strong>
+                    <span>{nextPatient.motivo}</span>
                   </span>
                 )}
                 {nextPatient.comentarioProcedimiento && (
                   <span className="next-patient-chip">
-                    <strong>Proc.:</strong> {nextPatient.comentarioProcedimiento}
+                    <strong>Proc.</strong>
+                    <span>{nextPatient.comentarioProcedimiento}</span>
                   </span>
                 )}
               </div>

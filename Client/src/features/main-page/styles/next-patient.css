@@ -1,10 +1,19 @@
-/* ── Card siguiendo el patrón de patient-stats / clock ── */
-.next-patient-card {
+/* ──────────────────────────────────────────────────────────────────────
+   Próximo Paciente — Hero accionable
+   - Banda de color superior por estado de la cita
+   - Hora destacada + countdown vivo
+   - Avatar mediano con anillo del estado
+   - Motivo en línea destacada
+   - CTA primaria "Ir a Consultas"
+   ────────────────────────────────────────────────────────────────────── */
+
+.np-home-card {
+  position: relative;
   background-color: var(--figma-bg-card);
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-lg);
   box-shadow: var(--figma-shadow-card);
-  padding: var(--figma-space-lg) var(--figma-space-2xl);
+  padding: var(--figma-space-lg) var(--figma-space-xl);
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -13,228 +22,350 @@
   gap: var(--figma-space-md);
   min-width: 0;
   overflow: hidden;
+  transition:
+    box-shadow var(--figma-transition-fast),
+    border-color var(--figma-transition-fast),
+    transform var(--figma-transition-fast);
 }
 
-/* ── Header ── */
-.next-patient-card_header {
+.np-home-card:hover {
+  box-shadow: var(--figma-shadow-elevated);
+}
+
+/* ── Banda de acento por estado ── */
+.np-home-card_accent { display: none; }
+
+/* ── Header: eyebrow + status badge ── */
+.np-home-card_header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--figma-space-md);
   flex-shrink: 0;
-}
-
-.next-patient-card_title {
-  font: var(--figma-text-heading-md);
-  letter-spacing: var(--figma-text-heading-md-tracking);
-  color: var(--figma-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Body horizontal: avatar a la izquierda + contenido a la derecha ── */
-.next-patient-card_body {
-  display: flex;
-  align-items: stretch;
-  gap: var(--figma-space-lg);
-  min-width: 0;
-  flex-grow: 1;
-  min-height: 0;
-}
-
-.next-patient-card_avatar {
-  flex-shrink: 0;
-  width: clamp(96px, 16vw, 132px);
-  aspect-ratio: 1 / 1;
-  align-self: center;
-}
-
-.next-patient-card_avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: var(--figma-radius-full);
-  object-fit: cover;
-  display: block;
-  border: 2px solid var(--figma-bg-card);
-  box-shadow: 0 0 0 1px var(--figma-border-default), var(--figma-shadow-card);
-}
-
-.next-patient-card_content {
-  flex-grow: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--figma-space-xs);
-  justify-content: center;
-}
-
-/* ── Fila 1: nombre + status badge ── */
-.next-patient-card_name-row {
-  display: flex;
-  align-items: center;
-  gap: var(--figma-space-md);
-  flex-wrap: wrap;
   min-width: 0;
 }
 
-.next-patient-card_name {
-  font: var(--figma-fw-bold) 20px / 26px var(--figma-font-family);
-  letter-spacing: -0.31px;
-  color: var(--figma-text-primary);
+.np-home-card_eyebrow {
+  font: var(--figma-text-small);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--figma-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  flex-grow: 1;
 }
 
-/* Badge de estado autocontenido (no depende del CSS de Consultas). */
-.next-patient-card_status {
+.np-home-card_status {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  padding: 0.2rem 0.7rem;
+  padding: 0.18rem 0.6rem;
   border-radius: var(--figma-radius-full);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--figma-fw-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1.4;
   white-space: nowrap;
 }
 
-.next-patient-card_status--confirmed {
+.np-home-card_status--confirmed {
   background: rgba(76, 175, 80, 0.12);
   color: var(--color-green-800, #2e7d32);
 }
 
-.next-patient-card_status--waiting {
+.np-home-card_status--waiting {
   background: rgba(245, 158, 11, 0.14);
   color: var(--color-warning, #b45309);
 }
 
-.next-patient-card_status--in-progress {
+.np-home-card_status--in-progress {
   background: var(--consultas-brand-tint, rgba(37, 99, 235, 0.12));
   color: var(--color-primary, #1d4ed8);
 }
 
-/* ── Fila 2: chips horizontales (hora, día, teléfono) ── */
-.next-patient-card_chips {
+/* ── Body horizontal: avatar + contenido ── */
+.np-home-card_body {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--figma-space-xs);
+  align-items: flex-start;
+  gap: var(--figma-space-lg);
+  min-width: 0;
+  flex-grow: 1;
+  min-height: 0;
 }
 
-.next-patient-card_chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+.np-home-card_avatar {
+  flex-shrink: 0;
+  width: clamp(64px, 9vw, 84px);
+  aspect-ratio: 1 / 1;
   border-radius: var(--figma-radius-full);
-  background: var(--figma-bg-neutral-alt, rgba(0, 0, 0, 0.04));
-  color: var(--figma-text-secondary);
-  font: var(--figma-text-caption);
-  letter-spacing: var(--figma-text-caption-tracking);
+}
+
+.np-home-card_avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--figma-radius-full);
+  object-fit: cover;
+  display: block;
+  background: var(--figma-bg-card);
+  border: 2px solid var(--figma-bg-card);
+}
+
+.np-home-card_content {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
+/* ── Hora grande + countdown pill ── */
+.np-home-card_time-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--figma-space-xs);
+  min-width: 0;
+}
+
+.np-home-card_time {
+  font: var(--figma-fw-bold) 26px / 30px var(--figma-font-family);
+  letter-spacing: -0.6px;
+  color: var(--figma-text-primary);
   white-space: nowrap;
 }
 
-.next-patient-card_chip svg {
+.np-home-card_countdown {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--figma-radius-full);
+  font-size: 11px;
+  font-weight: var(--figma-fw-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: var(--figma-bg-neutral-alt);
+  color: var(--figma-text-secondary);
+}
+
+.np-home-card_countdown--confirmed {
+  background: rgba(76, 175, 80, 0.12);
+  color: var(--color-green-800, #2e7d32);
+}
+
+.np-home-card_countdown--waiting {
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--color-warning, #b45309);
+}
+
+.np-home-card_countdown--in-progress {
+  background: var(--consultas-brand-tint, rgba(37, 99, 235, 0.14));
+  color: var(--color-primary, #1d4ed8);
+}
+
+/* ── Nombre del paciente ── */
+.np-home-card_name {
+  margin: 0;
+  font: var(--figma-fw-semibold) 17px / 22px var(--figma-font-family);
+  letter-spacing: -0.25px;
+  color: var(--figma-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ── Meta chips: día / teléfono ── */
+.np-home-card_meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.np-home-card_meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--figma-radius-full);
+  background: var(--figma-bg-neutral-alt, rgba(0, 0, 0, 0.04));
+  color: var(--figma-text-secondary);
+  font: var(--figma-fw-medium) 12px / 16px var(--figma-font-family);
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+}
+
+.np-home-card_meta-chip svg {
   flex-shrink: 0;
   opacity: 0.8;
 }
 
-.next-patient-card_chip--time {
-  color: var(--figma-text-primary);
-  font-weight: var(--figma-fw-medium);
-}
-
-/* ── Fila 3: meta horizontal (motivo / comentario lado a lado) ── */
-.next-patient-card_meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--figma-space-md);
-  margin-top: var(--figma-space-xs);
-  padding-top: var(--figma-space-md);
-  border-top: 1px solid var(--figma-border-default);
-}
-
-.next-patient-card_meta-item {
+/* ── Motivo: línea destacada con label en chip ── */
+.np-home-card_motivo {
+  margin: 4px 0 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
-}
-
-.next-patient-card_meta-label {
-  font: var(--figma-text-small);
-  color: var(--figma-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.next-patient-card_meta-value {
-  font: var(--figma-text-body-regular);
+  font: var(--figma-fw-regular) 13px / 18px var(--figma-font-family);
   color: var(--figma-text-primary);
-  word-break: break-word;
+}
+
+.np-home-card_motivo-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: var(--figma-fw-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--figma-text-secondary);
+  padding: 1px 7px;
+  border-radius: var(--figma-radius-sm);
+  background: var(--figma-bg-neutral-alt);
+  line-height: 1.4;
+}
+
+.np-home-card_motivo-value {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Footer con CTA ── */
+.np-home-card_footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.np-home-card_cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-primary, #084888);
+  color: var(--figma-text-on-dark, #ffffff);
+  border: none;
+  padding: 8px 14px;
+  border-radius: var(--figma-radius-md);
+  cursor: pointer;
+  font: var(--figma-fw-semibold) 13px / 16px var(--figma-font-family);
+  letter-spacing: -0.1px;
+  transition:
+    background var(--figma-transition-fast),
+    transform var(--figma-transition-fast),
+    box-shadow var(--figma-transition-fast);
+}
+
+.np-home-card_cta:hover {
+  background: var(--color-primary-hover, #025db8);
+  box-shadow: 0 2px 6px rgba(8, 72, 136, 0.25);
+}
+
+.np-home-card_cta:active {
+  transform: translateY(1px);
+}
+
+.np-home-card_cta:focus-visible {
+  outline: 2px solid var(--color-primary, #084888);
+  outline-offset: 2px;
+}
+
+.np-home-card_cta--ghost {
+  background: transparent;
+  color: var(--color-primary, #084888);
+  border: 1px solid var(--figma-border-default);
+}
+
+.np-home-card_cta--ghost:hover {
+  background: var(--figma-bg-neutral-alt);
+  box-shadow: none;
 }
 
 /* ── Estado vacío ── */
-.next-patient-card_empty {
+.np-home-card--empty {
+  align-items: stretch;
+}
+
+.np-home-card_empty {
   flex-grow: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  gap: 6px;
   min-height: 80px;
 }
 
-.next-patient-card_empty p {
+.np-home-card_empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--figma-radius-full);
+  background: var(--figma-bg-neutral-alt);
+  color: var(--figma-text-secondary);
+  margin-bottom: 2px;
+}
+
+.np-home-card_empty-title {
   margin: 0;
-  font: var(--figma-text-body-regular);
+  font: var(--figma-fw-semibold) 15px / 20px var(--figma-font-family);
+  color: var(--figma-text-primary);
+}
+
+.np-home-card_empty-caption {
+  margin: 0 0 4px;
+  font: var(--figma-text-caption);
   color: var(--figma-text-secondary);
 }
 
 /* ── Responsive ── */
+@media (max-width: 1280px) {
+  .np-home-card_time { font-size: 24px; line-height: 28px; }
+  .np-home-card_name { font-size: 16px; line-height: 21px; }
+}
+
 @media (max-width: 1024px) {
-  .next-patient-card_avatar {
-    width: clamp(88px, 18vw, 112px);
+  .np-home-card {
+    padding: var(--figma-space-md) var(--figma-space-lg);
   }
-  .next-patient-card_name {
-    font: var(--figma-fw-bold) 18px / 24px var(--figma-font-family);
+  .np-home-card_avatar {
+    width: clamp(60px, 12vw, 76px);
   }
 }
 
 @media (max-width: 768px) {
-  .next-patient-card {
-    padding: var(--figma-space-md) var(--figma-space-lg);
-  }
-  .next-patient-card_body {
+  .np-home-card_body {
     gap: var(--figma-space-md);
   }
-  .next-patient-card_avatar {
-    width: 80px;
+  .np-home-card_avatar {
+    width: 64px;
   }
+  .np-home-card_time { font-size: 22px; line-height: 26px; }
 }
 
 @media (max-width: 480px) {
-  .next-patient-card {
+  .np-home-card {
     padding: var(--figma-space-md);
   }
-  .next-patient-card_avatar {
-    width: 64px;
+  .np-home-card_avatar {
+    width: 56px;
   }
-  .next-patient-card_name {
-    font: var(--figma-fw-bold) 16px / 22px var(--figma-font-family);
+  .np-home-card_time { font-size: 20px; line-height: 24px; }
+  .np-home-card_name { font-size: 15px; line-height: 20px; }
+  .np-home-card_cta {
+    width: 100%;
+    justify-content: center;
   }
-  .next-patient-card_title {
-    font: var(--figma-text-label);
-  }
-  .next-patient-card_meta {
-    grid-template-columns: 1fr;
+  .np-home-card_footer {
+    justify-content: stretch;
   }
 }
