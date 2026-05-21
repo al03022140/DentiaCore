@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Input, message } from 'antd';
 import API from '../../../shared/services/axios-instance.js';
 import SignatureBadge from '../../../shared/components/SignatureBadge.jsx';
-import SignatureModal from '../../../shared/components/SignatureModal.jsx';
 import SignaturePadModal from '../../../shared/components/SignaturePadModal.jsx';
 import DoctorSignStep from '../../../shared/components/DoctorSignStep.jsx';
 import { useAuth } from '../../../app/auth/AuthContext.jsx';
@@ -58,9 +57,13 @@ const PatientEvolutionNote = ({
   const [signStep, setSignStep] = useState(null);
   const [patientSigDataUrl, setPatientSigDataUrl] = useState(null);
 
-  // Modal legacy de firma con PIN para notas ya guardadas (botón en badge)
-  const [signModalOpen, setSignModalOpen] = useState(false);
-  const [signTarget, setSignTarget] = useState(null);
+  // Flujo de firma para notas ya guardadas (BORRADOR → OFICIAL)
+  //   null     → sin modal abierto
+  //   'patient' → pad del paciente
+  //   'doctor'  → firma del doctor (PIN o pad)
+  const [existingSignStep, setExistingSignStep] = useState(null);
+  const [existingSignTarget, setExistingSignTarget] = useState(null); // { noteId, index }
+  const [existingPatientSig, setExistingPatientSig] = useState(null);
 
   useEffect(() => {
     if (Array.isArray(initialEvolutionNotes)) {
@@ -158,6 +161,45 @@ const PatientEvolutionNote = ({
   const handleCancelSign = () => {
     if (loading) return;
     resetSignFlow();
+  };
+
+  const resetExistingSignFlow = () => {
+    setExistingSignStep(null);
+    setExistingSignTarget(null);
+    setExistingPatientSig(null);
+  };
+
+  const handleSignExistingNote = (noteId, index) => {
+    setExistingSignTarget({ noteId, index });
+    setExistingSignStep('patient');
+  };
+
+  const handleExistingPatientSigned = (pngDataUrl) => {
+    setExistingPatientSig(pngDataUrl);
+    setExistingSignStep('doctor');
+  };
+
+  const handleExistingDoctorSigned = async (doctorSignature) => {
+    if (!existingSignTarget) return;
+    setLoading(true);
+    try {
+      const { noteId, index } = existingSignTarget;
+      const response = await API.post(
+        `/patients/${patientId}/evolution-note/${noteId}/sign`,
+        { patientSignature: existingPatientSig, doctorSignature }
+      );
+      const payload = response?.data;
+      if (payload?.success && payload?.data) {
+        setNotes(prev => prev.map((n, idx) => (idx === index ? payload.data : n)));
+        message.success('Nota firmada y marcada como OFICIAL.');
+      }
+      resetExistingSignFlow();
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Error al firmar la nota';
+      message.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePrint = () => {
@@ -333,10 +375,7 @@ const PatientEvolutionNote = ({
                             firmaDesactualizada={n.firmaDesactualizada}
                             contentHash={n.contentHash}
                             canSign={canSignOfficial}
-                            onSignClick={() => {
-                              setSignTarget({ noteId: n._id, index: idx });
-                              setSignModalOpen(true);
-                            }}
+                            onSignClick={() => handleSignExistingNote(n._id, idx)}
                           />
                         )}
                       </div>
@@ -491,31 +530,30 @@ const PatientEvolutionNote = ({
         loading={loading}
       />
 
-      {/* Modal legacy de firma con PIN para notas ya guardadas (badge) */}
-      <SignatureModal
-        isOpen={signModalOpen}
-        onClose={() => { setSignModalOpen(false); setSignTarget(null); }}
-        onSigned={(result) => {
-          if (signTarget !== null) {
-            setNotes(prev => prev.map((n, idx) => {
-              if (idx === signTarget.index) {
-                return {
-                  ...n,
-                  firmadoPor: { nombre: user?.nombre, cedulaProfesional: user?.cedulaProfesional },
-                  firmadoEn: result.firmadoEn,
-                  contentHash: result.contentHash,
-                  firmaDesactualizada: false,
-                };
-              }
-              return n;
-            }));
-            message.success('Nota firmada exitosamente');
-          }
-          setSignTarget(null);
-        }}
-        resourceType="patient"
-        resourceId={patientId}
-        description={signTarget !== null ? `Nota de evolución #${(notes[signTarget.index]?.numero_procedimiento ?? signTarget.index + 1)}` : ''}
+      {/* PASO 1 — Firma del paciente (nota ya guardada) */}
+      <SignaturePadModal
+        isOpen={existingSignStep === 'patient'}
+        onClose={() => { if (!loading) resetExistingSignFlow(); }}
+        onConfirm={handleExistingPatientSigned}
+        title="Firma del paciente"
+        subtitle="Consentimiento de la nota de evolución"
+        signerName={patientFullName}
+        signerRole="Paciente"
+        consentText={patientConsentText}
+        confirmLabel="Confirmar firma del paciente"
+        loading={loading}
+      />
+
+      {/* PASO 2 — Firma del doctor (nota ya guardada) */}
+      <DoctorSignStep
+        isOpen={existingSignStep === 'doctor'}
+        onClose={() => { if (!loading) resetExistingSignFlow(); }}
+        onConfirm={handleExistingDoctorSigned}
+        title="Firma del doctor"
+        subtitle={canSignOfficial
+          ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
+          : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
+        loading={loading}
       />
     </section>
   );

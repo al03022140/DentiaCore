@@ -1393,6 +1393,158 @@ exports.updateDraftEvolutionNote = async (req, res) => {
 };
 
 /**
+ * 🔹 Firmar una nota de evolución existente (BORRADOR → OFICIAL).
+ *
+ * POST /patients/:id/evolution-note/:noteId/sign
+ * Body: { patientSignature: dataURL, doctorSignature: { method, pin|dataUrl, asDoctorId? } }
+ */
+exports.signExistingEvolutionNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    const { patientSignature, doctorSignature } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(noteId)) {
+      return res.status(400).json({ success: false, error: 'IDs inválidos.' });
+    }
+    if (!patientSignature || typeof patientSignature !== 'string') {
+      return res.status(400).json({ success: false, error: 'La firma del paciente es obligatoria.' });
+    }
+    if (!doctorSignature || !doctorSignature.method) {
+      return res.status(400).json({ success: false, error: 'La firma del doctor es obligatoria.' });
+    }
+    if (doctorSignature.method !== 'pin' && doctorSignature.method !== 'pad') {
+      return res.status(400).json({ success: false, error: 'Método de firma del doctor inválido (use "pin" o "pad").' });
+    }
+
+    const patient = await Patient.findOne({ _id: id, deletedAt: null });
+    if (!patient) return res.status(404).json({ success: false, error: 'Paciente no encontrado.' });
+
+    const note = patient.notas_evolucion.id(noteId);
+    if (!note || note.deletedAt) return res.status(404).json({ success: false, error: 'Nota no encontrada.' });
+
+    if (note.estadoRegistro !== 'BORRADOR') {
+      return res.status(409).json({
+        success: false,
+        error: 'Esta nota ya está firmada como OFICIAL. Las notas OFICIALES son inmutables (NOM-024).'
+      });
+    }
+
+    const userPerms = getEffectivePermissions(req.user);
+
+    const asDoctorId = doctorSignature.asDoctorId || null;
+    let signerDoctor;
+    if (asDoctorId) {
+      if (!mongoose.Types.ObjectId.isValid(asDoctorId)) {
+        return res.status(400).json({ success: false, error: 'ID de doctor inválido.' });
+      }
+      signerDoctor = await Usuario.findById(asDoctorId);
+      if (!signerDoctor) return res.status(404).json({ success: false, error: 'Doctor seleccionado no encontrado.' });
+      if (signerDoctor.active === false) return res.status(403).json({ success: false, error: 'La cuenta del doctor está desactivada.' });
+      if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
+        return res.status(403).json({ success: false, error: 'El usuario seleccionado no es doctor.' });
+      }
+    } else {
+      if (!hasPermission(userPerms, ['consultas.create'])) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tiene permiso para firmar notas como OFICIAL. Pida al doctor que firme.'
+        });
+      }
+      signerDoctor = await Usuario.findById(req.user.id);
+      if (!signerDoctor) return res.status(401).json({ success: false, error: 'Usuario no encontrado.' });
+    }
+
+    if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+      });
+    }
+    if (!signerDoctor.pinHash) {
+      return res.status(400).json({ success: false, error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.' });
+    }
+    const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+    if (!pinResult.ok) {
+      if (pinResult.locked) {
+        const minutos = Math.ceil(pinResult.remainingMs / 60000);
+        return res.status(429).json({ success: false, error: `PIN del doctor bloqueado. Reintenta en ${minutos} minuto(s).`, locked: true });
+      }
+      return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.', attemptsLeft: pinResult.attemptsLeft });
+    }
+
+    const now = new Date();
+    const noteIdStr = note._id.toString();
+    const contentHash = _computeEvolutionNoteHash(note);
+    const writtenSignaturePaths = [];
+
+    try {
+      const patientSig = await saveSignatureDataUrl(patientSignature, [
+        'pacientes', id, 'firmas-notas', `${noteIdStr}_paciente.png`
+      ]);
+      if (patientSig.absPath) writtenSignaturePaths.push(patientSig.absPath);
+      note.pacienteFirmaUrl = patientSig.publicUrl;
+      note.pacienteFirmadoEn = now;
+      note.pacienteFirmaContentHash = contentHash;
+      note.pacienteFirmaImageHash = patientSig.contentHash;
+    } catch (e) {
+      return res.status(400).json({ success: false, error: `No se pudo guardar la firma del paciente: ${e.message}` });
+    }
+
+    if (doctorSignature.method === 'pad') {
+      try {
+        const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
+          'pacientes', id, 'firmas-notas', `${noteIdStr}_doctor.png`
+        ]);
+        if (docSig.absPath) writtenSignaturePaths.push(docSig.absPath);
+        note.doctorFirmaUrl = docSig.publicUrl;
+        note.doctorFirmaImageHash = docSig.contentHash;
+      } catch (e) {
+        await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+        return res.status(400).json({ success: false, error: `No se pudo guardar la firma del doctor: ${e.message}` });
+      }
+    } else {
+      try {
+        const snap = await copyFirmaToSnapshot(signerDoctor.firmaDigitalUrl, [
+          'pacientes', id, 'firmas-notas', `${noteIdStr}_doctor`
+        ]);
+        if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
+        note.doctorFirmaUrl = snap.publicUrl;
+        note.doctorFirmaImageHash = snap.contentHash;
+      } catch (e) {
+        await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+        return res.status(500).json({ success: false, error: 'No se pudo persistir el snapshot de la firma del doctor.' });
+      }
+    }
+
+    note.doctorFirmaMethod = doctorSignature.method;
+    note.firmadoPor = signerDoctor._id;
+    note.firmadoEn = now;
+    note.contentHash = contentHash;
+    note.firmaDesactualizada = false;
+    note.estadoRegistro = 'OFICIAL';
+
+    try {
+      await patient.save();
+    } catch (saveErr) {
+      await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+      return res.status(500).json({ success: false, error: 'No se pudo guardar la nota firmada. Los cambios se revirtieron.' });
+    }
+
+    auditLogger.registrarManual(req, 'firma_electronica', {
+      resourceType: 'patient',
+      resourceId: note._id,
+      patientId: patient._id,
+      detalles: { contentHash, noteId: noteIdStr, method: doctorSignature.method }
+    }).catch(() => {});
+
+    return res.json({ success: true, message: 'Nota firmada exitosamente como OFICIAL.', data: note });
+  } catch (error) {
+    console.error('Error en signExistingEvolutionNote:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Error interno al firmar la nota.' });
+  }
+};
+
+/**
  * 🔹 Finalizar historia clínica con consentimiento del paciente.
  *
  * POST /patients/:id/finalize-history

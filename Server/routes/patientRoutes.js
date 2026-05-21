@@ -470,6 +470,12 @@ router
   .all(validateId, checkPatient)
   .patch(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.updateDraftEvolutionNote);
 
+// Firmar una nota de evolución existente (BORRADOR → OFICIAL) con firma del paciente + doctor.
+router
+  .route('/:id/evolution-note/:noteId/sign')
+  .all(validateId, checkPatient)
+  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.signExistingEvolutionNote);
+
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router
   .route('/:id/finalize-history')
