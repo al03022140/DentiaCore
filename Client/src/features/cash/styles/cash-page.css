@@ -762,12 +762,11 @@
 
 .pending-charge-item {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-md); /* 10px — list item */
-  cursor: pointer;
   transition:
     border-color var(--figma-transition-fast),
     background var(--figma-transition-fast),
@@ -781,6 +780,61 @@
   background: var(--cash-brand-tint); /* Tinte azul de marca, no Bootstrap */
   box-shadow: inset 3px 0 0 var(--color-primary); /* Acento lateral patient-card */
   transform: translateY(-1px);
+}
+
+.pending-charge-item__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.pending-charge-item__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--figma-border-default);
+}
+
+.pending-charge-item__quick-pay,
+.pending-charge-item__pay {
+  padding: 4px 12px;
+  font-family: var(--font-family-primary);
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.pending-charge-item__quick-pay {
+  border: 1px solid var(--color-success, #16a34a);
+  background: var(--color-success, #16a34a);
+  color: #fff;
+}
+
+.pending-charge-item__quick-pay:hover:not(:disabled) {
+  background: var(--color-success-hover, #15803d);
+  border-color: var(--color-success-hover, #15803d);
+}
+
+.pending-charge-item__pay {
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.pending-charge-item__pay:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.pending-charge-item__quick-pay:disabled,
+.pending-charge-item__pay:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pending-charge-item__avatar {

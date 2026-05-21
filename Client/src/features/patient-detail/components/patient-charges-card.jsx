@@ -476,6 +476,14 @@ const PatientChargesCard = ({ patientId }) => {
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente:</strong> {formatMoney(selectedCharge.saldoPendiente)}
               </p>
+              <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+                <strong>Saldo pendiente total del paciente:</strong>{' '}
+                {formatMoney(round2(
+                  charges
+                    .filter(c => !c.cancelado)
+                    .reduce((sum, c) => sum + (Number(c.saldoPendiente) || 0), 0)
+                ))}
+              </p>
             </div>
 
             <div style={{ marginBottom: '0.75rem' }}>

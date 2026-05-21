@@ -93,7 +93,7 @@
 
 .patient-cash-movements .cash-mov-totals {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
@@ -132,6 +132,17 @@
 
 .patient-cash-movements .cash-mov-total--net .cash-mov-total__value {
   color: var(--color-primary, #3182ce);
+}
+
+/* Pendiente: misma forma que las demás cards, solo el valor en ámbar. */
+.patient-cash-movements .cash-mov-total--pending .cash-mov-total__value {
+  color: var(--color-warning, #d97706);
+}
+
+@media (max-width: 900px) {
+  .patient-cash-movements .cash-mov-totals {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 640px) {
@@ -236,4 +247,91 @@
 
 .patient-cash-movements .cash-mov-item--expense .cash-mov-item__amount {
   color: var(--color-danger, #c53030);
+}
+
+/* ── Sección "Pendientes por cobrar" ─────────────────────────
+   Sin borde ni fondo en el contenedor: el acento ámbar vive solo en el
+   título y en cada card individual. */
+.patient-cash-movements .cash-mov-pending-section {
+  margin-top: var(--spacing-md);
+}
+
+.patient-cash-movements .cash-mov-pending-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.patient-cash-movements .cash-mov-pending-section__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-warning, #b45309);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.patient-cash-movements .cash-mov-pending-section__hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #4a5568);
+  font-style: italic;
+}
+
+.patient-cash-movements .cash-mov-pending-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.patient-cash-movements .cash-mov-item--pending {
+  background: var(--color-bg-white, #fff);
+  border: 1px dashed var(--color-warning-border, #ffd591);
+  border-left: 3px solid var(--color-warning, #d97706);
+}
+
+/* Card clicable: cursor + feedback al pasar el mouse para indicar que
+   se puede registrar pago/abono haciendo click. */
+.patient-cash-movements .cash-mov-item--clickable {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.patient-cash-movements .cash-mov-item--clickable:hover {
+  background: var(--color-warning-bg, #fffbe6);
+  border-color: var(--color-warning, #d97706);
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.15);
+  transform: translateY(-1px);
+}
+
+.patient-cash-movements .cash-mov-item--clickable:focus-visible {
+  outline: 2px solid var(--color-warning, #d97706);
+  outline-offset: 2px;
+}
+
+.patient-cash-movements .cash-mov-item__amount--pending {
+  color: var(--color-warning, #d97706);
+  font-size: 0.85rem;
+}
+
+.patient-cash-movements .cash-mov-pending-section__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border-light, #e2e8f0);
+  font-weight: 600;
+  color: var(--color-warning, #b45309);
+}
+
+.patient-cash-movements .cash-mov-pending-section__footer-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
