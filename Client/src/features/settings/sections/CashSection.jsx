@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Popconfirm } from 'antd';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
 import { formatMoney } from '../../../shared/utils/money';
+import DEFAULT_DENTAL_SERVICES from './defaultDentalServices';
 
 // Tope superior del precio default — alineado con el schema del servidor
 // (clinicSettings.MAX_SERVICE_PRICE). Si se baja en el back, ajustar aquí.
@@ -84,6 +85,13 @@ const CashSection = () => {
     const k = name.toLowerCase();
     return serviceCatalog.some((s) => s.nombre.toLowerCase() === k);
   };
+
+  // Sugerencias del datalist: catálogo por defecto menos los ya agregados.
+  // Filtrar por lo escrito lo maneja el navegador automáticamente.
+  const serviceSuggestions = useMemo(() => {
+    const used = new Set(serviceCatalog.map((s) => s.nombre.toLowerCase()));
+    return DEFAULT_DENTAL_SERVICES.filter((name) => !used.has(name.toLowerCase()));
+  }, [serviceCatalog]);
 
   const addCategory = () => {
     const trimmed = normalizeName(newCat);
@@ -288,8 +296,15 @@ const CashSection = () => {
             placeholder="Nombre del servicio"
             maxLength={MAX_SERVICE_NAME}
             style={{ flex: '2 1 140px' }}
+            list="dental-services-suggestions"
+            autoComplete="off"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addService(); } }}
           />
+          <datalist id="dental-services-suggestions">
+            {serviceSuggestions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
           <input
             type="number"
             value={newServicePrice}
