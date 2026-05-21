@@ -94,13 +94,29 @@ patientChargeSchema.pre('save', async function (next) {
   }
 });
 
-// Recalcular totales de pago antes de guardar
+// Recalcular totales de pago antes de guardar — redondea a 2 decimales para
+// evitar saldoPendiente = $0.0000001 que bloquea el cierre del cobro.
+const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 patientChargeSchema.pre('save', function (next) {
-  if (this.confirmado && this.isModified('items')) {
+  // Guard de inmutabilidad: en UPDATE (no isNew) no se pueden modificar items
+  // de un cobro confirmado. En isNew no aplica — el cobro es flamante.
+  if (!this.isNew && this.confirmado && this.isModified('items')) {
     return next(new Error('No se pueden modificar items de un cobro confirmado'));
   }
-  this.totalPagado = this.pagos.reduce((sum, p) => sum + p.monto, 0);
-  this.saldoPendiente = Math.max(0, this.total - this.totalPagado);
+
+  // Normalizar montos de items SÓLO al crear o cuando items se modificó —
+  // evita marcar el array como dirty en updates que no tocan items
+  // (cancelar cobro, agregar pago).
+  if (this.isNew && Array.isArray(this.items)) {
+    for (const item of this.items) {
+      item.precioUnitario = round2(item.precioUnitario);
+      item.subtotal = round2(item.subtotal);
+    }
+  }
+
+  this.total = round2(this.total);
+  this.totalPagado = round2(this.pagos.reduce((sum, p) => sum + (Number.isFinite(p.monto) ? p.monto : 0), 0));
+  this.saldoPendiente = round2(Math.max(0, this.total - this.totalPagado));
   next();
 });
 

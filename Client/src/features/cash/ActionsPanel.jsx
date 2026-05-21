@@ -140,6 +140,10 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
             <InputNumber
               style={{ width: '100%' }}
               prefix="$"
+              min={0.01}
+              max={100000000}
+              step={0.01}
+              precision={2}
               formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
               parser={value => value.replace(/\$\s?|(,*)/g, '')}
             />

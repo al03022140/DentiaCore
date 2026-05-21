@@ -52,3 +52,14 @@ export const updateMovement = async (movementId, payload) => {
   const response = await API.put(`/cash/movements/${encodeURIComponent(movementId)}`, payload);
   return response.data;
 };
+
+export const getSessionHistory = async ({ skip = 0, limit = 30, from, to } = {}) => {
+  const params = new URLSearchParams();
+  if (skip) params.set('skip', String(skip));
+  if (limit !== 30) params.set('limit', String(limit));
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  const { data } = await API.get(`/cash/sessions${qs ? `?${qs}` : ''}`);
+  return data;
+};

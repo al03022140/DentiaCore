@@ -65,22 +65,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await getLastMovements();
-        if (cancelled) return;
-        setMovements(Array.isArray(data) ? data : []);
-      } catch (error) {
-        if (cancelled) return;
-        console.error('Error fetching movements:', error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [refreshTrigger]);
+  useEffect(() => { load(); }, [load, refreshTrigger]);
 
   const openEditModal = (movement) => {
     if (movement.linkedChargeId) return; // bloqueado: pago de cobro
@@ -269,6 +254,10 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated }) => {
               <InputNumber
                 style={{ width: '100%' }}
                 prefix="$"
+                min={0.01}
+                max={100000000}
+                step={0.01}
+                precision={2}
                 formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={value => value.replace(/\$\s?|(,*)/g, '')}
               />

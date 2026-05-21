@@ -267,6 +267,9 @@ const PatientCashMovements = ({ patientId }) => {
             <InputNumber
               style={{ width: '100%' }}
               min={0.01}
+              max={100000000}
+              step={0.01}
+              precision={2}
               prefix="$"
               formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
               parser={(value) => value.replace(/\$\s?|(,*)/g, '')}

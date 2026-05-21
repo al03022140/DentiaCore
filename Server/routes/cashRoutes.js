@@ -23,6 +23,7 @@ const withValidation = (rules) => [
 router.get('/balance/monthly', readLimiter, authorize(['cash.read']), cashController.getMonthlyBalance);
 router.get('/session/balance', readLimiter, authorize(['cash.read']), cashController.getSessionBalance);
 router.get('/session/status', readLimiter, authorize(['cash.read']), cashController.getSessionStatus);
+router.get('/sessions', readLimiter, authorize(['cash.read']), cashController.getSessionHistory);
 router.post(
 	'/session/open',
 	writeLimiter,
@@ -30,8 +31,8 @@ router.post(
 	withValidation([
 		body('initialAmount')
 			.optional()
-			.isFloat({ min: 0 })
-			.withMessage('El monto inicial debe ser un número mayor o igual a 0')
+			.isFloat({ min: 0, max: 100000000 })
+			.withMessage('El monto inicial debe estar entre 0 y 100,000,000')
 			.toFloat()
 	]),
 	cashController.openBox
@@ -44,7 +45,7 @@ router.post(
 	withValidation([
 		body('amount')
 			.exists().withMessage('El monto es obligatorio')
-			.isFloat({ gt: 0 }).withMessage('El monto debe ser un número mayor a 0')
+			.isFloat({ gt: 0, max: 100000000 }).withMessage('El monto debe estar entre 0.01 y 100,000,000')
 			.toFloat(),
 		body('type')
 			.isIn(['INCOME', 'EXPENSE']).withMessage('Tipo debe ser INCOME o EXPENSE'),
@@ -78,7 +79,7 @@ router.put(
 	withValidation([
 		body('amount')
 			.optional()
-			.isFloat({ gt: 0 }).withMessage('El monto debe ser un número mayor a 0')
+			.isFloat({ gt: 0, max: 100000000 }).withMessage('El monto debe estar entre 0.01 y 100,000,000')
 			.toFloat(),
 		body('paymentMethod')
 			.optional()

@@ -39,22 +39,7 @@ const CashDashboard = () => {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await getSessionBalance();
-        if (cancelled) return;
-        setData(res);
-      } catch (error) {
-        if (cancelled) return;
-        console.error('Error loading session balance:', error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const summary = data?.summary || {};
   const session = data?.session || null;

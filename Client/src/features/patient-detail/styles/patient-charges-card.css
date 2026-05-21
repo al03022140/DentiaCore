@@ -149,6 +149,46 @@
   color: #fff;
 }
 
+.charge-card__pay-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.charge-card__actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.charge-card__cancel-btn {
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.charge-card__cancel-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.charge-card--cancelled {
+  opacity: 0.65;
+  background: var(--color-bg-tertiary, #f5f5f5);
+}
+
+.charge-card__balance--cancelled {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 /* Modal items table */
 .add-charge-modal__items {
   width: 100%;

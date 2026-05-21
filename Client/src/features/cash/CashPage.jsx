@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Spin, message } from 'antd';
 import CashDashboard from './CashDashboard';
 import ActionsPanel from './ActionsPanel';
@@ -14,7 +14,7 @@ const CashPage = () => {
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     try {
       const { isOpen } = await getSessionStatus();
       setIsBoxOpen(isOpen);
@@ -25,26 +25,9 @@ const CashPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { isOpen } = await getSessionStatus();
-        if (cancelled) return;
-        setIsBoxOpen(isOpen);
-        setShowOpenModal(!isOpen);
-      } catch (error) {
-        if (cancelled) return;
-        console.error('Error checking session:', error);
-        message.error('Error al verificar estado de caja');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => { checkStatus(); }, [checkStatus]);
 
   const handleOpenSuccess = () => {
     setIsBoxOpen(true);

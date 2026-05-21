@@ -13,7 +13,9 @@ const cashMovementEditSchema = new mongoose.Schema({
 const cashMovementSchema = new mongoose.Schema({
   amount: {
     type: Number,
-    required: true
+    required: true,
+    min: 0.01,
+    max: 100_000_000
   },
   type: {
     type: String,
@@ -70,5 +72,13 @@ const cashMovementSchema = new mongoose.Schema({
 cashMovementSchema.index({ boxSessionId: 1 });
 cashMovementSchema.index({ date: -1 });
 cashMovementSchema.index({ patientId: 1, date: -1 });
+
+// Redondea amount a 2 decimales para evitar centavos fraccionarios IEEE-754
+cashMovementSchema.pre('save', function (next) {
+  if (typeof this.amount === 'number') {
+    this.amount = Math.round(this.amount * 100) / 100;
+  }
+  next();
+});
 
 module.exports = mongoose.model('CashMovement', cashMovementSchema);

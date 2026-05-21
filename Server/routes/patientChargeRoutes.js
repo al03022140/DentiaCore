@@ -8,5 +8,6 @@ router.get('/', readLimiter, authorize(['cash.read']), patientChargeController.g
 router.get('/:patientId', readLimiter, authorize(['cash.read']), patientChargeController.getChargesByPatient);
 router.post('/:patientId', writeLimiter, authorize(['cash.manage']), patientChargeController.createCharge);
 router.post('/:chargeId/payment', writeLimiter, authorize(['cash.manage']), patientChargeController.addPayment);
+router.post('/:chargeId/cancel', writeLimiter, authorize(['cash.manage']), patientChargeController.cancelCharge);
 
 module.exports = router;

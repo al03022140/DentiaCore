@@ -42,6 +42,9 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
           size="large"
           prefix="$"
           min={0}
+          max={100000000}
+          step={0.01}
+          precision={2}
           value={amount}
           onChange={setAmount}
           formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}

@@ -1,30 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Input, Select, message } from 'antd';
-import { getChargesByPatient, createCharge, addPayment } from '../../../shared/services/patientChargeService';
+import { Modal, Input, Select, message, Popconfirm } from 'antd';
+import { getChargesByPatient, createCharge, addPayment, cancelCharge } from '../../../shared/services/patientChargeService';
 import { getSettings } from '../../../shared/services/settingsService';
+import { getSessionStatus } from '../../../shared/services/cashService';
 import API from '../../../shared/services/axios-instance';
 import '../styles/patient-charges-card.css';
 
 const CONFIRM_PHRASE = 'CONFIRMO';
+const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
 
 const PatientChargesCard = ({ patientId }) => {
   const [charges, setCharges] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isBoxOpen, setIsBoxOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedCharge, setSelectedCharge] = useState(null);
 
-  // Add charge modal state
   const [serviceCatalog, setServiceCatalog] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [chargeItems, setChargeItems] = useState([]);
   const [chargeConfirmText, setChargeConfirmText] = useState('');
 
-  // Pay modal state
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH');
   const [payConfirmText, setPayConfirmText] = useState('');
+
+  const [cancelMotivo, setCancelMotivo] = useState('');
+  const [cancelConfirmText, setCancelConfirmText] = useState('');
 
   const loadCharges = useCallback(async () => {
     try {
@@ -37,18 +42,31 @@ const PatientChargesCard = ({ patientId }) => {
     }
   }, [patientId]);
 
+  // Refresca también el estado de caja para decidir si los botones se habilitan
+  const refreshBoxStatus = useCallback(async () => {
+    try {
+      const status = await getSessionStatus();
+      setIsBoxOpen(!!status?.isOpen);
+    } catch {
+      setIsBoxOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!patientId) return;
+    if (!patientId) return undefined;
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
-        const data = await getChargesByPatient(patientId);
+        const [data, status] = await Promise.all([
+          getChargesByPatient(patientId),
+          getSessionStatus().catch(() => ({ isOpen: false }))
+        ]);
         if (cancelled) return;
         setCharges(data);
+        setIsBoxOpen(!!status?.isOpen);
       } catch {
         if (cancelled) return;
-        // silent — empty state will show
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -56,7 +74,6 @@ const PatientChargesCard = ({ patientId }) => {
     return () => { cancelled = true; };
   }, [patientId]);
 
-  // Group charges by date
   const groupedCharges = charges.reduce((groups, charge) => {
     const dateKey = new Date(charge.fecha).toLocaleDateString('es-MX', {
       year: 'numeric', month: 'long', day: 'numeric'
@@ -66,7 +83,6 @@ const PatientChargesCard = ({ patientId }) => {
     return groups;
   }, {});
 
-  // Open add charge modal
   const openAddModal = async () => {
     try {
       const [settings, appointmentsRes] = await Promise.all([
@@ -76,8 +92,9 @@ const PatientChargesCard = ({ patientId }) => {
       setServiceCatalog(settings.serviceCatalog || []);
       const patientAppts = (Array.isArray(appointmentsRes) ? appointmentsRes : [])
         .filter(a => {
+          // paciente_id puede venir como string o como objeto populado.
           const pid = a.paciente_id?._id || a.paciente_id;
-          return pid === patientId;
+          return String(pid) === String(patientId);
         });
       setAppointments(patientAppts);
     } catch {
@@ -95,7 +112,7 @@ const PatientChargesCard = ({ patientId }) => {
     setChargeItems(prev => [...prev, {
       nombre: svc.nombre,
       cantidad: 1,
-      precioUnitario: svc.precioDefault
+      precioUnitario: round2(svc.precioDefault)
     }]);
   };
 
@@ -109,9 +126,9 @@ const PatientChargesCard = ({ patientId }) => {
     setChargeItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const chargeTotal = chargeItems.reduce((sum, item) => {
+  const chargeTotal = round2(chargeItems.reduce((sum, item) => {
     return sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0);
-  }, 0);
+  }, 0));
 
   const handleCreateCharge = async () => {
     if (chargeItems.length === 0) {
@@ -123,7 +140,7 @@ const PatientChargesCard = ({ patientId }) => {
         items: chargeItems.map(item => ({
           nombre: item.nombre,
           cantidad: Number(item.cantidad),
-          precioUnitario: Number(item.precioUnitario)
+          precioUnitario: round2(item.precioUnitario)
         })),
         appointmentId: selectedAppointment || undefined,
         confirmacion: chargeConfirmText.trim()
@@ -136,8 +153,15 @@ const PatientChargesCard = ({ patientId }) => {
     }
   };
 
-  // Pay modal
-  const openPayModal = (charge) => {
+  const openPayModal = async (charge) => {
+    // BUG-7: revalidar estado de caja al momento (puede haber cambiado
+    // desde el load inicial). Evita modal abierto contra caja cerrada.
+    await refreshBoxStatus();
+    const status = await getSessionStatus().catch(() => ({ isOpen: false }));
+    if (!status?.isOpen) {
+      message.warning('La caja está cerrada. Ábrela desde el módulo de Caja para registrar pagos.');
+      return;
+    }
     setSelectedCharge(charge);
     setPayAmount('');
     setPayMethod('CASH');
@@ -147,7 +171,7 @@ const PatientChargesCard = ({ patientId }) => {
 
   const handleAddPayment = async () => {
     if (!selectedCharge) return;
-    const monto = parseFloat(payAmount);
+    const monto = round2(parseFloat(payAmount));
     if (!Number.isFinite(monto) || monto <= 0) {
       message.warning('Ingresa un monto válido');
       return;
@@ -163,6 +187,32 @@ const PatientChargesCard = ({ patientId }) => {
       loadCharges();
     } catch (err) {
       message.error(err.response?.data?.message || 'Error al registrar pago');
+    }
+  };
+
+  const openCancelModal = (charge) => {
+    setSelectedCharge(charge);
+    setCancelMotivo('');
+    setCancelConfirmText('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelCharge = async () => {
+    if (!selectedCharge) return;
+    if (cancelMotivo.trim().length < 3) {
+      message.warning('Indica un motivo (mínimo 3 caracteres)');
+      return;
+    }
+    try {
+      await cancelCharge(selectedCharge._id, {
+        motivo: cancelMotivo.trim(),
+        confirmacion: cancelConfirmText.trim()
+      });
+      message.success('Cobro cancelado');
+      setShowCancelModal(false);
+      loadCharges();
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Error al cancelar cobro');
     }
   };
 
@@ -188,7 +238,10 @@ const PatientChargesCard = ({ patientId }) => {
             <div key={dateLabel} className="charges-date-group">
               <div className="charges-date-group__label">{dateLabel}</div>
               {dateCharges.map(charge => (
-                <div key={charge._id} className="charge-card">
+                <div
+                  key={charge._id}
+                  className={`charge-card${charge.cancelado ? ' charge-card--cancelled' : ''}`}
+                >
                   {charge.appointmentId && (
                     <div className="charge-card__appointment">
                       Cita: {charge.appointmentId.motivo || 'Sin motivo'}
@@ -204,7 +257,11 @@ const PatientChargesCard = ({ patientId }) => {
                   </ul>
                   <div className="charge-card__footer">
                     <span className="charge-card__total">Total: ${charge.total.toLocaleString()}</span>
-                    {charge.saldoPendiente > 0 ? (
+                    {charge.cancelado ? (
+                      <span className="charge-card__balance charge-card__balance--cancelled">
+                        Cancelado{charge.canceladoMotivo ? `: ${charge.canceladoMotivo}` : ''}
+                      </span>
+                    ) : charge.saldoPendiente > 0 ? (
                       <span className="charge-card__balance charge-card__balance--pending">
                         Pendiente: ${charge.saldoPendiente.toLocaleString()}
                         {charge.totalPagado > 0 && ` (pagado: $${charge.totalPagado.toLocaleString()})`}
@@ -213,10 +270,26 @@ const PatientChargesCard = ({ patientId }) => {
                       <span className="charge-card__balance charge-card__balance--paid">Pagado</span>
                     )}
                   </div>
-                  {charge.saldoPendiente > 0 && (
-                    <button className="charge-card__pay-btn" onClick={() => openPayModal(charge)}>
-                      Registrar Pago
-                    </button>
+                  {!charge.cancelado && (
+                    <div className="charge-card__actions">
+                      {charge.saldoPendiente > 0 && (
+                        <button
+                          className="charge-card__pay-btn"
+                          onClick={() => openPayModal(charge)}
+                          disabled={!isBoxOpen}
+                          title={isBoxOpen ? 'Registrar pago' : 'La caja está cerrada'}
+                        >
+                          Registrar Pago
+                        </button>
+                      )}
+                      <button
+                        className="charge-card__cancel-btn"
+                        onClick={() => openCancelModal(charge)}
+                        title="Cancelar cobro"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -302,6 +375,7 @@ const PatientChargesCard = ({ patientId }) => {
                       <input
                         type="number"
                         min="1"
+                        step="1"
                         value={item.cantidad}
                         onChange={e => updateItem(idx, 'cantidad', Math.max(1, parseInt(e.target.value) || 1))}
                       />
@@ -312,11 +386,12 @@ const PatientChargesCard = ({ patientId }) => {
                         min="0"
                         step="0.01"
                         value={item.precioUnitario}
-                        onChange={e => updateItem(idx, 'precioUnitario', parseFloat(e.target.value) || 0)}
+                        onChange={e => updateItem(idx, 'precioUnitario', round2(parseFloat(e.target.value) || 0))}
+                        onBlur={e => updateItem(idx, 'precioUnitario', round2(parseFloat(e.target.value) || 0))}
                       />
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>
-                      ${((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0)).toLocaleString()}
+                      ${round2((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0)).toLocaleString()}
                     </td>
                     <td>
                       <button type="button" className="remove-item-btn" onClick={() => removeItem(idx)}>×</button>
@@ -368,6 +443,7 @@ const PatientChargesCard = ({ patientId }) => {
                 step="0.01"
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
+                onBlur={e => setPayAmount(String(round2(parseFloat(e.target.value) || 0)))}
                 placeholder={`Máximo: $${selectedCharge.saldoPendiente.toLocaleString()}`}
               />
             </div>
@@ -385,6 +461,48 @@ const PatientChargesCard = ({ patientId }) => {
               <Input
                 value={payConfirmText}
                 onChange={e => setPayConfirmText(e.target.value)}
+                placeholder={CONFIRM_PHRASE}
+              />
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* Cancel Charge Modal */}
+      <Modal
+        title="Cancelar Cobro"
+        open={showCancelModal}
+        onCancel={() => setShowCancelModal(false)}
+        onOk={handleCancelCharge}
+        okText="Cancelar Cobro"
+        okType="danger"
+        cancelText="Volver"
+        okButtonProps={{ disabled: cancelConfirmText.trim() !== CONFIRM_PHRASE || cancelMotivo.trim().length < 3 }}
+      >
+        {selectedCharge && (
+          <>
+            <p style={{ marginBottom: '0.75rem' }}>
+              Esta acción marcará el cobro como cancelado. Los pagos ya registrados
+              quedarán en la caja (no se devuelven automáticamente).
+            </p>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: 4 }}>
+                Motivo de cancelación
+              </label>
+              <Input.TextArea
+                rows={2}
+                value={cancelMotivo}
+                onChange={e => setCancelMotivo(e.target.value)}
+                placeholder="Ej. Cobro duplicado, paciente solicitó anulación..."
+                maxLength={300}
+                showCount
+              />
+            </div>
+            <div className="add-charge-modal__confirm-section">
+              <label>Escribe <strong>{CONFIRM_PHRASE}</strong> para confirmar</label>
+              <Input
+                value={cancelConfirmText}
+                onChange={e => setCancelConfirmText(e.target.value)}
                 placeholder={CONFIRM_PHRASE}
               />
             </div>
