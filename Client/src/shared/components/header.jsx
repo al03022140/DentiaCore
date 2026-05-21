@@ -60,9 +60,7 @@ const Header = () => {
       <h1 ref={h1Ref} className="header-greeting" title={`Buenos días, ${fullName}`}>Buenos días, {displayName}</h1>
       <div className="header-actions">
         <button className="lock-button" onClick={() => lock('manual')} title="Bloquear pantalla">
-          {user?.nombre === 'Administrador Local'
-            ? <img src={lockBlockedIcon} alt="Administrador Local" width="14" height="14" className="theme-icon" style={{ verticalAlign: 'middle' }} />
-            : '🔒'} Bloquear
+          <img src={lockBlockedIcon} alt="" width="14" height="14" className="theme-icon" style={{ verticalAlign: 'middle' }} /> Bloquear
         </button>
         <button className="logout-button" onClick={handleLogout} title="Cerrar sesión">Cerrar sesión</button>
       </div>
