@@ -728,7 +728,16 @@ exports.savePeriodontogramData = [
       // Transacción: History.create + periodontogram.save deben ser
       // atómicos. Antes el History se persistía aunque el main fallara,
       // dejando registros huérfanos apuntando a `current` desactualizado.
-      try {
+      //
+      // Fallback standalone: `session.withTransaction` requiere MongoDB en
+      // replica set o mongos. En instalaciones standalone (dev local, self-
+      // hosted simple) lanza "Transaction numbers are only allowed on a
+      // replica set member or mongos". Detectamos esto y caemos a escritura
+      // secuencial sin sesión — se pierde la atomicidad estricta pero la
+      // operación deja de fallar con 500. El History se crea ANTES del save
+      // del main para que, si algo falla en el save, el History huérfano sea
+      // el único residuo (es append-only, no corrompe el current).
+      const writeWithTransaction = async () => {
         await session.withTransaction(async () => {
           await PeriodontogramHistory.create([{
             patient: periodontogram.patient,
@@ -741,6 +750,39 @@ exports.savePeriodontogramData = [
           }], { session });
           await periodontogram.save({ session });
         });
+      };
+      const writeWithoutTransaction = async () => {
+        await PeriodontogramHistory.create({
+          patient: periodontogram.patient,
+          periodontogram: periodontogram._id,
+          versionName,
+          teeth: plainTeethPreSave,
+          statistics: plainStatisticsPreSave,
+          appointmentId: saveAppointmentId,
+          createdBy: validUserId
+        });
+        await periodontogram.save();
+      };
+      const isStandaloneTxError = (err) => {
+        const msg = String(err?.message || '');
+        return (
+          err?.codeName === 'IllegalOperation' ||
+          err?.code === 20 ||
+          msg.includes('Transaction numbers are only allowed on a replica set') ||
+          msg.includes('Transactions are not supported')
+        );
+      };
+      try {
+        try {
+          await writeWithTransaction();
+        } catch (txError) {
+          if (isStandaloneTxError(txError)) {
+            console.warn('⚠️ MongoDB standalone detectado — guardando periodontograma sin transacción');
+            await writeWithoutTransaction();
+          } else {
+            throw txError;
+          }
+        }
       } catch (txError) {
         if (txError.code === 11000) {
           return res.status(409).json({

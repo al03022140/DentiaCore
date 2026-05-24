@@ -1223,7 +1223,13 @@ body div.data-cell.checkbox-cell label.checkbox-btn input:checked ~ span.checkma
 .periodontogram-container[data-read-only="true"] .triple-input input:disabled,
 .periodontogram-container[data-read-only="true"] .mini-input:disabled {
   background-color: transparent !important;
-  color: inherit !important;
+  /* WebKit ignora `color: inherit` en :disabled y aplica graytext via
+     -webkit-text-fill-color, lo que dejaba en negro las letras de
+     movilidad, pronóstico, furca, profundidad de sondaje y margen
+     gingival en modo Visualización + dark mode. Forzamos explícitamente
+     el color tematizado y también el text-fill-color de WebKit. */
+  color: var(--color-text-primary) !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
   opacity: 1 !important;
   cursor: default !important;
   border: none !important;
