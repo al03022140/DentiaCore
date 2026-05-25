@@ -103,19 +103,19 @@ MenuItem.prototype.renderStateActive = function (context, settings) {
 
     context.beginPath();
     context.globalAlpha = 1;
-    context.fillStyle = "#ace8d1";
+    context.fillStyle = settings ? settings.COLOR_MENU_ACTIVE_BG : "#ace8d1";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, this.rect.height);
 
-    context.fillStyle = "#bef7e1";
+    context.fillStyle = settings ? settings.COLOR_MENU_ACTIVE_TOP : "#bef7e1";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, portion);
 
-    context.fillStyle = "#dafff1";
+    context.fillStyle = settings ? settings.COLOR_MENU_ACTIVE_LINE : "#dafff1";
     context.fillRect(this.rect.x, this.rect.y, this.rect.width, 1);
 
-    context.fillStyle = "#8fd6bb";
+    context.fillStyle = settings ? settings.COLOR_MENU_ACTIVE_BOTTOM : "#8fd6bb";
     context.fillRect(this.rect.x, this.rect.y + (portion * 4), this.rect.width, portion);
 
-    context.fillStyle = "#6db096";
+    context.fillStyle = settings ? settings.COLOR_MENU_ACTIVE_BOTTOM_LINE : "#6db096";
     context.fillRect(this.rect.x, this.rect.y + (this.rect.height -1), this.rect.width, 1);
 
     context.globalAlpha = 1;

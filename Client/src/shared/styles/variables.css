@@ -716,7 +716,7 @@
   --color-text-secondary: #b0b0b0;
   --color-text-muted: #888;
   --color-text-light: #999;
-  --color-text-placeholder: #666;
+  --color-text-placeholder: #999;
   --color-text-strong: #f0f0f0;
   --color-text-deep: #fafafa;
   --color-text-black: #fff;
@@ -736,6 +736,9 @@
   --color-background-subtle: #222;
   --color-background-disabled: #2c2c2c;
   --color-bg-white-90: rgba(30, 30, 30, 0.9);
+  --color-bg-soft: #252525;
+  --color-warning-bg: rgba(217, 119, 6, 0.1);
+  --color-warning-border: rgba(255, 183, 77, 0.25);
 
   /* Bordes */
   --color-border-light: #333;

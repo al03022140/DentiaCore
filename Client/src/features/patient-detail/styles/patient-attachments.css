@@ -345,3 +345,37 @@
     height: 70vh;
   }
 }
+
+/* ── Modo oscuro ─────────────────────────────────────────── */
+[data-theme="dark"] .patient-attachments__card {
+  background: var(--color-bg-white);
+  border-color: var(--color-border-light);
+}
+
+[data-theme="dark"] .patient-attachments__thumb {
+  background: var(--color-neutral-200);
+  border-color: var(--color-border-light);
+}
+
+[data-theme="dark"] .patient-attachments__thumb-pdf,
+[data-theme="dark"] .patient-attachments__thumb-generic {
+  background: linear-gradient(135deg, var(--color-neutral-300) 0%, var(--color-neutral-200) 100%);
+}
+
+[data-theme="dark"] .patient-attachments__empty {
+  background: var(--color-bg-white);
+  border-color: var(--color-border-medium);
+}
+
+[data-theme="dark"] .patient-attachments__dropzone:hover,
+[data-theme="dark"] .patient-attachments__dropzone:focus-visible {
+  background: var(--color-bg-light);
+}
+
+[data-theme="dark"] .patient-attachments__dropzone.is-dragging {
+  background: rgba(74, 158, 255, 0.08);
+}
+
+[data-theme="dark"] .patient-attachments__preview-pdf {
+  background: var(--color-bg-white);
+}

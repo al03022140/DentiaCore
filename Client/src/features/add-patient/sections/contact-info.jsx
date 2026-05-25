@@ -1,4 +1,5 @@
-const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
+const ContactInfo = ({ formData, handleNestedChange, handleChange, invalidFields = new Set(), shakeKey = 0 }) => {
+  const inv = (path) => invalidFields.has(path) ? 'field-invalid' : '';
   return (
     <section className="form-section">
       <h2>Información de Contacto</h2>
@@ -15,17 +16,21 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
         <div className="form-group">
           <label>Teléfono *</label>
           <input
+            key={`telefono-${shakeKey}`}
             type="text"
             value={formData.contacto?.telefono || ""}
             onChange={(e) => handleNestedChange("contacto", "telefono", e.target.value)}
+            className={inv('contacto.telefono')}
           />
         </div>
         <div className="form-group">
           <label>Dirección *</label>
           <input
+            key={`direccion-${shakeKey}`}
             type="text"
             value={formData.contacto?.direccion || ""}
             onChange={(e) => handleNestedChange("contacto", "direccion", e.target.value)}
+            className={inv('contacto.direccion')}
           />
         </div>
         <div className="form-group">
@@ -63,17 +68,21 @@ const ContactInfo = ({ formData, handleNestedChange, handleChange }) => {
         <div className="form-group">
           <label>Ciudad *</label>
           <input
+            key={`ciudad-${shakeKey}`}
             type="text"
             value={formData.contacto?.ciudad || ""}
             onChange={(e) => handleNestedChange("contacto", "ciudad", e.target.value)}
+            className={inv('contacto.ciudad')}
           />
         </div>
         <div className="form-group">
           <label>Entidad Federativa *</label>
           <input
+            key={`entidad-${shakeKey}`}
             type="text"
             value={formData.contacto?.entidad_federativa || ""}
             onChange={(e) => handleNestedChange("contacto", "entidad_federativa", e.target.value)}
+            className={inv('contacto.entidad_federativa')}
           />
         </div>
       </div>

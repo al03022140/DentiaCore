@@ -590,3 +590,26 @@
   }
 }
 
+/* ── Modo oscuro ──────────────────────────────────────────── */
+[data-theme="dark"] .patient-evolution-note__form .form-row .ant-input-textarea textarea,
+[data-theme="dark"] .patient-evolution-note__form .form-row .ant-input {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .patient-evolution-note__form .form-row .ant-input-textarea textarea::placeholder,
+[data-theme="dark"] .patient-evolution-note__form .form-row .ant-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+[data-theme="dark"] .doctor-sign-tab {
+  background: var(--color-bg-light);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-medium);
+}
+
+[data-theme="dark"] .doctor-sign-pin input {
+  background: var(--color-bg-light);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-medium);
+}
+

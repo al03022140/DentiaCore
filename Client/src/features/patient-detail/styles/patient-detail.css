@@ -670,6 +670,19 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
+[data-theme="dark"] .odontograma-toggle-table-btn {
+  background: var(--color-bg-white);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .odontograma-toggle-table-btn:hover {
+  background: rgba(74, 158, 255, 0.12);
+  color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 4px 8px rgba(74, 158, 255, 0.2);
+}
+
 /* Modo oscuro: tablas y pestañas del odontograma (Ant Design sigue tokens claros por defecto) */
 [data-theme="dark"] .patient-detail_odontograma .odontograma-table.ant-table-wrapper .ant-table,
 [data-theme="dark"] .patient-detail_odontograma .odontograma-table .ant-table-container {

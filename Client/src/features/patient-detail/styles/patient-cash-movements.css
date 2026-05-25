@@ -30,13 +30,10 @@
   border-radius: var(--border-radius-sm, 4px);
 }
 
-/* El SectionHeader interno ya trae su h2 con estilos del shared.
-   Quitamos su border-bottom porque no queremos doble línea con la
-   del .patient-detail__section. */
 .patient-cash-movements .cash-mov-toggle h2 {
   margin: 0;
-  padding: 0;
-  border-bottom: none;
+  padding-bottom: var(--spacing-md);
+  flex: 1;
 }
 
 .patient-cash-movements .cash-mov-chevron {
@@ -334,4 +331,68 @@
   font-size: 1.1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Modal de pago/abono (desde patient-cash-movements) ── */
+
+.payment-modal__summary {
+  background: var(--color-bg-soft, #f7f9fc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.payment-modal__summary p {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.9rem;
+  color: var(--color-text-primary, #2c3e50);
+}
+
+.payment-modal__summary p:not(:last-child) {
+  border-bottom: 1px dashed var(--color-border-light, #e2e8f0);
+}
+
+.add-charge-modal__confirm-section {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-soft, #f7f9fc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: var(--border-radius-md);
+}
+
+.add-charge-modal__confirm-section label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text-muted, #4a5568);
+}
+
+/* ── Dark mode ── */
+
+[data-theme="dark"] .patient-cash-movements .cash-mov-pending-section__footer {
+  border-top-color: var(--color-border-light) !important;
+}
+
+[data-theme="dark"] .payment-modal__summary {
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-light) !important;
+}
+
+[data-theme="dark"] .payment-modal__summary p {
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme="dark"] .payment-modal__summary p:not(:last-child) {
+  border-bottom-color: var(--color-border-medium) !important;
+}
+
+[data-theme="dark"] .add-charge-modal__confirm-section {
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-light) !important;
+}
+
+[data-theme="dark"] .add-charge-modal__confirm-section label {
+  color: var(--color-text-muted) !important;
 }

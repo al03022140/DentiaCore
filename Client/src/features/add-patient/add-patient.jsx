@@ -508,6 +508,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   // marcaron como erróneos al intentar guardar. Sólo estos muestran la equis
   // roja para no abrumar al usuario con errores antes de tocar la sección.
   const [attemptedSteps, setAttemptedSteps] = useState(() => new Set());
+  // Campos con error de validación: Set de strings "path.joined" (e.g. "documento.tipo")
+  const [invalidFields, setInvalidFields] = useState(() => new Set());
+  // Incrementar para forzar re-mount de la clase y reiniciar la animación shake
+  const [shakeKey, setShakeKey] = useState(0);
   
   // useEffect para inicializar el formulario con datos del paciente cuando se está editando
   useEffect(() => {
@@ -988,8 +992,6 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
     const missingFields = validateRequiredFields(patientData);
     if (missingFields.length > 0) {
-      // Marcar como "intentados" todos los pasos donde hay campos faltantes,
-      // para que se pinten con la equis roja al cerrar el modal.
       setAttemptedSteps(prev => {
         const next = new Set(prev);
         for (const f of missingFields) {
@@ -997,6 +999,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
         }
         return next;
       });
+      markInvalidFields(missingFields);
       showMissingFieldsModal(missingFields, stepTitlesByIndex);
       throw new PatientValidationError("Faltan campos obligatorios", missingFields);
     }
@@ -1188,10 +1191,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   const stepSections = [
     // Step 0: Identificación + Datos Personales
     <>
-      <Identification formData={formData} handleNestedChange={handleNestedChange} />
+      <Identification formData={formData} handleNestedChange={handleNestedChange} invalidFields={invalidFields} shakeKey={shakeKey} />
       <PersonalData
         formData={formData}
         handleChange={handleChange}
+        invalidFields={invalidFields}
+        shakeKey={shakeKey}
         handleSituacionLaboralChange={(field) => {
           setFormData(prev => ({
             ...prev,
@@ -1207,7 +1212,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     </>,
     // Step 1: Contacto
     <>
-      <ContactInfo formData={formData} handleNestedChange={handleNestedChange} handleChange={handleChange} />
+      <ContactInfo formData={formData} handleNestedChange={handleNestedChange} handleChange={handleChange} invalidFields={invalidFields} shakeKey={shakeKey} />
     </>,
     // Step 2: Emergencia + Antecedentes
     <>
@@ -1272,6 +1277,15 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     return acc;
   }, {});
 
+  // Marca los campos faltantes como inválidos y dispara la animación shake.
+  const markInvalidFields = (missingFields) => {
+    const keys = new Set(missingFields.map(f => f.path.join('.')));
+    setInvalidFields(keys);
+    setShakeKey(k => k + 1);
+    // Limpiar resaltado después de 3 s para no dejar todo en rojo indefinidamente
+    setTimeout(() => setInvalidFields(new Set()), 3000);
+  };
+
   // Intenta avanzar/saltar a `newStep`. Si se va hacia adelante valida todos
   // los pasos intermedios (incluyendo el actual): si alguno tiene campos
   // obligatorios faltantes, bloquea la navegación, los marca como `attempted`
@@ -1292,6 +1306,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     }
     setAttemptedSteps(newAttempted);
     if (missingByStep.length > 0) {
+      markInvalidFields(missingByStep);
       showMissingFieldsModal(missingByStep, stepTitlesByIndex);
       return;
     }

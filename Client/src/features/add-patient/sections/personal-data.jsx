@@ -1,4 +1,5 @@
-const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange }) => {
+const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, invalidFields = new Set(), shakeKey = 0 }) => {
+  const inv = (path) => invalidFields.has(path) ? 'field-invalid' : '';
   return (
     <section className="form-section">
       <h2>Datos Personales</h2>
@@ -6,10 +7,12 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange }) 
         <div className="form-group">
           <label>Primer Nombre *</label>
           <input
+            key={`primer-nombre-${shakeKey}`}
             type="text"
             name="primer_nombre"
             value={formData.primer_nombre || ""}
             onChange={handleChange}
+            className={inv('primer_nombre')}
           />
         </div>
         <div className="form-group">
@@ -24,10 +27,12 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange }) 
         <div className="form-group">
           <label>Apellido Paterno *</label>
           <input
+            key={`apellido-paterno-${shakeKey}`}
             type="text"
             name="apellido_paterno"
             value={formData.apellido_paterno || ""}
             onChange={handleChange}
+            className={inv('apellido_paterno')}
           />
         </div>
         <div className="form-group">
@@ -42,18 +47,22 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange }) 
         <div className="form-group">
           <label>Fecha de Nacimiento *</label>
           <input
+            key={`fecha-nac-${shakeKey}`}
             type="date"
             name="fecha_nacimiento"
             value={formData.fecha_nacimiento || ""}
             onChange={handleChange}
+            className={inv('fecha_nacimiento')}
           />
         </div>
         <div className="form-group">
           <label>Sexo *</label>
           <select
+            key={`sexo-${shakeKey}`}
             name="sexo"
             value={formData.sexo || ""}
             onChange={handleChange}
+            className={inv('sexo')}
           >
             <option value="">Seleccione...</option>
             <option value="Masculino">Masculino</option>
