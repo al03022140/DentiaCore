@@ -1101,3 +1101,239 @@
   background: var(--color-primary-hover) !important;
   border-color: var(--color-primary-hover) !important;
 }
+
+/* ══════════════════════════════════════════════════════
+   DARK MODE — AntD Modal overrides
+   Las reglas base no fijan background; AntD lo hardcodea
+   en blanco. Estas reglas lo corrigen en modo oscuro.
+   ══════════════════════════════════════════════════════ */
+
+[data-theme="dark"] .ant-modal-content {
+  background: var(--figma-bg-card) !important;
+  color: var(--figma-text-primary) !important;
+  border: 1px solid var(--figma-border-default);
+}
+
+[data-theme="dark"] .ant-modal-header {
+  background: var(--figma-bg-card) !important;
+  border-bottom-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .ant-modal-title {
+  color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal-close {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-modal-close:hover {
+  color: var(--figma-text-primary) !important;
+  background: var(--figma-bg-neutral) !important;
+}
+
+[data-theme="dark"] .ant-modal-footer {
+  border-top: 1px solid var(--figma-border-default) !important;
+  background: transparent !important;
+}
+
+[data-theme="dark"] .ant-modal-footer .ant-btn-default {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal-footer .ant-btn-default:not(:disabled):hover {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+/* Campos de formulario */
+[data-theme="dark"] .ant-modal .ant-form-item-label > label {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-form-item-explain-error {
+  color: var(--color-danger) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input,
+[data-theme="dark"] .ant-modal .ant-input-affix-wrapper {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input::placeholder {
+  color: var(--figma-text-secondary) !important;
+  opacity: 0.75 !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input-affix-wrapper .ant-input {
+  background: transparent !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input-number {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input-number-input {
+  background: transparent !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-input-number-prefix {
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Select */
+[data-theme="dark"] .ant-modal .ant-select-selector {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-select-selection-item {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-select-selection-placeholder {
+  color: var(--figma-text-secondary) !important;
+  opacity: 0.75 !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-select-arrow {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-select-clear {
+  background: var(--figma-bg-input) !important;
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Dropdown del Select (renderiza fuera del modal) */
+[data-theme="dark"] .ant-select-dropdown {
+  background: var(--figma-bg-card) !important;
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-elevated) !important;
+}
+
+[data-theme="dark"] .ant-select-item {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: var(--figma-bg-neutral) !important;
+}
+
+[data-theme="dark"] .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: rgba(74, 158, 255, 0.15) !important;
+  color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .ant-select-item-empty {
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Radio buttons en modal */
+[data-theme="dark"] .ant-modal .ant-radio-button-wrapper {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover {
+  background: var(--figma-bg-neutral) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+/* Tabla Descriptions — resumen cierre de caja */
+[data-theme="dark"] .ant-descriptions-bordered {
+  border-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-label {
+  background: var(--figma-bg-neutral) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-content {
+  background: var(--figma-bg-card) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-row {
+  border-bottom-color: var(--figma-border-default) !important;
+}
+
+/* Notice / historial de edición dentro del modal */
+[data-theme="dark"] .edit-movement__notice {
+  background: var(--figma-bg-input) !important;
+  color: var(--figma-text-secondary) !important;
+  border: 1px solid var(--figma-border-default);
+}
+
+[data-theme="dark"] .edit-movement__history {
+  border-top-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .edit-movement__history-entry {
+  border-top-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .edit-movement__history-head {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .edit-movement__history-reason {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .edit-movement__history-entry ul {
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Open box modal input */
+[data-theme="dark"] .open-box-modal__hint {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .open-box-modal__input.ant-input-number,
+[data-theme="dark"] .open-box-modal__input.ant-input-number-affix-wrapper {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .open-box-modal__input.ant-input-number .ant-input-number-input,
+[data-theme="dark"] .open-box-modal__input.ant-input-number-affix-wrapper .ant-input-number-input {
+  color: var(--figma-text-primary) !important;
+  background: transparent !important;
+}
+
+[data-theme="dark"] .open-box-modal__input.ant-input-number-affix-wrapper .ant-input-number-prefix {
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Tooltip de historial de edición */
+[data-theme="dark"] .movement-edit-history-tooltip .ant-tooltip-inner {
+  background: var(--figma-bg-card) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .movement-edit-history-tooltip .ant-tooltip-arrow::before {
+  background: var(--figma-bg-card) !important;
+}
+
+/* Cash brand tint — en dark mode el tinte azul debe ser más sutil */
+[data-theme="dark"] .cash-page,
+[data-theme="dark"] .cash-card {
+  --cash-brand-tint: rgba(74, 158, 255, 0.08);
+  --cash-brand-tint-strong: rgba(74, 158, 255, 0.14);
+  --cash-brand-glow: rgba(74, 158, 255, 0.20);
+  --cash-brand-cta-shadow: 0 4px 8px rgba(74, 158, 255, 0.30);
+}
