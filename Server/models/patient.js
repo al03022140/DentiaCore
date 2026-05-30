@@ -510,7 +510,12 @@ const PatientSchema = new mongoose.Schema({
         estadoRegistro: {
             type: String,
             enum: ['BORRADOR', 'OFICIAL', 'ARCHIVADO'],
-            default: 'OFICIAL'
+            // Default seguro: BORRADOR. Una nota sólo debe quedar OFICIAL tras
+            // firmarse explícitamente. Con default OFICIAL, cualquier path que
+            // omitiera el campo creaba una nota inmutable y "oficial" sin firma
+            // — riesgoso sobre todo porque los $push/$set atómicos NO disparan
+            // el hook pre('save') de inmutabilidad.
+            default: 'BORRADOR'
         },
         creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
         modificadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },

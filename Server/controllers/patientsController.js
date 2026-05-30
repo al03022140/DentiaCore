@@ -14,6 +14,7 @@ const { saveSignatureDataUrl, copyFirmaToSnapshot } = require('../utils/saveSign
 const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
 const auditLogger = require('../middlewares/auditLogger');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
+const { computeEvolutionNoteHash } = require('../utils/signing');
 
 // Logs informativos sólo en desarrollo (los errores siempre se loggean).
 const DEBUG_LOGS = process.env.NODE_ENV !== 'production';
@@ -956,15 +957,11 @@ exports.saveOdontogramaScreenshot = (_req, res) => {
  * Se usa como snapshot al firmar (paciente y doctor) para detectar
  * modificaciones posteriores (NOM-024).
  */
+// Delega en la utilidad compartida (utils/signing) para que TODOS los caminos
+// de firma de notas calculen el mismo hash. Se conserva el nombre local para
+// no tocar los call sites de este controller.
 function _computeEvolutionNoteHash(note) {
-  const payload = JSON.stringify({
-    procedimiento: note.procedimiento || '',
-    observaciones: note.observaciones || '',
-    correcciones: note.correcciones || '',
-    fecha: note.fecha instanceof Date ? note.fecha.toISOString() : String(note.fecha || ''),
-    numero_procedimiento: note.numero_procedimiento ?? null,
-  });
-  return crypto.createHash('sha256').update(payload).digest('hex');
+  return computeEvolutionNoteHash(note);
 }
 
 /** 🔹 Agregar nota de evolución */
@@ -1099,23 +1096,44 @@ exports.addEvolutionNote = async (req, res) => {
       }
     }
 
-    // Calcular numero_procedimiento atómicamente vía $inc en BD para
-    // evitar duplicados bajo concurrencia (dos saves simultáneos antes
-    // generaban el mismo número porque ambos leían length antes de
-    // hacer push). El counter arranca en 0 y siempre sube — nunca se
-    // resetea aunque se borren notas (mantiene monotonía clínica).
+    // Calcular numero_procedimiento de forma 100% atómica con un UPDATE de
+    // pipeline (Mongo 4.2+): counter = max(counterActual, #notas) + 1, todo
+    // en una sola operación. Esto cubre dos casos sin ninguna race:
+    //   - Pacientes normales: el counter ya va por delante → simplemente +1.
+    //   - Pacientes legados sin counter persistido (o atrasado): se siembra
+    //     desde el length actual sin un segundo $set no-atómico.
+    // Antes el seeding se hacía con una lectura de length + un $set separado:
+    // dos primeras escrituras concurrentes leían el mismo length y asignaban
+    // el mismo número (el duplicado que el counter debía evitar). El counter
+    // siempre sube y nunca se resetea aunque se borren notas — se aceptan
+    // huecos para mantener monotonía clínica (NOM-024).
     const counterDoc = await Patient.findOneAndUpdate(
       { _id: id },
-      { $inc: { _evolutionNoteCounter: 1 } },
+      [
+        {
+          $set: {
+            _evolutionNoteCounter: {
+              $add: [
+                {
+                  $max: [
+                    { $ifNull: ['$_evolutionNoteCounter', 0] },
+                    { $size: { $ifNull: ['$notas_evolucion', []] } },
+                  ],
+                },
+                1,
+              ],
+            },
+          },
+        },
+      ],
       { new: true, projection: { _evolutionNoteCounter: 1 } }
     );
-    // Para registros legados sin counter persistido, sembrar con el
-    // length actual + 1 (un único save concurrente verá el mismo length,
-    // pero esto sólo aplica al primer escrito post-deploy del fix).
-    let numero_procedimiento = counterDoc?._evolutionNoteCounter;
-    if (!numero_procedimiento || numero_procedimiento < (patient.notas_evolucion?.length || 0) + 1) {
-      numero_procedimiento = (patient.notas_evolucion?.length || 0) + 1;
-      await Patient.updateOne({ _id: id }, { $set: { _evolutionNoteCounter: numero_procedimiento } });
+    const numero_procedimiento = counterDoc?._evolutionNoteCounter;
+    if (!numero_procedimiento) {
+      return res.status(500).json({
+        success: false,
+        error: 'No se pudo asignar el número de la nota. Intente nuevamente.'
+      });
     }
 
     // Preparar la nueva nota de evolución
@@ -1180,8 +1198,9 @@ exports.addEvolutionNote = async (req, res) => {
         savedSubdoc.pacienteFirmaContentHash = contentHash;
         savedSubdoc.pacienteFirmaImageHash = patientSig.contentHash;
       } catch (e) {
-        // Rollback del counter — la nota no se va a guardar.
-        await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
+        // La nota no se va a guardar. NO decrementamos el counter: es
+        // monótono por diseño (se aceptan huecos) y un $inc -1 aquí podría
+        // pisar un incremento concurrente de otra nota.
         return res.status(400).json({
           success: false,
           error: `No se pudo guardar la firma del paciente: ${e.message}`
@@ -1199,9 +1218,9 @@ exports.addEvolutionNote = async (req, res) => {
           savedSubdoc.doctorFirmaUrl = docSig.publicUrl;
           savedSubdoc.doctorFirmaImageHash = docSig.contentHash;
         } catch (e) {
-          // Rollback: borra la firma del paciente ya escrita + decrementa counter.
+          // Rollback: borra la firma del paciente ya escrita. El counter es
+          // monótono (no se decrementa — ver nota arriba).
           await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-          await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
           return res.status(400).json({
             success: false,
             error: `No se pudo guardar la firma del doctor: ${e.message}`
@@ -1224,7 +1243,6 @@ exports.addEvolutionNote = async (req, res) => {
         } catch (e) {
           console.error('[addEvolutionNote] Fallo al copiar snapshot de firma:', e.message);
           await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-          await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
           return res.status(500).json({
             success: false,
             error: 'No se pudo persistir el snapshot de la firma del doctor. La nota NO fue guardada. Intente nuevamente o contacte a soporte.'
@@ -1245,9 +1263,9 @@ exports.addEvolutionNote = async (req, res) => {
     // en vez de patient.save(). Cada inserción es una operación atómica del
     // lado de Mongo y no depende de releer/reescribir todo el documento, así
     // que guardados concurrentes del mismo paciente ya no pierden notas.
-    // Si falla, rollback explícito: decrementa el counter $inc y borra los
-    // PNGs ya escritos para no dejar archivos huérfanos ni huecos en la
-    // numeración (NOM-024).
+    // Si falla, rollback explícito: borra los PNGs ya escritos para no dejar
+    // archivos huérfanos. El counter NO se decrementa (es monótono; el hueco
+    // en la numeración es aceptable y preferible a una race de decrementos).
     try {
       const result = await Patient.updateOne(
         { _id: id, deletedAt: null },
@@ -1260,7 +1278,8 @@ exports.addEvolutionNote = async (req, res) => {
     } catch (saveErr) {
       console.error('[addEvolutionNote] inserción de nota falló, ejecutando rollback:', saveErr);
       await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-      await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
+      // El counter es monótono y no se decrementa (se acepta el hueco) para
+      // no pisar incrementos concurrentes de otras notas.
       return res.status(500).json({
         success: false,
         error: 'No se pudo guardar la nota. Los cambios se revirtieron.'

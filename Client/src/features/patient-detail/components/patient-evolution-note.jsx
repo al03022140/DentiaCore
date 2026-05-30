@@ -116,8 +116,13 @@ const PatientEvolutionNote = ({
         resetForm();
         resetSignFlow();
       } else {
-        message.success('Nota guardada.');
-        resetSignFlow();
+        // Respuesta 2xx pero sin success/data → no confiamos en que se guardó.
+        // Antes mostrábamos "Nota guardada." y limpiábamos el form, ocultando
+        // un posible fallo y haciendo perder lo capturado.
+        const msg = payload?.error || payload?.message || 'No se pudo confirmar el guardado de la nota. Recargue y verifique antes de reintentar.';
+        setError(msg);
+        message.error(msg);
+        throw new Error(msg);
       }
     } catch (err) {
       console.error(err);
@@ -183,17 +188,27 @@ const PatientEvolutionNote = ({
     if (!existingSignTarget) return;
     setLoading(true);
     try {
-      const { noteId, index } = existingSignTarget;
+      const { noteId } = existingSignTarget;
       const response = await API.post(
         `/patients/${patientId}/evolution-note/${noteId}/sign`,
         { patientSignature: existingPatientSig, doctorSignature }
       );
       const payload = response?.data;
       if (payload?.success && payload?.data) {
-        setNotes(prev => prev.map((n, idx) => (idx === index ? payload.data : n)));
+        // Reemplazar por _id, no por índice: entre abrir el modal y firmar la
+        // lista pudo cambiar (se antepuso una nota nueva o se reordenó), y un
+        // match por índice actualizaría la nota equivocada.
+        const updated = payload.data;
+        setNotes(prev => prev.map((n) => (
+          (n._id && updated._id && n._id === updated._id) || n._id === noteId ? updated : n
+        )));
         message.success('Nota firmada y marcada como OFICIAL.');
+        resetExistingSignFlow();
+      } else {
+        // No confirmado: dejamos el modal abierto para reintentar.
+        const msg = payload?.error || payload?.message || 'No se pudo confirmar la firma. Intente nuevamente.';
+        message.error(msg);
       }
-      resetExistingSignFlow();
     } catch (err) {
       const msg = err?.response?.data?.error || err?.message || 'Error al firmar la nota';
       message.error(msg);
@@ -319,7 +334,10 @@ const PatientEvolutionNote = ({
             notes.map((n, idx) => {
               const noteKey = n._id || `note-${idx}`;
               const isExpanded = expandedNotes.has(noteKey);
-              const num = n.numero_procedimiento ?? idx + 1;
+              // Número canónico del backend. No usamos idx+1 como fallback:
+              // tras filtrar notas soft-deleted hay huecos legítimos y idx+1
+              // mostraría un número distinto al real del expediente.
+              const num = n.numero_procedimiento ?? '—';
               const date = n.fechaFormateada || n.fecha || '';
               const hasProcedimiento = !!(n.procedimiento && n.procedimiento.trim());
               const hasObservaciones = !!(n.observaciones && n.observaciones.trim());
@@ -470,7 +488,7 @@ const PatientEvolutionNote = ({
             {Array.isArray(notes) && notes.length > 0 ? (
               notes.map((n, idx) => (
                 <tr key={idx}>
-                  <td>{n.numero_procedimiento ?? idx + 1}</td>
+                  <td>{n.numero_procedimiento ?? '—'}</td>
                   <td>{n.fechaFormateada || n.fecha || ''}</td>
                   <td>{n.procedimiento || ''}</td>
                   <td>{n.observaciones || ''}</td>

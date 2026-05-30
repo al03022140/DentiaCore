@@ -9,14 +9,18 @@ import SignaturePadModal from './SignaturePadModal.jsx';
  * consentimiento de HC.
  *
  * Lógica:
- *  - Si el usuario logueado puede firmar oficialmente (consultas.create) →
- *    no hay selector; firma como sí mismo.
- *  - Si NO puede (asistente) → carga la lista de doctores activos y muestra
- *    un selector. El doctor camina hasta el escritorio e ingresa su PIN
- *    (o redibuja su firma con el pad).
+ *  - SIEMPRE se muestra el selector de doctores activos. Cualquier doctor
+ *    puede caminar hasta el escritorio (sin importar qué cuenta clínica esté
+ *    con sesión iniciada: doctor, doctor_admin o asistente) y firmar con SU
+ *    PIN secreto. El PIN siempre se valida en el backend contra el doctor
+ *    SELECCIONADO (`asDoctorId`), no contra la cuenta logueada.
+ *  - Si el usuario logueado es doctor, su propia ficha queda preseleccionada
+ *    por comodidad, pero puede elegirse a cualquier otro.
  *  - Si el doctor seleccionado NO tiene firmaDigitalUrl, la opción PIN
  *    queda deshabilitada con un mensaje claro — debe subir su firma en
  *    "Perfil Profesional" antes, o usar el pad.
+ *  - Fallback: si la lista de doctores no carga y el usuario logueado es
+ *    doctor, se permite firmar como sí mismo (el backend valida su PIN).
  *
  * Emite `onConfirm({ method, pin?, dataUrl?, asDoctorId? })`.
  */
@@ -29,6 +33,8 @@ export default function DoctorSignStep({
   loading = false,
 }) {
   const { user } = useAuth();
+  // El usuario logueado puede firmar oficialmente como sí mismo (doctor).
+  // Sólo se usa para preseleccionar su ficha y como fallback si la lista falla.
   const isSelfDoctor = hasPermission(user?.permissions, ['consultas.create']);
 
   const [doctors, setDoctors] = useState([]);
@@ -40,7 +46,8 @@ export default function DoctorSignStep({
   const [padOpen, setPadOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Cargar lista de doctores cuando se abra el modal y el usuario no sea doctor.
+  // SIEMPRE cargamos la lista de doctores: cualquier doctor puede firmar con
+  // su PIN, independientemente de la cuenta clínica logueada.
   useEffect(() => {
     if (!isOpen) return;
     setPin('');
@@ -48,45 +55,41 @@ export default function DoctorSignStep({
     setPadOpen(false);
     setSubmitError('');
 
-    if (isSelfDoctor) {
-      // Auto-firma: no cargamos lista, el "doctor" es el usuario actual.
-      setSelectedDoctorId('');
-      setDoctors([]);
-      return;
-    }
-
     setDoctorsLoading(true);
     setDoctorsError('');
     getDoctors()
       .then((list) => {
         setDoctors(list);
-        if (list.length === 1) setSelectedDoctorId(list[0].id);
+        // Preselección: el doctor logueado si está en la lista; si no, el
+        // único disponible; si no, ninguno (el firmante debe elegir).
+        const self = isSelfDoctor && user?.id
+          ? list.find((d) => String(d.id) === String(user.id))
+          : null;
+        if (self) setSelectedDoctorId(self.id);
+        else if (list.length === 1) setSelectedDoctorId(list[0].id);
         else setSelectedDoctorId('');
       })
       .catch((e) => {
+        setDoctors([]);
         setDoctorsError(e?.response?.data?.message || 'No se pudo cargar la lista de doctores');
       })
       .finally(() => setDoctorsLoading(false));
-  }, [isOpen, isSelfDoctor]);
+  }, [isOpen, isSelfDoctor, user?.id]);
 
-  // Doctor "efectivo" para mostrar info y validar PIN-habilitado:
-  //  - self-doctor: usamos los datos del usuario actual (assumimos que tiene
-  //    firma si tiene firmaDigitalUrl en su perfil; pero el AuthContext no
-  //    lo expone explícitamente, así que dejamos que el backend valide y
-  //    le mostramos el mensaje de error si falta).
-  //  - cross-doctor: usamos el doctor seleccionado del dropdown.
+  // Fallback de auto-firma: si la lista no cargó (error o vacía) pero el
+  // usuario logueado es doctor, lo dejamos firmar como sí mismo para no
+  // bloquearlo por un fallo del endpoint de doctores. El backend valida su PIN.
+  const useSelfFallback = isSelfDoctor && !doctorsLoading && doctors.length === 0;
+
+  // Doctor "efectivo" para mostrar info y validar si PIN está habilitado.
   const effectiveDoctor = useMemo(() => {
-    if (isSelfDoctor) {
-      return {
-        id: user?.id,
-        nombre: user?.nombre,
-        // No tenemos forma fiable de saber hasFirma desde AuthContext; el
-        // backend devolverá error si no tiene firma al intentar PIN.
-        hasFirma: true,
-      };
+    if (useSelfFallback) {
+      // Sin datos fiables de hasFirma desde AuthContext; el backend devolverá
+      // error si falta la firma al intentar PIN.
+      return { id: user?.id, nombre: user?.nombre, hasFirma: true };
     }
     return doctors.find((d) => d.id === selectedDoctorId) || null;
-  }, [isSelfDoctor, user, doctors, selectedDoctorId]);
+  }, [useSelfFallback, user, doctors, selectedDoctorId]);
 
   const pinDisabled = effectiveDoctor && effectiveDoctor.hasFirma === false;
 
@@ -100,7 +103,7 @@ export default function DoctorSignStep({
   const handleSubmitPin = async (e) => {
     e?.preventDefault?.();
     setSubmitError('');
-    if (!isSelfDoctor && !selectedDoctorId) {
+    if (!useSelfFallback && !selectedDoctorId) {
       setSubmitError('Selecciona el doctor que firmará.');
       return;
     }
@@ -112,7 +115,10 @@ export default function DoctorSignStep({
       await onConfirm({
         method: 'pin',
         pin,
-        ...(isSelfDoctor ? {} : { asDoctorId: selectedDoctorId }),
+        // Siempre identificamos al firmante por el doctor seleccionado; el
+        // backend valida el PIN contra ÉL. Sólo se omite en el fallback de
+        // auto-firma (el backend usa la cuenta logueada).
+        ...(useSelfFallback ? {} : { asDoctorId: selectedDoctorId }),
       });
     } catch (err) {
       setSubmitError(err?.response?.data?.error || err?.message || 'Error al firmar');
@@ -122,7 +128,7 @@ export default function DoctorSignStep({
   const handleSubmitPad = async (pngDataUrl) => {
     setPadOpen(false);
     setSubmitError('');
-    if (!isSelfDoctor && !selectedDoctorId) {
+    if (!useSelfFallback && !selectedDoctorId) {
       setSubmitError('Selecciona el doctor que firmará.');
       return;
     }
@@ -130,7 +136,7 @@ export default function DoctorSignStep({
       await onConfirm({
         method: 'pad',
         dataUrl: pngDataUrl,
-        ...(isSelfDoctor ? {} : { asDoctorId: selectedDoctorId }),
+        ...(useSelfFallback ? {} : { asDoctorId: selectedDoctorId }),
       });
     } catch (err) {
       setSubmitError(err?.response?.data?.error || err?.message || 'Error al firmar');
@@ -159,7 +165,7 @@ export default function DoctorSignStep({
               </div>
             )}
 
-            {!isSelfDoctor && (
+            {!useSelfFallback && (
               <div className="settings-form-group">
                 <label htmlFor="doctor-select">Doctor que firma</label>
                 {doctorsLoading ? (
@@ -243,7 +249,7 @@ export default function DoctorSignStep({
                   <button
                     type="submit"
                     className="signature-pad-btn signature-pad-btn-confirm"
-                    disabled={loading || pin.length !== 4 || (!isSelfDoctor && !selectedDoctorId)}
+                    disabled={loading || pin.length !== 4 || (!useSelfFallback && !selectedDoctorId)}
                   >
                     {loading ? 'Firmando…' : 'Firmar y guardar'}
                   </button>
@@ -266,7 +272,7 @@ export default function DoctorSignStep({
                     type="button"
                     className="signature-pad-btn signature-pad-btn-confirm"
                     onClick={() => setPadOpen(true)}
-                    disabled={loading || (!isSelfDoctor && !selectedDoctorId)}
+                    disabled={loading || (!useSelfFallback && !selectedDoctorId)}
                   >
                     Abrir pad
                   </button>

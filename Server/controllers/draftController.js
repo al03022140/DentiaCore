@@ -19,7 +19,7 @@ const Patient = require('../models/patient');
 const Usuario = require('../models/users');
 const auditLogger = require('../middlewares/auditLogger');
 const { normalizeRole, isAdminRole, hasPermission, getEffectivePermissions } = require('../utils/permissions');
-const { computeContentHash } = require('../utils/signing');
+const { computeContentHash, computeEvolutionNoteHash } = require('../utils/signing');
 
 // Roles autorizados a firmar drafts (NOM-013). Admin/superadmin/doctor_admin
 // pueden firmar como capacidad administrativa. Asistente NO firma.
@@ -212,6 +212,11 @@ const signDraft = async (req, res) => {
       note.estadoRegistro = 'OFICIAL';
       note.firmadoPor = req.user.id;
       note.firmadoEn = new Date();
+      // Snapshot del contentHash al firmar (igual que signExistingEvolutionNote
+      // y que la rama de modelos top-level). Antes este path dejaba la nota
+      // OFICIAL con contentHash=null → sin forma de detectar manipulación
+      // posterior (NOM-024 / NOM-004 Art. 5.10).
+      note.contentHash = computeEvolutionNoteHash(note);
       note.firmaDesactualizada = false;
       // Limpiar marca de rechazo si la había.
       note.rechazadoEn = null;
@@ -223,6 +228,7 @@ const signDraft = async (req, res) => {
         resourceType: NOTE_RESOURCE,
         resourceId: note._id,
         patientId: patient._id,
+        detalles: { contentHash: note.contentHash },
       });
 
       return res.json({ message: 'Borrador firmado correctamente', noteId: note._id });
@@ -353,6 +359,8 @@ const batchSign = async (req, res) => {
           note.estadoRegistro = 'OFICIAL';
           note.firmadoPor = req.user.id;
           note.firmadoEn = new Date();
+          // Snapshot del contentHash al firmar (ver nota en signDraft).
+          note.contentHash = computeEvolutionNoteHash(note);
           note.firmaDesactualizada = false;
           note.rechazadoEn = null;
           note.rechazadoPor = null;

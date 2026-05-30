@@ -6,7 +6,7 @@ import {
   updateMyPreferences,
   uploadFirma,
   deleteFirma,
-  getFirmaUrl,
+  fetchFirmaBlobUrl,
 } from '../../../shared/services/settingsService';
 import pencilIcon from '../../../assets/images/icons/pencil.svg';
 import folderUploadIcon from '../../../assets/images/icons/folder-upload.svg';
@@ -46,6 +46,12 @@ const ProfessionalProfileSection = () => {
   // Preview inmediato (dataURL) de la firma que acaba de hacer/subir el usuario,
   // mostrada antes de que el server la procese y devuelva la URL definitiva.
   const [localPreview, setLocalPreview] = useState(null);
+  // Preview de la firma YA persistida en el servidor. Se descarga autenticada
+  // (vía axios → fetchFirmaBlobUrl) y se guarda como object URL. Antes se
+  // intentaba mostrar con un `<img src>` directo al endpoint protegido, que
+  // devuelve 401 sin el header Bearer → la firma no se veía tras re-loguear.
+  const [serverPreview, setServerPreview] = useState(null);
+  const [serverPreviewLoading, setServerPreviewLoading] = useState(false);
   const sigPadRef = useRef(null);
   const padWrapRef = useRef(null);
   // El canvas necesita píxeles explícitos; lo medimos igual que en
@@ -55,6 +61,30 @@ const ProfessionalProfileSection = () => {
   useEffect(() => {
     setHasFirma(!!user?.firmaDigitalUrl);
   }, [user?.firmaDigitalUrl]);
+
+  // Descargar la firma persistida de forma autenticada y exponerla como object
+  // URL. Se reejecuta cuando cambia la firma (firmaVersion) o el usuario. Si
+  // hay preview local (recién capturada) no hace falta ir al servidor.
+  useEffect(() => {
+    if (localPreview || !hasFirma || !userId) {
+      return undefined;
+    }
+    let objectUrl = null;
+    let cancelled = false;
+    setServerPreviewLoading(true);
+    fetchFirmaBlobUrl(userId)
+      .then((url) => {
+        if (cancelled) { URL.revokeObjectURL(url); return; }
+        objectUrl = url;
+        setServerPreview(url);
+      })
+      .catch(() => { if (!cancelled) setServerPreview(null); })
+      .finally(() => { if (!cancelled) setServerPreviewLoading(false); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [hasFirma, userId, firmaVersion, localPreview]);
 
   // Mantener el selector sincronizado si la preferencia cambia en otro tab
   // o se refresca el perfil tras guardar.
@@ -231,6 +261,7 @@ const ProfessionalProfileSection = () => {
       await refreshProfile?.();
       setHasFirma(false);
       setLocalPreview(null);
+      setServerPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setFirmaVersion(Date.now());
       setFirmaMsg({ type: 'success', text: 'Firma eliminada' });
     } catch (err) {
@@ -240,9 +271,8 @@ const ProfessionalProfileSection = () => {
 
   // URL a mostrar en el preview:
   //  1. localPreview (dataURL) si acabamos de capturar/subir → INSTANTÁNEO
-  //  2. URL del servidor con cache-bust si hay firma persistida
-  const previewSrc = localPreview
-    || (hasFirma && userId ? getFirmaUrl(userId, firmaVersion) : null);
+  //  2. serverPreview (object URL autenticado) si hay firma persistida
+  const previewSrc = localPreview || serverPreview;
 
   return (
     <div>
@@ -324,6 +354,11 @@ const ProfessionalProfileSection = () => {
       {/* Firma digital */}
       <h3 style={{ marginBottom: '1rem' }}>Firma digital</h3>
       {firmaMsg && <div className={`settings-message ${firmaMsg.type}`}>{firmaMsg.text}</div>}
+      {!previewSrc && hasFirma && serverPreviewLoading && (
+        <p style={{ margin: '0 0 1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+          Cargando tu firma actual…
+        </p>
+      )}
 
       {previewSrc && (
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>

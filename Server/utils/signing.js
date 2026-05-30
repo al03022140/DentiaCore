@@ -13,6 +13,7 @@
  * Si el documento se modifica después de la firma, el hash ya no coincide
  * y el campo `firmaDesactualizada` se marca como true.
  */
+const crypto = require('crypto');
 const { computeIntegrityHash, getSignableFields } = require('./integrity');
 
 // ── Mapa resourceType → modelo Mongoose name ──────────────────
@@ -42,6 +43,30 @@ function computeContentHash(doc, resourceType) {
 }
 
 /**
+ * Hash determinístico del contenido clínico de una nota de evolución (subdoc
+ * de Patient). Se usa como snapshot al firmar (paciente y doctor) para
+ * detectar modificaciones posteriores (NOM-024 / NOM-004 Art. 5.10).
+ *
+ * Vive aquí (y no en un controller) para que TODOS los caminos de firma de
+ * notas — addEvolutionNote, signExistingEvolutionNote, draftController.signDraft
+ * y batchSign — calculen el mismo hash. Antes draftController firmaba notas
+ * sin recomputar el hash, dejando notas OFICIAL con contentHash=null.
+ *
+ * @param {object} note - Subdocumento de nota (Mongoose o plano)
+ * @returns {string} SHA-256 hex
+ */
+function computeEvolutionNoteHash(note) {
+  const payload = JSON.stringify({
+    procedimiento: note.procedimiento || '',
+    observaciones: note.observaciones || '',
+    correcciones: note.correcciones || '',
+    fecha: note.fecha instanceof Date ? note.fecha.toISOString() : String(note.fecha || ''),
+    numero_procedimiento: note.numero_procedimiento ?? null,
+  });
+  return crypto.createHash('sha256').update(payload).digest('hex');
+}
+
+/**
  * Devuelve el nombre del modelo Mongoose para un resourceType.
  * @param {string} resourceType
  * @returns {string|null}
@@ -52,6 +77,7 @@ function getModelName(resourceType) {
 
 module.exports = {
   computeContentHash,
+  computeEvolutionNoteHash,
   getModelName,
   getSignableFields,
   RESOURCE_MODEL_MAP,
