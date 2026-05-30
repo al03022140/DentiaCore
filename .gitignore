@@ -50,4 +50,4 @@ token.txt
 # Optional: ignore local OS/editor files
 .idea/
 .vscode/
-.claude/
+esb.err
