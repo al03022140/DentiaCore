@@ -1056,6 +1056,13 @@ exports.addEvolutionNote = async (req, res) => {
         if (!signerDoctor) {
           return res.status(401).json({ success: false, error: 'Usuario no encontrado.' });
         }
+        // El firmante OFICIAL debe ser doctor real (NOM-004 Art. 5.10), igual
+        // que en la rama de firma cruzada. Antes la auto-firma solo validaba
+        // el permiso `consultas.create`, dejando que una cuenta no-doctor con
+        // ese permiso firmara como oficial.
+        if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
+          return res.status(403).json({ success: false, error: 'Solo un doctor puede firmar la nota como OFICIAL.' });
+        }
       }
 
       // Verificar PIN contra el doctor que firma. Antes el método 'pad'
@@ -1138,19 +1145,24 @@ exports.addEvolutionNote = async (req, res) => {
       capturaExtemporanea: req.body._capturaExtemporanea || undefined
     };
 
-    // Agregar al inicio del array (Mongoose generará _id del subdoc)
+    // Construimos el subdocumento con el constructor del array para que
+    // Mongoose aplique defaults, casting y genere el _id — pero lo
+    // persistimos con un $push atómico (ver más abajo) en vez de cargar y
+    // re-guardar el documento completo del paciente. Así, dos guardados
+    // simultáneos del mismo paciente no se pisan: con versionKey:false el
+    // save() no detectaba el conflicto y se podían perder notas.
     if (!Array.isArray(patient.notas_evolucion)) {
       patient.notas_evolucion = [];
     }
-    patient.notas_evolucion.unshift(newEvolutionNote);
+    const noteSubdoc = patient.notas_evolucion.create(newEvolutionNote);
 
-    // Rastrea archivos de firma escritos a disco — si `patient.save()` falla
+    // Rastrea archivos de firma escritos a disco — si la inserción falla
     // los borramos para evitar dejar PNGs huérfanos (BUG-C3).
     const writtenSignaturePaths = [];
 
     // Persistir firmas SOLO si la nota es OFICIAL (BORRADOR sin firma)
     if (estadoRegistro === 'OFICIAL') {
-      const savedSubdoc = patient.notas_evolucion[0];
+      const savedSubdoc = noteSubdoc;
       const noteId = savedSubdoc._id.toString();
       const contentHash = _computeEvolutionNoteHash(savedSubdoc);
 
@@ -1229,13 +1241,24 @@ exports.addEvolutionNote = async (req, res) => {
       savedSubdoc.firmaDesactualizada = false;
     }
 
-    // Guardar el paciente. Si falla, rollback explícito: decrementa el
-    // counter $inc y borra los PNGs ya escritos para no dejar archivos
-    // huérfanos ni huecos en la numeración (NOM-024).
+    // Insertar la nota con un $push atómico al inicio del array ($position:0),
+    // en vez de patient.save(). Cada inserción es una operación atómica del
+    // lado de Mongo y no depende de releer/reescribir todo el documento, así
+    // que guardados concurrentes del mismo paciente ya no pierden notas.
+    // Si falla, rollback explícito: decrementa el counter $inc y borra los
+    // PNGs ya escritos para no dejar archivos huérfanos ni huecos en la
+    // numeración (NOM-024).
     try {
-      await patient.save();
+      const result = await Patient.updateOne(
+        { _id: id, deletedAt: null },
+        { $push: { notas_evolucion: { $each: [noteSubdoc.toObject()], $position: 0 } } },
+        { runValidators: true }
+      );
+      if (!result || result.matchedCount === 0) {
+        throw new Error('Paciente no encontrado al insertar la nota');
+      }
     } catch (saveErr) {
-      console.error('[addEvolutionNote] patient.save() falló, ejecutando rollback:', saveErr);
+      console.error('[addEvolutionNote] inserción de nota falló, ejecutando rollback:', saveErr);
       await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
       await Patient.updateOne({ _id: id }, { $inc: { _evolutionNoteCounter: -1 } }).catch(() => {});
       return res.status(500).json({
@@ -1244,8 +1267,8 @@ exports.addEvolutionNote = async (req, res) => {
       });
     }
 
-    // Devolver el subdocumento guardado (con _id generado por Mongoose)
-    const savedNote = patient.notas_evolucion[0];
+    // Devolver el subdocumento guardado (con su _id ya generado)
+    const savedNote = noteSubdoc;
 
     // Audit log: create + (si aplica) firma. Antes el flujo no registraba
     // creación de notas en AuditLog — quedaba sin trazabilidad ante
@@ -1369,7 +1392,26 @@ exports.updateDraftEvolutionNote = async (req, res) => {
 
     note.modificadoPor = req.user?.id || null;
     note.modificadoEn = new Date();
-    await patient.save();
+
+    // $set posicional atómico (en vez de patient.save()) con guardia de
+    // BORRADOR: evita pisar cambios concurrentes y rechaza la edición si la
+    // nota fue firmada en paralelo (pasaría a OFICIAL → inmutable).
+    const updateResult = await Patient.updateOne(
+      { _id: id, deletedAt: null, 'notas_evolucion._id': note._id, 'notas_evolucion.estadoRegistro': 'BORRADOR' },
+      { $set: {
+        'notas_evolucion.$.procedimiento': note.procedimiento,
+        'notas_evolucion.$.observaciones': note.observaciones,
+        'notas_evolucion.$.correcciones': note.correcciones,
+        'notas_evolucion.$.modificadoPor': note.modificadoPor,
+        'notas_evolucion.$.modificadoEn': note.modificadoEn,
+      } }
+    );
+    if (!updateResult || updateResult.matchedCount === 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'La nota ya no es editable (fue firmada o modificada por otra operación). Recargue e intente de nuevo.'
+      });
+    }
 
     auditLogger.registrarManual(req, 'nota_evolucion_editada', {
       resourceType: 'patient',
@@ -1452,6 +1494,9 @@ exports.signExistingEvolutionNote = async (req, res) => {
       }
       signerDoctor = await Usuario.findById(req.user.id);
       if (!signerDoctor) return res.status(401).json({ success: false, error: 'Usuario no encontrado.' });
+      if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
+        return res.status(403).json({ success: false, error: 'Solo un doctor puede firmar la nota como OFICIAL.' });
+      }
     }
 
     if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
@@ -1523,8 +1568,32 @@ exports.signExistingEvolutionNote = async (req, res) => {
     note.firmaDesactualizada = false;
     note.estadoRegistro = 'OFICIAL';
 
+    // Persistir con un $set posicional atómico en vez de patient.save(). El
+    // filtro exige que la nota siga en BORRADOR: si otra operación la firmó o
+    // modificó en paralelo (el schema usa versionKey:false y save() no lo
+    // detectaría), matchedCount=0 y abortamos sin pisar nada.
     try {
-      await patient.save();
+      const result = await Patient.updateOne(
+        { _id: id, deletedAt: null, 'notas_evolucion._id': note._id, 'notas_evolucion.estadoRegistro': 'BORRADOR' },
+        { $set: {
+          'notas_evolucion.$.pacienteFirmaUrl': note.pacienteFirmaUrl,
+          'notas_evolucion.$.pacienteFirmadoEn': note.pacienteFirmadoEn,
+          'notas_evolucion.$.pacienteFirmaContentHash': note.pacienteFirmaContentHash,
+          'notas_evolucion.$.pacienteFirmaImageHash': note.pacienteFirmaImageHash,
+          'notas_evolucion.$.doctorFirmaUrl': note.doctorFirmaUrl,
+          'notas_evolucion.$.doctorFirmaImageHash': note.doctorFirmaImageHash,
+          'notas_evolucion.$.doctorFirmaMethod': note.doctorFirmaMethod,
+          'notas_evolucion.$.firmadoPor': note.firmadoPor,
+          'notas_evolucion.$.firmadoEn': note.firmadoEn,
+          'notas_evolucion.$.contentHash': note.contentHash,
+          'notas_evolucion.$.firmaDesactualizada': false,
+          'notas_evolucion.$.estadoRegistro': 'OFICIAL',
+        } }
+      );
+      if (!result || result.matchedCount === 0) {
+        await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+        return res.status(409).json({ success: false, error: 'La nota ya fue firmada o modificada por otra operación. Recargue e intente de nuevo.' });
+      }
     } catch (saveErr) {
       await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
       return res.status(500).json({ success: false, error: 'No se pudo guardar la nota firmada. Los cambios se revirtieron.' });
