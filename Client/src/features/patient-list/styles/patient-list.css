@@ -119,11 +119,11 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  justify-content: space-between;
+  justify-content: flex-start;
   text-align: left;
   min-width: 0;
   height: 100%;
-  gap: 0;
+  gap: 6px;
 }
 
 /* ── ID como badge/pill ── */
@@ -159,7 +159,7 @@
   flex-wrap: nowrap;
   padding-top: 6px;
   margin-top: 0;
-  border-top: 1px dashed var(--color-border-light);
+  border-top: 1px solid var(--color-border-medium);
   gap: 0 var(--figma-space-md);
   width: 100%;
   font-size: 0.84rem;

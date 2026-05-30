@@ -327,23 +327,31 @@ if (process.env.NODE_ENV !== 'test') {
 
         process.on('SIGINT', gracefulShutdown);
         process.on('SIGTERM', gracefulShutdown);
+        // ⚠️ IMPORTANTE — Resiliencia en producción (app de escritorio clínica):
+        // Antes, cualquier excepción no controlada o promesa rechazada suelta
+        // disparaba gracefulShutdown() en producción → pm2 reiniciaba el server.
+        // Como el cliente corre la app instalada (NODE_ENV=production vía pm2),
+        // un error async POST-respuesta (p. ej. una escritura de auditoría que
+        // rechaza después de enviar el 201 al guardar/firmar una nota) tumbaba
+        // todo el programa: "al guardar, el programa se reinicia".
+        //
+        // Para un sistema mono-usuario de escritorio, mantener el server vivo y
+        // registrar el error con detalle es mucho mejor que reiniciar a mitad de
+        // una operación clínica. Por eso NO cerramos el proceso aquí; solo
+        // registramos el detalle completo para poder diagnosticar la causa raíz.
+        const describeError = (e) => (e instanceof Error
+            ? { name: e.name, message: e.message, stack: e.stack }
+            : e);
+
         process.on('uncaughtException', (err) => {
-            logger.error('❌ Excepción no controlada', { err });
-            gracefulShutdown();
-        });
-        process.on('unhandledRejection', (reason, promise) => {
-            logger.error('⚠️ Promesa rechazada no manejada', {
-                reason: reason instanceof Error ? {
-                    message: reason.message,
-                    stack: reason.stack,
-                    name: reason.name
-                } : reason,
-                promise
+            logger.error('❌ Excepción no controlada (el server sigue activo)', {
+                err: describeError(err)
             });
-            // Solo cerrar en producción
-            if (process.env.NODE_ENV === 'production') {
-                gracefulShutdown();
-            }
+        });
+        process.on('unhandledRejection', (reason) => {
+            logger.error('⚠️ Promesa rechazada no manejada (el server sigue activo)', {
+                reason: describeError(reason)
+            });
         });
     })();
 } else {

@@ -119,7 +119,16 @@ const respondWithTokens = async (res, user) => {
       nombre: user.nombre,
       email: user.email,
       rol: user.rol,
-      permissions
+      permissions,
+      // Perfil profesional + preferencias — necesarios para que el frontend
+      // muestre cédula, firma, dispositivo de firma, etc. sin tener que
+      // pegarle a /settings/me/profile aparte tras cada refresh.
+      preferences: user.preferences,
+      firmaDigitalUrl: user.firmaDigitalUrl,
+      cedulaProfesional: user.cedulaProfesional,
+      especialidad: user.especialidad,
+      universidad: user.universidad,
+      registroSSA: user.registroSSA
     }
   });
 };
@@ -306,7 +315,15 @@ const me = async (req, res, next) => {
     nombre: user.nombre,
     email: user.email,
     rol: user.rol,
-    permissions
+    permissions,
+    // Mantener el mismo shape que respondWithTokens (login/refresh) para
+    // que el frontend lea los mismos campos sin importar por dónde entró.
+    preferences: user.preferences,
+    firmaDigitalUrl: user.firmaDigitalUrl,
+    cedulaProfesional: user.cedulaProfesional,
+    especialidad: user.especialidad,
+    universidad: user.universidad,
+    registroSSA: user.registroSSA
   });
   } catch (error) {
     next(error);

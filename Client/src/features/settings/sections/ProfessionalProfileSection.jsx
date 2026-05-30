@@ -3,6 +3,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../../../app/auth/AuthContext';
 import {
   updateProfessionalProfile,
+  updateMyPreferences,
   uploadFirma,
   deleteFirma,
   getFirmaUrl,
@@ -26,6 +27,14 @@ const ProfessionalProfileSection = () => {
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // Dispositivo de firma — cambia el comportamiento del pad (scroll-lock,
+  // pointer-capture, canvas a ancho completo). Vive en preferences del user.
+  const [signatureInput, setSignatureInput] = useState(
+    user?.preferences?.signatureInput || 'mouse'
+  );
+  const [savingDevice, setSavingDevice] = useState(false);
+  const [deviceMsg, setDeviceMsg] = useState(null);
+
   // Firma — mismo motor que el resto del sistema (react-signature-canvas).
   const [hasFirma, setHasFirma] = useState(!!user?.firmaDigitalUrl);
   const [firmaMode, setFirmaMode] = useState('upload'); // 'upload' | 'draw'
@@ -46,6 +55,37 @@ const ProfessionalProfileSection = () => {
   useEffect(() => {
     setHasFirma(!!user?.firmaDigitalUrl);
   }, [user?.firmaDigitalUrl]);
+
+  // Mantener el selector sincronizado si la preferencia cambia en otro tab
+  // o se refresca el perfil tras guardar.
+  useEffect(() => {
+    if (user?.preferences?.signatureInput) {
+      setSignatureInput(user.preferences.signatureInput);
+    }
+  }, [user?.preferences?.signatureInput]);
+
+  // Persistir el dispositivo de firma. Optimista: actualizamos el estado
+  // local primero, revertimos si el server rechaza.
+  const handleSignatureInputChange = async (next) => {
+    if (next === signatureInput) return;
+    const prev = signatureInput;
+    setSignatureInput(next);
+    setDeviceMsg(null);
+    setSavingDevice(true);
+    try {
+      await updateMyPreferences({ signatureInput: next });
+      await refreshProfile?.();
+      setDeviceMsg({ type: 'success', text: 'Dispositivo de firma actualizado' });
+    } catch (err) {
+      setSignatureInput(prev);
+      setDeviceMsg({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo guardar el dispositivo',
+      });
+    } finally {
+      setSavingDevice(false);
+    }
+  };
 
   // Medir el wrap del pad para dimensionar el canvas (responsivo).
   // Solo aplica en modo 'draw' — cuando el wrap está montado.
@@ -231,6 +271,53 @@ const ProfessionalProfileSection = () => {
           </button>
         </div>
       </form>
+
+      <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
+
+      {/* Dispositivo de firma — se aplica al pad de notas y al pad de aquí */}
+      <h3 style={{ marginBottom: '0.5rem' }}>Dispositivo de firma</h3>
+      <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+        Cómo se captura tu firma manuscrita. Selecciona el dispositivo que usas más seguido
+        para que el pad se comporte mejor (tamaño del área, bloqueo de scroll, captura del lápiz).
+      </p>
+      {deviceMsg && <div className={`settings-message ${deviceMsg.type}`}>{deviceMsg.text}</div>}
+      <div className="signature-device-options" role="radiogroup" aria-label="Dispositivo de firma">
+        {[
+          {
+            value: 'mouse',
+            title: 'Ratón / Trackpad',
+            desc: 'Para firmar con el ratón o el trackpad de la laptop.',
+          },
+          {
+            value: 'tablet',
+            title: 'Tableta gráfica',
+            desc: 'Wacom, XP-Pen, Huion u otra tableta con lápiz. Bloquea el desplazamiento y captura el lápiz.',
+          },
+          {
+            value: 'touch',
+            title: 'Pantalla táctil',
+            desc: 'iPad, Surface o cualquier pantalla táctil. Optimiza para dedo o lápiz capacitivo.',
+          },
+        ].map((opt) => (
+          <label
+            key={opt.value}
+            className={`signature-device-option ${signatureInput === opt.value ? 'is-selected' : ''}`}
+          >
+            <input
+              type="radio"
+              name="signatureInput"
+              value={opt.value}
+              checked={signatureInput === opt.value}
+              onChange={() => handleSignatureInputChange(opt.value)}
+              disabled={savingDevice}
+            />
+            <span className="signature-device-option-info">
+              <span className="signature-device-option-title">{opt.title}</span>
+              <span className="signature-device-option-desc">{opt.desc}</span>
+            </span>
+          </label>
+        ))}
+      </div>
 
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 

@@ -403,8 +403,8 @@
   padding: 1.25rem;
   min-width: 0;
   min-height: 0;
-  height: auto;
-  overflow-y: auto;
+  height: 100%;
+  overflow: hidden;
 }
 
 .metrics-panel__header h3 {
@@ -429,7 +429,9 @@
   flex-direction: column;
   gap: 1rem;
   overflow-y: auto;
-  padding-right: 0.5rem;
+  overflow-x: hidden;
+  padding: 0.5rem 0.75rem 0.75rem 0.5rem;
+  margin: 0 -0.5rem;
   flex: 1;
   min-height: 0;
 }
@@ -444,6 +446,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .metrics-card:active {
@@ -452,23 +456,35 @@
 
 .metrics-card__header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .metrics-card__header h4 {
   margin: 0;
   font: var(--pd-font-label-md);
   color: var(--color-text-primary);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .metrics-card__category {
   background: var(--color-blue-500-12);
   color: var(--color-primary);
   border-radius: 999px;
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0.55rem;
   font: var(--pd-font-label-sm);
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: flex-start;
 }
 
 .metrics-card__temporalities,

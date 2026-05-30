@@ -671,6 +671,72 @@
   background: #fff;
 }
 
+/* ── Dispositivo de firma (radio cards) ───────────────────────
+   Tres tarjetas grandes con radio nativo para elegir cómo se
+   captura la firma (mouse, tableta gráfica, pantalla táctil). */
+.signature-device-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.signature-device-option {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--border-radius-md);
+  background: var(--color-bg-white);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.signature-device-option:hover {
+  border-color: var(--color-border-medium);
+  background: var(--color-bg-light);
+}
+
+.signature-device-option.is-selected {
+  border-color: var(--color-primary);
+  background: rgba(43, 108, 176, 0.06);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+
+.signature-device-option input[type="radio"] {
+  margin-top: 0.2rem;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.signature-device-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.signature-device-option-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.signature-device-option-desc {
+  color: var(--color-text-muted);
+  font-size: 0.825rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 700px) {
+  .signature-device-options {
+    flex-direction: row;
+  }
+  .signature-device-option {
+    flex: 1 1 0;
+  }
+}
+
 /* ── Note Template Editor ─────────────── */
 
 .template-list {

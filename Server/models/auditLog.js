@@ -44,6 +44,12 @@ const auditLogSchema = new mongoose.Schema({
       'creacion_registro',
       'modificacion_registro',
       'addendum',
+      // Eventos granulares emitidos por los controladores. Antes faltaban en
+      // este enum, así que las escrituras de auditoría rechazaban en silencio
+      // (traza NOM-024 incompleta) y, sin .catch, podían tumbar el proceso.
+      'nota_evolucion_creada',
+      'nota_evolucion_editada',
+      'plan_tratamiento_creado',
 
       // Borradores (delegación controlada)
       'borrador_creado',

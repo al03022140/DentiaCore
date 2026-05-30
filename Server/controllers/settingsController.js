@@ -131,7 +131,7 @@ exports.updateRolePermissions = async (req, res) => {
 exports.updateMyPreferences = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
-    const allowed = ['theme', 'defaultAppointmentDuration', 'prescriptionDefaults', 'reminders'];
+    const allowed = ['theme', 'defaultAppointmentDuration', 'prescriptionDefaults', 'reminders', 'signatureInput'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[`preferences.${key}`] = req.body[key];

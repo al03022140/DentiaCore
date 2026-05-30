@@ -10,6 +10,13 @@
   padding: 1rem;
 }
 
+/* Modo tableta/táctil: bloquear gestos del overlay para que la tableta
+   no haga scroll del fondo cuando el lápiz cruza fuera del canvas. */
+.signature-pad-overlay--locked {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
 .signature-pad-card {
   background: var(--color-bg-white, #fff);
   border-radius: 14px;
@@ -47,6 +54,23 @@
   overflow-y: auto;
 }
 
+/* Step previo en modo tableta: el consentimiento ocupa el modal y debe
+   ser legible. Más padding, más altura permitida, tipografía un poco
+   mayor. El usuario lee → acepta → recién entonces ve el pad. */
+.signature-pad-consent--standalone {
+  max-height: 55vh;
+  padding: 1.1rem 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.signature-pad-consent-cta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #4a5568);
+  text-align: center;
+}
+
 .signature-pad-consent p,
 .signature-pad-consent ul {
   margin: 0 0 0.5rem;
@@ -70,12 +94,23 @@
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
+  box-sizing: border-box;
+  /* El canvas se renderiza a sus dimensiones internas (sin estirar) y el
+     wrap se adapta a su contenido: así CSS-px = canvas-px y no hay
+     desfase entre el puntero y el trazo. */
+  display: flex;
+  justify-content: center;
 }
 
 .signature-pad-canvas {
+  /* IMPORTANTE: NO usar width:100% / height:auto / max-width:100%.
+     Estirar el canvas con CSS lo desincroniza de sus píxeles internos
+     (los atributos width/height pasados desde JS): react-signature-canvas
+     captura coordenadas CSS pero dibuja en coordenadas internas, y el
+     mismatch produce el clásico "se escribe corrido a la derecha" en
+     tableta. El canvas se renderiza a su tamaño nativo y el wrap lo
+     centra con flex. */
   display: block;
-  width: 100%;
-  height: auto;
   background: #fff;
   cursor: crosshair;
 }
@@ -195,4 +230,71 @@
   .signature-pad-baseline {
     bottom: 18%;
   }
+}
+
+/* ── Modo tableta / táctil ────────────────────────────────────
+   Más área para el lápiz (canvas a ancho completo del modal) y
+   estilos para el indicador de hover, el hint de detección y la
+   nota contextual del header. */
+.signature-pad-card--tablet {
+  width: min(820px, 96vw);
+}
+
+.signature-pad-canvas-wrap--tablet {
+  max-width: 100%;
+}
+
+.signature-pad-device-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.825rem;
+  line-height: 1.45;
+  color: var(--color-text-muted, #4a5568);
+  background: var(--color-bg-light, #f7fafc);
+  border-left: 3px solid var(--color-primary, #2b6cb0);
+  border-radius: 0 6px 6px 0;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Pequeño punto que sigue al lápiz cuando hace hover (sin tocar)
+   sobre tabletas Wacom / XP-Pen / Huion. Sin esto el usuario no
+   sabe dónde va a empezar a escribir. */
+.signature-pad-hover-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary, #2b6cb0);
+  background: rgba(43, 108, 176, 0.18);
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+
+/* Sugerencia in-situ cuando detectamos un lápiz pero el usuario
+   está en modo ratón. Aparece arriba del pad como banner amarillo. */
+.signature-pad-pen-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #fff8e1;
+  color: #5b4a00;
+  border: 1px solid #f5d97b;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.signature-pad-pen-hint-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.signature-pad-pen-hint-actions .signature-pad-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.825rem;
 }
