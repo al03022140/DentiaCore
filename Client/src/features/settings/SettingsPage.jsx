@@ -33,7 +33,9 @@ import moneyIcon from '../../assets/images/icons/money.svg';
 const SECTIONS = [
   { id: 'apariencia', name: 'Apariencia', icon: <img src={pencilIcon} alt="Apariencia" width="36" height="36" className="theme-icon" />, desc: 'Tema claro, oscuro o del sistema', roles: null },
   { id: 'perfil', name: 'Mi Perfil', icon: <img src={userIcon} alt="Mi Perfil" width="36" height="36" className="theme-icon" />, desc: 'Nombre, correo, contraseña y PIN', roles: null },
-  { id: 'perfil-profesional', name: 'Perfil Profesional', icon: <img src={idCardIcon} alt="Perfil Profesional" width="36" height="36" className="theme-icon" />, desc: 'Firma digital y cédula profesional', roles: ['doctor', 'doctor_admin', 'administrador', 'superadmin'] },
+  // Solo firmantes: doctor / doctor_admin (y superadmin para soporte). El
+  // administrador NO es dentista → sin cédula ni firma digital propias.
+  { id: 'perfil-profesional', name: 'Perfil Profesional', icon: <img src={idCardIcon} alt="Perfil Profesional" width="36" height="36" className="theme-icon" />, desc: 'Firma digital y cédula profesional', roles: ['doctor', 'doctor_admin', 'superadmin'] },
   { id: 'notificaciones', name: 'Notificaciones', icon: <img src={bellIcon} alt="" width="36" height="36" className="theme-icon" />, desc: 'Recordatorios de citas y alertas', roles: null },
   { id: 'preferencias-clinicas', name: 'Preferencias Clínicas', icon: <img src={clipboardListIcon} alt="Preferencias Clínicas" width="36" height="36" className="theme-icon" />, desc: 'Plantillas de notas, formato receta, duración cita', roles: ['doctor', 'doctor_admin'] },
   { id: 'clinica', name: 'Clínica', icon: <img src={hospitalIcon} alt="Clínica" width="36" height="36" className="theme-icon" />, desc: 'Nombre, dirección, logo y contacto', roles: ['doctor_admin', 'administrador', 'superadmin'], permission: 'settings.update' },
@@ -69,14 +71,21 @@ const SettingsPage = () => {
   const userRole = user?.rol || user?.role;
   const permissions = user?.permissions || [];
 
-  const visibleSections = SECTIONS.filter((s) => {
+  // Predicado único de visibilidad por sección. Se usa tanto para filtrar el
+  // listado como para proteger el acceso directo por URL (abajo): sin esto, un
+  // admin podía abrir /configuracion/perfil-profesional a mano y ver la subida
+  // de firma aunque no aparezca en el menú.
+  const canSeeSection = (s) => {
+    if (!s) return false;
     if (s.roles && !s.roles.includes(userRole)) return false;
     if (s.permission) {
       const required = Array.isArray(s.permission) ? s.permission : [s.permission];
       if (!hasPermission(permissions, required) && !['administrador', 'superadmin'].includes(userRole)) return false;
     }
     return true;
-  });
+  };
+
+  const visibleSections = SECTIONS.filter(canSeeSection);
 
   if (section) {
     const SectionComponent = SECTION_COMPONENTS[section];
@@ -85,6 +94,15 @@ const SettingsPage = () => {
       return (
         <SettingsSection title="Sección no encontrada" onBack={() => navigate('/configuracion')}>
           <p>La sección solicitada no existe.</p>
+        </SettingsSection>
+      );
+    }
+    // Acceso directo por URL: si el rol no puede ver la sección, no renderizar
+    // el componente (defensa en profundidad — el backend además valida cada acción).
+    if (!canSeeSection(sectionMeta)) {
+      return (
+        <SettingsSection title="Acceso restringido" onBack={() => navigate('/configuracion')}>
+          <p>No tienes permiso para acceder a esta sección.</p>
         </SettingsSection>
       );
     }

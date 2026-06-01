@@ -746,3 +746,113 @@ describe('hasPermission (unit)', () => {
     expect(hp(['patients.read'], [])).toBe(true);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 10. FIRMA DIGITAL: solo el doctor/doctor_admin puede subir firma
+//     (el administrador NO es dentista — NOM-004 Art. 5.10)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('Firma digital: gating por rol firmante', () => {
+  // El administrador dirige la clínica pero NO firma: no debe poder subir
+  // ni borrar una firma digital.
+  test('Administrador NO puede subir firma (403)', async () => {
+    const { token } = await createUser({ rol: 'administrador' });
+    const res = await request(app)
+      .post('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('Administrador NO puede borrar firma (403)', async () => {
+    const { token } = await createUser({ rol: 'administrador' });
+    const res = await request(app)
+      .delete('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('Asistente NO puede subir firma (403)', async () => {
+    const { token } = await createUser({ rol: 'asistente' });
+    const res = await request(app)
+      .post('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('Recepcionista NO puede subir firma (403)', async () => {
+    const { token } = await createUser({ rol: 'recepcionista' });
+    const res = await request(app)
+      .post('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  // Los firmantes SÍ pasan el guard de rol. Sin archivo adjunto el controller
+  // responde 400 ("No se proporcionó imagen"); lo relevante es que NO es 403.
+  test('Doctor SÍ pasa el guard de firma (no 403)', async () => {
+    const { token } = await createUser({ rol: 'doctor' });
+    const res = await request(app)
+      .post('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(400);
+  });
+
+  test('Doctor_admin SÍ pasa el guard de firma (no 403)', async () => {
+    const { token } = await createUser({ rol: 'doctor_admin' });
+    const res = await request(app)
+      .post('/api/settings/me/firma')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(400);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 11. SELECTOR DE DOCTORES (nota de evolución): excluye al administrador
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('GET /api/users/doctors (selector de firma)', () => {
+  test('Solo lista doctor y doctor_admin — excluye administrador/asistente', async () => {
+    const { token } = await createUser({ rol: 'doctor', nombre: 'Dra. Firma' });
+    await createUser({ rol: 'doctor_admin', nombre: 'Dr. Director' });
+    await createUser({ rol: 'administrador', nombre: 'Admin NoDoc' });
+    await createUser({ rol: 'asistente', nombre: 'Asistente X' });
+
+    const res = await request(app)
+      .get('/api/users/doctors')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const roles = res.body.map((d) => d.rol);
+    expect(roles).toEqual(expect.arrayContaining(['doctor', 'doctor_admin']));
+    expect(roles).not.toContain('administrador');
+    expect(roles).not.toContain('asistente');
+    expect(roles).not.toContain('recepcionista');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 12. isSignerRole (unit)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('isSignerRole (unit)', () => {
+  const { isSignerRole } = require('../utils/permissions');
+
+  test('doctor y doctor_admin son firmantes', () => {
+    expect(isSignerRole('doctor')).toBe(true);
+    expect(isSignerRole('doctor_admin')).toBe(true);
+  });
+
+  test('administrador, asistente, recepcionista y superadmin NO son firmantes', () => {
+    expect(isSignerRole('administrador')).toBe(false);
+    expect(isSignerRole('asistente')).toBe(false);
+    expect(isSignerRole('recepcionista')).toBe(false);
+    expect(isSignerRole('superadmin')).toBe(false);
+  });
+
+  test('normaliza mayúsculas/espacios', () => {
+    expect(isSignerRole('  Doctor ')).toBe(true);
+    expect(isSignerRole('DOCTOR_ADMIN')).toBe(true);
+  });
+});

@@ -1,4 +1,4 @@
-const { hasPermission, isAdminRole, isClinicalRole, normalizeRole } = require('../utils/permissions');
+const { hasPermission, isAdminRole, isClinicalRole, isSignerRole, normalizeRole } = require('../utils/permissions');
 
 /**
  * Middleware de autorización por permisos.
@@ -134,10 +134,34 @@ const requireClinicalRole = (req, res, next) => {
   });
 };
 
+/**
+ * Middleware que requiere que el usuario sea un FIRMANTE clínico
+ * (doctor o doctor_admin) — el único profesional que puede tener cédula
+ * profesional y firma digital y firmar registros oficiales
+ * (NOM-004 Art. 5.10 + NOM-013).
+ *
+ * `superadmin` (programador/soporte) pasa para tareas de mantenimiento.
+ * Quedan EXCLUIDOS `administrador`, `asistente` y `recepcionista`: el
+ * administrador dirige la clínica pero NO es dentista, así que no puede
+ * subir firma (antes lo permitía `requireClinicalRole` vía isAdminRole).
+ */
+const requireSignerRole = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Usuario no autenticado' });
+  }
+  if (normalizeRole(req.user.role) === 'superadmin' || isSignerRole(req.user.role)) {
+    return next();
+  }
+  return res.status(403).json({
+    message: 'Solo un doctor puede subir o usar una firma digital. El administrador no es profesional firmante (NOM-004 Art. 5.10).'
+  });
+};
+
 module.exports = authorize;
 module.exports.authorize = authorize;
 module.exports.filterPatientFields = filterPatientFields;
 module.exports.sanitizePatientForBasicRead = sanitizePatientForBasicRead;
 module.exports.requireClinicalRole = requireClinicalRole;
+module.exports.requireSignerRole = requireSignerRole;
 module.exports.BASIC_PATIENT_FIELDS = BASIC_PATIENT_FIELDS;
 module.exports.BASIC_PATIENT_WRITE_FIELDS = BASIC_PATIENT_WRITE_FIELDS;

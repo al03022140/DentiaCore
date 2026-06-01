@@ -280,6 +280,25 @@ const isClinicalRole = (role) => {
 };
 
 /**
+ * Verifica si un rol es FIRMANTE clínico: el profesional dentista que puede
+ * firmar registros oficiales y, por tanto, el único que tiene cédula
+ * profesional y firma digital (NOM-004 Art. 5.10 + NOM-013).
+ *
+ * Solo `doctor` y `doctor_admin`. Quedan EXCLUIDOS:
+ *  - `administrador`: dirige la clínica pero NO es dentista → no firma ni
+ *    sube firma, y no aparece en el selector de doctores de las notas.
+ *  - `asistente`: captura en borrador bajo supervisión, no firma como autor.
+ *  - `recepcionista`: sin acceso a contenido clínico.
+ *
+ * Es el mismo conjunto que posee `draft.approve`; usar este helper mantiene
+ * la regla en un único lugar y evita gates inconsistentes.
+ */
+const isSignerRole = (role) => {
+  const normalized = normalizeRole(role);
+  return normalized === 'doctor' || normalized === 'doctor_admin';
+};
+
+/**
  * Catálogo de todos los permisos conocidos del sistema (unión de todos los
  * roles). Se usa como lista blanca al asignar overrides de permisos.
  */
@@ -350,5 +369,6 @@ module.exports = {
   hasPermission,
   isAdminRole,
   isClinicalRole,
+  isSignerRole,
   validatePermissionAssignment,
 };

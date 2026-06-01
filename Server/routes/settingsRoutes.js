@@ -2,7 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const settingsController = require('../controllers/settingsController');
-const { authorize, requireClinicalRole } = require('../middlewares/authorize');
+const { authorize, requireClinicalRole, requireSignerRole } = require('../middlewares/authorize');
 const uploadFirma = require('../middlewares/uploadFirma');
 const uploadLogo = require('../middlewares/uploadLogo');
 const ClinicSettings = require('../models/clinicSettings');
@@ -90,11 +90,17 @@ router.patch('/me/profile', settingsController.updateMyProfile);
 router.patch('/me/preferences', settingsController.updateMyPreferences);
 router.patch('/me/password', sensitiveActionRateLimit, settingsController.changeMyPassword);
 router.patch('/me/pin', sensitiveActionRateLimit, settingsController.changeMyPin);
-router.patch('/me/professional-profile', requireClinicalRole, settingsController.updateProfessionalProfile);
-router.post('/me/firma', requireClinicalRole, uploadFirma.single('firma'), settingsController.uploadFirma);
-router.delete('/me/firma', requireClinicalRole, settingsController.deleteFirma);
+// Perfil profesional + firma digital: SOLO firmantes (doctor / doctor_admin).
+// El administrador dirige la clínica pero NO es dentista → no tiene cédula
+// ni firma. Antes `requireClinicalRole` lo permitía (vía isAdminRole), por lo
+// que el admin podía subir firma; `requireSignerRole` lo bloquea.
+router.patch('/me/professional-profile', requireSignerRole, settingsController.updateProfessionalProfile);
+router.post('/me/firma', requireSignerRole, uploadFirma.single('firma'), settingsController.uploadFirma);
+router.delete('/me/firma', requireSignerRole, settingsController.deleteFirma);
 
-// ── Get firma of a specific user (requires clinical or admin role) ─
+// ── Get firma of a specific user ─────────────────────────────────
+// La LECTURA sí queda abierta a personal clínico + admin: la firma se muestra
+// al desplegar/imprimir una nota ya firmada (el admin tiene lectura clínica).
 router.get('/users/:userId/firma', requireClinicalRole, settingsController.getFirma);
 
 module.exports = router;
