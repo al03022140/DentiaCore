@@ -50,8 +50,12 @@ const summarizeMovements = (movements, initialAmount = 0) => {
 };
 
 // GET /cash/balance/monthly
-// Excluye movimientos de sesiones huérfanas (OPEN > 48 h) — un olvido
-// de cierre no debe contaminar reportes mensuales subsecuentes.
+// A-9: el balance mensual incluye TODOS los movimientos reales del mes. Antes
+// se descartaban los de sesiones OPEN/CLOSING con más de 48 h (un olvido de
+// cierre), lo que hacía DESAPARECER dinero real del total y subreportaba
+// ingresos/egresos — un problema serio de integridad contable. Ahora el dinero
+// siempre se contabiliza y, en su lugar, se informan las sesiones rezagadas
+// como advertencia (`staleSessionWarning`) para que el operador las resuelva.
 exports.getMonthlyBalance = async (req, res) => {
   try {
     const now = new Date();
@@ -63,15 +67,16 @@ exports.getMonthlyBalance = async (req, res) => {
     }).populate('boxSessionId', 'status startTime');
 
     const HOURS_48 = 48 * 60 * 60 * 1000;
-    const valid = movements.filter((m) => {
-      if (!m.boxSessionId) return true; // movimientos legacy sin sesión
-      if (m.boxSessionId.status === 'CLOSED') return true;
-      // Sesión OPEN o CLOSING: sólo si lleva menos de 48 h abierta
+    // Contar (sin excluir) los movimientos atados a sesiones huérfanas, sólo
+    // para advertir. NO se filtran del cálculo: el dinero es real.
+    const staleMovementCount = movements.filter((m) => {
+      if (!m.boxSessionId) return false;
+      if (m.boxSessionId.status === 'CLOSED') return false;
       const opened = m.boxSessionId.startTime?.getTime?.() ?? Date.now();
-      return Date.now() - opened < HOURS_48;
-    });
+      return Date.now() - opened >= HOURS_48;
+    }).length;
 
-    const summary = summarizeMovements(valid);
+    const summary = summarizeMovements(movements);
 
     res.json({
       cash: summary.cashNet,
@@ -85,7 +90,12 @@ exports.getMonthlyBalance = async (req, res) => {
       totalIncome: summary.totalIncome,
       totalExpense: summary.totalExpense,
       movementCount: summary.movementCount,
-      excludedOrphanCount: movements.length - valid.length,
+      // Advertencia: movimientos contabilizados que pertenecen a sesiones
+      // sin cerrar desde hace >48 h. El total ya los incluye.
+      staleSessionMovementCount: staleMovementCount,
+      staleSessionWarning: staleMovementCount > 0
+        ? 'Hay movimientos en cajas sin cerrar desde hace más de 48 h. Están incluidos en el total; resuelva esas cajas para cuadrar.'
+        : null,
       month: now.getMonth() + 1,
       year: now.getFullYear()
     });
@@ -668,18 +678,38 @@ exports.updateMovement = async (req, res) => {
       changes: sanitizedChanges
     });
 
-    await movement.save();
-
     // BUG-6: si la sesión del movimiento está CLOSED, recalcular finalAmount
     // para que los reportes históricos sigan cuadrando.
+    // M-9: validamos ANTES de persistir el movimiento para no dejar un estado
+    // inconsistente (movimiento editado pero corte no actualizado). El recálculo
+    // usa los valores YA editados en memoria, sustituyendo el movimiento actual.
+    let sessionToUpdate = null;
     if (movement.boxSessionId && (changes.amount || changes.paymentMethod)) {
       const sess = await BoxSession.findById(movement.boxSessionId);
       if (sess && sess.status === 'CLOSED') {
         const allMovs = await CashMovement.find({ boxSessionId: sess._id });
-        const recalc = summarizeMovements(allMovs, sess.initialAmount);
+        // Sustituir el movimiento que se está editando por su versión en memoria
+        const projected = allMovs.map((m) =>
+          m._id.equals(movement._id) ? movement : m
+        );
+        const recalc = summarizeMovements(projected, sess.initialAmount);
+        // No permitir que la edición de un movimiento histórico deje el corte
+        // de una sesión CERRADA en negativo: un corte consolidado no debe poder
+        // reescribirse a un efectivo físico imposible (< 0).
+        if (recalc.cashOnHand < 0) {
+          return res.status(409).json({
+            message: 'La edición dejaría el corte de una caja ya cerrada en negativo. ' +
+              'No se permite reescribir la contabilidad consolidada de esa forma.'
+          });
+        }
         sess.finalAmount = recalc.cashOnHand;
-        await sess.save();
+        sessionToUpdate = sess;
       }
+    }
+
+    await movement.save();
+    if (sessionToUpdate) {
+      await sessionToUpdate.save();
     }
 
     const populated = await CashMovement.findById(movement._id)

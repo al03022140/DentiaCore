@@ -1,7 +1,14 @@
 const multer = require('multer');
-const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
+
+// M-6: la extensión almacenada se deriva del MIME validado, no del nombre
+// que envía el cliente.
+const MIME_TO_EXT = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg'
+};
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -16,7 +23,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return cb(new Error('Usuario no autenticado'));
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = MIME_TO_EXT[file.mimetype] || '.png';
     cb(null, `${userId}_firma_${Date.now()}${ext}`);
   }
 });

@@ -34,8 +34,13 @@ export const deleteAttachment = async (patientId, attachmentId) => {
 };
 
 // Devuelve la URL absoluta a partir del campo `url` ("/uploads/...") guardado en el adjunto.
+// M-13: los archivos viven en el servidor de la API (p. ej. :5002), no en el
+// origen del frontend. Antes se anteponía `window.location.origin`, lo que en
+// producción daba 404 salvo que un proxy reenviara /uploads. Usamos la base de
+// la API (igual que getLogoUrl/getFirmaUrl) para construir una URL correcta.
 export const buildAttachmentUrl = (relativeUrl) => {
   if (!relativeUrl) return '';
   if (relativeUrl.startsWith('http')) return relativeUrl;
-  return `${window.location.origin}${relativeUrl}`;
+  const base = (API.defaults.baseURL || window.location.origin).replace(/\/$/, '');
+  return `${base}${relativeUrl}`;
 };

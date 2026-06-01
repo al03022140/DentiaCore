@@ -5,6 +5,7 @@ const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
 const { validatePasswordStrength } = require('../utils/crypto');
+const { VALID_ROLES, normalizeRole, validatePermissionAssignment } = require('../utils/permissions');
 
 let bcrypt;
 try { bcrypt = require('bcrypt'); } catch (_e) { bcrypt = require('bcryptjs'); }
@@ -114,13 +115,23 @@ exports.updateRolePermissions = async (req, res) => {
   try {
     const { role } = req.params;
     const { permissions } = req.body;
-    if (!Array.isArray(permissions)) {
-      return res.status(400).json({ message: 'permissions debe ser un array' });
+
+    // Validar que el rol exista (evita crear overrides para roles inventados)
+    if (!VALID_ROLES.includes(normalizeRole(role))) {
+      return res.status(400).json({ message: `Rol inválido: ${role}` });
     }
+
+    // Prevenir escalada de privilegios (C-2): lista blanca de permisos +
+    // el actor no puede otorgar permisos peligrosos ni que él mismo no posea.
+    const check = validatePermissionAssignment(permissions, req.user);
+    if (!check.valid) {
+      return res.status(403).json({ message: check.message });
+    }
+
     const settings = await ClinicSettings.getSettings();
-    settings.rolePermissionOverrides.set(role, permissions);
+    settings.rolePermissionOverrides.set(normalizeRole(role), permissions);
     await settings.save();
-    res.json({ message: 'Permisos actualizados', role, permissions });
+    res.json({ message: 'Permisos actualizados', role: normalizeRole(role), permissions });
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar permisos del rol', error: error.message });
   }
@@ -313,9 +324,14 @@ exports.updateUserPermissions = async (req, res) => {
       return res.status(400).json({ message: 'ID de usuario inválido' });
     }
     const { permissions } = req.body;
-    if (!Array.isArray(permissions)) {
-      return res.status(400).json({ message: 'permissions debe ser un array' });
+
+    // Prevenir escalada de privilegios (C-2): lista blanca de permisos +
+    // el actor no puede otorgar permisos peligrosos ni que él mismo no posea.
+    const check = validatePermissionAssignment(permissions, req.user);
+    if (!check.valid) {
+      return res.status(403).json({ message: check.message });
     }
+
     const user = await Usuario.findByIdAndUpdate(userId, { $set: { permissions } }, { new: true })
       .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });

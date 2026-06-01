@@ -60,7 +60,6 @@ const {
 const patientCtrl = require('../controllers/patientsController');
 const checkPatient = require('../middlewares/checkPatient');
 const { authorize, filterPatientFields, requireClinicalRole } = require('../middlewares/authorize');
-const backdatedEntry = require('../middlewares/backdatedEntry');
 const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 // Middleware de validación de ID
@@ -456,12 +455,20 @@ router.use('/:id', validateId, odontogramaRoutes);
 router
   .route('/:id/treatment-plan')
   .all(validateId, checkPatient)
-  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addTreatmentPlan);
+  // La captura extemporánea se valida en el middleware global
+  // `validarCapturaExtemporanea` (config/routes.js), que SÍ lee la fecha
+  // anidada (treatmentPlan.fecha). Antes había aquí un `backdatedEntry()` que
+  // sólo miraba `req.body.fecha` de nivel superior → nunca disparaba para este
+  // payload y además entraba en conflicto de contrato con el guard global.
+  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.addTreatmentPlan);
 
 router
   .route('/:id/evolution-note')
   .all(validateId, checkPatient)
-  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), backdatedEntry(), patientCtrl.addEvolutionNote);
+  // Captura extemporánea: validada por el guard global (lee evolutionNote.fecha
+  // anidada). Se elimina el `backdatedEntry()` redundante que sólo miraba la
+  // fecha de nivel superior.
+  .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.addEvolutionNote);
 
 // Editar una nota de evolución mientras siga en BORRADOR. Restricciones
 // (BORRADOR + creador/admin) las aplica el controller.
@@ -475,6 +482,13 @@ router
   .route('/:id/evolution-note/:noteId/sign')
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.signExistingEvolutionNote);
+
+// Verificar la integridad de una nota firmada (contentHash + hashes de las
+// imágenes de firma en disco). Sólo lectura, para auditoría (NOM-024).
+router
+  .route('/:id/evolution-note/:noteId/verify')
+  .all(validateId, checkPatient)
+  .get(requireClinicalRole, authorize(['consultas.read']), patientCtrl.verifyEvolutionNoteIntegrity);
 
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router

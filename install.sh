@@ -260,6 +260,34 @@ EOF
 mv "$ENV_FILE.tmp" "$ENV_FILE"
 print_ok ".env actualizado (IP: $LOCAL_IP)"
 
+# Garantizar JWT_SECRET fuerte (paridad con install.ps1).
+# Sin un JWT_SECRET >=32 chars el server genera un secreto EFÍMERO distinto en
+# cada arranque (Server/utils/crypto.js), invalidando todas las sesiones en cada
+# reinicio y expulsando al usuario al login a mitad de una operación (p. ej. al
+# firmar una nota). Lo generamos una sola vez y lo preservamos en reinstalaciones.
+CURRENT_JWT="$(grep -E '^JWT_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '[:space:]')"
+if [ "${#CURRENT_JWT}" -lt 32 ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        NEW_JWT="$(openssl rand -hex 32)"
+    elif command -v node >/dev/null 2>&1; then
+        NEW_JWT="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+    else
+        NEW_JWT="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    # Quitar cualquier línea JWT_SECRET previa (vacía o débil) y añadir la nueva.
+    grep -v -E '^JWT_SECRET=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+    echo "JWT_SECRET=$NEW_JWT" >> "$ENV_FILE.tmp"
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+    print_ok "JWT_SECRET aleatorio generado (64 chars hex)"
+else
+    print_ok "JWT_SECRET existente conservado"
+fi
+
+# COOKIE_SECURE off por default (no usamos HTTPS en LAN local) — paridad con install.ps1
+if ! grep -qE '^COOKIE_SECURE=' "$ENV_FILE"; then
+    echo "COOKIE_SECURE=false" >> "$ENV_FILE"
+fi
+
 # Client/.env — Vite hornea VITE_API_URL en el bundle de producción.
 # El archivo está en .gitignore, así que NO viene en descargas frescas.
 CLIENT_ENV_FILE="$CLIENT_DIR/.env"

@@ -20,6 +20,7 @@ const Usuario = require('../models/users');
 const auditLogger = require('../middlewares/auditLogger');
 const { normalizeRole, isAdminRole, hasPermission, getEffectivePermissions } = require('../utils/permissions');
 const { computeContentHash, computeEvolutionNoteHash } = require('../utils/signing');
+const { copyFirmaToSnapshot } = require('../utils/saveSignatureImage');
 
 // Roles autorizados a firmar drafts (NOM-013). Admin/superadmin/doctor_admin
 // pueden firmar como capacidad administrativa. Asistente NO firma.
@@ -46,6 +47,48 @@ function canSign(user) {
   const hasPerm = hasPermission(userPerms, ['draft.approve', 'drafts.batch_sign']);
   const role = normalizeRole(user?.role);
   return hasPerm && SIGNING_ROLES.has(role);
+}
+
+// Roles que pueden ser el FIRMANTE (firmadoPor) de un registro CLÍNICO: sólo un
+// dentista (doctor o doctor_admin). NOM-004 Art. 5.10 — la nota la firma quien
+// la elabora, que debe ser el profesional tratante. administrador/superadmin
+// pueden aprobar borradores de otros recursos por capacidad administrativa,
+// pero NO deben quedar registrados como autores de una nota de evolución.
+const DOCTOR_SIGNER_ROLES = new Set(['doctor', 'doctor_admin']);
+function isDoctorSigner(user) {
+  return DOCTOR_SIGNER_ROLES.has(normalizeRole(user?.role));
+}
+
+/**
+ * Adjunta la firma del doctor a una nota de evolución al firmarla desde el
+ * Centro de Firmas (signDraft/batchSign).
+ *
+ * Antes, estos caminos marcaban la nota OFICIAL pero NO guardaban firma del
+ * doctor (doctorFirmaUrl/doctorFirmaMethod quedaban null) → notas OFICIALES
+ * sin firma visible, incoherentes con addEvolutionNote/signExistingEvolutionNote
+ * y contra NOM-004 Art. 5.10. Aquí registramos la firma electrónica del doctor
+ * (method='pin', ya validada con su PIN por el caller) y, si tiene imagen de
+ * firma subida, copiamos un snapshot inmutable servible.
+ *
+ * No bloquea la firma legalmente válida (PIN + contentHash) ante un fallo de
+ * disco: en ese caso la firma queda como electrónica (method='pin') sin imagen.
+ *
+ * @param {object} note - subdocumento de nota (Mongoose)
+ * @param {object} signer - Usuario que firma (req.user resuelto a documento)
+ * @param {string|object} patientId - _id del paciente (para la ruta del snapshot)
+ */
+async function attachDoctorSignatureToNote(note, signer, patientId) {
+  note.doctorFirmaMethod = 'pin';
+  if (!signer || !signer.firmaDigitalUrl) return;
+  try {
+    const snap = await copyFirmaToSnapshot(signer.firmaDigitalUrl, [
+      'pacientes', String(patientId), 'firmas-notas', `${note._id.toString()}_doctor`,
+    ]);
+    note.doctorFirmaUrl = snap.publicUrl;
+    note.doctorFirmaImageHash = snap.contentHash;
+  } catch (e) {
+    console.warn('[draftController] No se pudo snapshotear la firma del doctor:', e.message);
+  }
 }
 
 // ── Helpers para notas de evolución (subdoc en Patient) ──────────
@@ -208,6 +251,14 @@ const signDraft = async (req, res) => {
       if (note.estadoRegistro !== 'BORRADOR') {
         return res.status(400).json({ message: 'El registro no está en estado BORRADOR' });
       }
+      // Sólo un dentista puede ser el autor/firmante de una nota clínica
+      // (NOM-004 Art. 5.10). Antes administrador/superadmin con draft.approve
+      // podían quedar como `firmadoPor` de una nota de evolución.
+      if (!isDoctorSigner(req.user)) {
+        return res.status(403).json({
+          message: 'Sólo un doctor (o doctor administrador) puede firmar una nota de evolución como OFICIAL.'
+        });
+      }
 
       note.estadoRegistro = 'OFICIAL';
       note.firmadoPor = req.user.id;
@@ -218,6 +269,9 @@ const signDraft = async (req, res) => {
       // posterior (NOM-024 / NOM-004 Art. 5.10).
       note.contentHash = computeEvolutionNoteHash(note);
       note.firmaDesactualizada = false;
+      // Adjunta la firma del doctor (method='pin' + snapshot si tiene imagen).
+      // Sin esto la nota quedaba OFICIAL sin ninguna firma del doctor.
+      await attachDoctorSignatureToNote(note, user, patient._id);
       // Limpiar marca de rechazo si la había.
       note.rechazadoEn = null;
       note.rechazadoPor = null;
@@ -228,7 +282,7 @@ const signDraft = async (req, res) => {
         resourceType: NOTE_RESOURCE,
         resourceId: note._id,
         patientId: patient._id,
-        detalles: { contentHash: note.contentHash },
+        detalles: { contentHash: note.contentHash, doctorFirmaMethod: note.doctorFirmaMethod },
       });
 
       return res.json({ message: 'Borrador firmado correctamente', noteId: note._id });
@@ -356,12 +410,20 @@ const batchSign = async (req, res) => {
             errores.push({ id, resourceType, error: 'No está en estado BORRADOR' });
             continue;
           }
+          // Sólo un dentista puede ser el autor de una nota clínica (NOM-004
+          // Art. 5.10) — administrador/superadmin no firman notas de evolución.
+          if (!isDoctorSigner(req.user)) {
+            errores.push({ id, resourceType, error: 'Sólo un doctor puede firmar notas de evolución como OFICIAL' });
+            continue;
+          }
           note.estadoRegistro = 'OFICIAL';
           note.firmadoPor = req.user.id;
           note.firmadoEn = new Date();
           // Snapshot del contentHash al firmar (ver nota en signDraft).
           note.contentHash = computeEvolutionNoteHash(note);
           note.firmaDesactualizada = false;
+          // Adjunta la firma del doctor (method='pin' + snapshot si tiene imagen).
+          await attachDoctorSignatureToNote(note, user, patient._id);
           note.rechazadoEn = null;
           note.rechazadoPor = null;
           note.rechazoMotivo = null;

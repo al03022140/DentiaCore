@@ -883,13 +883,18 @@ exports.getAppointmentActivity = async (req, res) => {
             .lean();
 
         // ── Movimientos de caja directos (sin cobro) que apunten al paciente
-        //    y caigan en la ventana de la cita. Sólo informativo.
-        const aptDate = new Date(apt.fecha_hora);
-        const aptDateEnd = new Date(aptDate.getTime() + 24 * 60 * 60 * 1000);
+        //    y caigan en el DÍA de la cita. Sólo informativo.
+        // M-10: antes la ventana era [hora_cita, hora_cita+24h), lo que dejaba
+        // fuera un pago hecho minutos antes de la cita y atribuía movimientos
+        // del día siguiente. Usamos los límites del día calendario (local) de la
+        // cita, que es lo que el reporte pretende mostrar.
+        const aptDay = new Date(apt.fecha_hora);
+        const dayStart = new Date(aptDay.getFullYear(), aptDay.getMonth(), aptDay.getDate(), 0, 0, 0, 0);
+        const dayEnd = new Date(aptDay.getFullYear(), aptDay.getMonth(), aptDay.getDate(), 23, 59, 59, 999);
         const directMovements = await CashMovement.find({
             patientId: apt.paciente_id,
             linkedChargeId: null,
-            date: { $gte: aptDate, $lt: aptDateEnd }
+            date: { $gte: dayStart, $lte: dayEnd }
         })
             .select('amount type paymentMethod concept date')
             .sort({ date: 1 })

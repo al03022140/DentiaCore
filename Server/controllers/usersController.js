@@ -1,6 +1,6 @@
 const Usuario = require('../models/users');
 const { validatePasswordStrength } = require('../utils/crypto');
-const { isAdminRole } = require('../utils/permissions');
+const { isAdminRole, validatePermissionAssignment } = require('../utils/permissions');
 
 // Role hierarchy: higher index = more privileged
 // doctor_admin va entre doctor y administrador: el dentista-director tiene
@@ -83,13 +83,14 @@ const listDoctors = async (req, res) => {
       rol: { $in: ['doctor', 'doctor_admin'] },
       active: true,
     })
-      .select('_id nombre cedulaProfesional firmaDigitalUrl rol')
+      // M-5: no exponer la cédula profesional (PII) a cualquier rol; el
+      // asistente solo necesita el nombre y si el doctor tiene firma.
+      .select('_id nombre firmaDigitalUrl rol')
       .sort({ nombre: 1 })
       .lean();
     res.json(doctors.map((d) => ({
       id: d._id,
       nombre: d.nombre,
-      cedulaProfesional: d.cedulaProfesional || null,
       rol: d.rol,
       hasFirma: Boolean(d.firmaDigitalUrl),
     })));
@@ -114,6 +115,15 @@ const createUser = async (req, res) => {
     const escalationErr = checkPrivilegeEscalation(req.user.role, null, rol);
     if (escalationErr) {
       return res.status(403).json({ message: escalationErr });
+    }
+
+    // Prevent privilege escalation via the `permissions` field (C-2):
+    // an actor cannot grant dangerous or self-not-held permissions.
+    if (permissions !== undefined) {
+      const permCheck = validatePermissionAssignment(permissions, req.user);
+      if (!permCheck.valid) {
+        return res.status(403).json({ message: permCheck.message });
+      }
     }
 
     if (!/^\d{4}$/.test(pin)) {
@@ -197,6 +207,19 @@ const updateUser = async (req, res) => {
     const escalationErr = checkPrivilegeEscalation(req.user.role, user.rol, rol, isSelf);
     if (escalationErr) {
       return res.status(403).json({ message: escalationErr });
+    }
+
+    // Prevent privilege escalation via the `permissions` field (C-2):
+    // an actor cannot grant dangerous or self-not-held permissions, and
+    // cannot edit their own individual permission overrides.
+    if (permissions !== undefined) {
+      if (isSelf) {
+        return res.status(403).json({ message: 'No puede modificar sus propios permisos' });
+      }
+      const permCheck = validatePermissionAssignment(permissions, req.user);
+      if (!permCheck.valid) {
+        return res.status(403).json({ message: permCheck.message });
+      }
     }
 
     // Validar unicidad de email si se está cambiando

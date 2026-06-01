@@ -5,6 +5,7 @@ const {
   normalizeEntry
 } = require('../helpers/odontograma');
 const mongoose = require('mongoose');
+const fsExtra = require('fs-extra');
 const OdontogramaModel = require('../models/odontograma');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');

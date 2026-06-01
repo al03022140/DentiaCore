@@ -8,13 +8,13 @@ const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
-const { hasPermission, getEffectivePermissions } = require('../utils/permissions');
+const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
-const { saveSignatureDataUrl, copyFirmaToSnapshot } = require('../utils/saveSignatureImage');
+const { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash } = require('../utils/saveSignatureImage');
 const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
 const auditLogger = require('../middlewares/auditLogger');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
-const { computeEvolutionNoteHash } = require('../utils/signing');
+const { computeEvolutionNoteHash, evaluateNoteIntegrity } = require('../utils/signing');
 
 // Logs informativos sólo en desarrollo (los errores siempre se loggean).
 const DEBUG_LOGS = process.env.NODE_ENV !== 'production';
@@ -1108,7 +1108,11 @@ exports.addEvolutionNote = async (req, res) => {
     // siempre sube y nunca se resetea aunque se borren notas — se aceptan
     // huecos para mantener monotonía clínica (NOM-024).
     const counterDoc = await Patient.findOneAndUpdate(
-      { _id: id },
+      // A-8: filtrar `deletedAt: null` igual que el $push posterior. Antes el
+      // contador se incrementaba aunque el paciente estuviera soft-deleted,
+      // mientras la inserción de la nota (que sí filtra deletedAt) fallaba —
+      // dejando el contador monotónico avanzado de forma permanente y un 500.
+      { _id: id, deletedAt: null },
       [
         {
           $set: {
@@ -1128,7 +1132,16 @@ exports.addEvolutionNote = async (req, res) => {
       ],
       { new: true, projection: { _evolutionNoteCounter: 1 } }
     );
-    const numero_procedimiento = counterDoc?._evolutionNoteCounter;
+    // A-8: si el paciente no existe o está soft-deleted, el update filtrado por
+    // `deletedAt: null` no matchea y counterDoc es null. No se mutó nada (el
+    // contador no avanzó), así que respondemos 404 sin efectos colaterales.
+    if (!counterDoc) {
+      return res.status(404).json({
+        success: false,
+        error: 'Paciente no encontrado o no disponible.'
+      });
+    }
+    const numero_procedimiento = counterDoc._evolutionNoteCounter;
     if (!numero_procedimiento) {
       return res.status(500).json({
         success: false,
@@ -1144,13 +1157,18 @@ exports.addEvolutionNote = async (req, res) => {
       evolutionNote.appointmentId || req.body.appointmentId,
       id
     );
+    // Fecha clínica de la nota (puede ser retroactiva en una captura
+    // extemporánea). `fechaFormateada` se deriva de ESTA fecha, no de `now`:
+    // antes una nota retroactiva mostraba la fecha de captura en la UI (que
+    // prefiere `fechaFormateada`) en vez de la fecha clínica real.
+    const fechaNota = evolutionNote.fecha ? new Date(evolutionNote.fecha) : now;
     const newEvolutionNote = {
       numero_procedimiento,
       procedimiento: (evolutionNote.procedimiento || '').trim(),
       observaciones: (evolutionNote.observaciones || '').trim(),
       correcciones: (evolutionNote.correcciones || '').trim(),
-      fecha: evolutionNote.fecha ? new Date(evolutionNote.fecha) : now,
-      fechaFormateada: evolutionNote.fechaFormateada || now.toLocaleDateString('es-ES', {
+      fecha: fechaNota,
+      fechaFormateada: evolutionNote.fechaFormateada || fechaNota.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -1369,7 +1387,11 @@ exports.updateDraftEvolutionNote = async (req, res) => {
     }
 
     const userPerms = getEffectivePermissions(req.user);
-    const isAdmin = ['administrador', 'superadmin', 'doctor_admin'].includes(req.user?.role);
+    // Usa el helper canónico (normaliza casing e incluye 'admin'/'superadmin').
+    // Antes era un `includes()` case-sensitive contra strings en minúscula: si el
+    // rol del token venía con otra capitalización, un admin legítimo NO era
+    // reconocido como tal y no podía editar un borrador ajeno.
+    const isAdmin = isAdminRole(req.user?.role);
     const isCreator = note.creadoPor && note.creadoPor.toString() === req.user?.id;
     if (!isAdmin && !isCreator) {
       return res.status(403).json({
@@ -1629,6 +1651,95 @@ exports.signExistingEvolutionNote = async (req, res) => {
   } catch (error) {
     console.error('Error en signExistingEvolutionNote:', error);
     return res.status(500).json({ success: false, error: error.message || 'Error interno al firmar la nota.' });
+  }
+};
+
+/**
+ * 🔹 Verificar la integridad de una nota de evolución firmada.
+ *
+ * GET /patients/:id/evolution-note/:noteId/verify
+ *
+ * NOM-024-SSA3-2012 (integridad). Comprueba dos cosas que hasta ahora se
+ * guardaban pero NUNCA se verificaban:
+ *   1. Que el contenido clínico no cambió tras la firma → recomputa el
+ *      contentHash y lo compara con el snapshot guardado al firmar.
+ *   2. Que los PNG de firma en disco no fueron manipulados → compara el
+ *      SHA-256 actual del archivo contra el hash guardado al firmar
+ *      (verifySignatureImageHash, que antes era código muerto).
+ *
+ * Es de sólo lectura y no muta nada; expone un reporte para auditoría.
+ */
+exports.verifyEvolutionNoteIntegrity = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(noteId)) {
+      return res.status(400).json({ success: false, error: 'IDs inválidos.' });
+    }
+
+    const patient = await Patient.findOne({ _id: id, deletedAt: null });
+    if (!patient) return res.status(404).json({ success: false, error: 'Paciente no encontrado.' });
+
+    const note = patient.notas_evolucion.id(noteId);
+    if (!note || note.deletedAt) return res.status(404).json({ success: false, error: 'Nota no encontrada.' });
+
+    // 1) Integridad del contenido vs hash firmado.
+    const expectedContentHash = note.contentHash || null;
+    const actualContentHash = _computeEvolutionNoteHash(note);
+    const contenido = {
+      ok: expectedContentHash ? expectedContentHash === actualContentHash : null,
+      expected: expectedContentHash,
+      actual: actualContentHash,
+      // Si la nota nunca se firmó (BORRADOR), no hay hash de referencia.
+      motivo: expectedContentHash ? undefined : 'nota_sin_firma',
+    };
+
+    // 2) Integridad de los PNG de firma en disco.
+    // publicUrl es '/uploads/...'; lo mapeamos a ruta absoluta del store.
+    const toAbsPath = (publicUrl) => {
+      if (!publicUrl) return null;
+      const rel = String(publicUrl).replace(/^\/+/, '').replace(/^uploads\//i, '');
+      return resolveUploadsPath(...rel.split('/').filter(Boolean));
+    };
+
+    // Sólo se puede verificar si hay URL de firma Y hash de referencia guardado.
+    // Sin uno u otro → no aplica (null), no se reporta como manipulación.
+    const checkFirma = async (url, expectedHash) => {
+      if (!url) return { ok: null, reason: 'sin_firma' };
+      if (!expectedHash) return { ok: null, reason: 'sin_hash_referencia' };
+      return verifySignatureImageHash(toAbsPath(url), expectedHash);
+    };
+    const firmaPaciente = await checkFirma(note.pacienteFirmaUrl, note.pacienteFirmaImageHash);
+    const firmaDoctor = await checkFirma(note.doctorFirmaUrl, note.doctorFirmaImageHash);
+
+    // Veredicto de integridad (función pura). A diferencia del cálculo anterior
+    // (`ok !== false` en las tres comprobaciones), una nota OFICIAL ahora EXIGE
+    // contentHash válido y firma del doctor presente e íntegra; si falta alguno
+    // → NO íntegra. Antes una nota OFICIAL sin hash o sin firma del doctor (p. ej.
+    // firmada por el Centro de Firmas) reportaba `integro: true` falsamente.
+    const { integro, motivos } = evaluateNoteIntegrity({
+      estadoRegistro: note.estadoRegistro,
+      contenidoOk: contenido.ok,
+      firmaPacienteOk: firmaPaciente.ok,
+      firmaDoctorOk: firmaDoctor.ok,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        noteId: note._id,
+        numero_procedimiento: note.numero_procedimiento,
+        estadoRegistro: note.estadoRegistro,
+        firmaDesactualizada: note.firmaDesactualizada,
+        integro,
+        motivos,
+        contenido,
+        firmaPaciente,
+        firmaDoctor,
+      },
+    });
+  } catch (error) {
+    console.error('Error en verifyEvolutionNoteIntegrity:', error);
+    return res.status(500).json({ success: false, error: 'Error al verificar la integridad de la nota.' });
   }
 };
 
@@ -2016,14 +2127,27 @@ exports.addTreatmentPlan = async (req, res) => {
             capturaExtemporanea: req.body._capturaExtemporanea || undefined
         };
 
-        // Agregar el plan de tratamiento al array
-        patient.planes_tratamiento.unshift(newTreatmentPlan);
+        // A-10: insertar de forma ATÓMICA con $push + $position:0 (equivalente a
+        // unshift) en lugar de unshift + patient.save(). El modelo usa
+        // versionKey:false (sin control de concurrencia optimista), por lo que
+        // un read-modify-write del documento completo descartaba silenciosamente
+        // planes en escrituras concurrentes. addEvolutionNote ya se reescribió
+        // así; esto alinea addTreatmentPlan al mismo patrón seguro.
+        const planId = new mongoose.Types.ObjectId();
+        newTreatmentPlan._id = planId;
+        const updateResult = await Patient.updateOne(
+            { _id: id, deletedAt: null },
+            { $push: { planes_tratamiento: { $each: [newTreatmentPlan], $position: 0 } } }
+        );
+        if (!updateResult || updateResult.matchedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Paciente no encontrado'
+            });
+        }
 
-        // Guardar el paciente
-        await patient.save();
-
-        // Devolver el subdocumento guardado (con _id generado por Mongoose)
-        const savedPlan = patient.planes_tratamiento[0];
+        // Devolver el subdocumento guardado (con el _id que generamos)
+        const savedPlan = { ...newTreatmentPlan, _id: planId };
 
         // Audit log: trazabilidad NOM-024 — antes el create de plan no quedaba
         // registrado (a diferencia de notas de evolución, que sí lo hacían).

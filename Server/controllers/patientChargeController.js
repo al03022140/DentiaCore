@@ -135,10 +135,30 @@ exports.createCharge = async (req, res) => {
     // vinculados a citas de otro paciente (cross-linking en auditoría).
     const validatedAppointmentId = await resolvePatientAppointmentId(appointmentId, patientId);
 
+    // M-7: validar la fecha del cobro. La fecha alimenta toda agregación de
+    // estadísticas/ingresos; una fecha futura o muy antigua (accidental o
+    // maliciosa) sesga los reportes y evade los controles de captura
+    // extemporánea. Sin `fecha` → ahora. Con `fecha` → debe ser válida, no
+    // futura (con 5 min de tolerancia de reloj) y no anterior a 2 años.
+    let chargeDate = new Date();
+    if (fecha !== undefined && fecha !== null && fecha !== '') {
+      chargeDate = new Date(fecha);
+      if (Number.isNaN(chargeDate.getTime())) {
+        return res.status(400).json({ message: 'La fecha del cobro no es válida' });
+      }
+      const nowTs = Date.now();
+      if (chargeDate.getTime() > nowTs + 5 * 60 * 1000) {
+        return res.status(400).json({ message: 'La fecha del cobro no puede ser futura' });
+      }
+      if (chargeDate.getTime() < nowTs - 2 * 365 * 24 * 60 * 60 * 1000) {
+        return res.status(400).json({ message: 'La fecha del cobro es demasiado antigua' });
+      }
+    }
+
     const charge = new PatientCharge({
       patientId,
       appointmentId: validatedAppointmentId,
-      fecha: fecha || new Date(),
+      fecha: chargeDate,
       items: processedItems,
       total,
       confirmado: true,
@@ -268,17 +288,49 @@ exports.addPayment = async (req, res) => {
       });
     }
 
+    // A-6: aplicar el pago de forma ATÓMICA con guarda de saldo. El filtro
+    // `saldoPendiente >= amount` garantiza que dos pagos concurrentes sobre el
+    // mismo cobro no puedan sobre-cobrar: solo uno gana la carrera; el otro
+    // recibe null y se revierte. Recalculamos totalPagado/saldoPendiente con
+    // $round DENTRO del mismo update (las pre-save hooks no corren en
+    // findOneAndUpdate, por eso el cálculo se hace explícito aquí). El $push se
+    // hace vía $concatArrays, por lo que los pagos existentes nunca se alteran.
+    let updatedCharge = null;
     try {
-      charge.pagos.push({
+      const nuevoPago = {
+        _id: new mongoose.Types.ObjectId(),
         monto: amount,
         fecha: now,
         paymentMethod,
         cashMovementId: movement._id,
-        registradoPor: req.user.id
-      });
-      await charge.save();
+        registradoPor: new mongoose.Types.ObjectId(req.user.id)
+      };
+      updatedCharge = await PatientCharge.findOneAndUpdate(
+        { _id: charge._id, cancelado: { $ne: true }, saldoPendiente: { $gte: amount } },
+        [
+          {
+            $set: {
+              pagos: { $concatArrays: ['$pagos', [nuevoPago]] },
+              totalPagado: { $round: [{ $add: ['$totalPagado', amount] }, 2] },
+              saldoPendiente: {
+                $round: [
+                  { $max: [0, { $subtract: ['$total', { $add: ['$totalPagado', amount] }] }] },
+                  2
+                ]
+              }
+            }
+          }
+        ],
+        { new: true }
+      );
     } catch (chargeErr) {
-      // Rollback: borrar el CashMovement ya creado.
+      console.error('Error guardando cobro tras pago:', chargeErr);
+      updatedCharge = null;
+    }
+
+    if (!updatedCharge) {
+      // Perdió la carrera (saldo cambió / cobro cancelado) o falló el update.
+      // Revertir el CashMovement ya creado para no inflar la caja.
       try {
         await CashMovement.deleteOne({ _id: movement._id });
       } catch (rollbackErr) {
@@ -289,8 +341,9 @@ exports.addPayment = async (req, res) => {
           rollbackErr
         });
       }
-      console.error('Error guardando cobro tras pago:', chargeErr);
-      return res.status(500).json({ message: 'Error al registrar pago: la operación se revirtió.' });
+      return res.status(409).json({
+        message: 'No se pudo registrar el pago: el saldo cambió o el cobro fue cancelado. Reintente.'
+      });
     }
 
     const populated = await PatientCharge.findById(charge._id)
@@ -372,6 +425,7 @@ exports.cancelCharge = async (req, res) => {
       }
 
       const chargeRef = `#${String(charge._id).slice(-6)}`;
+      let reverseInterrupted = false;
       for (const pago of charge.pagos) {
         try {
           const expense = await CashMovement.create({
@@ -385,11 +439,34 @@ exports.cancelCharge = async (req, res) => {
             linkedChargeId: charge._id,
             creadoPor: req.user.id
           });
+
+          // A-7: cerrar el race contra closeBox. Entre la lectura de la sesión
+          // OPEN y este create, otro request pudo cerrar la caja; el EXPENSE
+          // quedaría atado a una sesión cerrada y no contaría en el corte,
+          // corrompiendo el balance. Si pasó a CLOSING/CLOSED, revertimos este
+          // movimiento y detenemos el reverso (los pagos restantes quedan
+          // pendientes de reversión manual).
+          const stillOpen = await BoxSession.exists({ _id: activeSession._id, status: 'OPEN' });
+          if (!stillOpen) {
+            try { await CashMovement.deleteOne({ _id: expense._id }); }
+            catch (rbErr) { console.error('CRITICAL: rollback reverso falló:', { movementId: expense._id, rbErr }); }
+            reverseInterrupted = true;
+            break;
+          }
           reversedMovementIds.push(expense._id);
         } catch (revErr) {
           // Loguear y continuar — los pagos restantes deben intentar revertirse.
           console.error('[cancelCharge] Error revirtiendo pago:', { chargeId, pagoId: pago._id, revErr });
         }
+      }
+
+      if (reverseInterrupted) {
+        return res.json({
+          charge,
+          reverseStatus: 'partial',
+          reverseMessage: 'Cobro cancelado. La caja se cerró durante el reverso: algunos pagos NO se revirtieron a caja. Complete el reverso manualmente con la caja abierta.',
+          reversedMovementIds
+        });
       }
     }
 

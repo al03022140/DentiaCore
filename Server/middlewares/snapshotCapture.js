@@ -12,7 +12,7 @@ const mongoose = require('mongoose');
 
 // ── Mapa de patrón de ruta → modelo Mongoose ────────────────────
 const ROUTE_MODEL_MAP = [
-  [/\/api\/patients\/([a-f\d]{24})\/evolution-note/i,   { modelName: 'Patient', paramIndex: 1, subField: 'notas_evolucion' }],
+  [/\/api\/patients\/([a-f\d]{24})\/evolution-note(?:\/([a-f\d]{24}))?/i, { modelName: 'Patient', paramIndex: 1, subField: 'notas_evolucion', subIdIndex: 2 }],
   [/\/api\/patients\/([a-f\d]{24})\/odontograma/i,      { modelName: 'Odontograma', lookup: 'patientId' }],
   [/\/api\/patients\/([a-f\d]{24})\/periodontogram/i,   { modelName: 'Periodontogram', lookup: 'patient' }],
   [/\/api\/patients\/([a-f\d]{24})\/treatment-plan/i,   { modelName: 'Patient', paramIndex: 1, subField: 'consultas' }],
@@ -38,13 +38,16 @@ function resolveModelAndId(url) {
       if (!Model) continue;
 
       const docId = config.paramIndex ? match[config.paramIndex] : null;
+      // ID del subdocumento (p. ej. la nota concreta en
+      // /evolution-note/:noteId) para acotar el snapshot a ese elemento.
+      const subId = config.subIdIndex ? (match[config.subIdIndex] || null) : null;
 
       if (config.lookup) {
         // Para sub-recursos buscados por campo (ej. patientId)
-        return { model: Model, lookupField: config.lookup, lookupValue: match[1], subField: config.subField };
+        return { model: Model, lookupField: config.lookup, lookupValue: match[1], subField: config.subField, subId };
       }
 
-      return { model: Model, docId, subField: config.subField };
+      return { model: Model, docId, subField: config.subField, subId };
     }
   }
   return null;
@@ -62,22 +65,34 @@ function snapshotCapture(req, res, next) {
   const resolved = resolveModelAndId(req.originalUrl);
   if (!resolved) return next();
 
-  const { model, docId, lookupField, lookupValue, subField } = resolved;
+  const { model, docId, lookupField, lookupValue, subField, subId } = resolved;
 
-  // Fire-and-forget: no bloquear el request si la captura falla
   const capturePromise = (async () => {
     try {
       let doc;
       if (docId) {
-        doc = await model.findById(docId).lean().maxTimeMS(3000);
+        // Si es un sub-campo, proyectamos SOLO ese campo (no traemos todo el
+        // documento del paciente). Reduce carga y evita arrastrar datos ajenos.
+        doc = await model
+          .findById(docId, subField ? { [subField]: 1 } : undefined)
+          .lean()
+          .maxTimeMS(3000);
       } else if (lookupField && lookupValue) {
         doc = await model.findOne({ [lookupField]: lookupValue }).lean().maxTimeMS(3000);
       }
 
       if (doc) {
-        // Si es un sub-campo, extraer solo esa parte
         if (subField && doc[subField]) {
-          req._snapshotAntes = { [subField]: doc[subField] };
+          let value = doc[subField];
+          // Acotar el snapshot al subdocumento concreto que se edita (por _id).
+          // Antes se guardaba el array COMPLETO de notas en el audit log →
+          // se filtraba en cada edición el contenido clínico de TODAS las notas
+          // del paciente (PII innecesaria, LFPDPPP Art. 6 + logs enormes).
+          if (subId && Array.isArray(value)) {
+            const one = value.find(el => String(el?._id) === String(subId));
+            value = one ? [one] : [];
+          }
+          req._snapshotAntes = { [subField]: value };
           req._snapshotResourceType = subField;
         } else {
           // Excluir campos internos enormes del snapshot
@@ -91,8 +106,12 @@ function snapshotCapture(req, res, next) {
     }
   })();
 
-  // Esperamos brevemente pero no bloqueamos indefinidamente
-  capturePromise.then(() => next()).catch(() => next());
+  // No bloqueamos el request esperando el snapshot (antes añadía hasta 3 s de
+  // latencia por escritura). Guardamos la promesa para que el auditLogger la
+  // espere FUERA del camino crítico (en su setImmediate, tras responder), sin
+  // perder el before-image.
+  req._snapshotPromise = capturePromise;
+  return next();
 }
 
 module.exports = snapshotCapture;

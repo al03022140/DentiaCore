@@ -113,7 +113,10 @@ app.use((req, res, next) => {
 // 3) Servir archivos estáticos
 const uploadsBase = getUploadsBase();
 fsExtra.ensureDirSync(uploadsBase);
-app.use('/uploads', express.static(uploadsBase));
+// C-1: /uploads contiene PHI (adjuntos, odontogramas, fotos de pacientes).
+// Exigir una sesión válida (Bearer o cookie httpOnly) antes del estático.
+const uploadsAuth = require('../middlewares/uploadsAuth');
+app.use('/uploads', uploadsAuth, express.static(uploadsBase));
 app.use(express.static(path.join(__dirname, '../../Client/dist')));
 
 // 5) Endpoints de debug (async/await) - SOLO EN DESARROLLO

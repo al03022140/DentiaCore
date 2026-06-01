@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import API from '../../shared/services/axios-instance';
+import API, { triggerTokenRefresh } from '../../shared/services/axios-instance';
 import { clearAccessToken, getAccessToken, setAccessToken } from '../../shared/services/auth-token';
+import { clearAllDrafts } from '../../shared/hooks/useDraftPersistence';
 
 const AuthContext = createContext(null);
 
@@ -30,6 +31,8 @@ export const AuthProvider = ({ children }) => {
       // Ignorar errores de logout
     } finally {
       clearAccessToken();
+      // M-14: limpiar drafts con PHI de localStorage al cerrar sesión.
+      clearAllDrafts();
       setUser(null);
     }
   }, []);
@@ -46,11 +49,24 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const bootstrap = async () => {
-      const token = getAccessToken();
-      if (token) {
-        await refreshProfile();
+      // A-2: el access token ya no se persiste en localStorage, así que al
+      // cargar la app siempre está vacío en memoria. Intentamos rehidratarlo
+      // vía /auth/refresh usando la cookie httpOnly de refresh. Si hay sesión
+      // válida, obtenemos un nuevo access token y cargamos el perfil; si no,
+      // quedamos como no autenticados (el usuario verá /login).
+      try {
+        let token = getAccessToken();
+        if (!token) {
+          token = await triggerTokenRefresh();
+        }
+        if (token) {
+          await refreshProfile();
+        }
+      } catch (_e) {
+        // Sin sesión válida: nada que hacer, seguimos como invitado.
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     bootstrap();

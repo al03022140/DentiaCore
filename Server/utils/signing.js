@@ -75,9 +75,53 @@ function getModelName(resourceType) {
   return RESOURCE_MODEL_MAP[resourceType] || null;
 }
 
+/**
+ * Veredicto de integridad de una nota de evolución a partir de los resultados
+ * de comprobación ya calculados (contenido + firmas). Función PURA (sin I/O)
+ * para poder testearla aislada.
+ *
+ * Reglas (NOM-004 Art. 5.10 / NOM-024):
+ *  - Cualquier comprobación que dé `false` (hash que no coincide) ⇒ manipulación.
+ *  - Una nota OFICIAL DEBE tener, además: contentHash de referencia que coincida
+ *    (contenidoOk === true) y firma del doctor presente e íntegra
+ *    (firmaDoctorOk === true). Antes, si esas piezas faltaban se reportaban como
+ *    "no aplica" (null) y NO afectaban `integro`: una nota OFICIAL sin
+ *    contentHash o sin firma del doctor reportaba `integro: true` falsamente.
+ *  - La firma del PACIENTE es informativa: el flujo interactivo la captura, pero
+ *    la firma en lote (Centro de Firmas) firma sólo con el doctor. Sólo penaliza
+ *    si está presente y alterada (ok === false).
+ *  - Una nota en BORRADOR no tiene firma de referencia ⇒ evaluación laxa (sólo
+ *    falla ante un `false` explícito).
+ *
+ * @param {object} p
+ * @param {string} p.estadoRegistro
+ * @param {boolean|null} p.contenidoOk
+ * @param {boolean|null} p.firmaPacienteOk
+ * @param {boolean|null} p.firmaDoctorOk
+ * @returns {{ integro: boolean, motivos: string[] }}
+ */
+function evaluateNoteIntegrity({ estadoRegistro, contenidoOk, firmaPacienteOk, firmaDoctorOk }) {
+  const motivos = [];
+  const esOficial = estadoRegistro === 'OFICIAL';
+
+  // Contenido clínico vs hash firmado.
+  if (contenidoOk === false) motivos.push('contenido_alterado');
+  else if (esOficial && contenidoOk !== true) motivos.push('oficial_sin_hash_contenido');
+
+  // Firma del doctor (obligatoria en OFICIAL).
+  if (firmaDoctorOk === false) motivos.push('firma_doctor_alterada');
+  else if (esOficial && firmaDoctorOk !== true) motivos.push('oficial_sin_firma_doctor');
+
+  // Firma del paciente: sólo penaliza si está presente y alterada.
+  if (firmaPacienteOk === false) motivos.push('firma_paciente_alterada');
+
+  return { integro: motivos.length === 0, motivos };
+}
+
 module.exports = {
   computeContentHash,
   computeEvolutionNoteHash,
+  evaluateNoteIntegrity,
   getModelName,
   getSignableFields,
   RESOURCE_MODEL_MAP,

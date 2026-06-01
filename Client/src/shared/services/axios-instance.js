@@ -111,7 +111,16 @@ API.interceptors.response.use(
         // Sólo excluir verify-pin si el servidor devuelve valid:false (PIN incorrecto).
         // Si valid es undefined, es el middleware de auth rechazando por token expirado
         // → dejar pasar al bloque de refresh para que se renueve y se reintente.
-        (originalRequest?.url?.includes('/auth/verify-pin') && error.response?.data?.valid === false)
+        (originalRequest?.url?.includes('/auth/verify-pin') && error.response?.data?.valid === false) ||
+        // 401 de NEGOCIO (no de sesión): los controladores responden con
+        // { success:false, error:... } — p. ej. "PIN del doctor incorrecto" al
+        // firmar una nota. El middleware de auth, en cambio, responde solo con
+        // { message:... } y SIN `success`. Por eso, un 401 con success:false NO
+        // es un token expirado y NO debe disparar refresh+reintento: hacerlo
+        // reenviaba el POST con el mismo PIN y lo validaba dos veces, gastando
+        // el doble de intentos del bloqueo del PIN. Lo dejamos pasar para que la
+        // vista muestre el error tal cual.
+        error.response?.data?.success === false
       ) {
         return Promise.reject(error);
       }

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { getJwtSecret } = require('../utils/crypto');
 
+const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
+
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ')
@@ -12,7 +14,14 @@ const authenticate = (req, res, next) => {
   }
 
   try {
-    const payload = jwt.verify(token, getJwtSecret());
+    const payload = jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer() });
+
+    // Rechazar refresh tokens en rutas protegidas: solo los access tokens
+    // (que no llevan `type`) deben autorizar el acceso a la API.
+    if (payload.type === 'refresh') {
+      return res.status(401).json({ message: 'Token inválido o expirado' });
+    }
+
     req.user = {
       id: payload.sub,
       role: payload.role,

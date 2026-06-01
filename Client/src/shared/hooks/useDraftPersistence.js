@@ -1,10 +1,27 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 const DRAFT_PREFIX = 'dentiacore:draft:';
-// Drafts más viejos que esto se consideran obsoletos y se ignoran al cargar.
-const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+// M-14: los drafts contienen PHI (formularios de paciente, odontogramas). Se
+// acorta la retención de 7 días a 24 h para reducir la exposición en estaciones
+// compartidas. Drafts más viejos se consideran obsoletos y se ignoran al cargar.
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const storageKey = (key) => `${DRAFT_PREFIX}${key}`;
+
+// M-14: borra TODOS los drafts persistidos. Se invoca al cerrar sesión para no
+// dejar PHI en localStorage tras el logout (estaciones clínicas compartidas).
+export const clearAllDrafts = () => {
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(DRAFT_PREFIX)) toRemove.push(k);
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // noop — localStorage deshabilitado
+  }
+};
 
 const readDraft = (key) => {
   try {

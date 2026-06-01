@@ -1,0 +1,45 @@
+# A-11: pipeline de CI. Antes existía una suite de pruebas (25 archivos con
+# jest + supertest + mongodb-memory-server) pero nada la ejecutaba en push/PR,
+# así que las regresiones se publicaban en silencio.
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  server-tests:
+    name: Server tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Server/package-lock.json
+      - name: Install server deps
+        working-directory: Server
+        run: npm ci
+      - name: Run server tests
+        working-directory: Server
+        run: npm test
+
+  client-tests:
+    name: Client tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Client/package-lock.json
+      - name: Install client deps
+        working-directory: Client
+        run: npm ci
+      - name: Run client tests
+        working-directory: Client
+        run: npm test

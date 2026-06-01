@@ -10,14 +10,30 @@
     <!-- Agregar política de referencia -->
     <meta name="referrer" content="strict-origin-when-cross-origin">
     
+    <!--
+      M-1/M-2: CSP endurecida.
+      - script-src: se quitaron 'unsafe-inline', 'unsafe-eval' y data: (no hay
+        scripts inline ni eval/new Function en el código ni en el bundle Vite).
+        Se conserva blob: para web workers. Esto restaura la protección XSS real.
+      - connect-src: 'self' cubre la API en el despliegue same-origin (Express
+        sirve Client/dist y /api juntos). Se mantienen localhost/ws para dev y
+        los endpoints de Google. Si en producción la API vive en OTRO origen,
+        agrega ese origen aquí.
+      - img-src: se agregó blob: (las firmas y adjuntos se muestran vía
+        URL.createObjectURL) y googleusercontent (avatar de Google).
+      - style-src conserva 'unsafe-inline' (lo requieren los estilos inline de
+        React y los <style> inyectados por antd).
+      ⚠️ Verificar en navegador antes de desplegar: login, editor de odontograma
+         y vista de firmas. Si algo se rompe, revertir esta etiqueta.
+    -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:;
-      connect-src 'self' http://localhost:* http://127.0.0.1:* data: ws: wss:;
-      frame-src 'self';
+      script-src 'self' blob:;
+      connect-src 'self' http://localhost:* http://127.0.0.1:* ws: wss: https://accounts.google.com https://www.googleapis.com;
+      frame-src 'self' https://accounts.google.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
-      img-src 'self' data: https://via.placeholder.com;
+      img-src 'self' data: blob: https://via.placeholder.com https://*.googleusercontent.com;
 ">
     <script src="/js/dateUtils.js"></script>
     <script src="/js/engine.js"></script>

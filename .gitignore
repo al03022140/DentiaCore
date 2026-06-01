@@ -51,3 +51,14 @@ token.txt
 .idea/
 .vscode/
 esb.err
+
+# B-1: agente local / worktrees duplicados (evita commitear copias enormes)
+.claude/
+
+# B-2/B-4: logs y artefactos de build
+*.log
+vite-build.log
+.vercel/
+
+# Bundle de macOS generado en instalación (no versionar)
+DentiaCore.app/

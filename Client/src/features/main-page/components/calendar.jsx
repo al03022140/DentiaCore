@@ -17,9 +17,15 @@ const setAuthFetchInProgress = (value) => {
 };
 
 // ── Token storage ──────────────────────────────────────────────────────────────
-const storeTokenWithExpiration = (token, expiresIn = 3600, refreshToken = null) => {
+// A-3/A-4: el refresh token de Google NUNCA se guarda en el cliente. Vive sólo
+// en la cookie httpOnly `google_refresh_token` (server-side). Guardamos un
+// MARCADOR no-secreto ('cookie') para que la lógica de renovación existente
+// (que se apoya en `refreshToken` para decidir si puede renovar) siga
+// funcionando, pero sin exponer ningún secreto a XSS/localStorage.
+const REFRESH_MARKER = 'cookie';
+const storeTokenWithExpiration = (token, expiresIn = 3600) => {
   const expirationTime = Date.now() + expiresIn * 1000;
-  localStorage.setItem('accessToken', JSON.stringify({ token, expiration: expirationTime, refreshToken }));
+  localStorage.setItem('accessToken', JSON.stringify({ token, expiration: expirationTime, refreshToken: REFRESH_MARKER }));
 };
 
 const getStoredToken = () => {
@@ -176,16 +182,21 @@ const Calendar = () => {
     return stored?.token || null;
   }, []);
 
-  const renewAccessToken = useCallback(async (refreshToken) => {
+  // A-4: la renovación usa la cookie httpOnly `google_refresh_token` (enviada
+  // automáticamente con credentials:'include'); ya no se manda el refresh token
+  // en el body. El parámetro se conserva por compatibilidad con los call sites
+  // existentes, pero su valor (el marcador) no se usa.
+  const renewAccessToken = useCallback(async (_refreshMarker) => {
     try {
       const response = await fetch(`${API_BASE}/api/google/refresh-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
+        body: JSON.stringify({}),
       });
       if (response.ok) {
         const data = await response.json();
-        storeTokenWithExpiration(data.accessToken, data.expiresIn, data.refreshToken);
+        storeTokenWithExpiration(data.accessToken, data.expiresIn);
         return data.accessToken;
       }
       localStorage.removeItem('accessToken');
@@ -298,13 +309,15 @@ const Calendar = () => {
   }, [fetchCalendarEvents, renewAccessToken]);
 
   // ── Effects ────────────────────────────────────────────────────────────────
-  // Handle OAuth callback: both old ?accessToken= and new ?google_auth=success
+  // Handle OAuth callback: solo el flujo seguro ?google_auth=success (cookie httpOnly).
+  // A-3: se eliminó el flujo legacy ?accessToken=/?refreshToken= por URL. Un
+  // refresh token de Google en la URL queda en historial/Referer/logs y es de
+  // larga vida; además el servidor (oauth2callback) ya NO redirige con tokens
+  // en la URL — usa cookies httpOnly. Mantener el parser legacy sólo dejaba
+  // abierto un vector para inyectar tokens vía URL.
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('accessToken');
-    const refreshTokenFromUrl = urlParams.get('refreshToken');
     const errorFromUrl = urlParams.get('error');
-    const expiresInParam = urlParams.get('expiresIn');
     const googleAuthSuccess = urlParams.get('google_auth') === 'success';
 
     if (errorFromUrl) {
@@ -335,7 +348,9 @@ const Calendar = () => {
           });
           if (res.ok) {
             const data = await res.json();
-            storeTokenWithExpiration(data.accessToken, data.expiresIn, data.refreshToken);
+            // A-4: /auth/token ya no devuelve refreshToken; el refresh vive en
+            // la cookie httpOnly. Sólo persistimos el access token + expiración.
+            storeTokenWithExpiration(data.accessToken, data.expiresIn);
             fetchUserInfo(data.accessToken);
             fetchCalendarEvents(data.accessToken);
             // If there's a saved return path (e.g. from Settings), navigate there
@@ -355,18 +370,6 @@ const Calendar = () => {
         }
       })();
       return;
-    }
-
-    if (tokenFromUrl) {
-      // Legacy flow: token in URL param
-      const expiresIn = expiresInParam ? parseInt(expiresInParam, 10) : 3600;
-      storeTokenWithExpiration(tokenFromUrl, Number.isFinite(expiresIn) ? expiresIn : 3600, refreshTokenFromUrl);
-      authAttemptedRef.current = true;
-      clearAuthInProgress();
-      setAuthFetchInProgress(false);
-      window.history.replaceState({}, document.title, window.location.pathname);
-      fetchUserInfo(tokenFromUrl);
-      fetchCalendarEvents(tokenFromUrl);
     }
   }, [fetchCalendarEvents, fetchUserInfo]);
 

@@ -145,7 +145,13 @@ function auditLogger(opciones = {}) {
           ? detectEditedFields(req)
           : undefined;
 
-        setImmediate(() => {
+        setImmediate(async () => {
+          // El snapshot se captura sin bloquear el request (snapshotCapture).
+          // Aquí, ya fuera del camino crítico (tras responder), esperamos su
+          // promesa para no perder el before-image sin añadir latencia.
+          if (req._snapshotPromise) {
+            try { await req._snapshotPromise; } catch { /* non-blocking */ }
+          }
           // Construir detalles con diff antes/después si hay snapshot
           const detalles = {};
           if (req._snapshotAntes && (method === 'PUT' || method === 'PATCH')) {

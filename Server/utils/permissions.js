@@ -279,13 +279,76 @@ const isClinicalRole = (role) => {
     || normalized === 'doctor_admin';
 };
 
+/**
+ * Catálogo de todos los permisos conocidos del sistema (unión de todos los
+ * roles). Se usa como lista blanca al asignar overrides de permisos.
+ */
+const ALL_KNOWN_PERMISSIONS = Array.from(
+  new Set(Object.values(ROLE_PERMISSIONS).flat())
+);
+
+/**
+ * Permisos peligrosos que SOLO un superadmin puede otorgar. Conceden control
+ * total (wildcard de clínica, configuración técnica, mantenimiento) y romperían
+ * por completo la jerarquía de roles si los asignara cualquier otro actor.
+ */
+const SUPERADMIN_ONLY_PERMISSIONS = ['*', 'system.*', 'maintenance.*'];
+
+/**
+ * Valida una solicitud para asignar `requestedPermissions` (override de rol o de
+ * usuario individual). Previene escalada de privilegios (C-2):
+ *  1. `permissions` debe ser un array de strings.
+ *  2. Solo se aceptan permisos conocidos (lista blanca `ALL_KNOWN_PERMISSIONS`).
+ *  3. Los permisos peligrosos solo los puede otorgar un superadmin.
+ *  4. Un actor no-superadmin no puede otorgar un permiso que él mismo no posee
+ *     (no se puede dar lo que no se tiene → no hay auto-escalada).
+ *
+ * @param {string[]} requestedPermissions - permisos a asignar (del cliente)
+ * @param {Object} actor - { role, permissions } del usuario autenticado (req.user)
+ * @returns {{ valid: boolean, message?: string }}
+ */
+const validatePermissionAssignment = (requestedPermissions, actor = {}) => {
+  if (!Array.isArray(requestedPermissions)) {
+    return { valid: false, message: 'permissions debe ser un array' };
+  }
+  if (!requestedPermissions.every((p) => typeof p === 'string')) {
+    return { valid: false, message: 'permissions debe contener solo cadenas de texto' };
+  }
+
+  const actorRole = normalizeRole(actor.role || actor.rol);
+  const isSuperadmin = actorRole === 'superadmin';
+  const actorPermissions = actor.permissions || [];
+
+  for (const perm of requestedPermissions) {
+    // 2. Lista blanca: rechazar permisos desconocidos/inventados
+    if (!ALL_KNOWN_PERMISSIONS.includes(perm)) {
+      return { valid: false, message: `Permiso desconocido: ${perm}` };
+    }
+
+    // 3. Permisos peligrosos: solo superadmin
+    if (SUPERADMIN_ONLY_PERMISSIONS.includes(perm) && !isSuperadmin) {
+      return { valid: false, message: `No tiene permitido otorgar el permiso: ${perm}` };
+    }
+
+    // 4. No se puede otorgar lo que no se tiene (superadmin tiene '*' → todo)
+    if (!isSuperadmin && !hasPermission(actorPermissions, [perm])) {
+      return { valid: false, message: `No puede otorgar un permiso que usted no posee: ${perm}` };
+    }
+  }
+
+  return { valid: true };
+};
+
 module.exports = {
   ROLE_PERMISSIONS,
   VALID_ROLES,
+  ALL_KNOWN_PERMISSIONS,
+  SUPERADMIN_ONLY_PERMISSIONS,
   normalizeRole,
   getPermissionsForRole,
   getEffectivePermissions,
   hasPermission,
   isAdminRole,
   isClinicalRole,
+  validatePermissionAssignment,
 };

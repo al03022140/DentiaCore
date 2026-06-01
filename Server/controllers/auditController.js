@@ -254,6 +254,10 @@ const searchPatients = async (req, res, next) => {
 
     const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     const patients = await Patient.find({
+      // M-11: excluir pacientes con soft-delete, igual que todas las demás
+      // consultas de pacientes. Antes esta búsqueda los exponía, contradiciendo
+      // la garantía de cancelación (LFPDPPP) y permitiéndolos como filtro.
+      deletedAt: null,
       $or: [
         { primer_nombre: regex },
         { apellido_paterno: regex },

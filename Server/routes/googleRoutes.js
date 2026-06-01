@@ -46,25 +46,32 @@ function cleanupProcessedCodes() {
 }
 
 const { oauthLimiter } = require('../middlewares/rateLimiter');
+const authenticate = require('../middlewares/authenticate');
 
 // Endpoint puente: lee el token de la cookie httpOnly y lo devuelve al cliente
-// Necesario porque el OAuth callback redirige con ?google_auth=success + cookie
-router.get('/auth/token', (req, res) => {
+// Necesario porque el OAuth callback redirige con ?google_auth=success + cookie.
+// A-4: exige sesión de la app (authenticate) + rate limit. Antes reflejaba los
+// tokens de Google (access/refresh) de la cookie a CUALQUIER llamante sin
+// sesión, anulando el httpOnly. Sólo se invoca tras login, así que authenticate
+// no rompe el flujo. Además dejamos de exponer el refresh token al cliente.
+router.get('/auth/token', oauthLimiter, authenticate, (req, res) => {
     const accessToken = req.cookies?.google_access_token;
-    const refreshToken = req.cookies?.google_refresh_token;
     const expiresIn = req.cookies?.google_expires_in;
     if (!accessToken) {
         return res.status(401).json({ error: 'No hay token de Google en sesión' });
     }
+    // A-4: NO devolver el refresh token al cliente. El refresh se hace
+    // server-side leyendo la cookie httpOnly `google_refresh_token`. Exponerlo
+    // al navegador lo dejaba persistible en localStorage (XSS → acceso durable).
     res.json({
         accessToken,
-        refreshToken: refreshToken || null,
         expiresIn: Number(expiresIn) || 3600,
     });
 });
 
 // Endpoint de información del usuario autenticado con Google
-router.get('/auth/userinfo', async (req, res) => {
+// A-4: rate limit agregado (antes sin throttling).
+router.get('/auth/userinfo', oauthLimiter, async (req, res) => {
     try {
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
@@ -192,7 +199,8 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
 });
 
 // Listar calendarios del usuario (para selector de calendario destino)
-router.get('/calendar/list', async (req, res, next) => {
+// A-4: rate limit agregado.
+router.get('/calendar/list', oauthLimiter, async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
@@ -220,7 +228,8 @@ router.get('/calendar/list', async (req, res, next) => {
 });
 
 // Obtener eventos del calendario (montada bajo /api/google)
-router.get('/calendar/events', async (req, res, next) => {
+// A-4: rate limit agregado.
+router.get('/calendar/events', oauthLimiter, async (req, res, next) => {
     try {
         // Only accept token from Authorization header — never from query params (prevents URL logging)
         const authHeader = req.headers.authorization || '';
@@ -257,7 +266,8 @@ router.get('/calendar/events', async (req, res, next) => {
 });
 
 // Crear evento en Google Calendar (montada bajo /api/google)
-router.post('/calendar/events', async (req, res, next) => {
+// A-4: rate limit agregado.
+router.post('/calendar/events', oauthLimiter, async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
@@ -287,14 +297,18 @@ router.post('/calendar/events', async (req, res, next) => {
 });
 
 // Renovar access token usando refresh token (montada bajo /api/google)
-router.post('/refresh-token', async (req, res) => {
+// A-4: rate limit + el refresh token se toma de la cookie httpOnly
+// `google_refresh_token` (no del body), de modo que el cliente nunca necesita
+// poseer el refresh token. Se mantiene un fallback al body sólo por
+// compatibilidad transitoria con clientes que aún lo envíen.
+router.post('/refresh-token', oauthLimiter, authenticate, async (req, res) => {
     try {
-        const { refreshToken } = req.body;
-        
+        const refreshToken = req.cookies?.google_refresh_token || req.body?.refreshToken;
+
         if (!refreshToken) {
             return res.status(400).json({ error: 'Se requiere refresh_token' });
         }
-        
+
         // Crear cliente OAuth2 por solicitud para evitar condiciones de carrera
         const perRequestClient = new google.auth.OAuth2(
             process.env.GOOGLE_CLIENT_ID,
@@ -302,23 +316,34 @@ router.post('/refresh-token', async (req, res) => {
             process.env.GOOGLE_REDIRECT_URI
         );
         perRequestClient.setCredentials({ refresh_token: refreshToken });
-        
+
         // Obtener nuevos tokens
         const { credentials } = await perRequestClient.getAccessToken();
-        
+
         // Calcular tiempo de expiración en segundos
-        const expiresInSec = credentials.expiry_date 
+        const expiresInSec = credentials.expiry_date
             ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
             : 3600; // Default 1 hora
-        
+
+        // Si Google rotó el refresh token, actualizamos la cookie httpOnly.
+        if (credentials.refresh_token && credentials.refresh_token !== refreshToken) {
+            const isProduction = process.env.NODE_ENV === 'production';
+            res.cookie('google_refresh_token', credentials.refresh_token, {
+                httpOnly: true,
+                secure: isProduction,
+                sameSite: isProduction ? 'strict' : 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000,
+                path: '/'
+            });
+        }
+
+        // A-4: NO devolver el refresh token al cliente.
         res.json({
             accessToken: credentials.access_token,
             expiresIn: expiresInSec,
-            // Incluir el nuevo refresh_token si Google lo proporciona
-            refreshToken: credentials.refresh_token || refreshToken
         });
     } catch (_error) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Error renovando token'
         });
     }

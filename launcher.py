@@ -541,18 +541,51 @@ class DentiaCoreLauncher:
         
     def _ensure_server_env_file(self):
         """
-        Garantiza que Server/.env exista. Si falta (instalador no se corrió o
-        fue parcial), crea uno mínimo con valores de desarrollo local.
-        Devuelve True si existía o se creó OK, False si no se pudo.
-        """
-        env_file = self.server_dir / '.env'
-        if env_file.exists() and env_file.stat().st_size > 0:
-            return True  # Ya existe con contenido
+        Garantiza que Server/.env exista Y tenga un JWT_SECRET válido.
 
+        Dos escenarios:
+          1) El archivo falta o está vacío → se crea uno mínimo de desarrollo.
+          2) El archivo existe pero JWT_SECRET está vacío o es débil (<32 chars)
+             → se REPARA in-place generando un secreto fuerte y preservando el
+             resto de claves.
+
+        El segundo caso es crítico: si JWT_SECRET queda vacío, el server genera
+        un secreto EFÍMERO distinto en cada arranque (ver Server/utils/crypto.js),
+        lo que invalida todas las sesiones en cada reinicio y expulsa al usuario
+        al login a mitad de una operación (p. ej. al firmar una nota).
+
+        Devuelve True si quedó OK, False si no se pudo.
+        """
+        import secrets
+
+        env_file = self.server_dir / '.env'
+
+        # ── Caso 2: el archivo ya existe con contenido ──────────────────
+        if env_file.exists() and env_file.stat().st_size > 0:
+            try:
+                current = self._parse_simple_env(env_file)
+                secret = (current.get('JWT_SECRET') or '').strip()
+                if len(secret) >= 32:
+                    return True  # Secreto válido — nada que hacer
+
+                # JWT_SECRET vacío o demasiado corto → reparar sin tocar el resto
+                print(f"⚠️  JWT_SECRET ausente/débil en {env_file} — generando uno fuerte…")
+                if self._update_env_file(env_file, {'JWT_SECRET': secrets.token_hex(32)}):
+                    print("✅ JWT_SECRET reparado (64 chars hex). Las sesiones ahora sobreviven a reinicios.")
+                    return True
+                # Si no se pudo escribir, no bloqueamos el arranque: el server
+                # caerá a un secreto efímero (con warning) pero seguirá funcionando.
+                print(f"⚠️  No se pudo reparar JWT_SECRET en {env_file}; el server usará un secreto efímero.")
+                return True
+            except Exception as e:
+                # Ante cualquier fallo de lectura, no bloqueamos el arranque.
+                print(f"⚠️  No se pudo validar JWT_SECRET en {env_file}: {e}")
+                return True
+
+        # ── Caso 1: el archivo falta o está vacío → crear de cero ───────
         print(f"⚠️  {env_file} no existe — creando con valores por defecto…")
 
         # Generar JWT_SECRET aleatorio (64 chars hex) para evitar el warning
-        import secrets
         jwt_secret = secrets.token_hex(32)
 
         env_content = (
