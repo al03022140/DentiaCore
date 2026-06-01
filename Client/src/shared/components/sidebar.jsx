@@ -16,7 +16,11 @@ const Sidebar = () => {
   const canViewPatients = hasPermission(permissions, ['patients.read', 'patients.create', 'patients.update']);
   const canViewCash = hasPermission(permissions, ['cash.read', 'cash.manage', 'cash.open', 'cash.close']);
   const canViewConsultas = hasPermission(permissions, ['consultas.read', 'consultas.create', 'consultas.update']);
-  const canViewStats = hasPermission(permissions, ['stats.read']);
+  // El permiso real es granular (stats.read.own / stats.read.admin); 'stats.read'
+  // a secas no existe en el modelo de roles, así que pedirlo ocultaba Estadísticas
+  // a todos (incluido doctor_admin) salvo superadmin. Enumeramos las variantes
+  // reales, igual que canViewCash/canViewPatients.
+  const canViewStats = hasPermission(permissions, ['stats.read', 'stats.read.own', 'stats.read.admin']);
 
   const handleNavClick = () => {
     close();
