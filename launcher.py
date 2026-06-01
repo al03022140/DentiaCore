@@ -144,6 +144,70 @@ class DentiaCoreLauncher:
             else:
                 raise
 
+    def _ensure_node_on_path(self):
+        """Garantiza que el directorio de node/npm esté en os.environ['PATH'].
+
+        Las apps GUI (DentiaCore.app / acceso directo) suelen heredar un PATH
+        mínimo que NO incluye node — típico con nvm, Homebrew o instalaciones de
+        usuario en Windows. En ese caso subprocess.Popen(['npm', ...]) falla con
+        FileNotFoundError ('npm') y el arranque del servidor se cae. Aquí
+        buscamos npm en ubicaciones conocidas y lo agregamos al PATH una sola vez.
+        """
+        try:
+            import shutil
+            if getattr(self, '_node_path_ready', False):
+                return
+            if shutil.which('npm') or (sys.platform == 'win32' and shutil.which('npm.cmd')):
+                self._node_path_ready = True
+                return
+
+            home = Path.home()
+            candidates = []
+            if sys.platform == 'win32':
+                exe = 'npm.cmd'
+                for var in ('ProgramFiles', 'ProgramW6432', 'ProgramFiles(x86)'):
+                    base = os.environ.get(var)
+                    if base:
+                        candidates.append(Path(base) / 'nodejs')
+                appdata = os.environ.get('APPDATA')
+                if appdata:
+                    candidates.append(Path(appdata) / 'npm')
+                # nvm-windows
+                for base in (os.environ.get('NVM_HOME'),
+                             str(home / 'AppData' / 'Roaming' / 'nvm'),
+                             r'C:\nvm'):
+                    if base and Path(base).exists():
+                        candidates.extend(sorted(Path(base).glob('v*'), reverse=True))
+                        candidates.append(Path(base))
+            else:
+                exe = 'npm'
+                candidates.extend([
+                    Path('/opt/homebrew/bin'),
+                    Path('/usr/local/bin'),
+                    Path('/usr/bin'),
+                    home / '.volta' / 'bin',
+                ])
+                # nvm: ~/.nvm/versions/node/vX.Y.Z/bin (elige la más nueva)
+                nvm = home / '.nvm' / 'versions' / 'node'
+                if nvm.exists():
+                    candidates.extend(sorted(nvm.glob('v*/bin'), reverse=True))
+
+            for d in candidates:
+                try:
+                    if d and (Path(d) / exe).exists():
+                        p = str(d)
+                        if p not in os.environ.get('PATH', '').split(os.pathsep):
+                            os.environ['PATH'] = p + os.pathsep + os.environ.get('PATH', '')
+                        print(f"🔧 node/npm localizado en {p}; PATH actualizado para el lanzamiento")
+                        self._node_path_ready = True
+                        return
+                except Exception:
+                    continue
+            print("⚠️ No se encontró npm en rutas conocidas; se usará el PATH heredado "
+                  "(puede fallar si node no está en PATH)")
+        except Exception as e:
+            print(f"⚠️ _ensure_node_on_path no pudo completar: {e}")
+
     # ── Helpers de UI (Design System) ──────────────────────────────
 
     def _create_rounded_card(self, parent, width, height, radius=16, bg='#ffffff',
@@ -631,7 +695,7 @@ class DentiaCoreLauncher:
         try:
             if not path.exists():
                 return result
-            for raw in path.read_text(encoding='utf-8').splitlines():
+            for raw in path.read_text(encoding='utf-8-sig').splitlines():
                 line = raw.strip()
                 if not line or line.startswith('#') or '=' not in line:
                     continue
@@ -654,7 +718,7 @@ class DentiaCoreLauncher:
         try:
             lines = []
             if file_path.exists():
-                lines = file_path.read_text(encoding='utf-8').splitlines()
+                lines = file_path.read_text(encoding='utf-8-sig').splitlines()
 
             keys_seen = set()
             new_lines = []
@@ -752,6 +816,9 @@ class DentiaCoreLauncher:
         try:
             # VERIFICACIONES PREVIAS AL INICIO
             print("🚀 Iniciando verificaciones del sistema...")
+
+            # Asegurar que node/npm sean alcanzables (apps GUI/nvm heredan PATH mínimo)
+            self._ensure_node_on_path()
 
             # 0. Garantizar Server/.env antes de cualquier cosa (server crashea sin él)
             if not self._ensure_server_env_file():
@@ -905,10 +972,13 @@ class DentiaCoreLauncher:
     def _stop_all_thread(self):
         """Hilo para detener todos los servicios"""
         try:
-            if self.using_pm2:
-                subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
-                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
-                self.using_pm2 = False
+            # Siempre intentar borrar la app de pm2 (aunque using_pm2 sea False
+            # por haber reabierto el launcher). Falla en silencio si no aplica.
+            try:
+                subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True, timeout=15)
+            except Exception:
+                pass
+            self.using_pm2 = False
 
             # Terminar procesos si existen (cliente primero, luego servidor)
             if self.client_process:
@@ -1029,7 +1099,7 @@ class DentiaCoreLauncher:
                 # On macOS/Linux: try lsof first, fallback to ps
                 try:
                     result = subprocess.run(
-                        ['lsof', '-ti', f':{port}'],
+                        ['lsof', '-ti', f'tcp:{port}', '-sTCP:LISTEN'],
                         capture_output=True, text=True, timeout=5
                     )
                     if result.stdout.strip():
@@ -1243,6 +1313,7 @@ class DentiaCoreLauncher:
 
     def _apply_mode_environment(self):
         """Configurar variables de entorno según el modo seleccionado"""
+        self._ensure_node_on_path()
         with self.mode_lock:
             mode = self.mode_var.get()
         public_url = self.lan_url_var.get().strip() or 'http://localhost:5002'
@@ -1290,7 +1361,7 @@ class DentiaCoreLauncher:
         try:
             if not os.path.exists(file_path):
                 return env
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith('#'):
@@ -1428,6 +1499,11 @@ class DentiaCoreLauncher:
     def _start_server_thread(self):
         """Hilo para iniciar el servidor"""
         try:
+            # Asegurar node/npm en PATH y que Server/.env exista (igual que el flujo completo)
+            self._ensure_node_on_path()
+            if not self._ensure_server_env_file():
+                return
+
             # Matar puerto del servidor antes de iniciar
             self._kill_port(5002)
             time.sleep(1)
@@ -1508,17 +1584,20 @@ class DentiaCoreLauncher:
                 self.root.after(0, lambda: messagebox.showerror("Servidor no disponible", msg))
 
         except Exception as e:
-            error_msg = f"Error al iniciar servidor: {str(e)}\n\nVerifica:\n1. MongoDB esta corriendo\n2. El puerto 5002 esta libre\n3. Dependencias instaladas"
+            error_msg = f"Error al iniciar servidor: {str(e)}\n\nVerifica:\n1. node/npm estan en el PATH (instala Node.js y reinicia la PC)\n2. MongoDB esta corriendo\n3. El puerto 5002 esta libre\n4. Dependencias instaladas (npm install)"
             self.root.after(0, lambda: messagebox.showerror("Error Servidor", error_msg))
         finally:
             self.root.after(0, self.update_ui_state)
             
     def stop_server(self):
         """Detener solo el servidor"""
-        if self.using_pm2:
-            subprocess.run(['pm2', 'stop', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
-            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True)
-            self.using_pm2 = False
+        # Siempre intentar borrar la app de pm2 (cubre relanzar el launcher con
+        # using_pm2 ya perdido en memoria). Falla en silencio si pm2 no aplica.
+        try:
+            subprocess.run(['pm2', 'delete', 'dentiacore-api'], shell=(sys.platform == 'win32'), cwd=self.server_dir, env=self.current_env, capture_output=True, timeout=15)
+        except Exception:
+            pass
+        self.using_pm2 = False
         if self.server_process:
             self.server_process.terminate()
             self.server_process = None
@@ -1759,13 +1838,28 @@ class DentiaCoreLauncher:
     def _create_admin_thread(self, email, password, pin, nombre, dlg, msg_var, create_btn, cancel_btn):
         """Hilo que ejecuta create-admin.js y reporta el resultado."""
         try:
+            # Credenciales por ENV (no por argv): evita que el shell de Windows
+            # corrompa contraseñas con caracteres especiales y que la contraseña
+            # quede visible en la lista de procesos. shell=False en todas las
+            # plataformas + node resuelto explícitamente.
+            import shutil
+            self._ensure_node_on_path()
+            node_exe = shutil.which('node') or ('node.exe' if sys.platform == 'win32' else 'node')
+            admin_env = dict(self.current_env or os.environ)
+            admin_env.update({
+                'ADMIN_EMAIL': email,
+                'ADMIN_PASSWORD': password,
+                'ADMIN_PIN': pin,
+                'ADMIN_NOMBRE': nombre,
+            })
             result = subprocess.run(
-                ['node', 'create-admin.js', email, password, pin, nombre],
+                [node_exe, 'create-admin.js'],
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                shell=(sys.platform == 'win32'),
-                timeout=60
+                shell=False,
+                timeout=60,
+                env=admin_env
             )
             stdout = (result.stdout or '').strip()
             stderr = (result.stderr or '').strip()
@@ -2303,11 +2397,10 @@ class DentiaCoreLauncher:
             time.sleep(min(2 ** attempt, 5))
             attempt += 1
         print(f"❌ Timeout: MongoDB no aceptó conexiones en {host}:{port} tras {timeout}s")
-        self.root.after(0, lambda: messagebox.showerror(
-            'MongoDB no disponible',
-            f'No se pudo establecer conexión con MongoDB en {host}:{port}.\n\n'
-            'Verifica que el servicio esté ejecutándose y sin errores.'
-        ))
+        # Sonda silenciosa: NO mostrar diálogo aquí. Este método se usa como
+        # pre-chequeo en varios sitios y, tras fallar, el caller suele arrancar
+        # Mongo y reintentar con éxito. El error final (si lo hay) lo muestra
+        # _ensure_mongo_running una sola vez.
         return False
 
     # ── Funciones auxiliares para macOS/Linux ──────────────────────────────
@@ -2363,11 +2456,21 @@ class DentiaCoreLauncher:
                 (db_dir / 'logs').mkdir(exist_ok=True)
 
                 log_file = str(db_dir / 'logs' / 'mongod.log')
+                # Bind solo a loopback salvo en modo LAN: no exponer una BD sin
+                # auth (PII de pacientes) a toda la red cuando se usa en local.
+                _mode = (self.current_env or {}).get('DENT_MODE')
+                if not _mode:
+                    try:
+                        with self.mode_lock:
+                            _mode = self.mode_var.get()
+                    except Exception:
+                        _mode = 'local'
+                _bind_ip = '0.0.0.0' if _mode == 'lan' else '127.0.0.1'
                 cmd = [
                     mongod_path,
                     '--dbpath', str(db_dir),
                     '--logpath', log_file,
-                    '--bind_ip', '0.0.0.0',
+                    '--bind_ip', _bind_ip,
                 ]
 
                 self.mongo_process = subprocess.Popen(
@@ -2905,9 +3008,15 @@ class DentiaCoreLauncher:
                 "Hay servicios ejecutándose. ¿Quieres detenerlos antes de cerrar?"
             )
             if result:
-                self.stop_all()
-                # Esperar un poco para que se detengan
-                self.root.after(2000, self.root.destroy)
+                # Detener de forma SÍNCRONA antes de destruir la ventana para no
+                # dejar procesos huérfanos (node/vite/mongod) reteniendo puertos.
+                try:
+                    t = threading.Thread(target=self._stop_all_thread, daemon=True)
+                    t.start()
+                    t.join(timeout=15)
+                except Exception:
+                    pass
+                self.root.destroy()
             else:
                 self.root.destroy()
         else:

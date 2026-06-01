@@ -20,10 +20,14 @@ async function main() {
   try {
     await connectDB({ exitOnFail: false });
 
-    const email = process.argv[2];
-    const password = process.argv[3];
-    const pin = process.argv[4];
-    const nombre = process.argv[5] || 'Administrador Local';
+    // Preferir variables de entorno (las pasa el launcher) sobre argv: evita que
+    // el shell de Windows corrompa contraseñas con caracteres especiales y que la
+    // contraseña quede visible en la lista de procesos. Compatible con el uso por
+    // argv directo desde la terminal.
+    const email = process.env.ADMIN_EMAIL || process.argv[2];
+    const password = process.env.ADMIN_PASSWORD || process.argv[3];
+    const pin = process.env.ADMIN_PIN || process.argv[4];
+    const nombre = process.env.ADMIN_NOMBRE || process.argv[5] || 'Administrador Local';
 
     if (!email || !password || !pin || !/^\d{4}$/.test(pin)) {
       console.error('Uso: node create-admin.js <email> <contraseña> <pin-4-digitos> [nombre]');

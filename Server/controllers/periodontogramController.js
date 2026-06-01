@@ -134,7 +134,8 @@ exports.getPeriodontogram = [
       
       // Obtener periodontograma con consulta optimizada
       const optimizedPeriodontogram = await Periodontogram.findById(periodontogram._id)
-        .select('-history') // Excluir historial para mejorar rendimiento
+        // Nota: el esquema no tiene campo 'history' (el historial vive en la colección
+        // PeriodontogramHistory), por lo que un .select('-history') era un no-op engañoso.
         .populate('patient', 'primer_nombre primer_apellido email')
         .lean()
         .maxTimeMS(15000) // Timeout de 15 segundos para esta consulta específica

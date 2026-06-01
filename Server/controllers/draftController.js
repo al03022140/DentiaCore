@@ -91,6 +91,80 @@ async function attachDoctorSignatureToNote(note, signer, patientId) {
   }
 }
 
+/**
+ * Persiste atómicamente la transición BORRADOR → OFICIAL de una nota de
+ * evolución (subdoc de Patient) con un $set posicional, en vez de patient.save().
+ *
+ * IMPORTANTE (pérdida de notas por concurrencia): el esquema Patient usa
+ * versionKey:false, por lo que patient.save() reescribe TODO el documento
+ * (incluido el array notas_evolucion completo) sin detección de conflictos. Si
+ * entre findNoteSubdoc() y save() ocurría un $push de una nota nueva
+ * (addEvolutionNote) o un $set de otra firma, esos cambios concurrentes se
+ * PERDÍAN al pisarse con el array obsoleto que tenía este documento en memoria.
+ * Es el mismo lost-update que ya se había corregido en addEvolutionNote /
+ * signExistingEvolutionNote / updateDraftEvolutionNote, pero esta vía (Centro
+ * de Firmas) había quedado sin migrar.
+ *
+ * El $elemMatch del filtro garantiza que el operador posicional `$` apunte a la
+ * MISMA nota que cumple _id + estadoRegistro=BORRADOR; si otra operación la
+ * firmó/modificó en paralelo, matchedCount=0 y el caller reporta conflicto en
+ * vez de pisar nada.
+ *
+ * @returns {Promise<number>} matchedCount (0 ⇒ la nota ya no estaba en BORRADOR)
+ */
+async function persistNoteOfficial(patientId, note) {
+  const result = await Patient.updateOne(
+    {
+      _id: patientId,
+      deletedAt: null,
+      notas_evolucion: { $elemMatch: { _id: note._id, estadoRegistro: 'BORRADOR' } },
+    },
+    {
+      $set: {
+        'notas_evolucion.$.estadoRegistro': 'OFICIAL',
+        'notas_evolucion.$.firmadoPor': note.firmadoPor,
+        'notas_evolucion.$.firmadoEn': note.firmadoEn,
+        'notas_evolucion.$.contentHash': note.contentHash,
+        'notas_evolucion.$.firmaDesactualizada': false,
+        'notas_evolucion.$.doctorFirmaMethod': note.doctorFirmaMethod,
+        'notas_evolucion.$.doctorFirmaUrl': note.doctorFirmaUrl ?? null,
+        'notas_evolucion.$.doctorFirmaImageHash': note.doctorFirmaImageHash ?? null,
+        'notas_evolucion.$.rechazadoEn': null,
+        'notas_evolucion.$.rechazadoPor': null,
+        'notas_evolucion.$.rechazoMotivo': null,
+      },
+    }
+  );
+  return result?.matchedCount || 0;
+}
+
+/**
+ * Persiste atómicamente el rechazo de una nota de evolución en BORRADOR con un
+ * $set posicional. Misma motivación anti-concurrencia que persistNoteOfficial:
+ * evita que patient.save() pierda notas insertadas/firmadas en paralelo.
+ *
+ * @returns {Promise<number>} matchedCount (0 ⇒ la nota ya no estaba en BORRADOR)
+ */
+async function persistNoteRejected(patientId, note) {
+  const result = await Patient.updateOne(
+    {
+      _id: patientId,
+      deletedAt: null,
+      notas_evolucion: { $elemMatch: { _id: note._id, estadoRegistro: 'BORRADOR' } },
+    },
+    {
+      $set: {
+        'notas_evolucion.$.rechazadoEn': note.rechazadoEn,
+        'notas_evolucion.$.rechazadoPor': note.rechazadoPor,
+        'notas_evolucion.$.rechazoMotivo': note.rechazoMotivo,
+        'notas_evolucion.$.modificadoPor': note.modificadoPor,
+        'notas_evolucion.$.modificadoEn': note.modificadoEn,
+      },
+    }
+  );
+  return result?.matchedCount || 0;
+}
+
 // ── Helpers para notas de evolución (subdoc en Patient) ──────────
 async function listNoteDrafts({ isAdmin, userId, isApprover }) {
   // Filtro de paciente: traemos todos los pacientes que tienen al menos
@@ -276,7 +350,18 @@ const signDraft = async (req, res) => {
       note.rechazadoEn = null;
       note.rechazadoPor = null;
       note.rechazoMotivo = null;
-      await patient.save();
+      // Persistir con $set posicional atómico (no patient.save(), que pierde
+      // notas concurrentes — ver persistNoteOfficial). Si la nota dejó de estar
+      // en BORRADOR entre la lectura y aquí (firmada/modificada en paralelo),
+      // matchedCount=0 → 409 sin pisar nada. El snapshot de firma ya escrito se
+      // deja: su ruta está indexada por noteId y borrarla podría eliminar la del
+      // firmante que sí ganó la carrera.
+      const matched = await persistNoteOfficial(patient._id, note);
+      if (!matched) {
+        return res.status(409).json({
+          message: 'La nota ya fue firmada o modificada por otra operación. Recargue e intente de nuevo.'
+        });
+      }
 
       await auditLogger.registrarManual(req, 'borrador_aprobado', {
         resourceType: NOTE_RESOURCE,
@@ -427,7 +512,15 @@ const batchSign = async (req, res) => {
           note.rechazadoEn = null;
           note.rechazadoPor = null;
           note.rechazoMotivo = null;
-          await patient.save();
+          // $set posicional atómico en vez de patient.save() (anti pérdida de
+          // notas por concurrencia — ver persistNoteOfficial). Si la nota dejó
+          // de estar en BORRADOR en paralelo, se reporta como error de este item
+          // sin abortar el resto del lote ni pisar cambios ajenos.
+          const matched = await persistNoteOfficial(patient._id, note);
+          if (!matched) {
+            errores.push({ id, resourceType, error: 'La nota ya no estaba en BORRADOR (firmada o modificada en paralelo)' });
+            continue;
+          }
           aprobados.push(note._id);
           resultados.push({ id: note._id, resourceType, status: 'aprobado' });
           continue;
@@ -532,7 +625,15 @@ const rejectDraft = async (req, res) => {
       note.rechazoMotivo = motivoTrim;
       note.modificadoPor = req.user.id;
       note.modificadoEn = now;
-      await patient.save();
+      // $set posicional atómico en vez de patient.save() (anti pérdida de notas
+      // por concurrencia — ver persistNoteRejected). Si la nota dejó de estar en
+      // BORRADOR en paralelo (p. ej. la firmaron), matchedCount=0 → 409.
+      const matched = await persistNoteRejected(patient._id, note);
+      if (!matched) {
+        return res.status(409).json({
+          message: 'La nota ya no está en BORRADOR (fue firmada o modificada). Recargue e intente de nuevo.'
+        });
+      }
 
       await auditLogger.registrarManual(req, 'borrador_rechazado', {
         resourceType: NOTE_RESOURCE,

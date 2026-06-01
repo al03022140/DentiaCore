@@ -23,7 +23,6 @@
     "node": ">=18 <=22"
   },
   "dependencies": {
-    "canvas": "^3.1.0",
     "concurrently": "^9.1.2",
     "cropperjs": "^1.6.2",
     "form-data": "^4.0.4",
@@ -35,8 +34,7 @@
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "react-cropper": "^2.3.3",
-    "react-easy-crop": "^5.4.1",
-    "sharp": "^0.34.3"
+    "react-easy-crop": "^5.4.1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

@@ -318,7 +318,16 @@ function cleanupInactiveSessions(maxAge = 60 * 60 * 1000) {
   const sessionsToDelete = [];
   
   for (const [sessionId, timestamp] of activeSessionTimestamps) {
-    const sessionTime = new Date(timestamp.replace(/-/g, ':')).getTime();
+    // El timestamp se almacena como 'YYYY-MM-DDTHH-MM-SS' (con guiones también en la parte
+    // de hora). Sólo los guiones de la HORA deben convertirse a ':' para reconstruir una
+    // fecha válida; reemplazar todos los '-' producía 'YYYY:MM:DD...' = Invalid Date (NaN),
+    // por lo que las sesiones inactivas nunca se limpiaban (fuga de memoria).
+    const [datePart, timePart = ''] = String(timestamp).split('T');
+    const normalized = timePart ? `${datePart}T${timePart.replace(/-/g, ':')}` : datePart;
+    const sessionTime = new Date(normalized).getTime();
+    if (Number.isNaN(sessionTime)) {
+      continue; // timestamp no parseable: no eliminar por edad
+    }
     if (now - sessionTime > maxAge) {
       sessionsToDelete.push(sessionId);
     }

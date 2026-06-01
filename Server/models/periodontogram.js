@@ -505,8 +505,9 @@ const PeriodontogramSchema = new mongoose.Schema({
   collection: 'periodontograms',
   // Optimizaciones de rendimiento
   autoIndex: process.env.NODE_ENV !== 'production',
-  bufferCommands: false,
-  bufferMaxEntries: 0
+  bufferCommands: false
+  // 'bufferMaxEntries' se eliminó: fue removida en Mongoose 6+ (aquí v7) y se ignora
+  // silenciosamente como opción de esquema.
 });
 
 // Índices para optimización de consultas

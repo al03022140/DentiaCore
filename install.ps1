@@ -22,6 +22,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Escribe texto en UTF-8 SIN BOM. Windows PowerShell 5.1 'Set-Content -Encoding UTF8'
+# añade un BOM (EF BB BF) que rompe el YAML de mongod.cfg y corrompe la primera
+# clave de los .env (la leen dotenv y el launcher). Usar esto en su lugar.
+function Write-Utf8NoBom {
+    param([Parameter(Mandatory)][string]$Path, [string]$Content)
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $enc)
+}
+
 # Ejecuta 'npm install' en un directorio y valida el resultado
 function Run-NpmInstall {
     param([string]$TargetDir)
@@ -168,7 +177,7 @@ try {
     $rules = @(@{ Name="DentiaCore API"; Port=5002 }, @{ Name="DentiaCore MongoDB"; Port=27017 })
     foreach ($r in $rules) {
         Remove-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue
-        New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -LocalPort $r.Port -Protocol TCP -Action Allow -Profile Any | Out-Null
+        New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -LocalPort $r.Port -Protocol TCP -Action Allow -Profile Domain,Private -RemoteAddress LocalSubnet | Out-Null
     }
     Write-Ok "Firewall configurado."
 
@@ -196,7 +205,7 @@ try {
                 $LogFile = "$LogDir\mongod.log"
                 $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
 
-                Set-Content -Path $ConfigPath -Value $ConfigContent -Encoding UTF8
+                Write-Utf8NoBom -Path $ConfigPath -Content $ConfigContent
                 # Quotear paths para soportar rutas con espacios (ej. C:\Program Files\...).
                 # Sin esto, sc.exe/New-Service trunca el binPath en el primer espacio
                 # y el servicio falla silenciosamente al iniciar.
@@ -221,7 +230,7 @@ try {
                         if ($Content -notmatch "0.0.0.0") {
                             Write-Step "Actualizando bindIp a 0.0.0.0..."
                             $Content = $Content -replace "bindIp:.*", "bindIp: 0.0.0.0"
-                            Set-Content -Path $ExistingCfg -Value $Content -Encoding UTF8
+                            Write-Utf8NoBom -Path $ExistingCfg -Content $Content
                             Restart-Service "MongoDB" -Force -ErrorAction SilentlyContinue
                             Write-Ok "Servicio reiniciado."
                         }
@@ -307,7 +316,7 @@ try {
     foreach ($Key in $FinalEnv.Keys) {
         $NewContent += "$Key=$($FinalEnv[$Key])"
     }
-    $NewContent | Set-Content -Path $EnvFile -Encoding UTF8
+    Write-Utf8NoBom -Path $EnvFile -Content (($NewContent -join "`n") + "`n")
     Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados y JWT_SECRET garantizado."
 
     # Client/.env — necesario porque Vite hornea VITE_API_URL en el bundle de producción.
@@ -315,7 +324,7 @@ try {
     $ClientEnvFile = Join-Path $ClientDir ".env"
     Write-Step "Creando/actualizando Client/.env..."
     $ClientApiUrl = "http://$DetectedIP" + ":5002"
-    "VITE_API_URL=`"$ClientApiUrl`"" | Set-Content -Path $ClientEnvFile -Encoding UTF8
+    Write-Utf8NoBom -Path $ClientEnvFile -Content ("VITE_API_URL=`"$ClientApiUrl`"" + "`n")
     Write-Ok "Client/.env actualizado (VITE_API_URL=$ClientApiUrl)"
 
     Write-Header "4. INSTALANDO Y COMPILANDO"
@@ -338,6 +347,9 @@ try {
         Write-Err "Node.js v18 o superior es requerido (detectado: $NodeVersionRaw). Actualiza con: winget upgrade OpenJS.NodeJS.LTS"
         throw "node_version_too_old"
     }
+    if ($NodeMajor -gt 22) {
+        Write-Warn "Node.js $NodeVersionRaw supera el rango probado por el proyecto (engines: >=18 <=22). Si hay fallos de build/runtime, instala Node 20/22 LTS."
+    }
     Write-Ok "Node.js validado: $NodeVersionRaw"
 
     Run-NpmInstall $RepoRoot
@@ -350,13 +362,26 @@ try {
         Write-Step "Compilando Frontend para LAN..."
         $env:VITE_API_URL = "http://$DetectedIP`:5002"
         Push-Location $ClientDir
+        $BuildOut = $null
         try {
-            npm run build 2>&1 | Out-Null
-            Write-Ok "Build completado."
+            $BuildOut = & npm run build 2>&1 | Out-String
         } catch {
-            Write-Warn "Build del frontend omitido (opcional). Puedes ejecutar 'npm run build' manualmente en Client/"
+            $BuildOut = $_ | Out-String
         }
         Pop-Location
+        $DistIndex = Join-Path $ClientDir 'dist\index.html'
+        if (Test-Path $DistIndex) {
+            Write-Ok "Build completado (Client/dist/index.html generado)."
+        } else {
+            Write-Err "El build del frontend NO genero Client/dist/index.html."
+            if ($BuildOut) { Write-Err $BuildOut }
+            if ($Mode -eq 'LAN') {
+                # En modo LAN el server sirve Client/dist; sin build no hay frontend.
+                throw "frontend_build_failed"
+            } else {
+                Write-Warn "Continuando en modo $Mode (no sirve estaticos), pero revisa el build."
+            }
+        }
     }
 
     if ($CreateShortcut) {
@@ -436,6 +461,34 @@ try {
 
         if (Test-Path (Join-Path $RepoRoot 'DB')) { Write-Ok "DB/ existe" }
         else { $errors += "DB/ faltante" }
+
+        # Prueba HTTP real: arrancar el server unos segundos y consultar /api/health
+        Write-Step "Probando el servidor (GET /api/health)..."
+        $serverProc = $null
+        try {
+            $nodeExe = (Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+            $DentJs = Join-Path $ServerDir 'scripts\dent.js'
+            if ($nodeExe -and (Test-Path $DentJs)) {
+                $env:PORT = '5002'; $env:HOST = '127.0.0.1'
+                $serverProc = Start-Process -FilePath $nodeExe -ArgumentList 'scripts\dent.js' -WorkingDirectory $ServerDir -PassThru -WindowStyle Hidden
+                $healthOk = $false
+                foreach ($i in 1..20) {
+                    Start-Sleep -Seconds 1
+                    try {
+                        $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:5002/api/health' -UseBasicParsing -TimeoutSec 3
+                        if ($resp.StatusCode -eq 200) { $healthOk = $true; break }
+                    } catch { }
+                }
+                if ($healthOk) { Write-Ok "API responde: GET /api/health -> 200" }
+                else { $errors += "El server no respondio 200 en http://127.0.0.1:5002/api/health (revisa DB\logs\mongod.log, Server/logs y MONGODB_URI)" }
+            } else {
+                Write-Warn "Prueba HTTP omitida (node o Server/scripts/dent.js no encontrado)."
+            }
+        } catch {
+            $errors += "Fallo la prueba HTTP del server: $($_.Exception.Message)"
+        } finally {
+            if ($serverProc -and -not $serverProc.HasExited) { Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue }
+        }
 
         if ($errors.Count -eq 0) {
             Write-Ok "Smoke test: TODO OK"
