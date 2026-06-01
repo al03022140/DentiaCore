@@ -1005,7 +1005,7 @@ exports.addEvolutionNote = async (req, res) => {
     }
 
     const hasSignaturesPayload = Boolean(patientSignature && doctorSignature && doctorSignature.method);
-    let estadoRegistro = hasSignaturesPayload ? 'OFICIAL' : 'BORRADOR';
+    const estadoRegistro = hasSignaturesPayload ? 'OFICIAL' : 'BORRADOR';
 
     // ── Si pide OFICIAL, validar todo ──────────────────────────────
     let signerDoctor = null;
@@ -1062,37 +1062,44 @@ exports.addEvolutionNote = async (req, res) => {
         }
       }
 
-      // Verificar PIN contra el doctor que firma. Antes el método 'pad'
-      // saltaba toda verificación de PIN, dejando que un asistente con
-      // permisos pudiera enviar un PNG cualquiera como "firma del doctor"
-      // → suplantación. Ahora ambos métodos exigen PIN del doctor.
-      if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
-        return res.status(400).json({
-          success: false,
-          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-        });
-      }
-      if (!signerDoctor.pinHash) {
-        return res.status(400).json({
-          success: false,
-          error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
-        });
-      }
-      const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
-      if (!pinResult.ok) {
-        if (pinResult.locked) {
-          const minutos = Math.ceil(pinResult.remainingMs / 60000);
-          return res.status(429).json({
+      // Autenticación del doctor firmante según el método:
+      //  - 'pin': reusa la firma digital subida; exige firma subida + PIN.
+      //  - 'pad': el doctor dibuja su firma en vivo; el TRAZO es la
+      //    autorización, por lo que NO se exige PIN (el dataUrl se valida y
+      //    guarda más abajo; saveSignatureDataUrl rechaza dibujos vacíos).
+      //  NOTA DE SEGURIDAD: relajar el PIN en 'pad' reintroduce el riesgo de
+      //  que un asistente con permisos envíe un PNG arbitrario como "firma del
+      //  doctor" (suplantación). Es una decisión explícita del propietario;
+      //  para volver al modo estricto, exigir PIN también aquí.
+      if (doctorSignature.method === 'pin') {
+        if (!signerDoctor.firmaDigitalUrl) {
+          return res.status(400).json({
             success: false,
-            error: `PIN del doctor bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
-            locked: true
+            error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
           });
         }
-        return res.status(401).json({
-          success: false,
-          error: 'PIN del doctor incorrecto.',
-          attemptsLeft: pinResult.attemptsLeft
-        });
+        if (!signerDoctor.pinHash) {
+          return res.status(400).json({
+            success: false,
+            error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
+          });
+        }
+        const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+        if (!pinResult.ok) {
+          if (pinResult.locked) {
+            const minutos = Math.ceil(pinResult.remainingMs / 60000);
+            return res.status(429).json({
+              success: false,
+              error: `PIN del doctor bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
+              locked: true
+            });
+          }
+          return res.status(401).json({
+            success: false,
+            error: 'PIN del doctor incorrecto.',
+            attemptsLeft: pinResult.attemptsLeft
+          });
+        }
       }
     }
 
@@ -1540,22 +1547,26 @@ exports.signExistingEvolutionNote = async (req, res) => {
       }
     }
 
-    if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
-      return res.status(400).json({
-        success: false,
-        error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-      });
-    }
-    if (!signerDoctor.pinHash) {
-      return res.status(400).json({ success: false, error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.' });
-    }
-    const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
-    if (!pinResult.ok) {
-      if (pinResult.locked) {
-        const minutos = Math.ceil(pinResult.remainingMs / 60000);
-        return res.status(429).json({ success: false, error: `PIN del doctor bloqueado. Reintenta en ${minutos} minuto(s).`, locked: true });
+    // 'pin' → exige firma subida + PIN. 'pad' → el dibujo en vivo es la
+    // autorización; no se exige PIN (el dataUrl se valida/guarda abajo).
+    if (doctorSignature.method === 'pin') {
+      if (!signerDoctor.firmaDigitalUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+        });
       }
-      return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.', attemptsLeft: pinResult.attemptsLeft });
+      if (!signerDoctor.pinHash) {
+        return res.status(400).json({ success: false, error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.' });
+      }
+      const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+      if (!pinResult.ok) {
+        if (pinResult.locked) {
+          const minutos = Math.ceil(pinResult.remainingMs / 60000);
+          return res.status(429).json({ success: false, error: `PIN del doctor bloqueado. Reintenta en ${minutos} minuto(s).`, locked: true });
+        }
+        return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.', attemptsLeft: pinResult.attemptsLeft });
+      }
     }
 
     const now = new Date();
@@ -1596,7 +1607,7 @@ exports.signExistingEvolutionNote = async (req, res) => {
         if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
         note.doctorFirmaUrl = snap.publicUrl;
         note.doctorFirmaImageHash = snap.contentHash;
-      } catch (e) {
+      } catch (_e) {
         await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
         return res.status(500).json({ success: false, error: 'No se pudo persistir el snapshot de la firma del doctor.' });
       }
@@ -1635,7 +1646,7 @@ exports.signExistingEvolutionNote = async (req, res) => {
         await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
         return res.status(409).json({ success: false, error: 'La nota ya fue firmada o modificada por otra operación. Recargue e intente de nuevo.' });
       }
-    } catch (saveErr) {
+    } catch (_saveErr) {
       await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
       return res.status(500).json({ success: false, error: 'No se pudo guardar la nota firmada. Los cambios se revirtieron.' });
     }
@@ -1703,7 +1714,7 @@ exports.verifyEvolutionNoteIntegrity = async (req, res) => {
 
     // Sólo se puede verificar si hay URL de firma Y hash de referencia guardado.
     // Sin uno u otro → no aplica (null), no se reporta como manipulación.
-    const checkFirma = async (url, expectedHash) => {
+    const checkFirma = (url, expectedHash) => {
       if (!url) return { ok: null, reason: 'sin_firma' };
       if (!expectedHash) return { ok: null, reason: 'sin_hash_referencia' };
       return verifySignatureImageHash(toAbsPath(url), expectedHash);
@@ -1821,22 +1832,24 @@ exports.finalizeClinicalHistory = async (req, res) => {
       }
     }
 
-    // PIN: validar antes de tocar nada. PIN exigido SIEMPRE (incluso si
-    // method='pad') para evitar suplantación — pad sólo controla el
-    // SOURCE visual, no la AUTORIZACIÓN.
-    if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
-      return res.status(400).json({
-        success: false,
-        error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-      });
-    }
-    if (!signerDoctor.pinHash) {
-      return res.status(400).json({
-        success: false,
-        error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
-      });
-    }
-    {
+    // Autenticación del doctor según el método:
+    //  - 'pin': reusa la firma digital subida; exige firma subida + PIN.
+    //  - 'pad': el dibujo en vivo es la autorización; no se exige PIN (el
+    //    dataUrl se valida/guarda abajo). Decisión explícita del propietario;
+    //    para volver al modo estricto, exigir PIN también aquí.
+    if (doctorSignature.method === 'pin') {
+      if (!signerDoctor.firmaDigitalUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+        });
+      }
+      if (!signerDoctor.pinHash) {
+        return res.status(400).json({
+          success: false,
+          error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
+        });
+      }
       const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
       if (!pinResult.ok) {
         if (pinResult.locked) {

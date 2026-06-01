@@ -10,7 +10,12 @@ module.exports = {
     jest: true
   },
   extends: [
-    'eslint:recommended'
+    'eslint:recommended',
+    // Prettier (.prettierrc) es la fuente de verdad del FORMATO. Este preset
+    // (eslint-config-prettier) apaga las reglas de formato de ESLint que
+    // chocarían con Prettier (indent, comillas, comas finales, etc.).
+    // Debe ir al final para anular esas reglas.
+    'prettier'
   ],
   parserOptions: {
     ecmaVersion: 'latest',
@@ -64,11 +69,10 @@ module.exports = {
     // Requerir punto y coma
     'semi': ['error', 'always'],
 
-    // Comillas simples preferidas
-    'quotes': ['error', 'single', { 'allowTemplateLiterals': true }],
-
-    // Indentación de 4 espacios
-    'indent': ['error', 4, { 'SwitchCase': 1 }],
+    // El FORMATO (indentación, comillas, comas finales) lo gobierna Prettier
+    // vía eslint-config-prettier (ver `extends`). Por eso aquí ya no van
+    // 'indent', 'quotes' ni 'comma-dangle': chocaban con .prettierrc
+    // (p. ej. ESLint pedía indent 4 / comas "never" y Prettier pide 2 / "es5").
 
     // Espacios alrededor de operadores
     'space-infix-ops': 'error',
@@ -78,9 +82,6 @@ module.exports = {
 
     // Espacios en corchetes de arrays
     'array-bracket-spacing': ['error', 'never'],
-
-    // Coma al final en objetos/arrays multilínea
-    'comma-dangle': ['error', 'never'],
 
     // ── Mejores Prácticas ─────────────────────────────────────────
     
@@ -127,7 +128,11 @@ module.exports = {
           '_id',
           '__v',
           '__dirname',
-          '__filename'
+          '__filename',
+          // Helpers internos y campos de documento privados del dominio
+          '_computeEvolutionNoteHash',
+          '_evolutionNoteCounter',
+          '_capturaExtemporanea'
         ],
         'allowAfterThis': true,
         'allowAfterSuper': true
