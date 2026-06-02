@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { values, CASH_MOVEMENT_TYPE, PAYMENT_METHOD } = require('../constants/enums');
 
 // Audit trail de ediciones. `changes` guarda únicamente los campos modificados
 // con la forma { field: { from, to } } — al reproducir la cadena se reconstruye
@@ -20,12 +21,12 @@ const cashMovementSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['INCOME', 'EXPENSE'],
+    enum: values(CASH_MOVEMENT_TYPE),
     required: true
   },
   paymentMethod: {
     type: String,
-    enum: ['CASH', 'DIGITAL'],
+    enum: values(PAYMENT_METHOD),
     required: true
   },
   concept: {
