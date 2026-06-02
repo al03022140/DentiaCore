@@ -139,11 +139,7 @@ module.exports = {
           '__filename',
           // Helpers internos y campos de documento privados del dominio
           '_evolutionNoteCounter',
-          '_capturaExtemporanea',
-          // Propiedad interna de BSON (detección de ObjectId en canonicalize)
-          '_bsontype',
-          // Flag privado de módulo (gestión de secreto de auditoría)
-          '_auditSecretWarned'
+          '_capturaExtemporanea'
         ],
         'allowAfterThis': true,
         'allowAfterSuper': true
@@ -177,12 +173,7 @@ module.exports = {
       },
       rules: {
         'no-console': 'off',
-        'no-unused-expressions': 'off',
-        // Los fixtures de test reflejan datos reales/legacy (incl. campos en
-        // español como paciente_id, estado). Las reglas de naming aplican al
-        // código de la app, no a los datos que los tests deben reproducir.
-        'camelcase': 'off',
-        'id-denylist': 'off'
+        'no-unused-expressions': 'off'
       }
     },
     {

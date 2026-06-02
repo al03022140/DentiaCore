@@ -412,7 +412,7 @@ El estado no vive solo en documentos "vivos": está también en `periodontogramH
 
 ---
 
-## 15. Restricción de integridad NOM-024 (firmas) — leer antes de migrar campos firmables
+## 15. Restricción de integridad NOM-024 (firmas) — campos firmados CONGELADOS
 
 Esta es la restricción **más crítica** de toda la migración y la que el plan original no contemplaba. Afecta a cualquier campo que forme parte de un documento clínico firmado.
 
@@ -433,35 +433,21 @@ Consecuencia: **renombrar un campo** (`apellido_paterno` → `lastNamePaternal`)
 
 Subtleza adicional del flujo de firma: el hash se calcula sobre un **snapshot** justo antes de setear `firmadoEn`/`estadoRegistro`. Por eso un campo firmable **no puede derivarse** de `firmadoEn` (que se setea después): la verificación recalcularía distinto. Esto es lo que hace inseguro convertir `status` de periodontograma en un virtual derivado de `firmadoEn`.
 
-### 15.2 La solución: hashear sobre la representación "legacy canónica"
+### 15.2 Decisión: NO se normalizan los campos firmados
 
-Implementado en `Server/utils/integrity.js` (Fase 1). El hash se calcula **siempre sobre los nombres y valores originales**, sin importar cómo los llame el código tras la migración. Dos mapas, **vacíos hoy**, se poblarán a medida que se migre cada campo:
+Por esta restricción, la estrategia adoptada es **excluir de la normalización todos los campos que aparecen en `SIGNABLE_FIELDS`**. Esos campos clínicos firmados se dejan **CONGELADOS en su forma original (en español)** — no se renombran ni se canonicalizan sus enums. La normalización se limita a campos **NO firmados** (p. ej. el dominio caja: `cashMovement`, `boxSession`, `patientCharge`, que no son documentos firmados y ya se migraron a `enums.js`).
 
-```js
-// nombre-legacy -> nombres físicos nuevos a tolerar (el legacy se intenta primero)
-const HASH_FIELD_ALIASES = {
-  // al migrar:  patient: { apellido_paterno: ['lastNamePaternal'] }
-};
-// valor-nuevo -> valor-legacy, para enums escalares canonicalizados
-const HASH_VALUE_MAPS = {
-  // al migrar:  cita: { estado: { PENDING: 'Pendiente', CONFIRMED: 'Confirmada' } }
-};
-```
+Ventaja: las firmas NOM-024 nunca se tocan → cero riesgo sobre expedientes legales. Costo aceptado: los modelos firmados quedan permanentemente "mixtos" (campos en español junto a código en inglés). Es un trade-off deliberado a favor de la seguridad de los datos.
 
-`computeIntegrityHash` resuelve cada campo firmable tolerando el nombre nuevo o el legacy, y mapea los valores nuevos a su forma legacy **antes** de hashear. Resultado: un documento migrado al inglés produce **exactamente el mismo hash** que cuando estaba en español → las firmas previas siguen verificando.
+**Campos que NO se deben renombrar ni canonicalizar** (excepción legítima al estándar, para PRs y linter): todos los listados en `SIGNABLE_FIELDS` de `Server/utils/integrity.js`.
 
-**Garantía verificada:** con los mapas vacíos (hoy), el hash es **byte-idéntico** al algoritmo anterior. Lo prueba `Server/tests/integrity-hash-compat.test.js` (test "HOY (mapas vacíos) ... byte-idéntico"), junto con tests de que un alias y un mapa de valores reproducen el hash legacy.
+### 15.3 Si algún día se decide migrar un campo firmado
 
-### 15.3 Reglas para migrar un campo firmable
+No a la ligera. Requeriría primero una **capa de compatibilidad de hash** (hashear sobre la representación legacy: mapear nombres/valores nuevos → originales antes de calcular el hash), con tests que prueben hash byte-idéntico, y recién entonces migrar código y datos (Fases 3-4) con las trampas de Mongoose del §14 en mente. Se prototipó esa capa y **se revirtió por innecesaria** bajo la decisión de §15.2; queda en el historial de git (commit de Fase 1) como referencia si el criterio cambia.
 
-1. **Las claves de `SIGNABLE_FIELDS` están CONGELADAS.** No renombrar ni quitar una clave (eso invalida firmas y requeriría versionar el hash). Solo se agregan entradas a `HASH_FIELD_ALIASES` / `HASH_VALUE_MAPS`.
-2. **Antes** de renombrar un campo físico o canonicalizar su enum, registrar su alias / mapa de valores en `integrity.js` y correr `npm test` (debe seguir verde, incluyendo la regresión de hash).
-3. Recién entonces migrar el código y los datos (Fases 3-4), con las trampas de Mongoose del §14 en mente.
-4. Nunca derivar un campo firmable de algo que se setea después del hash (`firmadoEn`, `estadoRegistro` en el flujo de firma).
+### 15.4 Impacto en periodontograma
 
-### 15.4 Impacto en el piloto de periodontograma
-
-Por esta razón, el `status` de periodontograma **no se toca** en Fase 1: está en `SIGNABLE_FIELDS.periodontograma`, así que volverlo virtual o derivarlo de `firmadoEn` rompería las firmas. La unificación del doble estado de periodontograma se difiere a la migración coordinada de `DOCUMENT_STATUS`, que se hará **sobre** esta capa de compatibilidad (registrando el alias/valor correspondiente antes de tocar nada).
+El `status` de periodontograma está en `SIGNABLE_FIELDS.periodontograma`, así que **no se toca**: ni se vuelve virtual ni se deriva de `firmadoEn` (rompería firmas). El doble estado `status` (firmado, congelado) / `estadoRegistro` (no firmado) se documenta como **inconsistencia conocida** y se deja como está; cualquier unificación quedaría sujeta a §15.3.
 
 ---
 
@@ -481,7 +467,7 @@ Procedimiento para correr una migración de datos contra la base de una clínica
 ### 16.2 Precondiciones (antes del día) — todo o se pospone
 
 - [ ] Código de la fase mergeado; CI en verde (tests + lint del módulo migrado).
-- [ ] Capas de compatibilidad registradas: alias/getters de Mongoose (§3, §6) y —si el campo es firmable— su entrada en `HASH_FIELD_ALIASES` / `HASH_VALUE_MAPS` (§15), con el test de regresión de hash en verde.
+- [ ] El módulo a migrar **no toca campos firmados** (§15.2); si los tocara, primero hay que construir la capa de compatibilidad de hash (§15.3). Capas de compatibilidad de Mongoose (alias/getters) registradas para los campos NO firmados que se renombren (§3, §6).
 - [ ] Script en `Server/migrations/NNNN-*.js`: idempotente, con `up()` y registro de migraciones aplicadas (§7).
 - [ ] Ensayo en copia ya realizado con éxito al menos una vez (§16.4).
 - [ ] Plan de rollback escrito (§16.7).
@@ -507,7 +493,7 @@ Procedimiento para correr una migración de datos contra la base de una clínica
 
 - [ ] Conteos antes/después coinciden con lo esperado (N migrados, **0** perdidos).
 - [ ] Spot-check: abrir varios registros y confirmar que el dato migró bien.
-- [ ] **Integridad NOM-024:** los documentos firmados siguen verificando — `firmaDesactualizada` **NO** se dispara. Es lo que protege la capa de hash (§15). **Si esto falla → ABORTAR.**
+- [ ] **Integridad NOM-024:** los documentos firmados siguen verificando — `firmaDesactualizada` **NO** se dispara. Como no se tocan campos firmados (§15.2), no debería cambiar; **si una firma se invalida → ABORTAR.**
 - [ ] La app arranca y los flujos clave funcionan: login, ver expediente, caja, firma.
 - [ ] Sin errores nuevos en logs.
 - [ ] Suite de tests en verde contra la copia migrada.
