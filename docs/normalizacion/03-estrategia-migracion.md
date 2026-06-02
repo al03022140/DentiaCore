@@ -409,3 +409,56 @@ El estado no vive solo en documentos "vivos": está también en `periodontogramH
 | 3 Campos | §14.2 alias no aplica en queries/aggregations | Migrar dato físico primero; cambiar `$campo` en lockstep |
 | 4 Datos | §14.4 reconciliación por `firmadoEn`; §14.5 historial+archivados | Usar `reconcileStatus()`; incluir `periodontogramHistory` y versiones |
 | 7 Retiro | §14.5 | No restringir enum hasta migrar también historial/archivados |
+
+---
+
+## 15. Restricción de integridad NOM-024 (firmas) — leer antes de migrar campos firmables
+
+Esta es la restricción **más crítica** de toda la migración y la que el plan original no contemplaba. Afecta a cualquier campo que forme parte de un documento clínico firmado.
+
+### 15.1 El problema
+
+Los documentos clínicos firmados guardan un `contentHash` (SHA-256) calculado sobre un subconjunto de campos definido en `Server/utils/integrity.js` → `SIGNABLE_FIELDS`. La verificación recalcula ese hash y lo compara; si difiere, marca `firmaDesactualizada` (firma inválida). Hoy esos campos se hashean **con sus nombres y valores actuales en español**:
+
+```js
+// Server/utils/integrity.js — SIGNABLE_FIELDS (extracto)
+patient:        ['primer_nombre','apellido_paterno','fecha_nacimiento','sexo', ...],
+examen:         ['paciente_id','doctor_id','tipo_examen','estado', ...],
+receta:         ['paciente_id','doctor_id','fecha','medicamentos','estado','notas'],
+periodontograma:['patient','initial','current','status'],
+cita:           ['paciente_id','doctor_id','fecha_hora','duracion_minutos','estado','motivo', ...],
+```
+
+Consecuencia: **renombrar un campo** (`apellido_paterno` → `lastNamePaternal`) o **canonicalizar un enum** (`'Pendiente'` → `'PENDING'`) que esté en esta lista **cambia el hash recalculado → invalida TODAS las firmas existentes** de ese tipo de documento. En un expediente con valor legal (NOM-024 / firma electrónica) eso es inaceptable.
+
+Subtleza adicional del flujo de firma: el hash se calcula sobre un **snapshot** justo antes de setear `firmadoEn`/`estadoRegistro`. Por eso un campo firmable **no puede derivarse** de `firmadoEn` (que se setea después): la verificación recalcularía distinto. Esto es lo que hace inseguro convertir `status` de periodontograma en un virtual derivado de `firmadoEn`.
+
+### 15.2 La solución: hashear sobre la representación "legacy canónica"
+
+Implementado en `Server/utils/integrity.js` (Fase 1). El hash se calcula **siempre sobre los nombres y valores originales**, sin importar cómo los llame el código tras la migración. Dos mapas, **vacíos hoy**, se poblarán a medida que se migre cada campo:
+
+```js
+// nombre-legacy -> nombres físicos nuevos a tolerar (el legacy se intenta primero)
+const HASH_FIELD_ALIASES = {
+  // al migrar:  patient: { apellido_paterno: ['lastNamePaternal'] }
+};
+// valor-nuevo -> valor-legacy, para enums escalares canonicalizados
+const HASH_VALUE_MAPS = {
+  // al migrar:  cita: { estado: { PENDING: 'Pendiente', CONFIRMED: 'Confirmada' } }
+};
+```
+
+`computeIntegrityHash` resuelve cada campo firmable tolerando el nombre nuevo o el legacy, y mapea los valores nuevos a su forma legacy **antes** de hashear. Resultado: un documento migrado al inglés produce **exactamente el mismo hash** que cuando estaba en español → las firmas previas siguen verificando.
+
+**Garantía verificada:** con los mapas vacíos (hoy), el hash es **byte-idéntico** al algoritmo anterior. Lo prueba `Server/tests/integrity-hash-compat.test.js` (test "HOY (mapas vacíos) ... byte-idéntico"), junto con tests de que un alias y un mapa de valores reproducen el hash legacy.
+
+### 15.3 Reglas para migrar un campo firmable
+
+1. **Las claves de `SIGNABLE_FIELDS` están CONGELADAS.** No renombrar ni quitar una clave (eso invalida firmas y requeriría versionar el hash). Solo se agregan entradas a `HASH_FIELD_ALIASES` / `HASH_VALUE_MAPS`.
+2. **Antes** de renombrar un campo físico o canonicalizar su enum, registrar su alias / mapa de valores en `integrity.js` y correr `npm test` (debe seguir verde, incluyendo la regresión de hash).
+3. Recién entonces migrar el código y los datos (Fases 3-4), con las trampas de Mongoose del §14 en mente.
+4. Nunca derivar un campo firmable de algo que se setea después del hash (`firmadoEn`, `estadoRegistro` en el flujo de firma).
+
+### 15.4 Impacto en el piloto de periodontograma
+
+Por esta razón, el `status` de periodontograma **no se toca** en Fase 1: está en `SIGNABLE_FIELDS.periodontograma`, así que volverlo virtual o derivarlo de `firmadoEn` rompería las firmas. La unificación del doble estado de periodontograma se difiere a la migración coordinada de `DOCUMENT_STATUS`, que se hará **sobre** esta capa de compatibilidad (registrando el alias/valor correspondiente antes de tocar nada).
