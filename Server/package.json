@@ -2,7 +2,9 @@
   "scripts": {
     "start": "cross-env NODE_ENV=production node scripts/dent.js",
     "dev": "cross-env NODE_ENV=development nodemon scripts/dent.js",
-    "test": "jest"
+    "test": "jest",
+    "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint .",
+    "lint:fix": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint . --fix"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

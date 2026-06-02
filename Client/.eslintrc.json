@@ -1,11 +1,44 @@
 {
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true,
+    "jest": true
+  },
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": { "jsx": true }
+  },
+  "settings": {
+    "react": { "version": "detect" }
+  },
   "extends": [
-    "react-app",
-    "react-app/jest",
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react/jsx-runtime",
     "plugin:prettier/recommended"
   ],
-  "plugins": ["prettier"],
+  "plugins": ["react", "prettier"],
   "rules": {
-    "prettier/prettier": "warn"
-  }
+    "prettier/prettier": "warn",
+    "react/prop-types": "off",
+    "camelcase": [
+      "error",
+      {
+        "properties": "always",
+        "ignoreDestructuring": false,
+        "allow": ["^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"]
+      }
+    ],
+    "id-denylist": [
+      "error",
+      "fecha", "fechaHora", "nombre", "apellido", "contraseña", "correo",
+      "motivo", "duracion", "comentario", "observaciones", "estado", "sexo",
+      "edad", "telefono", "usuario"
+    ],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  },
+  "ignorePatterns": ["dist/", "build/", "node_modules/", "coverage/", "*.config.js"]
 }
