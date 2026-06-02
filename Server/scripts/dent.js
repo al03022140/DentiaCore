@@ -20,11 +20,15 @@ const connectDB = require('../config/db');
 const configureRoutes = require('../config/routes');
 const googleRouter = require('../routes/googleRoutes');
 const { getJwtSecret } = require('../utils/crypto');
+const { getAuditHmacSecret } = require('../utils/integrity');
 const { globalLimiter, botGuard } = require('../middlewares/rateLimiter');
 
-// Validate JWT_SECRET early — fail fast if insecure
+// Validar secretos críticos al arranque — fail fast si son inseguros.
+// En producción, getJwtSecret/getAuditHmacSecret lanzan si faltan o son débiles
+// (<32 chars), evitando arrancar con una configuración insegura.
 try {
   getJwtSecret();
+  getAuditHmacSecret(); // NOM-024: protege la integridad/no-repudio del audit log
 } catch (err) {
   console.error(`\n❌ ${err.message}\n`);
   process.exit(1);

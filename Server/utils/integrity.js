@@ -173,4 +173,6 @@ module.exports = {
   computeEntryHash,
   getSignableFields,
   SIGNABLE_FIELDS,
+  // Expuesto para validar al arranque (fail-fast en producción).
+  getAuditHmacSecret,
 };
