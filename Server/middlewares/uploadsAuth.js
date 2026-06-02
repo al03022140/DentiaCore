@@ -1,31 +1,37 @@
 const jwt = require('jsonwebtoken');
 const { getJwtSecret } = require('../utils/crypto');
+const {
+  getEffectivePermissions,
+  hasPermission,
+  isAdminRole,
+  isClinicalRole,
+} = require('../utils/permissions');
+const Usuario = require('../models/users');
+const ClinicSettings = require('../models/clinicSettings');
 
 const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
 
 /**
- * Gate de autenticación para los archivos servidos desde /uploads (PHI).
+ * Gate de autenticación + AUTORIZACIÓN para los archivos de /uploads (PHI).
  *
- * Hallazgo C-1: /uploads se servía de forma totalmente pública, permitiendo
- * descargar adjuntos, odontogramas, periodontogramas y fotos de pacientes sin
- * sesión. Esto cierra ese hueco exigiendo una sesión válida.
+ * Hallazgo C-1: /uploads se servía público. Primero se cerró exigiendo una
+ * sesión válida; ahora además se aplica autorización por tipo de archivo:
  *
- * Reto: el frontend referencia varias de estas rutas directamente como
- * `<img src="/uploads/...">`, y un `<img>` del navegador NO envía el header
- * `Authorization`. Por eso aceptamos DOS formas de autenticación:
- *   1. Header `Authorization: Bearer <accessToken>` — peticiones axios / fetch
- *      de blobs (descargas, vistas previas autenticadas).
- *   2. Cookie httpOnly `refreshToken` — el navegador la envía automáticamente
- *      con las peticiones de subrecursos (`<img>`, `<a download>`) cuando el
- *      cliente y la API comparten origen, como ocurre en producción (Express
- *      sirve Client/dist y /uploads desde el mismo host).
+ *   - /uploads/pacientes/<id>/profile-pic/...  → foto de contacto (BÁSICO):
+ *       basta una sesión válida. La foto se muestra en muchas listas de la UI
+ *       (citas, caja, próximo paciente) vía <img>, así que NO se restringe por
+ *       permiso para no romper esas miniaturas.
+ *   - /uploads/pacientes/<id>/<otra-subcarpeta>/... → expediente CLÍNICO
+ *       (odontograma, adjuntos, firmas de notas/HC): exige `patients.read` o
+ *       rol clínico/admin. Así un rol sin acceso al expediente (p. ej. caja)
+ *       no puede descargar archivos clínicos adivinando la URL.
+ *   - Resto (/uploads/logos, /uploads/firmas a nivel raíz): sesión válida.
  *
- * Nota de despliegue: en desarrollo, si el cliente (Vite :5173) y la API
- * (:5002) están en orígenes distintos, la cookie `SameSite=Lax` no viaja con
- * los `<img>` cross-origin; las miniaturas que dependen de la cookie pueden dar
- * 401 en dev. La migración recomendada (fuera de este parche) es servir esas
- * imágenes como blobs autenticados, igual que ya hace la firma digital
- * (`fetchFirmaBlobUrl`).
+ * Doble forma de autenticación: header `Authorization: Bearer <accessToken>`
+ * (axios/fetch de blobs) o cookie httpOnly `refreshToken` (que el navegador
+ * envía con `<img>` en mismo origen). El access token ya trae role+permissions;
+ * la cookie solo trae el id, así que para autorizar contenido clínico vía cookie
+ * se cargan los permisos efectivos desde la BD.
  */
 const verifyToken = (token) => {
   try {
@@ -35,28 +41,101 @@ const verifyToken = (token) => {
   }
 };
 
-const uploadsAuth = (req, res, next) => {
-  // 1) Bearer token (access token) en el header Authorization
+// Subcarpetas de paciente consideradas NO clínicas (nivel contacto/básico).
+const BASIC_PATIENT_SUBDIRS = new Set(['profile-pic']);
+
+/**
+ * Clasifica una ruta relativa a /uploads en 'clinical' | 'basic' | 'non-patient'.
+ * Pura y determinista (exportada para pruebas).
+ * @param {string} relPath  ej. '/pacientes/<id>/odontograma-inicial/<file>'
+ */
+const classifyUploadPath = (relPath) => {
+  const parts = String(relPath || '').split('/').filter(Boolean);
+  if (parts[0] !== 'pacientes') return 'non-patient';
+  const subdir = parts[2] || '';
+  return BASIC_PATIENT_SUBDIRS.has(subdir) ? 'basic' : 'clinical';
+};
+
+// ¿Hay una sesión válida? (sin resolver permisos) — para rutas no clínicas.
+const hasValidSession = (req) => {
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
     const payload = verifyToken(authHeader.slice(7).trim());
-    // Un access token válido no lleva `type: 'refresh'`
-    if (payload && payload.type !== 'refresh') {
-      return next();
-    }
+    if (payload && payload.type !== 'refresh') return true;
   }
-
-  // 2) Cookie de sesión httpOnly (refresh token) — la envía el `<img>` en
-  //    mismo origen. Verifica firma + issuer; debe ser de tipo refresh.
   const cookieToken = req.cookies && req.cookies.refreshToken;
   if (cookieToken) {
     const payload = verifyToken(cookieToken);
-    if (payload && payload.type === 'refresh') {
-      return next();
+    if (payload && payload.type === 'refresh') return true;
+  }
+  return false;
+};
+
+// Resuelve { role, permissions } del solicitante para decisiones de autorización.
+// Bearer: directo del payload. Cookie: cargando usuario + permisos efectivos.
+const resolveActor = async (req) => {
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const payload = verifyToken(authHeader.slice(7).trim());
+    if (payload && payload.type !== 'refresh') {
+      return { role: payload.role, permissions: payload.permissions || [] };
     }
   }
+  const cookieToken = req.cookies && req.cookies.refreshToken;
+  if (cookieToken) {
+    const payload = verifyToken(cookieToken);
+    if (payload && payload.type === 'refresh' && payload.sub) {
+      const user = await Usuario.findById(payload.sub)
+        .select('rol permissions active')
+        .lean();
+      if (!user || user.active === false) return null;
+      let roleOverrides = null;
+      try {
+        const settings = await ClinicSettings.getSettings();
+        roleOverrides = settings && settings.rolePermissionOverrides;
+      } catch (_e) {
+        roleOverrides = null; // sin overrides → permisos base del rol
+      }
+      return { role: user.rol, permissions: getEffectivePermissions(user, roleOverrides) };
+    }
+  }
+  return null;
+};
 
-  return res.status(401).json({ message: 'No autorizado para acceder a este archivo' });
+// ¿El actor puede leer el expediente clínico de pacientes?
+// Pura (exportada para pruebas).
+const canAccessClinical = (actor) =>
+  !!actor &&
+  (isAdminRole(actor.role) ||
+    isClinicalRole(actor.role) ||
+    hasPermission(actor.permissions || [], ['patients.read']));
+
+const uploadsAuth = async (req, res, next) => {
+  try {
+    // req.path es relativo al mount '/uploads'.
+    const level = classifyUploadPath(req.path);
+
+    if (level === 'clinical') {
+      const actor = await resolveActor(req);
+      if (!actor) {
+        return res.status(401).json({ message: 'No autorizado para acceder a este archivo' });
+      }
+      if (!canAccessClinical(actor)) {
+        return res.status(403).json({ message: 'No tiene permiso para acceder a este archivo clínico' });
+      }
+      return next();
+    }
+
+    // 'basic' (foto) y 'non-patient' (logos, firmas raíz): basta sesión válida.
+    if (!hasValidSession(req)) {
+      return res.status(401).json({ message: 'No autorizado para acceder a este archivo' });
+    }
+    return next();
+  } catch (_e) {
+    return res.status(500).json({ message: 'Error de autorización de archivo' });
+  }
 };
 
 module.exports = uploadsAuth;
+module.exports.classifyUploadPath = classifyUploadPath;
+module.exports.canAccessClinical = canAccessClinical;
