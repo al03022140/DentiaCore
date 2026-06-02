@@ -14,7 +14,9 @@
     "test:client": "npm --prefix Client run test",
     "test": "npm run test:server && npm run test:client",
     "backup:db": "node scripts/backup-db.js",
-    "restore:db": "node scripts/restore-db.js"
+    "restore:db": "node scripts/restore-db.js",
+    "migrate": "node scripts/migrate.js",
+    "migrate:dry": "node scripts/migrate.js --dry-run"
   },
   "keywords": [],
   "author": "",
