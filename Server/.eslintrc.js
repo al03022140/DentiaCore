@@ -27,23 +27,31 @@ module.exports = {
     'no-process-env': 'error',
     // ── Convenciones de Nomenclatura ──────────────────────────────
     
-    // Variables y funciones en camelCase
+    // ESTRICTO (Fase 0 de normalización): exigir camelCase en variables,
+    // funciones Y propiedades. Ya NO se permite snake_case — los campos en
+    // español (p. ej. paciente_id, apellido_paterno) se migran en Fases 3-4
+    // (ver docs/normalizacion/03-estrategia-migracion.md). Solo se permite
+    // UPPER_SNAKE_CASE para constantes y valores de enum.
     'camelcase': [
       'error',
       {
-        'properties': 'never', // Permitir snake_case en propiedades (modelos DB)
-        'ignoreDestructuring': true,
+        'properties': 'always',
+        'ignoreDestructuring': false,
         'ignoreImports': true,
         'ignoreGlobals': true,
         'allow': [
-          // Permitir snake_case para propiedades de modelos
-          '^[a-z]+(_[a-z]+)*$',
-          // Permitir IDs con sufijo _id
-          '^[a-z]+(_[a-z]+)*_id$',
-          // Permitir constantes en UPPER_SNAKE_CASE
-          '^[A-Z]+(_[A-Z]+)*$'
+          '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'
         ]
       }
+    ],
+
+    // Prohibir identificadores en español (lista inicial; ampliable).
+    // Ver docs/normalizacion/01-estandares-tecnicos.md §13.
+    'id-denylist': [
+      'error',
+      'fecha', 'fechaHora', 'nombre', 'apellido', 'contraseña', 'correo',
+      'motivo', 'duracion', 'comentario', 'observaciones', 'estado', 'sexo',
+      'usuario', 'creado', 'modificado', 'firma'
     ],
 
     // Funciones deben ser camelCase
@@ -177,29 +185,10 @@ module.exports = {
       }
     },
     {
-      // Modelos de base de datos
-      files: ['models/*.js'],
-      rules: {
-        // Permitir snake_case en modelos
-        'camelcase': [
-          'error',
-          {
-            'properties': 'never',
-            'ignoreDestructuring': true,
-            'allow': [
-              // Propiedades de modelos en snake_case
-              '^[a-z]+(_[a-z]+)*$',
-              '^[a-z]+(_[a-z]+)*_id$',
-              // Métodos en camelCase
-              '^[a-z][a-zA-Z]*$',
-              // Constantes
-              '^[A-Z]+(_[A-Z]+)*$'
-            ]
-          }
-        ]
-      }
-    },
-    {
+      // NOTA (Fase 0): se eliminó el override que permitía snake_case en
+      // models/*.js. Ahora los modelos también exigen camelCase, de modo que
+      // los campos legacy en español (paciente_id, apellido_paterno, ...)
+      // quedan marcados como deuda a migrar en las Fases 3-4.
       // Controladores
       files: ['controllers/*.js'],
       rules: {
