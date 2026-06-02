@@ -462,3 +462,76 @@ const HASH_VALUE_MAPS = {
 ### 15.4 Impacto en el piloto de periodontograma
 
 Por esta razón, el `status` de periodontograma **no se toca** en Fase 1: está en `SIGNABLE_FIELDS.periodontograma`, así que volverlo virtual o derivarlo de `firmadoEn` rompería las firmas. La unificación del doble estado de periodontograma se difiere a la migración coordinada de `DOCUMENT_STATUS`, que se hará **sobre** esta capa de compatibilidad (registrando el alias/valor correspondiente antes de tocar nada).
+
+---
+
+## 16. Runbook de día de migración (datos en producción)
+
+Procedimiento para correr una migración de datos contra la base de una clínica **en producción** (cualquier migración de Fase 4: renombre de campos, canonicalización de enums, etc.).
+
+> **Regla de oro:** la automatización/agente trabaja sobre **copias**; el disparo final sobre la base viva lo hace una **persona**, con backup y rollback en mano. Toda migración es *backup-first*, **idempotente** y **reversible**. Contexto actual: hay **una** clínica en producción — es a la vez tu único entorno real y tu mayor riesgo, así que el ensayo en copia (§16.4) no es opcional.
+
+### 16.1 Roles
+
+| Rol | Hace | NO hace |
+|-----|------|---------|
+| Agente (Opus / Cowork / Claude Code) | Escribe scripts + tests; corre y re-corre la migración sobre **copias**/datos sintéticos; ayuda a verificar y a redactar el post-mortem | Tener credenciales de escritura a prod; disparar la corrida final; "arreglar" en vivo |
+| Persona responsable | Revisa los scripts; **dispara** la corrida en prod; decide *go/no-go* y *rollback* | — |
+
+### 16.2 Precondiciones (antes del día) — todo o se pospone
+
+- [ ] Código de la fase mergeado; CI en verde (tests + lint del módulo migrado).
+- [ ] Capas de compatibilidad registradas: alias/getters de Mongoose (§3, §6) y —si el campo es firmable— su entrada en `HASH_FIELD_ALIASES` / `HASH_VALUE_MAPS` (§15), con el test de regresión de hash en verde.
+- [ ] Script en `Server/migrations/NNNN-*.js`: idempotente, con `up()` y registro de migraciones aplicadas (§7).
+- [ ] Ensayo en copia ya realizado con éxito al menos una vez (§16.4).
+- [ ] Plan de rollback escrito (§16.7).
+- [ ] Ventana de mantenimiento acordada con la clínica y avisada.
+- [ ] Espacio en disco para **2** backups.
+
+### 16.3 Pre-flight (el día)
+
+- [ ] Confirmar versión actual de la app y del esquema.
+- [ ] Confirmar que nadie escribirá durante la ventana (fin de jornada).
+- [ ] A la mano: credenciales, `npm run backup:db`, comando de restore, y este runbook.
+
+### 16.4 Ensayo en copia (obligatorio, sin tocar prod)
+
+1. Backup fresco de prod: `npm run backup:db`.
+2. Restaurar ese backup en una base **copia** (otra instancia, aislada; anonimizada si la maneja un agente).
+3. Correr la migración sobre la copia.
+4. Verificar (§16.5) sobre la copia.
+5. Correr la migración una **segunda vez** sobre la copia → no debe cambiar nada (prueba de idempotencia).
+6. Solo si todo pasa → *go*.
+
+### 16.5 Verificación (sobre copia, y luego sobre prod)
+
+- [ ] Conteos antes/después coinciden con lo esperado (N migrados, **0** perdidos).
+- [ ] Spot-check: abrir varios registros y confirmar que el dato migró bien.
+- [ ] **Integridad NOM-024:** los documentos firmados siguen verificando — `firmaDesactualizada` **NO** se dispara. Es lo que protege la capa de hash (§15). **Si esto falla → ABORTAR.**
+- [ ] La app arranca y los flujos clave funcionan: login, ver expediente, caja, firma.
+- [ ] Sin errores nuevos en logs.
+- [ ] Suite de tests en verde contra la copia migrada.
+
+### 16.6 Corrida en producción (la dispara una persona)
+
+1. Poner la app en mantenimiento (detener writes; `pm2 stop` del server o modo lectura).
+2. Backup fresco **otra vez** (el definitivo pre-cambio).
+3. Correr el **mismo** script ya ensayado.
+4. Verificar (§16.5) sobre prod.
+5. Levantar la app en la nueva versión.
+6. Monitoreo activo los primeros minutos/horas: logs, flujos clave, reportes de la clínica.
+
+### 16.7 Rollback
+
+Disparar si: la verificación falla, se invalidan firmas, la app no levanta, o hay errores en flujos críticos.
+
+1. Detener la app.
+2. Restaurar el backup pre-cambio.
+3. Redesplegar la versión anterior de la app.
+4. Confirmar que la clínica opera normal.
+5. Post-mortem antes de reintentar.
+
+### 16.8 Frontera del agente (resumen)
+
+- ✅ Escribe scripts, tests y codemods; corre/re-corre la migración sobre copias; ayuda a verificar y documentar.
+- ❌ No tiene credenciales de escritura a prod; no dispara la corrida final; no improvisa sobre datos reales.
