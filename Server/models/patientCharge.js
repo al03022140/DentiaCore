@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
+const { values, PAYMENT_METHOD } = require('../constants/enums');
 
 const paymentSchema = new mongoose.Schema({
   monto: { type: Number, required: true, min: 0.01 },
   fecha: { type: Date, default: Date.now },
-  paymentMethod: { type: String, enum: ['CASH', 'DIGITAL'], required: true },
+  paymentMethod: { type: String, enum: values(PAYMENT_METHOD), required: true },
   cashMovementId: { type: mongoose.Schema.Types.ObjectId, ref: 'CashMovement' },
   registradoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }
 }, { _id: true });

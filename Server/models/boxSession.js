@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { values, BOX_SESSION_STATUS } = require('../constants/enums');
 
 const boxSessionSchema = new mongoose.Schema({
   initialAmount: {
@@ -21,8 +22,8 @@ const boxSessionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['OPEN', 'CLOSED', 'CLOSING'],
-    default: 'OPEN',
+    enum: values(BOX_SESSION_STATUS),
+    default: BOX_SESSION_STATUS.OPEN,
     required: true
   },
   // Usuario que abrió la caja — required para trazabilidad (NOM-024)
@@ -51,7 +52,7 @@ const boxSessionSchema = new mongoose.Schema({
 // mismo tiempo, MongoDB rechaza uno con E11000.
 boxSessionSchema.index(
   { status: 1 },
-  { unique: true, partialFilterExpression: { status: 'OPEN' } }
+  { unique: true, partialFilterExpression: { status: BOX_SESSION_STATUS.OPEN } }
 );
 
 // Redondear initialAmount/finalAmount a 2 decimales — evita errores IEEE-754
