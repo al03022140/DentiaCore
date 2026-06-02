@@ -33,7 +33,9 @@ router.post(
 	authorize(['cash.manage']),
 	withValidation([
 		body('initialAmount')
-			.optional()
+			// values:'null' → null y undefined se tratan como ausentes (abrir caja
+			// en ceros desde un campo vacío). El controlador hace Number()||0.
+			.optional({ values: 'null' })
 			.isFloat({ min: 0, max: 100000000 })
 			.withMessage('El monto inicial debe estar entre 0 y 100,000,000')
 			.toFloat()

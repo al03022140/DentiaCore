@@ -5,7 +5,7 @@ const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
 const { validatePasswordStrength } = require('../utils/crypto');
-const { VALID_ROLES, normalizeRole, validatePermissionAssignment } = require('../utils/permissions');
+const { VALID_ROLES, normalizeRole, validatePermissionAssignment, isOverrideProtectedRole } = require('../utils/permissions');
 
 let bcrypt;
 try { bcrypt = require('bcrypt'); } catch (_e) { bcrypt = require('bcryptjs'); }
@@ -119,6 +119,16 @@ exports.updateRolePermissions = async (req, res) => {
     // Validar que el rol exista (evita crear overrides para roles inventados)
     if (!VALID_ROLES.includes(normalizeRole(role))) {
       return res.status(400).json({ message: `Rol inválido: ${role}` });
+    }
+
+    // Roles protegidos (doctor_admin/administrador/superadmin) no son editables
+    // desde aquí: su base de permisos se gestiona en código y es inalienable
+    // (ver OVERRIDE_PROTECTED_ROLES en utils/permissions.js). Bloquear evita
+    // overrides que confundan o intenten reducir permisos estructurales.
+    if (isOverrideProtectedRole(role)) {
+      return res.status(403).json({
+        message: 'Este rol no es editable; sus permisos se gestionan en código.'
+      });
     }
 
     // Prevenir escalada de privilegios (C-2): lista blanca de permisos +

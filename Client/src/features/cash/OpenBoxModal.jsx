@@ -9,7 +9,11 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
   const handleOpen = async () => {
     setLoading(true);
     try {
-      await openBox(amount);
+      // Campo vacío / borrado → antd InputNumber entrega null. Abrir la caja en
+      // ceros es válido (sin fondo de cambio), así que coercionamos a 0 en vez
+      // de mandar null (que el backend rechazaba con 400).
+      const initialAmount = Number.isFinite(amount) && amount >= 0 ? amount : 0;
+      await openBox(initialAmount);
       message.success('Caja abierta correctamente');
       onOpenSuccess();
     } catch (error) {

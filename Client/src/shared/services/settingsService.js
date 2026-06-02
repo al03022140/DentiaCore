@@ -75,8 +75,8 @@ export const changeMyPassword = async (currentPassword, newPassword) => {
   return data;
 };
 
-export const changeMyPin = async (pin) => {
-  const { data } = await API.patch('/settings/me/pin', { pin });
+export const changeMyPin = async (currentPassword, pin) => {
+  const { data } = await API.patch('/settings/me/pin', { pin, currentPassword });
   return data;
 };
 

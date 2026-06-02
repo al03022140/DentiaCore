@@ -195,6 +195,18 @@ const mergePermissions = (basePermissions = [], extraPermissions = []) => {
 };
 
 /**
+ * Roles privilegiados cuya base de permisos es INALIENABLE: un override solo
+ * puede AÑADIR permisos (UNION con la base), nunca quitarlos. Son los roles que
+ * la UI de "Cuentas y Permisos" NO expone como editables — solo el superadmin
+ * debería tocarlos, y se gestionan en código. Evita que un override viejo o mal
+ * guardado deje a `doctor_admin` (o al administrador) sin Caja, Estadísticas, etc.
+ */
+const OVERRIDE_PROTECTED_ROLES = ['superadmin', 'administrador', 'doctor_admin'];
+
+const isOverrideProtectedRole = (role) =>
+  OVERRIDE_PROTECTED_ROLES.includes(normalizeRole(role));
+
+/**
  * Calcula los permisos efectivos del usuario:
  * 1. Si existe un override de rol en ClinicSettings.rolePermissionOverrides
  *    para este rol → ese array es AUTORITATIVO (reemplaza la base de
@@ -220,7 +232,18 @@ const getEffectivePermissions = (user, roleOverrides) => {
     if (Array.isArray(raw)) override = raw;
   }
 
-  const rolePermissions = override !== null ? override : getPermissionsForRole(role);
+  const base = getPermissionsForRole(role);
+
+  // Roles protegidos (superadmin/administrador/doctor_admin): la base es
+  // inalienable. El override sólo SUMA — nunca reduce la base. Garantiza, p. ej.,
+  // que doctor_admin SIEMPRE conserve cash.read/cash.manage (Caja en el sidebar).
+  if (isOverrideProtectedRole(role)) {
+    return mergePermissions(mergePermissions(base, override || []), user.permissions || []);
+  }
+
+  // Roles editables (doctor/asistente/recepcionista): el override, si existe, es
+  // autoritativo y puede tanto agregar como QUITAR permisos.
+  const rolePermissions = override !== null ? override : base;
   return mergePermissions(rolePermissions, user.permissions || []);
 };
 
@@ -363,6 +386,8 @@ module.exports = {
   VALID_ROLES,
   ALL_KNOWN_PERMISSIONS,
   SUPERADMIN_ONLY_PERMISSIONS,
+  OVERRIDE_PROTECTED_ROLES,
+  isOverrideProtectedRole,
   normalizeRole,
   getPermissionsForRole,
   getEffectivePermissions,

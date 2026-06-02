@@ -275,7 +275,13 @@ const OdontogramClinicalSection = ({
             }
         } catch (error) {
             console.error('Error al guardar odontograma clínico:', error);
-            message.error('Error al guardar el odontograma clínico');
+            // Si el padre ya notificó al usuario (p.ej. warning de concurrencia
+            // ODONTOGRAMA_STALE) no duplicamos el mensaje. En cualquier caso NO
+            // se llega aquí en un guardado exitoso, así que el toast de éxito de
+            // arriba ya no aparece junto a un error.
+            if (!error?.handled) {
+                message.error(error?.message || 'Error al guardar el odontograma clínico');
+            }
         } finally {
             setIsSaving(false);
             savingRef.current = false;
@@ -565,7 +571,7 @@ const OdontogramClinicalSection = ({
     useEffect(() => {
         // Fallback para evitar que isSaving quede atascado si el usuario cancela el prompt
         let fallbackTimeout = null;
-        const handleSaveClinicalData = (event) => {
+        const handleSaveClinicalData = async (event) => {
             clearTimeout(fallbackTimeout);
             const { tipo, patientId: evtId, entries } = event.detail;
             if (tipo !== 'clinico' || evtId !== patientId) return;
@@ -578,12 +584,17 @@ const OdontogramClinicalSection = ({
                   setIsSaving(false);
                   return;
                 }
-                if (onDataSave) onDataSave(engineData);
+                // IMPORTANTE: await — onDataSave es async y lanza en caso de
+                // fallo. Sin await, "Guardado OK" salía siempre (incluso al
+                // fallar) y el rechazo quedaba sin capturar.
+                if (onDataSave) await onDataSave(engineData);
                 markClean();
                 draft.clearDraft();
                 message.success('Guardado OK');
             } catch (err) {
-                message.error('Error guardando clínico');
+                if (!err?.handled) {
+                    message.error(err?.message || 'Error guardando clínico');
+                }
             } finally {
                 setIsSaving(false);
             }

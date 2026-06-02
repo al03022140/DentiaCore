@@ -25,6 +25,10 @@ const ESTADOS_VALIDOS = [...ESTADOS_VIVOS, ...ESTADOS_CERRADOS];
 const MAX_FUTURE_MS = 5 * 365 * 24 * 60 * 60 * 1000;
 // Mínimo de motivo para eliminar — alineado con el cliente (5 chars).
 const MIN_DELETE_REASON_LEN = 5;
+// Redondeo monetario a 2 decimales. Necesario al recalcular el saldo de un
+// cobro vía findOneAndUpdate, donde el hook pre('save') del modelo (que
+// normalmente recalcula totalPagado/saldoPendiente) NO se ejecuta.
+const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
 
 // Transiciones permitidas: clave = origen, valor = destinos válidos.
 const TRANSITION_MATRIX = {
@@ -626,11 +630,40 @@ exports.updateAppointment = async (req, res) => {
             }
         } else if (chargeOpAfterSave?.type === 'updateItems') {
             try {
-                await PatientCharge.findOneAndUpdate(
-                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
-                    { $set: chargeOpAfterSave.payload },
-                    { runValidators: true }
-                );
+                // El cobro de cita nace confirmado:false y nunca se promueve, por lo
+                // que esta rama siempre es alcanzable. El hook pre('save') que
+                // recalcula totalPagado/saldoPendiente NO corre en findOneAndUpdate,
+                // así que la invariante saldoPendiente = max(0, total - pagado) hay
+                // que mantenerla a mano (si no, editar items deja saldoPendiente
+                // obsoleto → se sobre-cobra o sub-cobra al paciente).
+                const linked = await PatientCharge.findOne(
+                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } }
+                ).select('totalPagado');
+
+                const totalPagado = round2(linked?.totalPagado || 0);
+
+                if (totalPagado > 0) {
+                    // El cobro ya recibió pagos: NO se reescriben los conceptos
+                    // facturados (alterar la base de un cobro pagado por una puerta
+                    // lateral corrompe la contabilidad). El ajuste debe hacerse desde
+                    // el expediente del paciente (cancelar + reemitir el cobro).
+                    chargeWarnings.push('La cita tiene un cobro con pagos registrados; sus conceptos NO se modificaron. Ajusta el cobro desde el expediente del paciente.');
+                } else {
+                    const newTotal = round2(chargeOpAfterSave.payload.total);
+                    await PatientCharge.findOneAndUpdate(
+                        { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
+                        {
+                            $set: {
+                                items: chargeOpAfterSave.payload.items,
+                                total: newTotal,
+                                // Sin pagos → saldoPendiente = total. Se fija explícito
+                                // porque el hook pre('save') no se ejecuta aquí.
+                                saldoPendiente: round2(Math.max(0, newTotal - totalPagado))
+                            }
+                        },
+                        { runValidators: true }
+                    );
+                }
             } catch (chargeErr) {
                 console.error('[updateAppointment] Fallo al actualizar charge items:', chargeErr);
                 chargeWarnings.push('Items de la cita actualizados pero el cobro asociado no — reintenta');

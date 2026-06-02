@@ -23,38 +23,58 @@ const DEFAULT_TIMEOUT = 10000;
  * @property {string} meta.sortOrder - Orden de clasificación
  */
 
-// Helper para manejar errores de API
+// Helper para manejar errores de API.
+// IMPORTANTE: este helper "aplana" el axios error en un Error normal. Antes
+// perdía el `code` de negocio del backend (p.ej. ODONTOGRAMA_STALE) porque
+// solo conservaba un string de mensaje — y además, cuando el backend responde
+// `{ error: { code, message } }` (objeto), `new Error(data.error)` producía
+// el texto literal "[object Object]". Ahora preservamos `code`, `status` y un
+// mensaje legible para que las capas superiores puedan ramificar.
 const handleApiError = (error) => {
+  const buildError = (message, code, status) => {
+    const e = new Error(message);
+    if (code) e.code = code;
+    if (status) e.status = status;
+    return e;
+  };
+
   if (error.code === 'ECONNABORTED') {
-    throw new Error('La operación tardó demasiado. Por favor, intente nuevamente.');
+    throw buildError('La operación tardó demasiado. Por favor, intente nuevamente.', 'TIMEOUT');
   }
-  
+
   if (error.response) {
     const { status, data } = error.response;
-    
-    // Si el backend devuelve errores de validación ricos, puedes extender aquí:
-    // if (data.validationErrors) { ... }
+    // El backend suele responder { success:false, error:{ code, message } },
+    // pero algunos endpoints devuelven { error: "texto" }. Soportamos ambos.
+    const apiErr = data?.error;
+    const apiCode = apiErr && typeof apiErr === 'object' ? apiErr.code : undefined;
+    const apiMsg = apiErr && typeof apiErr === 'object' ? apiErr.message : apiErr;
+
     switch (status) {
       case 400:
-        throw new Error(data.details || data.error || 'Error de validación en los datos');
+        throw buildError(data?.details || apiMsg || 'Error de validación en los datos', apiCode || 'VALIDATION', status);
+      case 403:
+        throw buildError(apiMsg || 'No tienes permiso para realizar esta operación', apiCode || 'FORBIDDEN', status);
+      case 409:
+        throw buildError(apiMsg || 'El registro fue modificado por otro usuario. Recarga antes de guardar.', apiCode || 'CONFLICT', status);
       case 413:
-        throw new Error('El archivo es demasiado grande. El tamaño máximo permitido es 5MB');
+        throw buildError('El archivo es demasiado grande. El tamaño máximo permitido es 5MB', 'FILE_TOO_LARGE', status);
       case 415:
-        throw new Error('Tipo de archivo no permitido. Solo se aceptan imágenes PNG, JPG o JPEG');
+        throw buildError('Tipo de archivo no permitido. Solo se aceptan imágenes PNG, JPG o JPEG', 'UNSUPPORTED_MEDIA_TYPE', status);
       case 404:
-        throw new Error('Recurso no encontrado');
+        throw buildError('Recurso no encontrado', apiCode || 'NOT_FOUND', status);
       case 500:
-        throw new Error('Error interno del servidor. Por favor, intente más tarde');
+        throw buildError(apiMsg || 'Error interno del servidor. Por favor, intente más tarde', apiCode || 'INTERNAL', status);
       default:
-        throw new Error(data.error || 'Error en la operación');
+        throw buildError(apiMsg || 'Error en la operación', apiCode, status);
     }
   }
-  
+
   if (error.request) {
-    throw new Error('Error de conexión. Por favor, verifique su conexión a internet');
+    throw buildError('Error de conexión. Por favor, verifique su conexión a internet', 'NETWORK');
   }
-  
-  throw new Error('Error al configurar la petición');
+
+  throw buildError('Error al configurar la petición', 'REQUEST_SETUP');
 };
 
 // Utilidad para desnormalizar payloads al backend.
@@ -218,10 +238,15 @@ const odontogramaService = {
       // Concurrencia optimista: el server compara con su updatedAt actual y
       // responde 409 ODONTOGRAMA_STALE si difieren.
       if (options.expectedUpdatedAt) body.expectedUpdatedAt = options.expectedUpdatedAt;
+      // Timeout extendido: el odontograma clínico es longitudinal y la
+      // respuesta incluye TODO el historial; en equipos con Mongo local lento
+      // el guardado puede pasar de 10s. Si se aborta a los 10s, el servidor a
+      // veces YA persistió el registro → el usuario veía "error" pese a que sí
+      // se guardó. 30s reduce esos falsos negativos.
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-clinico`,
         body,
-        { timeout: DEFAULT_TIMEOUT }
+        { timeout: 30000 }
       );
       return {
         exists: data.exists ?? true,

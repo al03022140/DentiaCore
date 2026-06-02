@@ -392,8 +392,11 @@ const PatientDetail = () => {
       setClinicalOdontogramExists(result.exists ?? true);
       setClinicalOdontogramUpdatedAt(result.updatedAt || null);
     } catch (err) {
-      const code = err?.response?.data?.error?.code;
-      if (code === 'ODONTOGRAMA_STALE') {
+      // handleApiError aplana el axios error a Error(message) con `code`/`status`
+      // adjuntos: el code de negocio ya NO viaja en err.response.data.error.code.
+      const code = err?.code || err?.response?.data?.error?.code;
+      const isStale = code === 'ODONTOGRAMA_STALE';
+      if (isStale) {
         message.warning('Otro usuario modificó este odontograma. Recargando cambios…');
         // Recargar para refrescar updatedAt y datos antes del próximo intento.
         try {
@@ -405,10 +408,18 @@ const PatientDetail = () => {
         } catch (refreshErr) {
           console.error('Error refrescando odontograma clínico tras 409:', refreshErr);
         }
-        return;
+        // Ya avisamos al usuario con un warning: marcamos para que el hijo no
+        // duplique el mensaje, pero IGUAL propagamos para que NO muestre éxito.
+        err.handled = true;
+      } else {
+        console.error('Error al guardar odontograma clínico:', err);
       }
-      console.error('Error al guardar odontograma clínico:', err);
-      message.error('Error al guardar el odontograma clínico');
+      // CLAVE de la corrección: propagar el error. Antes este catch se "tragaba"
+      // el fallo (no relanzaba) → el componente hijo continuaba y mostraba
+      // "Odontograma clínico guardado exitosamente" encima del error. De ahí el
+      // síntoma "guardado y error al mismo tiempo". Al relanzar, el hijo entra
+      // en su propio catch y NO muestra el toast de éxito.
+      throw err;
     }
   }, [patientId, currentAppointmentId, clinicalOdontogramUpdatedAt]);
 

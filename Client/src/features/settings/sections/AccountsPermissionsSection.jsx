@@ -95,26 +95,6 @@ const ALL_PERMISSIONS = Object.keys(PERMISSIONS_META);
  * Solo incluyo los roles editables desde la UI (doctor / asistente / recepcionista).
  */
 const ROLE_DEFAULTS = {
-  doctor_admin: [
-    // Pacientes — CRUD completo
-    'patients.read', 'patients.create', 'patients.update', 'patients.delete',
-    // Clínico
-    'odontogram.read', 'odontogram.create', 'odontogram.update',
-    'periodontogram.read', 'periodontogram.create', 'periodontogram.update',
-    'consultas.read', 'consultas.create', 'consultas.update',
-    'exams.read', 'exams.create', 'exams.update',
-    // Citas — CRUD completo
-    'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
-    'cash.read', 'cash.manage',
-    'stats.read.own', 'stats.read.admin',
-    'users.read', 'users.create', 'users.update', 'users.disable',
-    'settings.read', 'settings.update',
-    'professional.update',
-    'audit.read.full',
-    'draft.approve', 'drafts.batch_sign',
-    'notes.create.backdated', 'notes.template.use', 'notes.template.manage',
-    'session.lock',
-  ],
   doctor: [
     'patients.read', 'patients.create', 'patients.update',
     'odontogram.read', 'odontogram.create', 'odontogram.update',
@@ -151,8 +131,11 @@ const ROLE_DEFAULTS = {
   ],
 };
 
+// `doctor_admin` (y administrador/superadmin) NO se exponen aquí: son roles
+// privilegiados cuya base de permisos se gestiona en código
+// (Server/utils/permissions.js → OVERRIDE_PROTECTED_ROLES) y es inalienable.
+// Solo se editan los roles operativos.
 const ROLES = [
-  { id: 'doctor_admin',  label: 'Doctor (administrador)', desc: 'Dentista-director: practica clínicamente Y administra cuentas, caja, configuración y citas.' },
   { id: 'doctor',        label: 'Doctor',        desc: 'Acceso clínico completo: pacientes, citas, odontograma y periodontograma.' },
   { id: 'recepcionista', label: 'Recepcionista', desc: 'Gestión de agenda, citas y caja desde la recepción.' },
   { id: 'asistente',     label: 'Asistente',     desc: 'Apoyo clínico bajo supervisión directa del doctor (captura en borrador).' },

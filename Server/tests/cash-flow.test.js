@@ -645,3 +645,90 @@ describe('getSessionHistory', () => {
     expect(res.body.sessions[0].initialAmount).toBe(200); // más reciente primero
   });
 });
+
+describe('A1 · cobro de cita — saldoPendiente consistente al editar items', () => {
+  const Appointment = require('../models/appointment');
+  const appointmentController = require('../controllers/appointmentController');
+
+  const seedAppointmentWithCharge = async ({ total = 1000 } = {}) => {
+    const patientId = new mongoose.Types.ObjectId();
+    const doctorId = new mongoose.Types.ObjectId();
+    const items = [{ nombre: 'Limpieza', cantidad: 1, precioUnitario: total, subtotal: total }];
+    const appointment = await Appointment.create({
+      paciente_id: patientId,
+      doctor_id: doctorId,
+      fecha_hora: new Date(Date.now() + 3600000),
+      motivo: 'Consulta',
+      items,
+      totalEstimado: total
+    });
+    const charge = await PatientCharge.create({
+      patientId,
+      appointmentId: appointment._id,
+      fecha: new Date(),
+      items,
+      total,
+      confirmado: false,
+      creadoPor: new mongoose.Types.ObjectId()
+    });
+    return { appointment, charge };
+  };
+
+  test('SIN pagos: al reducir items, total y saldoPendiente se recalculan juntos', async () => {
+    const { appointment, charge } = await seedAppointmentWithCharge({ total: 1000 });
+    expect(charge.saldoPendiente).toBe(1000);
+
+    const req = mkReq({
+      params: { id: appointment._id.toString() },
+      body: { items: [{ nombre: 'Limpieza', cantidad: 1, precioUnitario: 600 }] }
+    });
+    const res = mkRes();
+    await appointmentController.updateAppointment(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const updated = await PatientCharge.findById(charge._id);
+    expect(updated.total).toBe(600);
+    // Antes del fix quedaba en 1000 (obsoleto). Ahora sigue la invariante.
+    expect(updated.saldoPendiente).toBe(600);
+    expect(updated.totalPagado).toBe(0);
+  });
+
+  test('CON pago parcial: editar items NO reescribe el cobro pagado', async () => {
+    const { appointment, charge } = await seedAppointmentWithCharge({ total: 1000 });
+    const { userId } = await openCajaWith(0);
+
+    // Pago parcial de 400 (efectivo) sobre el cobro de la cita.
+    const payReq = mkReq({
+      user: { id: userId },
+      params: { chargeId: charge._id.toString() },
+      body: { monto: 400, paymentMethod: 'CASH', confirmacion: 'CONFIRMO' }
+    });
+    const payRes = mkRes();
+    await patientChargeController.addPayment(payReq, payRes);
+    expect(payRes.statusCode).toBe(200);
+
+    const afterPay = await PatientCharge.findById(charge._id);
+    expect(afterPay.totalPagado).toBe(400);
+    expect(afterPay.saldoPendiente).toBe(600);
+
+    // Intentar bajar el total editando los items de la cita.
+    const req = mkReq({
+      params: { id: appointment._id.toString() },
+      body: { items: [{ nombre: 'Limpieza', cantidad: 1, precioUnitario: 600 }] }
+    });
+    const res = mkRes();
+    await appointmentController.updateAppointment(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.warnings || []).toEqual(
+      expect.arrayContaining([expect.stringMatching(/pagos registrados/i)])
+    );
+
+    const updated = await PatientCharge.findById(charge._id);
+    // El cobro pagado NO se altera por la puerta lateral de la cita.
+    expect(updated.total).toBe(1000);
+    expect(updated.totalPagado).toBe(400);
+    expect(updated.saldoPendiente).toBe(600);
+    // Invariante contable intacta: saldoPendiente = total - totalPagado.
+    expect(updated.total - updated.totalPagado).toBe(updated.saldoPendiente);
+  });
+});

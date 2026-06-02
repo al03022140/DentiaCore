@@ -856,3 +856,50 @@ describe('isSignerRole (unit)', () => {
     expect(isSignerRole('DOCTOR_ADMIN')).toBe(true);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 13. getEffectivePermissions: overrides y roles protegidos
+//     doctor_admin nunca pierde su base (Caja, etc.); los roles editables sí.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('getEffectivePermissions: overrides y roles protegidos', () => {
+  const { getEffectivePermissions } = require('../utils/permissions');
+
+  test('doctor_admin conserva Caja aunque el override la omita (objeto)', () => {
+    const user = { rol: 'doctor_admin', permissions: [] };
+    const overrides = { doctor_admin: ['patients.read'] }; // override viejo sin caja
+    const perms = getEffectivePermissions(user, overrides);
+    expect(perms).toContain('cash.read');
+    expect(perms).toContain('cash.manage');
+  });
+
+  test('doctor_admin conserva Caja con override vacío (Map)', () => {
+    const user = { rol: 'doctor_admin', permissions: [] };
+    const overrides = new Map([['doctor_admin', []]]);
+    const perms = getEffectivePermissions(user, overrides);
+    expect(perms).toContain('cash.read');
+    expect(perms).toContain('cash.manage');
+  });
+
+  test('administrador (protegido) tampoco pierde su base', () => {
+    const user = { rol: 'administrador', permissions: [] };
+    const overrides = { administrador: ['patients.read'] };
+    const perms = getEffectivePermissions(user, overrides);
+    expect(perms).toContain('cash.read');
+    expect(perms).toContain('cash.manage');
+  });
+
+  test('rol editable (doctor): el override SÍ puede recortar permisos', () => {
+    const user = { rol: 'doctor', permissions: [] };
+    const overrides = { doctor: ['patients.read'] };
+    const perms = getEffectivePermissions(user, overrides);
+    expect(perms).toEqual(['patients.read']);
+  });
+
+  test('sin override, doctor_admin usa su base con Caja', () => {
+    const user = { rol: 'doctor_admin', permissions: [] };
+    const perms = getEffectivePermissions(user);
+    expect(perms).toContain('cash.read');
+    expect(perms).toContain('cash.manage');
+  });
+});

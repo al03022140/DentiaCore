@@ -17,6 +17,7 @@ const ProfileSection = () => {
   const [pwMsg, setPwMsg] = useState(null);
 
   // PIN
+  const [pinCurrentPassword, setPinCurrentPassword] = useState('');
   const [pin, setPin] = useState('');
   const [pinMsg, setPinMsg] = useState(null);
 
@@ -57,8 +58,9 @@ const ProfileSection = () => {
     e.preventDefault();
     setPinMsg(null);
     try {
-      await changeMyPin(pin);
+      await changeMyPin(pinCurrentPassword, pin);
       setPinMsg({ type: 'success', text: 'PIN actualizado' });
+      setPinCurrentPassword('');
       setPin('');
     } catch (err) {
       setPinMsg({ type: 'error', text: err.response?.data?.message || 'Error al cambiar PIN' });
@@ -127,6 +129,10 @@ const ProfileSection = () => {
       <h3 style={{ marginBottom: '1rem' }}>Cambiar PIN de acceso rápido</h3>
       <form onSubmit={handlePinChange}>
         {pinMsg && <div className={`settings-message ${pinMsg.type}`}>{pinMsg.text}</div>}
+        <div className="settings-form-group">
+          <label>Contraseña actual</label>
+          <input type="password" value={pinCurrentPassword} onChange={(e) => setPinCurrentPassword(e.target.value)} required autoComplete="current-password" />
+        </div>
         <div className="settings-form-group">
           <label>Nuevo PIN (4 dígitos)</label>
           <input
