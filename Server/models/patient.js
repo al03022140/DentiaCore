@@ -888,18 +888,32 @@ PatientSchema.statics.generateUniquePatientId = async function() {
     let id, exists = true;
     let attempts = 0;
     const maxAttempts = 100;
-    
+
+    // Camino rápido: probar IDs aleatorios. Con pocos pacientes acierta al 1er intento.
     while (exists && attempts < maxAttempts) {
         id = generate4Digits().toString();
         exists = await this.exists({ paciente_id: id });
         attempts++;
     }
-    
-    if (attempts >= maxAttempts) {
-        throw new Error('No se pudo generar un paciente_id único después de múltiples intentos');
+
+    if (!exists) return id;
+
+    // Fallback determinístico: si 100 intentos aleatorios chocaron (la clínica
+    // tiene muchos pacientes y el rango 1000-9999 está densamente ocupado), NO
+    // nos rendimos —eso hacía fallar un alta por pura mala suerte—: buscamos el
+    // primer ID libre. Solo lanzamos error si de verdad no queda ninguno.
+    const taken = new Set(
+        (await this.find({ paciente_id: { $ne: null } })
+            .select('paciente_id -_id')
+            .lean())
+            .map((d) => String(d.paciente_id))
+    );
+    for (let n = 1000; n <= 9999; n++) {
+        const candidate = String(n);
+        if (!taken.has(candidate)) return candidate;
     }
-    
-    return id;
+
+    throw new Error('No hay paciente_id de 4 dígitos disponibles (máximo de 9000 pacientes alcanzado).');
 };
 
 // Método estático para buscar pacientes con filtros avanzados

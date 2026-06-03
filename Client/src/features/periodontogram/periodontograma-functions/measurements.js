@@ -480,11 +480,13 @@ export const calculateGlobalAverageGumWidth = (periodontogramData) => {
  * @returns {number} Nivel de inserción clínica
  */
 export const calculateClinicalAttachmentLevel = (probingDepth, gingivalMargin) => {
-  // NIC = Profundidad de sondaje + Recesión gingival
-  // Fórmula clínica estándar: NIC = PS + MG
-  // Si el margen es negativo (recesión), se suma la recesión
-  // Si el margen es positivo (hiperplasia), se suma la hiperplasia
-  return probingDepth + gingivalMargin;
+  // NIC = Profundidad de Sondaje − Margen Gingival (margen FIRMADO: recesión negativa).
+  // Convención unificada con el backend (UniversalToothValidator) y con la
+  // detección de recesión (margin <= -umbral): recesión = margen NEGATIVO.
+  //   - margen negativo (recesión): NIC = PS − (negativo) = PS + |recesión| → mayor pérdida de inserción.
+  //   - margen positivo (cobertura/hiperplasia): NIC = PS − (positivo) → menor.
+  // (Antes era PS + MG: con recesión negativa RESTABA la recesión e invertía el NIC.)
+  return probingDepth - gingivalMargin;
 };
 
 /**
@@ -494,8 +496,8 @@ export const calculateClinicalAttachmentLevel = (probingDepth, gingivalMargin) =
  */
 export const calculateGlobalAverageNIC = (periodontogramData) => {
   try {
-    // Fórmula clínica estándar: Media NIC = ∑(profundidad + margen) / número de sitios con valor
-    // NIC = Profundidad de Sondaje + Margen Gingival (según estándares SEPA)
+    // Media NIC = ∑(profundidad − margen) / número de sitios con valor
+    // NIC = Profundidad de Sondaje − Margen Gingival (margen firmado, recesión negativa)
     const data = getAllTeethData(periodontogramData);
     let totalNIC = 0;
     let totalMeasurements = 0;

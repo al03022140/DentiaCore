@@ -145,7 +145,7 @@ class PeriodontogramService {
       const response = await API.post(`/patients/${patientId}/periodontogram`, {
         initialData
       }, {
-        timeout: DEFAULT_TIMEOUT
+        timeout: 30000 // 30s: evita abortos por Mongo local lento (es idempotente: 409 → get)
       });
       
       console.log('✅ Periodontograma creado exitosamente');
@@ -245,7 +245,10 @@ class PeriodontogramService {
         `/patients/${patientId}/periodontogram/data`,
         body,
         {
-          timeout: DEFAULT_TIMEOUT,
+          // 30s (no 10s): el periodontograma completo es un payload grande (todos
+          // los dientes × caras × mediciones); en laptop con Mongo local lento,
+          // 10s abortaba un guardado que sí completaba. Igual que el odontograma clínico.
+          timeout: 30000,
           signal: options.signal
         }
       );

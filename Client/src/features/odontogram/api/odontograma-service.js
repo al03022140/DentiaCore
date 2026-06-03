@@ -152,7 +152,10 @@ const odontogramaService = {
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial`,
         body,
-        { timeout: DEFAULT_TIMEOUT }
+        // 30s (no 10s): guardado de captura única; en laptop con Mongo local
+        // lento, 10s abortaba un guardado que sí completaba (mismo motivo que el
+        // odontograma clínico). El backend responde 409 si ya existe, sin duplicar.
+        { timeout: 30000 }
       );
       return data;
     } catch (error) {
@@ -215,7 +218,7 @@ const odontogramaService = {
       const { data } = await API.post(
         `/patients/${patientId}/odontograma-inicial/history`,
         body,
-        { timeout: DEFAULT_TIMEOUT }
+        { timeout: 30000 } // 30s: escritura; evita abortos por Mongo local lento en laptop
       );
       return data;
     } catch (error) {

@@ -278,7 +278,7 @@ const StatisticsPanel = ({
             • %SS = (Sitios con sangrado / Sitios válidos de dientes presentes) × 100<br/>
             • %P = (Sitios con placa / Sitios válidos de dientes presentes) × 100<br/>
             • Media PS = ∑profundidades reales / # sitios válidos (≠999)<br/>
-            • Media NIC = ∑(profundidad + margen) / # sitios válidos (≠999)<br/>
+            • Media NIC = ∑(profundidad − margen) / # sitios válidos (≠999)<br/>
             <em><img src={checkCircle2Icon} alt="✓" width="14" height="14" className="theme-icon" /> Base: 96 sitios totales, ajustado por {statistics.presentTeeth} dientes presentes</em>
           </div>
           <button 

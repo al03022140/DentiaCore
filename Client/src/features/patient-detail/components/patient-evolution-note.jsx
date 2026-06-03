@@ -103,7 +103,11 @@ const PatientEvolutionNote = ({
         body.doctorSignature = doctorSignature;
       }
 
-      const response = await API.post(`/patients/${patientId}/evolution-note`, body);
+      // Timeout 30s (no los 10s por defecto): una nota OFICIAL sube 2 PNGs de
+      // firma + verificación de PIN (bcrypt) + escritura en Mongo; en una laptop
+      // lenta los 10s se quedaban cortos y abortaban una subida que sí iba a
+      // completar — y al reintentar se duplicaba la nota.
+      const response = await API.post(`/patients/${patientId}/evolution-note`, body, { timeout: 30000 });
       const payload = response?.data;
 
       if (payload && payload.success && payload.data) {
@@ -126,7 +130,16 @@ const PatientEvolutionNote = ({
       }
     } catch (err) {
       console.error(err);
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Error al guardar la nota';
+      // Timeout / sin respuesta: la nota PUDO guardarse en el servidor aunque el
+      // cliente no recibiera el 201. Como el POST de creación no es idempotente
+      // (el contador ya avanzó), un reintento a ciegas DUPLICA la nota. Avisamos
+      // explícitamente para que el usuario recargue y verifique antes de reintentar.
+      const isTimeout = err?.code === 'ECONNABORTED'
+        || err?.code === 'ERR_NETWORK'
+        || (!err?.response && /timeout/i.test(err?.message || ''));
+      const msg = isTimeout
+        ? 'El servidor tardó demasiado en responder. La nota PUDO haberse guardado: recarga el expediente y verifica ANTES de volver a intentar, para no duplicarla.'
+        : (err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Error al guardar la nota');
       setError(msg);
       message.error(msg);
       throw err;
@@ -189,9 +202,14 @@ const PatientEvolutionNote = ({
     setLoading(true);
     try {
       const { noteId } = existingSignTarget;
+      // Timeout 30s como en la creación (sube firmas + valida PIN + escribe en
+      // Mongo). Esta vía SÍ es segura ante reintentos: el server exige que la
+      // nota siga en BORRADOR, así que un reintento tras firmar devuelve 409 sin
+      // duplicar nada.
       const response = await API.post(
         `/patients/${patientId}/evolution-note/${noteId}/sign`,
-        { patientSignature: existingPatientSig, doctorSignature }
+        { patientSignature: existingPatientSig, doctorSignature },
+        { timeout: 30000 }
       );
       const payload = response?.data;
       if (payload?.success && payload?.data) {

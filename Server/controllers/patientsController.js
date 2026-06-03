@@ -476,13 +476,20 @@ exports.createPatient = async (req, res) => {
         savedSuccessfully = true;
         debugLog("✅ Paciente guardado exitosamente con ID:", newPatient._id);
 
-        // Periodontograma inicial (best-effort, no aborta la creación)
-        try {
-            const initialPeriodontogram = await Periodontogram.createInitial(newPatient._id);
-            debugLog("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
-        } catch (periodontogramError) {
-            console.error("⚠️ Error al crear periodontograma inicial:", periodontogramError.message);
-        }
+        // Periodontograma inicial: best-effort y FUERA de la ruta crítica.
+        // Antes se await-eaba aquí, sumando una segunda escritura a Mongo antes
+        // de responder; con mongod lento eso alargaba el guardado y ayudaba a
+        // gatillar el timeout del cliente. Como su error ya se ignora (nunca
+        // debe abortar la creación), lo disparamos SIN await: el paciente ya
+        // quedó persistido y el 201 vuelve de inmediato. El .catch() evita que
+        // un fallo quede como unhandledRejection.
+        Periodontogram.createInitial(newPatient._id)
+            .then((initialPeriodontogram) => {
+                debugLog("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
+            })
+            .catch((periodontogramError) => {
+                console.error("⚠️ Error al crear periodontograma inicial:", periodontogramError.message);
+            });
 
         return res.status(201).json({
             message: "✅ Paciente creado correctamente",

@@ -1055,12 +1055,18 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
     try {
       let res;
+      // Timeout ampliado a 30s SÓLO para estas escrituras: el alta crea
+      // carpetas + foto + documento en Mongo, y en una laptop con mongod lento
+      // el default de 10s de la instancia se quedaba corto y abortaba un
+      // guardado que en realidad iba a completar (ECONNABORTED sin respuesta).
+      // 30s es el mismo valor que ya usa el guardado del odontograma.
+      const writeConfig = { timeout: 30000 };
       if (patientToEdit) {
         // Actualizar paciente existente
-        res = await API.put(`/patients/${patientToEdit._id}`, formDataToSend);
+        res = await API.put(`/patients/${patientToEdit._id}`, formDataToSend, writeConfig);
       } else {
         // Crear nuevo paciente
-        res = await API.post('/patients', formDataToSend);
+        res = await API.post('/patients', formDataToSend, writeConfig);
       }
 
       const data = res.data;
@@ -1087,13 +1093,29 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       // paciente fue modificado por otro usuario. Mostrar mensaje claro
       // para que recargue antes de reintentar.
       const errCode = err?.response?.data?.code;
-      const title = errCode === 'PATIENT_STALE'
-        ? 'El paciente fue modificado por otro usuario'
-        : (patientToEdit ? 'No se pudo actualizar el paciente' : 'No se pudo guardar el paciente');
+      // Timeout / sin respuesta del servidor: axios aborta (ECONNABORTED) o no
+      // llegó respuesta (err.response undefined). Casi siempre es mongod lento o
+      // caído en el equipo. El alta NO se completó, pero el formulario sigue
+      // lleno, así que se puede reintentar sin recapturar nada.
+      const isTimeout = err?.code === 'ECONNABORTED'
+        || err?.code === 'ERR_NETWORK'
+        || (!err?.response && /timeout/i.test(err?.message || ''));
       const status = err?.response?.status || err?.status;
-      const description = errCode === 'PATIENT_STALE'
-        ? 'Recarga la página para ver los cambios más recientes antes de volver a guardar.'
-        : (err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado.');
+
+      let title;
+      let description;
+      if (errCode === 'PATIENT_STALE') {
+        title = 'El paciente fue modificado por otro usuario';
+        description = 'Recarga la página para ver los cambios más recientes antes de volver a guardar.';
+      } else if (isTimeout) {
+        title = 'El servidor tardó demasiado en responder';
+        description = 'No se pudo confirmar el guardado: la base de datos no respondió a tiempo. '
+          + 'Tus datos siguen en el formulario y no se perdieron. Verifica que el programa esté '
+          + 'activo y vuelve a intentar en unos segundos.';
+      } else {
+        title = patientToEdit ? 'No se pudo actualizar el paciente' : 'No se pudo guardar el paciente';
+        description = err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado.';
+      }
 
       Modal.error({
         title,

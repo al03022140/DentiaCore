@@ -1049,7 +1049,7 @@ export class UniversalToothValidator {
                 const depth = parseFloat(depthData[i]);
                 const margin = parseFloat(marginData[i]);
                 if (!isNaN(depth) && !isNaN(margin) && depth !== 999 && margin !== 999) {
-                  const attachmentLevel = depth + margin;
+                  const attachmentLevel = depth - margin; // NIC = PS − MG (margen firmado: recesión negativa)
                   totalAttachmentLevel += attachmentLevel;
                   attachmentLevelCount++;
                 }

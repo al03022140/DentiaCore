@@ -18,7 +18,17 @@ const connectDB = async (options = {}) => {
 
     // Configurar timeouts para evitar cuelgues
     const mongooseOptions = {
-        serverSelectionTimeoutMS: 10000, // 10 segundos para seleccionar servidor
+        // 5s (antes 10s): si mongod no responde (p. ej. la laptop volvió de
+        // suspensión y la conexión del pool murió, o el disco está saturado por
+        // antivirus), cada operación falla en ~5s y el controlador devuelve un
+        // error claro ANTES de que el cliente (axios) corte a los 10s. Antes
+        // ambos valían 10000ms, así que el navegador abortaba justo cuando el
+        // server iba a fallar y el usuario solo veía "timeout" sin causa.
+        serverSelectionTimeoutMS: 5000, // 5 segundos para seleccionar servidor
+        // Cada cuánto el driver sondea la salud de mongod. Bajarlo de 10s a 5s
+        // acelera la RE-detección del servidor tras una suspensión/reconexión,
+        // para que el primer guardado tras "despertar" no espere un ciclo largo.
+        heartbeatFrequencyMS: 5000,
         socketTimeoutMS: 20000, // 20 segundos para operaciones de socket
         connectTimeoutMS: 10000, // 10 segundos para conectar
         maxPoolSize: 10, // Máximo 10 conexiones en el pool

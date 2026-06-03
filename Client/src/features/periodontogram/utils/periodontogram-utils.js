@@ -248,7 +248,10 @@ export class PeriodontogramUtils {
     }
     
     if (type === 'margin') {
-      if (numValue >= 0) return PERIODONTOGRAM_CONFIG.UI_COLORS.gingivalMargin.recession;
+      // Margen firmado: recesión = NEGATIVO (raíz expuesta). Positivo = margen
+      // coronal al LAC (inflamación/hiperplasia). Coherente con NIC = PS − MG y
+      // con la detección de recesión (margin <= -umbral).
+      if (numValue < 0) return PERIODONTOGRAM_CONFIG.UI_COLORS.gingivalMargin.recession;
       return PERIODONTOGRAM_CONFIG.UI_COLORS.gingivalMargin.inflammation;
     }
     

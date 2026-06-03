@@ -1553,7 +1553,7 @@ export class PeriodontogramLinearGraphics extends OptimizedCanvasRenderer {
     if (measurementData.probingDepth && measurementData.gingivalMargin) {
       measurementData.probingDepth.forEach((depth, index) => {
         const margin = measurementData.gingivalMargin[index] || 0;
-        const attachmentLevel = depth + Math.abs(margin);
+        const attachmentLevel = depth - margin; // NIC = PS − MG (recesión = margen negativo)
         
         if (attachmentLevel >= config.attachment_loss.threshold) {
           indicators.attachmentLoss.push({
