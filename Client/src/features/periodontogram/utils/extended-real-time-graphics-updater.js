@@ -22,6 +22,7 @@ import {
   ADVANCED_LOGGING_CONFIG
 } from './config.js';
 import { getAllTeethData } from './periodontogram-utils.js';
+import { logger } from '../../../shared/utils/logger';
 
 export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
   constructor(canvasMap, engine, options = {}) {
@@ -77,7 +78,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
    */
   initializeLinearGraphicsSystem() {
     if (!this.linearGraphicsEnabled || !this.canvasMap) {
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('Gráficas lineales deshabilitadas');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('Gráficas lineales deshabilitadas');
       return;
     }
     
@@ -102,7 +103,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
       // Extender event listeners para incluir gráficas lineales
       this.setupExtendedEventListeners();
       
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`ExtendedRealTimeGraphicsUpdater inicializado con ${this.linearGraphicsInstances.size} instancias de gráficas lineales`);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`ExtendedRealTimeGraphicsUpdater inicializado con ${this.linearGraphicsInstances.size} instancias de gráficas lineales`);
     } catch (error) {
       if (ADVANCED_LOGGING_CONFIG.enabled) console.error('Error inicializando sistema de gráficas lineales:', error);
       this.linearGraphicsEnabled = false;
@@ -178,7 +179,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
         return;
       }
       
-      console.log(`🎯 [handleLinearGraphicsInput] Diente ${toothNumber} - Superficie: ${surface} - Campo: ${field} - Posición: ${position} - Valor: ${value}`);
+      logger.log(`🎯 [handleLinearGraphicsInput] Diente ${toothNumber} - Superficie: ${surface} - Campo: ${field} - Posición: ${position} - Valor: ${value}`);
       
       // Si el valor es null o vacío, solo actualizar el cache pero no renderizar elementos visuales
       if (value === null || value === undefined || isNaN(value)) {
@@ -407,7 +408,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
     const toothData = this.measurementCache.get(cacheKey);
     if (toothData[field]) {
       toothData[field][position] = value;
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`📝 [updateMeasurementCache] ${surface ? `Superficie ${surface} - ` : ''}Diente ${toothNumber} - ${field}[${position}] = ${value}`);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`📝 [updateMeasurementCache] ${surface ? `Superficie ${surface} - ` : ''}Diente ${toothNumber} - ${field}[${position}] = ${value}`);
     }
   }
   
@@ -435,11 +436,11 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
     
     if (linearGraphics && typeof linearGraphics.clearSpecificPosition === 'function') {
       linearGraphics.clearSpecificPosition(toothNumber, position, field);
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🧹 [clearVisualElementsForSpecificSurface] Limpiada posición ${position} del campo ${field} en superficie ${surface} del diente ${toothNumber}`);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🧹 [clearVisualElementsForSpecificSurface] Limpiada posición ${position} del campo ${field} en superficie ${surface} del diente ${toothNumber}`);
     } else if (linearGraphics && typeof linearGraphics.clearToothVisualElements === 'function') {
       // Fallback: limpiar todos los elementos visuales del diente
       linearGraphics.clearToothVisualElements(toothNumber);
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🧹 [clearVisualElementsForSpecificSurface] Limpiados todos los elementos visuales de superficie ${surface} del diente ${toothNumber}`);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🧹 [clearVisualElementsForSpecificSurface] Limpiados todos los elementos visuales de superficie ${surface} del diente ${toothNumber}`);
     }
   }
   
@@ -604,7 +605,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
         }
       });
       
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('Todas las gráficas lineales actualizadas');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('Todas las gráficas lineales actualizadas');
     } catch (error) {
       if (ADVANCED_LOGGING_CONFIG.enabled) console.error('Error actualizando todas las gráficas lineales:', error);
     }
@@ -750,7 +751,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
     const canvasKey = `${toothNumber}-${surface}`;
     const linearGraphics = this.linearGraphicsInstances.get(canvasKey);
     
-    console.log(`🎯 [updateSpecificSurfaceLinearGraphics] Actualizando solo: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
+    logger.log(`🎯 [updateSpecificSurfaceLinearGraphics] Actualizando solo: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
     
     if (!linearGraphics) {
       console.warn(`⚠️ No se encontró instancia de gráficas lineales para ${canvasKey}`);
@@ -774,11 +775,11 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
       } else {
         linearGraphics.updateToothLinearGraphics(toothNumber, toothData);
       }
-      console.log(`✅ [updateSpecificSurfaceLinearGraphics] Actualizada superficie ${surface} del diente ${toothNumber}`);
+      logger.log(`✅ [updateSpecificSurfaceLinearGraphics] Actualizada superficie ${surface} del diente ${toothNumber}`);
     } else {
       // Si no hay datos válidos, limpiar elementos visuales
       linearGraphics.clearToothVisualElements(toothNumber);
-      console.log(`🧹 [updateSpecificSurfaceLinearGraphics] Limpiada superficie ${surface} del diente ${toothNumber}`);
+      logger.log(`🧹 [updateSpecificSurfaceLinearGraphics] Limpiada superficie ${surface} del diente ${toothNumber}`);
     }
   }
 
@@ -790,7 +791,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
     const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
     const surfaces = isUpperTooth ? ['vestibular', 'palatine'] : ['vestibular', 'lingual'];
     
-    console.log(`🦷 [DEBUG] Diente ${toothNumber} - Tipo: ${isUpperTooth ? 'Superior' : 'Inferior'} - Superficies: [${surfaces.join(', ')}]`);
+    logger.log(`🦷 [DEBUG] Diente ${toothNumber} - Tipo: ${isUpperTooth ? 'Superior' : 'Inferior'} - Superficies: [${surfaces.join(', ')}]`);
     
     let instancesUpdated = 0;
     
@@ -804,7 +805,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
       const canvasKey = `${toothNumber}-${surface}`;
       const linearGraphics = this.linearGraphicsInstances.get(canvasKey);
       
-      console.log(`🎨 [DEBUG] Buscando canvas: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
+      logger.log(`🎨 [DEBUG] Buscando canvas: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
       
       if (linearGraphics) {
         if (hasValidData) {
@@ -826,7 +827,7 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
       }
     });
     
-    console.log(`📊 [DEBUG] Diente ${toothNumber} - Instancias actualizadas: ${instancesUpdated}/${surfaces.length}`);
+    logger.log(`📊 [DEBUG] Diente ${toothNumber} - Instancias actualizadas: ${instancesUpdated}/${surfaces.length}`);
     
     if (instancesUpdated === 0) {
       this.logAdvanced('warn', `No se encontraron instancias de gráficas lineales para diente ${toothNumber}`);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import { triggerTokenRefresh } from '../services/axios-instance';
 import { getAccessToken } from '../services/auth-token';
+import { logger } from '../utils/logger';
 
 // Refresca con margen antes de que el access token (15 min por defecto)
 // expire. 10 min cubre cómodamente cualquier valor razonable de JWT_ACCESS_TTL.
@@ -48,7 +49,7 @@ export const useSessionKeepAlive = () => {
       // expirado tras 7 días). El interceptor manejará el 401 cuando el
       // usuario interactúe; en ese punto los drafts ya están en localStorage.
       if (import.meta.env.DEV) {
-        console.debug('[SessionKeepAlive] refresh falló (', reason, '):', err?.message);
+        logger.debug('[SessionKeepAlive] refresh falló (', reason, '):', err?.message);
       }
     } finally {
       inFlightRef.current = false;

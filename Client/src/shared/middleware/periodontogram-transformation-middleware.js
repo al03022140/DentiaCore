@@ -31,6 +31,7 @@ import {
 import { validatePeriodontogramData } from '../schemas/unified-periodontogram-schema.js';
 import { normalizeBackendPeriodontogram } from '../utils/periodontogram-normalizer.js';
 import { UniversalToothValidator } from '../validators/universal-tooth-validator.js';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // CONFIGURACIÓN DE TRANSFORMACIÓN CONSOLIDADA
@@ -154,7 +155,7 @@ export class PeriodontogramTransformationMiddleware {
         throw new Error('ID de paciente requerido');
       }
       
-      console.log('✅ Iniciando validación con esquema unificado', {
+      logger.log('✅ Iniciando validación con esquema unificado', {
         patientId,
         dataKeys: Object.keys(frontendData)
       });
@@ -170,7 +171,7 @@ export class PeriodontogramTransformationMiddleware {
       // Usar el validador unificado
       const validatedData = UniversalToothValidator.validateUnifiedData(unifiedData);
       
-      console.log('✅ Datos validados con esquema unificado', {
+      logger.log('✅ Datos validados con esquema unificado', {
         teethCount: Object.keys(validatedData.teeth).length,
         version: validatedData.version
       });
@@ -224,7 +225,7 @@ export class PeriodontogramTransformationMiddleware {
         }
       };
 
-      console.log('🎉 Transformación backend → frontend exitosa', {
+      logger.log('🎉 Transformación backend → frontend exitosa', {
         teethCount,
         useLegacyFormat
       });
@@ -276,7 +277,7 @@ export class PeriodontogramTransformationMiddleware {
     
     const saveKey = `save_${patientId}`;
     
-    console.log('💾 Iniciando guardado con debouncing', {
+    logger.log('💾 Iniciando guardado con debouncing', {
       patientId,
       debounceDelay,
       enableRetries
@@ -341,7 +342,7 @@ export class PeriodontogramTransformationMiddleware {
     let attempt = this.retryAttempts.get(saveKey) || 0;
     
     try {
-      console.log(`💾 Ejecutando guardado (intento ${attempt + 1})`, { patientId });
+      logger.log(`💾 Ejecutando guardado (intento ${attempt + 1})`, { patientId });
       
       // ✅ ESQUEMA UNIFICADO - Validar datos sin transformaciones
       const validatedData = validatePeriodontogramData({
@@ -351,10 +352,10 @@ export class PeriodontogramTransformationMiddleware {
         version: periodontogramData.version || new Date().toISOString()
       });
       
-      console.log('📋 Datos validados con esquema unificado en middleware:', validatedData);
+      logger.log('📋 Datos validados con esquema unificado en middleware:', validatedData);
       
       // Ejecutar función de guardado (integración real con API)
-      console.log('📡 Enviando datos al servidor...', { patientId });
+      logger.log('📡 Enviando datos al servidor...', { patientId });
       const saveResult = await saveFunction(validatedData);
       
       // Invalidar caché de estadísticas en caso de éxito
@@ -363,7 +364,7 @@ export class PeriodontogramTransformationMiddleware {
       // Resetear contador de reintentos
       this.retryAttempts.delete(saveKey);
       
-      console.log('✅ Guardado exitoso en el servidor', {
+      logger.log('✅ Guardado exitoso en el servidor', {
         patientId,
         attempt: attempt + 1,
         teethSaved: Object.keys(validatedData.teeth || {}).length
@@ -391,7 +392,7 @@ export class PeriodontogramTransformationMiddleware {
           ? TRANSFORMATION_CONFIG_CONSOLIDATED.RETRY_DELAY * Math.pow(2, attempt)
           : TRANSFORMATION_CONFIG_CONSOLIDATED.RETRY_DELAY;
         
-        console.log(`🔄 Reintentando guardado en ${retryDelay}ms (intento ${attempt + 2}/${this.maxRetries + 1})`);
+        logger.log(`🔄 Reintentando guardado en ${retryDelay}ms (intento ${attempt + 2}/${this.maxRetries + 1})`);
         
         setTimeout(async () => {
           const retryResult = await this.executeSave(periodontogramData, patientId, saveFunction, options);
@@ -442,7 +443,7 @@ export class PeriodontogramTransformationMiddleware {
    */
   async loadData(loadFunction, patientId, useLegacyFormat = false) {
     try {
-      console.log('📥 Cargando datos del backend', { patientId, useLegacyFormat });
+      logger.log('📥 Cargando datos del backend', { patientId, useLegacyFormat });
       
       // Ejecutar función de carga
       const backendData = await loadFunction(patientId);
@@ -454,7 +455,7 @@ export class PeriodontogramTransformationMiddleware {
         throw new Error(`Error en transformación: ${transformResult.error}`);
       }
       
-      console.log('✅ Datos cargados exitosamente', {
+      logger.log('✅ Datos cargados exitosamente', {
         patientId,
         teethLoaded: transformResult.stats.teethProcessed
       });
@@ -523,7 +524,7 @@ export class PeriodontogramTransformationMiddleware {
     this.pendingOperations.clear();
     this.retryAttempts.clear();
     
-    console.log('🛑 Todas las operaciones pendientes canceladas');
+    logger.log('🛑 Todas las operaciones pendientes canceladas');
   }
   
   /**
@@ -547,7 +548,7 @@ export class PeriodontogramTransformationMiddleware {
     this.errorHandlers.clear();
     UniversalToothValidator.invalidateCache();
     
-    console.log('🧹 Middleware limpiado completamente');
+    logger.log('🧹 Middleware limpiado completamente');
   }
 }
 

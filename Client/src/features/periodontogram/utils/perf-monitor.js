@@ -1,6 +1,7 @@
 // Ligera util de instrumentación para render counts y timings
 // Se activa sólo si debug = true. Evita dependencias externas.
 import React from 'react';
+import { logger } from '../../../shared/utils/logger';
 
 class PerfMonitor {
   constructor(enabled = false) {
@@ -28,7 +29,7 @@ class PerfMonitor {
     if (!marker) return;
     const duration = performance.now() - marker.start;
     // eslint-disable-next-line no-console
-    console.log(`[Perf] ${marker.label}: ${duration.toFixed(2)}ms`);
+    logger.log(`[Perf] ${marker.label}: ${duration.toFixed(2)}ms`);
     this.markers.delete(id);
     return duration;
   }

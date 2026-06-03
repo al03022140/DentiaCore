@@ -14,6 +14,7 @@
 // import PeriodontogramLogger from '../logger';
 import PeriodontogramUtils, { getAllTeethData } from '../utils/periodontogram-utils';
 import { UI_COLORS } from '../../../shared/config/periodontogram-config';
+import { logger } from '../../../shared/utils/logger';
 
 // ============================================================================
 // FUNCIONES BASE DEL CANVAS
@@ -59,7 +60,7 @@ export const ensureCanvasContext = (ctx, canvas) => {
     console.warn('Contexto del canvas perdido, intentando restaurar...');
     const newCtx = canvas.getContext('2d');
     if (newCtx) {
-      console.log('Contexto del canvas restaurado exitosamente');
+      logger.log('Contexto del canvas restaurado exitosamente');
       return newCtx;
     }
   }
@@ -701,7 +702,7 @@ export const renderCompletePeriodontogram = (ctx, periodontogramData, canvasConf
       renderCompleteTooth(ctx, toothNum, toothData, position, renderOptions);
     });
     
-    console.log('Periodontograma renderizado completamente');
+    logger.log('Periodontograma renderizado completamente');
     
   } catch (error) {
     console.error('Error al renderizar periodontograma completo:', error);

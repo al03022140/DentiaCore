@@ -1,4 +1,5 @@
 import PERIODONTOGRAM_CONFIG from '../config/periodontogram-config.js';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // IMPORTAR CONFIGURACIÓN CENTRALIZADA
@@ -110,7 +111,7 @@ class ValidationLogger {
     } else if (level === 'warn' && process.env.NODE_ENV === 'development') {
       console.warn(`[${timestamp}] VALIDATION WARNING: ${message}`, data);
     } else if (level === 'info' && process.env.NODE_ENV === 'development') {
-      console.log(`[${timestamp}] VALIDATION: ${message}`, data);
+      logger.log(`[${timestamp}] VALIDATION: ${message}`, data);
     }
   }
   

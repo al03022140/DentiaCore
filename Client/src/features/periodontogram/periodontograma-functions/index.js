@@ -11,6 +11,7 @@ import * as Measurements from './measurements';
 import * as Rendering from './rendering';
 import { isValidToothNumber, getToothPosition, getToothSection } from '../utils/periodontogram-utils';
 import { UniversalToothValidator } from '../../../shared/validators/universal-tooth-validator.js';
+import { logger } from '../../../shared/utils/logger';
 
 // Exportaciones de módulos consolidados
 export { ToothOperations };
@@ -176,7 +177,7 @@ export const CleanupFunctions = {
   // Función consolidada para limpiar todos los datos clínicos
   clearAllClinicalData: (periodontogramData) => {
     // Implementación simplificada - usar PeriodontogramStateManager para operaciones complejas
-    console.log('Limpieza de datos clínicos - usar PeriodontogramStateManager');
+    logger.log('Limpieza de datos clínicos - usar PeriodontogramStateManager');
     return periodontogramData;
   }
 };

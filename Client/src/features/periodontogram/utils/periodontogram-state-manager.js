@@ -22,6 +22,7 @@ import PERIODONTOGRAM_CONFIG from '../../../shared/config/periodontogram-config.
 // PeriodontogramData ahora se maneja completamente en el backend
 import { getToothData as getToothDataUtil, getAllTeethData } from './periodontogram-utils.js';
 import { UniversalToothValidator } from '../../../shared/validators/universal-tooth-validator.js';
+import { logger } from '../../../shared/utils/logger';
 
 // Importar configuración centralizada
 const {
@@ -113,7 +114,7 @@ export class PeriodontogramStateManager {
       this.saveToLocalStorage();
       
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
-        console.log(`Diente ${toothNumber} actualizado - caché invalidado`);
+        logger.log(`Diente ${toothNumber} actualizado - caché invalidado`);
       }
       
       return true;
@@ -145,7 +146,7 @@ export class PeriodontogramStateManager {
       const success = absentUpdated;
 
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
-        console.log(`Diente ${toothNumber} ${newAbsentValue ? 'marcado como ausente' : 'marcado como presente'} - caché invalidado`);
+        logger.log(`Diente ${toothNumber} ${newAbsentValue ? 'marcado como ausente' : 'marcado como presente'} - caché invalidado`);
       }
 
       return success;
@@ -188,7 +189,7 @@ export class PeriodontogramStateManager {
       this.saveToLocalStorage();
       
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
-        console.log(`Datos clínicos del diente ${toothNumber} reseteados - caché invalidado`);
+        logger.log(`Datos clínicos del diente ${toothNumber} reseteados - caché invalidado`);
       }
       
       return true;
@@ -353,7 +354,7 @@ export class PeriodontogramStateManager {
       localStorage.setItem(this._storageKey(), JSON.stringify(dataToSave));
       
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
-        console.log('Datos guardados en localStorage');
+        logger.log('Datos guardados en localStorage');
       }
       
     } catch (error) {
@@ -421,7 +422,7 @@ export class PeriodontogramStateManager {
       const stats = UniversalToothValidator.calculateStatistics(periodontogramData);
       
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
-        console.log('Estadísticas calculadas:', stats);
+        logger.log('Estadísticas calculadas:', stats);
       }
       
       return stats;

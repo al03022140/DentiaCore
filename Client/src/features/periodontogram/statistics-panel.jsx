@@ -11,6 +11,7 @@ import { ADVANCED_LOGGING_CONFIG } from './utils/config.js';
 import './styles/statistics-panel.css';
 import stadisticsIcon from '../../assets/images/icons/stadistics.svg';
 import checkCircle2Icon from '../../assets/images/icons/check circle 2.svg';
+import { logger } from '../../shared/utils/logger';
 
 const StatisticsPanel = ({
   data = null,
@@ -149,7 +150,7 @@ const StatisticsPanel = ({
       averageAttachmentLevel: stats.averageAttachmentLevel || stats.nivelInsercionPromedio || stats.averageAttachment || 0
     };
     
-    if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🔄 StatisticsPanel: Estadísticas normalizadas:', {
+    if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('🔄 StatisticsPanel: Estadísticas normalizadas:', {
       original: stats,
       normalized: normalized
     });
@@ -174,7 +175,7 @@ const StatisticsPanel = ({
 
   // Usar directamente las estadísticas calculadas por UniversalToothValidator
   const statistics = useMemo(() => {
-    if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🔄 StatisticsPanel: Recalculando estadísticas...', {
+    if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('🔄 StatisticsPanel: Recalculando estadísticas...', {
       hasData: !!data,
       dataKey,
       sampleDataVersion,
@@ -185,13 +186,13 @@ const StatisticsPanel = ({
     if (data) {
       // SIEMPRE recalcular estadísticas desde los datos de dientes para reflejar ediciones en tiempo real
       if (data.teeth && Object.keys(data.teeth).length > 0) {
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Recalculando estadísticas desde dientes...');
+        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Recalculando estadísticas desde dientes...');
         const result = UniversalToothValidator.calculateStatistics(data);
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Estadísticas calculadas:', result);
+        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Estadísticas calculadas:', result);
         
         // Si el cálculo produjo todo ceros, intentar usar pre-calculadas como fallback
         if (areStatisticsAllZero(result) && data.statistics && !areStatisticsAllZero(data.statistics)) {
-          if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Cálculo dio ceros, usando estadísticas pre-calculadas como fallback');
+          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Cálculo dio ceros, usando estadísticas pre-calculadas como fallback');
           const normalized = normalizeStatistics(data.statistics);
           return normalized;
         }
@@ -201,13 +202,13 @@ const StatisticsPanel = ({
       
       // Si no hay dientes pero sí estadísticas pre-calculadas, usarlas
       if (data.statistics && !areStatisticsAllZero(data.statistics)) {
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Sin dientes, usando estadísticas pre-calculadas:', data.statistics);
+        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Sin dientes, usando estadísticas pre-calculadas:', data.statistics);
         const normalized = normalizeStatistics(data.statistics);
         return normalized;
       }
       
       // Fallback: calcular (resultará en ceros)
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('⚠️ StatisticsPanel: Sin dientes ni estadísticas, calculando vacío...');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('⚠️ StatisticsPanel: Sin dientes ni estadísticas, calculando vacío...');
       const result = UniversalToothValidator.calculateStatistics(data);
       return result;
     } else {
@@ -228,7 +229,7 @@ const StatisticsPanel = ({
       });
       
       const result = UniversalToothValidator.calculateStatistics(mockData);
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 StatisticsPanel: Estadísticas de muestra calculadas:', result);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Estadísticas de muestra calculadas:', result);
       return result;
     }
   }, [data, sampleDataVersion, dataKey, forceUpdate]);

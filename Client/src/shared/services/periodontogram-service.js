@@ -1,5 +1,6 @@
 import API from './axios-instance.js';
 import { ADVANCED_LOGGING_CONFIG } from '../../features/periodontogram/utils/config.js';
+import { logger } from '../utils/logger';
 
 // Configuración de timeouts
 const UPLOAD_TIMEOUT = 15000; // 15 segundos para subidas
@@ -118,13 +119,13 @@ class PeriodontogramService {
    */
   static async getPeriodontogram(patientId) {
     try {
-      console.log('🔍 Obteniendo periodontograma para paciente:', patientId);
+      logger.log('🔍 Obteniendo periodontograma para paciente:', patientId);
       
       const response = await API.get(`/patients/${patientId}/periodontogram`, {
         timeout: DEFAULT_TIMEOUT
       });
       
-      console.log('✅ Periodontograma obtenido exitosamente');
+      logger.log('✅ Periodontograma obtenido exitosamente');
       return response.data;
     } catch (error) {
       console.error('❌ Error obteniendo periodontograma:', error);
@@ -140,7 +141,7 @@ class PeriodontogramService {
    */
   static async createPeriodontogram(patientId, initialData = {}) {
     try {
-      console.log('🚀 Creando periodontograma para paciente:', patientId);
+      logger.log('🚀 Creando periodontograma para paciente:', patientId);
       
       const response = await API.post(`/patients/${patientId}/periodontogram`, {
         initialData
@@ -148,11 +149,11 @@ class PeriodontogramService {
         timeout: 30000 // 30s: evita abortos por Mongo local lento (es idempotente: 409 → get)
       });
       
-      console.log('✅ Periodontograma creado exitosamente');
+      logger.log('✅ Periodontograma creado exitosamente');
       return response.data;
     } catch (error) {
       if (error.response?.status === 409) {
-        console.info('ℹ️ Periodontograma ya existe. Obteniendo el registro actual.');
+        logger.info('ℹ️ Periodontograma ya existe. Obteniendo el registro actual.');
         return await this.getPeriodontogram(patientId);
       }
       console.error('❌ Error creando periodontograma:', error);
@@ -187,13 +188,13 @@ class PeriodontogramService {
    */
   static async exists(patientId) {
     try {
-      console.log('🔍 Verificando existencia de periodontograma para paciente:', patientId);
+      logger.log('🔍 Verificando existencia de periodontograma para paciente:', patientId);
       
       const data = await this.getData(patientId);
-      console.log('✅ Periodontograma existe');
+      logger.log('✅ Periodontograma existe');
       return !!data;
     } catch (error) {
-      console.log('📝 Periodontograma no existe o error al obtener datos');
+      logger.log('📝 Periodontograma no existe o error al obtener datos');
       // Si hay error 404 o cualquier otro error, asumimos que no existe
       return false;
     }
@@ -207,7 +208,7 @@ class PeriodontogramService {
    */
   static async getStatistics(patientId, version = null) {
     try {
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📊 Obteniendo estadísticas del periodontograma:', {
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 Obteniendo estadísticas del periodontograma:', {
         patientId,
         version
       });
@@ -220,7 +221,7 @@ class PeriodontogramService {
         timeout: DEFAULT_TIMEOUT
       });
       
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Estadísticas obtenidas exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Estadísticas obtenidas exitosamente');
       return response.data;
     } catch (error) {
       if (ADVANCED_LOGGING_CONFIG.enabled) console.error('❌ Error obteniendo estadísticas:', error);
@@ -231,7 +232,7 @@ class PeriodontogramService {
   static async saveData(patientId, periodontogramData, options = {}) {
     try {
       if (ADVANCED_LOGGING_CONFIG.enabled) {
-        console.log('💾 Guardando datos JSON del periodontograma:', {
+        logger.log('💾 Guardando datos JSON del periodontograma:', {
           patientId,
           versionName: periodontogramData?.versionName
         });
@@ -253,7 +254,7 @@ class PeriodontogramService {
         }
       );
 
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Datos JSON guardados exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Datos JSON guardados exitosamente');
       return response.data;
     } catch (error) {
       if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
@@ -272,7 +273,7 @@ class PeriodontogramService {
   static async getData(patientId, version = null, options = {}) {
     try {
       if (ADVANCED_LOGGING_CONFIG.enabled) {
-        console.log('📄 Obteniendo datos JSON del periodontograma:', {
+        logger.log('📄 Obteniendo datos JSON del periodontograma:', {
           patientId,
           version
         });
@@ -287,7 +288,7 @@ class PeriodontogramService {
         signal: options.signal
       });
 
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Datos JSON obtenidos exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Datos JSON obtenidos exitosamente');
       const result = response.data?.data || response.data;
       return normalizeLegacyTeethData(result);
     } catch (error) {
@@ -306,7 +307,7 @@ class PeriodontogramService {
   static async getDataVersions(patientId, options = {}) {
     try {
       if (ADVANCED_LOGGING_CONFIG.enabled) {
-        console.log('📚 Obteniendo lista de versiones JSON del periodontograma:', patientId);
+        logger.log('📚 Obteniendo lista de versiones JSON del periodontograma:', patientId);
       }
 
       const response = await API.get(
@@ -317,7 +318,7 @@ class PeriodontogramService {
         }
       );
 
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Lista de versiones obtenida exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Lista de versiones obtenida exitosamente');
       const rawVersions = response.data?.versions || [];
 
       // Solo aceptar versiones con versionName válido (no otros campos como id, name, etc.)
@@ -374,11 +375,11 @@ class PeriodontogramService {
 
   static async deletePeriodontogram(patientId) {
     try {
-      console.log('🗑️ Eliminando periodontograma para paciente:', patientId);
+      logger.log('🗑️ Eliminando periodontograma para paciente:', patientId);
       await API.delete(`/patients/${patientId}/periodontogram`, {
         timeout: DEFAULT_TIMEOUT
       });
-      console.log('✅ Periodontograma eliminado correctamente');
+      logger.log('✅ Periodontograma eliminado correctamente');
     } catch (error) {
       console.error('❌ Error eliminando periodontograma:', error);
       handleApiError(error);
