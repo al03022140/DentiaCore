@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, memo, useRef } from 'react';
 import { perfMonitor, withRenderCount } from './utils/perf-monitor';
 import PeriodontogramUtils from "./utils/periodontogram-utils";
-import { getToothNumberButtonProps } from './periodontograma-functions/index.js';
+import { getToothNumberButtonProps } from './periodontograma-functions/tooth-operations';
 import { VALIDATION_RANGES, ZONE_CONFIG, SELECT_OPTIONS, ROW_DEFINITIONS, FIELD_TYPE_MAP, RESPONSIVE_CONFIG } from './constants/periodontogram-constants';
 import { LINEAR_GRAPHICS_CONFIG } from './utils/config';
 import BleedingMultiStateCheckbox from './components/bleeding-multi-state-checkbox';
