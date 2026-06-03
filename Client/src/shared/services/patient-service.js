@@ -1,7 +1,11 @@
 /**
- * Servicio de pacientes — CRUD contra /patients sobre la instancia axios
- * compartida (axios-instance). Incluye una cache de 2 min para la lista,
- * que se invalida en cada mutación.
+ * Servicio de pacientes — lectura y borrado contra /patients sobre la instancia
+ * axios compartida (axios-instance), con cache de 2 min para la lista (se
+ * invalida al borrar).
+ *
+ * Nota: el ALTA y la EDICIÓN no están aquí: add-patient.jsx los hace con
+ * FormData + config propia (subida de imagen, timeout) llamando a la API
+ * directamente. Un create/update con JSON plano aquí quedaba sin uso.
  */
 import API from './axios-instance';
 
@@ -29,34 +33,12 @@ export const getAllPatients = async (options = {}) => {
   }
 };
 
-export const createPatient = async (patientData) => {
-  try {
-    const response = await API.post('/patients', patientData);
-    invalidatePatientsCache();
-    return response.data;
-  } catch (error) {
-    console.error('❌ Error al crear paciente:', error);
-    throw error;
-  }
-};
-
 export const getPatientById = async (id) => {
   try {
     const response = await API.get(`/patients/${id}`);
     return response.data;
   } catch (error) {
     console.error(`❌ Error al obtener paciente con ID ${id}:`, error);
-    throw error;
-  }
-};
-
-export const updatePatient = async (id, patientData) => {
-  try {
-    const response = await API.put(`/patients/${id}`, patientData);
-    invalidatePatientsCache();
-    return response.data;
-  } catch (error) {
-    console.error(`❌ Error al actualizar paciente con ID ${id}:`, error);
     throw error;
   }
 };
