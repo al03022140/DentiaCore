@@ -8,6 +8,7 @@ import { getSettings, getDoctors } from '../../../shared/services/settingsServic
 import API from '../../../shared/services/axios-instance';
 import userNot from '../../../assets/images/icons/Profile Default.svg';
 import './CreateAppointmentModal.css';
+import { calculateAgeYears } from '../../../shared/utils/formatters';
 
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
 
@@ -155,12 +156,7 @@ const CreateAppointmentModal = ({
       .filter(Boolean).join(' ');
   };
 
-  const calculateAge = (fechaNacimiento) => {
-    if (!fechaNacimiento) return '—';
-    const birth = new Date(fechaNacimiento);
-    const diff = Date.now() - birth.getTime();
-    return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-  };
+  const calculateAge = (fechaNacimiento) => calculateAgeYears(fechaNacimiento, '—');
 
   const selectPatient = (patient) => {
     setSelectedPatient(patient);
