@@ -23,7 +23,7 @@ import PermissionGate from './auth/PermissionGate';
 import DraftsCenter from '../features/consultas/DraftsCenter';
 import SettingsPage from '../features/settings/SettingsPage';
 import UsersPage from '../features/users/UsersPage';
-import { SidebarProvider } from '../shared/context/SidebarContext';
+import { SidebarProvider } from '../shared/contexts/SidebarContext';
 
 const antdTheme = {
   token: {

@@ -4,7 +4,7 @@ import '../styles/sidebar.css';
 import logo from "../../assets/images/logos/DentiaCore.svg";
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
-import { useSidebar } from '../context/SidebarContext';
+import { useSidebar } from '../contexts/SidebarContext';
 
 
 const Sidebar = () => {
