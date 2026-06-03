@@ -68,13 +68,13 @@ const LOWER_POSITIONS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17]
 /**
  * Clase principal de utilidades del periodontograma consolidada
  */
-export class PeriodontogramUtils {
+export const PeriodontogramUtils = {
   
   /**
    * Obtiene la posición del diente para imágenes (1-17, saltándose el 9)
    * Función unificada con memoización
    */
-  static getToothPosition(toothNumber) {
+  getToothPosition(toothNumber) {
     if (_cache.toothPositions.has(toothNumber)) {
       return _cache.toothPositions.get(toothNumber);
     }
@@ -95,12 +95,12 @@ export class PeriodontogramUtils {
     
     _cache.toothPositions.set(toothNumber, position);
     return position;
-  }
+  },
 
   /**
    * Obtiene la ruta de imagen del diente con cache optimizado
    */
-  static getToothImagePath(toothNumber, type = TOOTH_TYPES.NORMAL, zone = TOOTH_ZONES.VESTIBULAR) {
+  getToothImagePath(toothNumber, type = TOOTH_TYPES.NORMAL, zone = TOOTH_ZONES.VESTIBULAR) {
     const cacheKey = `${toothNumber}-${type}-${zone}`;
     
     if (_cache.imagePaths.has(cacheKey)) {
@@ -136,32 +136,32 @@ export class PeriodontogramUtils {
     _cache.imagePaths.set(cacheKey, imagePath);
     
     return imagePath;
-  }
+  },
 
   /**
    * Obtiene la ruta de imagen de fondo del diente
    */
-  static getToothBackgroundImagePath(toothNumber) {
+  getToothBackgroundImagePath(toothNumber) {
     const section = this.getToothSection(toothNumber);
     return `/images/Periodontogram/background/background-${section}.png`;
-  }
+  },
 
   /**
    * Determina la sección del diente (superior/inferior)
    */
-  static getToothSection(toothNumber) {
+  getToothSection(toothNumber) {
     // Superior = cuadrantes FDI 1 y 2 (permanentes 11-28) y 5 y 6 (temporales
     // 51-65). Antes solo 11-28 contaba como superior, así que los temporales
     // superiores (51-65) se clasificaban como inferiores → fondo y zona
     // lingual/palatina equivocados. Se decide por el cuadrante (primer dígito).
     const q = Math.floor(Number(toothNumber) / 10);
     return (q === 1 || q === 2 || q === 5 || q === 6) ? TOOTH_SECTIONS.UPPER : TOOTH_SECTIONS.LOWER;
-  }
+  },
 
   /**
    * Determina si la zona es lingual/palatina
    */
-  static isLingualZone(toothNumber, zone) {
+  isLingualZone(toothNumber, zone) {
     const section = this.getToothSection(toothNumber);
     
     if (section === TOOTH_SECTIONS.UPPER) {
@@ -169,20 +169,20 @@ export class PeriodontogramUtils {
     } else {
       return zone === TOOTH_ZONES.LINGUAL;
     }
-  }
+  },
 
   /**
    * Valida si un número de diente FDI es válido
    * Delegado al UniversalToothValidator para evitar duplicación
    */
-  static isValidToothNumber(toothNumber) {
+  isValidToothNumber(toothNumber) {
     return UniversalToothValidator.isValidToothNumber(toothNumber);
-  }
+  },
 
   /**
    * Obtiene el nombre del diente con cache
    */
-  static getToothName(toothNumber) {
+  getToothName(toothNumber) {
     if (_cache.toothNames.has(toothNumber)) {
       return _cache.toothNames.get(toothNumber);
     }
@@ -232,20 +232,20 @@ export class PeriodontogramUtils {
     const name = names[toothNumber] || `Diente ${toothNumber}`;
     _cache.toothNames.set(toothNumber, name);
     return name;
-  }
+  },
 
   /**
    * Obtiene el cuadrante del diente
    * Delegado a PERIODONTOGRAM_CONFIG para evitar duplicación
    */
-  static getToothQuadrant(toothNumber) {
+  getToothQuadrant(toothNumber) {
     return PERIODONTOGRAM_CONFIG.getToothQuadrant(toothNumber);
-  }
+  },
 
   /**
    * Determina el color según el valor clínico usando configuración centralizada
    */
-  static getColorByValue(value, type = 'depth') {
+  getColorByValue(value, type = 'depth') {
     const numValue = parseFloat(value);
     
     if (type === 'depth') {
@@ -261,12 +261,12 @@ export class PeriodontogramUtils {
     }
     
     return '#000000';
-  }
+  },
 
   /**
    * Interpreta el valor clínico
    */
-  static getInterpretation(value, type = 'depth') {
+  getInterpretation(value, type = 'depth') {
     const numValue = parseFloat(value);
     
     if (type === 'depth') {
@@ -281,12 +281,12 @@ export class PeriodontogramUtils {
     }
     
     return 'Sin interpretación';
-  }
+  },
 
   /**
    * Obtiene todos los dientes de una arcada
    */
-  static getArchTeeth(arch) {
+  getArchTeeth(arch) {
     if (arch === 'upper') {
       return [...UPPER_TEETH];
     }
@@ -294,19 +294,19 @@ export class PeriodontogramUtils {
       return [...LOWER_TEETH];
     }
     return [];
-  }
+  },
 
   /**
    * Obtiene todos los dientes válidos
    */
-  static getAllTeeth() {
+  getAllTeeth() {
     return [...UPPER_TEETH, ...LOWER_TEETH];
-  }
+  },
 
   /**
    * Determina si un diente puede tener furca
    */
-  static canHaveFurca(toothNumber, isVestibular = true, isPalatine = false) {
+  canHaveFurca(toothNumber, isVestibular = true, isPalatine = false) {
     // Usar configuración centralizada si está disponible
     if (PERIODONTOGRAM_CONFIG.isMolar && PERIODONTOGRAM_CONFIG.isMolar(toothNumber)) {
       return true;
@@ -327,48 +327,48 @@ export class PeriodontogramUtils {
       return lowerFurca.includes(toothNumber);
     }
     return false;
-  }
+  },
 
   /**
    * Determina si un diente palatino necesita doble entrada de furca
    */
-  static needsDoubleFurca(toothNumber) {
+  needsDoubleFurca(toothNumber) {
     const doubleFurcaTeeth = [18, 17, 16, 14, 24, 26, 27, 28];
     return doubleFurcaTeeth.includes(toothNumber);
-  }
+  },
 
   /**
    * Obtiene los dientes superiores
    */
-  static getUpperTeeth() {
+  getUpperTeeth() {
     return [...UPPER_TEETH];
-  }
+  },
 
   /**
    * Obtiene los dientes inferiores
    */
-  static getLowerTeeth() {
+  getLowerTeeth() {
     return [...LOWER_TEETH];
-  }
+  },
 
   /**
    * Obtiene el color para el valor de placa usando configuración centralizada
    */
-  static getPlaqueColor(value) {
+  getPlaqueColor(value) {
     return PERIODONTOGRAM_CONFIG.getIndicatorColor('plaque', value);
-  }
+  },
 
   /**
    * Obtiene el color para profundidad de sondaje usando configuración centralizada
    */
-  static getProbingDepthColor(value) {
+  getProbingDepthColor(value) {
     return PERIODONTOGRAM_CONFIG.getIndicatorColor('probingDepth', value);
-  }
+  },
 
   /**
    * Calcula índice de severidad periodontal
    */
-  static calculatePeriodontalSeverity(avgDepth, bleedingPercentage, plaquePercentage) {
+  calculatePeriodontalSeverity(avgDepth, bleedingPercentage, plaquePercentage) {
     let score = 0;
     
     // Profundidad de sondaje
@@ -388,53 +388,53 @@ export class PeriodontogramUtils {
     if (score <= 2) return { level: 'mild', text: 'Periodontitis leve' };
     if (score <= 5) return { level: 'moderate', text: 'Periodontitis moderada' };
     return { level: 'severe', text: 'Periodontitis severa' };
-  }
+  },
 
   /**
    * Obtiene arrays optimizados de dientes para las 4 caras específicas del periodontograma
    * Orden estándar dental: derecha a izquierda del paciente
    */
-  static getOptimizedToothArrays() {
+  getOptimizedToothArrays() {
     return {
       upperVestibular: [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28],
       upperPalatine: [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28],
       lowerVestibular: [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38],
       lowerLingual: [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38]
     };
-  }
+  },
 
   /**
    * Obtiene los dientes superiores vestibulares
    */
-  static getUpperVestibular() {
+  getUpperVestibular() {
     return [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28];
-  }
+  },
 
   /**
    * Obtiene los dientes superiores palatinos
    */
-  static getUpperPalatine() {
+  getUpperPalatine() {
     return [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28];
-  }
+  },
 
   /**
    * Obtiene los dientes inferiores vestibulares
    */
-  static getLowerVestibular() {
+  getLowerVestibular() {
     return [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38];
-  }
+  },
 
   /**
    * Obtiene los dientes inferiores linguales
    */
-  static getLowerLingual() {
+  getLowerLingual() {
     return [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38];
-  }
+  },
 
   /**
    * Limpia el cache para optimización de memoria
    */
-  static clearCache(type = 'all') {
+  clearCache(type = 'all') {
     switch (type) {
       case 'positions':
         _cache.toothPositions.clear();
@@ -453,12 +453,12 @@ export class PeriodontogramUtils {
         Object.values(_cache).forEach(cache => cache.clear());
         break;
     }
-  }
+  },
 
   /**
    * Obtiene estadísticas del cache para monitoreo
    */
-  static getCacheStats() {
+  getCacheStats() {
     return {
       positions: _cache.toothPositions.size,
       images: _cache.imagePaths.size,
@@ -466,8 +466,8 @@ export class PeriodontogramUtils {
       names: _cache.toothNames.size,
       total: Object.values(_cache).reduce((total, cache) => total + cache.size, 0)
     };
-  }
-}
+  },
+};
 
 /**
  * Clona un objeto de datos del periodontograma de forma optimizada
