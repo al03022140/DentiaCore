@@ -218,7 +218,7 @@ function convertThreeElementToFourFace(threeElementArray, toothNumber) {
 /**
  * VALIDADOR UNIVERSAL CONSOLIDADO - ÚNICO PARA TODO EL SISTEMA
  */
-export class UniversalToothValidator {
+export const UniversalToothValidator = {
   
   // ==========================================================================
   // TRANSFORMADORES BIDIRECCIONALES CORREGIDOS
@@ -232,7 +232,7 @@ export class UniversalToothValidator {
    * ✅ ESQUEMA UNIFICADO - Validar datos sin transformaciones
    * Reemplaza transformToBackend para usar el esquema unificado directamente
    */
-  static validateUnifiedData(data) {
+  validateUnifiedData(data) {
     try {
       if (!data || typeof data !== 'object') {
         ValidationLogger.error('Datos inválidos para validación unificada', data);
@@ -264,12 +264,12 @@ export class UniversalToothValidator {
       ValidationLogger.error('Error validando datos unificados', { data, error: error.message });
       throw error;
     }
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar un diente individual
    */
-  static validateUnifiedTooth(toothData, toothNumber) {
+  validateUnifiedTooth(toothData, toothNumber) {
     const validated = {
       toothNumber: parseInt(toothNumber),
       absent: Boolean(toothData.ausente || toothData.absent),
@@ -284,24 +284,24 @@ export class UniversalToothValidator {
     this.addCanonicalFaceStructure(validated, toothData);
     
     return validated;
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Agregar estructura canónica de 4 caras
    */
-  static addCanonicalFaceStructure(validated, toothData) {
+  addCanonicalFaceStructure(validated, toothData) {
     const faces = ['mesial', 'distal', 'vestibular', 'lingual'];
     
     faces.forEach(face => {
       const faceData = toothData[face] || toothData[this.getFaceLegacyName(face)] || {};
       validated[face] = this.validateCanonicalFaceData(faceData);
     });
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Mapear nombres legacy de caras
    */
-  static getFaceLegacyName(face) {
+  getFaceLegacyName(face) {
     const mapping = {
       'lingual': 'palatino',
       'vestibular': 'vestibular',
@@ -309,12 +309,12 @@ export class UniversalToothValidator {
       'distal': 'distal'
     };
     return mapping[face] || face;
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar datos de una cara dental (estructura canónica)
    */
-  static validateCanonicalFaceData(faceData) {
+  validateCanonicalFaceData(faceData) {
     if (!faceData || typeof faceData !== 'object') {
       return {
         probingDepth: [0, 0, 0],
@@ -332,12 +332,12 @@ export class UniversalToothValidator {
         suppuration: this.validateBinaryArray(faceData.supuracion || faceData.suppuration),
         plaque: this.validateBinaryArray(faceData.placa || faceData.plaque)
       };
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar datos de furca
    */
-  static validateFurcaData(furcaData) {
+  validateFurcaData(furcaData) {
     if (!furcaData) {
       return { vestibular: 0, lingual: 0, mesial: 0 };
     }
@@ -352,82 +352,82 @@ export class UniversalToothValidator {
       lingual: Math.max(0, Math.min(3, parseInt(furcaData.lingual || 0))),
       mesial: Math.max(0, Math.min(3, parseInt(furcaData.mesial || 0)))
     };
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar pronóstico
    */
-  static validatePronostico(pronostico) {
+  validatePronostico(pronostico) {
     const validValues = ['bueno', 'regular', 'malo', 'dudoso', 'imposible']; // P6: +imposible (la UI lo ofrece)
     const normalizedValue = validValues.includes(pronostico?.toLowerCase()) ? pronostico.toLowerCase() : 'bueno';
     // Capitalizar primera letra para coincidir con backend
     return normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar array de mediciones [mesial, central, distal]
    */
-  static validateMeasurementArray(data) {
+  validateMeasurementArray(data) {
     if (!Array.isArray(data) || data.length !== 3) {
       return [0, 0, 0];
     }
     return data.map(val => Math.max(0, Math.min(20, parseFloat(val) || 0)));
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar array binario [mesial, central, distal]
    */
-  static validateBinaryArray(data) {
+  validateBinaryArray(data) {
     if (!Array.isArray(data) || data.length !== 3) {
       return [0, 0, 0];
     }
     return data.map(val => val ? 1 : 0);
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar array de sangrado (rango 0-3)
    */
-  static validateBleedingArray(data) {
+  validateBleedingArray(data) {
     if (!Array.isArray(data) || data.length !== 3) {
       return [0, 0, 0];
     }
     return data.map(val => Math.max(0, Math.min(3, parseInt(val) || 0)));
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar array de profundidad de sondaje (rango -9 a 9)
    */
-  static validateProbingDepthArray(data) {
+  validateProbingDepthArray(data) {
     if (!Array.isArray(data) || data.length !== 3) {
       return [0, 0, 0];
     }
     return data.map(val => Math.max(-9, Math.min(9, parseFloat(val) || 0)));
-  }
+  },
   
   /**
    * ✅ ESQUEMA UNIFICADO - Validar array de margen gingival (rango -9 a 9)
    */
-  static validateGingivalMarginArray(data) {
+  validateGingivalMarginArray(data) {
     if (!Array.isArray(data) || data.length !== 3) {
       return [0, 0, 0];
     }
     return data.map(val => Math.max(-9, Math.min(9, parseFloat(val) || 0)));
-  }
+  },
   
   /**
    * @deprecated - Usar validateUnifiedData en su lugar
    * Mantenido solo para compatibilidad temporal
    */
-  static transformToBackend(frontendData) {
+  transformToBackend(frontendData) {
     ValidationLogger.warn('transformToBackend está deprecado, usar validateUnifiedData');
     return this.validateUnifiedData(frontendData);
-  }
+  },
   
   /**
    * Transforma datos del backend al formato del frontend
    * MAPEA CORRECTAMENTE ESTRUCTURAS VESTIBULAR/PALATINO A 4-CARAS PARA COMPATIBILIDAD LEGACY
    */
-  static transformToFrontend(backendData, useLegacyFormat = false) {
+  transformToFrontend(backendData, useLegacyFormat = false) {
     try {
       if (!backendData || typeof backendData !== 'object') {
         ValidationLogger.error('Datos del backend inválidos', backendData);
@@ -566,7 +566,7 @@ export class UniversalToothValidator {
       ValidationLogger.error('Error crítico transformando a frontend', { backendData, error: error.message });
       return this.getDefaultToothData(backendData?.toothNumber);
     }
-  }
+  },
   
   // ==========================================================================
   // VALIDACIÓN Y SANITIZACIÓN ROBUSTAS
@@ -575,7 +575,7 @@ export class UniversalToothValidator {
   /**
    * Valida un valor según su esquema
    */
-  static validateValue(value, schema, fieldName = 'unknown') {
+  validateValue(value, schema, fieldName = 'unknown') {
     try {
       if (value === undefined || value === null) {
         return schema.default !== undefined ? schema.default : null;
@@ -676,14 +676,14 @@ export class UniversalToothValidator {
       ValidationLogger.error(`Error validando ${fieldName}:`, error);
       return schema.default !== undefined ? schema.default : null;
     }
-  }
+  },
   
   /**
    * Sanitiza un valor aplicando límites y correcciones
    */
-  static sanitizeValue(value, schema, fieldName = 'unknown') {
+  sanitizeValue(value, schema, fieldName = 'unknown') {
     return this.validateValue(value, schema, fieldName);
-  }
+  },
   
   // ==========================================================================
   // VALIDACIÓN COMPLETA DE DATOS DE DIENTES
@@ -692,7 +692,7 @@ export class UniversalToothValidator {
   /**
    * Valida y sanitiza datos completos de un diente
    */
-  static validateCompleteToothData(toothData, toothNumber = null) {
+  validateCompleteToothData(toothData, toothNumber = null) {
     if (!toothData || typeof toothData !== 'object') {
       ValidationLogger.warn('Datos de diente inválidos, usando valores por defecto');
       return this.getDefaultToothData(toothNumber);
@@ -727,7 +727,7 @@ export class UniversalToothValidator {
     }
     
     return validatedData;
-  }
+  },
   
   // ==========================================================================
   // UTILIDADES DE VALIDACIÓN
@@ -737,14 +737,14 @@ export class UniversalToothValidator {
    * Valida si un número de diente es válido
    * DELEGADO A CONFIGURACIÓN CENTRALIZADA
    */
-  static isValidToothNumber(toothNumber) {
+  isValidToothNumber(toothNumber) {
     return PERIODONTOGRAM_CONFIG.isValidToothNumber(toothNumber);
-  }
+  },
   
   /**
    * Valida si un diente es permanente
    */
-  static isValidPermanentTooth(toothNumber) {
+  isValidPermanentTooth(toothNumber) {
     const permanentTeeth = [
       11, 12, 13, 14, 15, 16, 17, 18,
       21, 22, 23, 24, 25, 26, 27, 28,
@@ -752,12 +752,12 @@ export class UniversalToothValidator {
       41, 42, 43, 44, 45, 46, 47, 48
     ];
     return permanentTeeth.includes(parseInt(toothNumber));
-  }
+  },
   
   /**
    * Valida una medición específica
    */
-  static validateMeasurement(value, measurementType) {
+  validateMeasurement(value, measurementType) {
     const constraints = {
       'PROBING_DEPTH': { min: -9, max: 15, default: 0 },
       'GINGIVAL_MARGIN': { min: -10, max: 10, default: 0 },
@@ -785,7 +785,7 @@ export class UniversalToothValidator {
     }
     
     return Math.max(constraint.min, Math.min(constraint.max, numValue));
-  }
+  },
   
   // ==========================================================================
   // DATOS POR DEFECTO E INICIALIZACIÓN
@@ -795,7 +795,7 @@ export class UniversalToothValidator {
    * Inicializa datos completos del periodontograma
    * Crea estructura con todos los dientes permanentes
    */
-  static initializePeriodontogramData(initialData = {}) {
+  initializePeriodontogramData(initialData = {}) {
     try {
       const periodontogramData = {
         teeth: {},
@@ -843,14 +843,14 @@ export class UniversalToothValidator {
         }
       };
     }
-  }
+  },
   
   /**
    * Genera datos por defecto para un diente
    * BASADO EN CONFIGURACIÓN CENTRALIZADA
    * ESTRUCTURA COMPATIBLE CON UNIFIED_TOOTH_SCHEMA
    */
-  static getDefaultToothData(toothNumber = null) {
+  getDefaultToothData(toothNumber = null) {
     const defaultData = {
       toothNumber: toothNumber ? parseInt(toothNumber) : null,
       present: true,
@@ -903,7 +903,7 @@ export class UniversalToothValidator {
     };
     
     return defaultData;
-  }
+  },
   
   // ==========================================================================
   // ESTADÍSTICAS CON CACHÉ OPTIMIZADO
@@ -915,7 +915,7 @@ export class UniversalToothValidator {
    * @param {Object} periodontogramData - Datos del periodontograma
    * @returns {Object} - Estadísticas calculadas
    */
-  static calculateStatistics(periodontogramData) {
+  calculateStatistics(periodontogramData) {
     try {
       if (!periodontogramData || typeof periodontogramData !== 'object') {
         return this.getDefaultStatistics();
@@ -1102,12 +1102,12 @@ export class UniversalToothValidator {
       ValidationLogger.error('Error calculando estadísticas', error);
       return this.getDefaultStatistics();
     }
-  }
+  },
   
   /**
    * Normaliza datos para generar hash consistente
    */
-  static normalizeDataForHash(data) {
+  normalizeDataForHash(data) {
     if (data === null || data === undefined) {
       return null;
     }
@@ -1126,12 +1126,12 @@ export class UniversalToothValidator {
     }
     
     return data;
-  }
+  },
   
   /**
    * Genera hash de datos para caché de forma determinística
    */
-  static generateDataHash(data) {
+  generateDataHash(data) {
     try {
       // Normalizar datos antes de generar hash
       const normalizedData = this.normalizeDataForHash(data);
@@ -1150,30 +1150,30 @@ export class UniversalToothValidator {
       ValidationLogger.error('Error generando hash de datos', error);
       return Date.now().toString();
     }
-  }
+  },
   
   /**
    * Invalida caché de estadísticas
    */
-  static invalidateCache(key = null) {
+  invalidateCache(key = null) {
     if (key) {
       statisticsCache.invalidate(key);
     } else {
       statisticsCache.clear();
     }
-  }
+  },
   
   /**
    * Obtiene estadísticas del caché
    */
-  static getCacheStats() {
+  getCacheStats() {
     return statisticsCache.getStats();
-  }
+  },
   
   /**
    * Estadísticas por defecto - muestra 32/32 dientes inicialmente
    */
-  static getDefaultStatistics() {
+  getDefaultStatistics() {
     return {
       totalTeeth: 32,
       presentTeeth: 32, // Inicialmente todos los dientes están presentes
@@ -1184,14 +1184,14 @@ export class UniversalToothValidator {
       maxProbingDepth: 0,
       lastCalculated: new Date().toISOString()
     };
-  }
+  },
   
   /**
    * Alias para getDefaultStatistics para mantener compatibilidad con código existente
    */
-  static getEmptyStatistics() {
+  getEmptyStatistics() {
     return this.getDefaultStatistics();
-  }
+  },
   
   // ==========================================================================
   // VALIDACIÓN DE ESTRUCTURA COMPLETA
@@ -1200,7 +1200,7 @@ export class UniversalToothValidator {
   /**
    * Valida estructura completa del periodontograma
    */
-  static validatePeriodontogramStructure(periodontogramData) {
+  validatePeriodontogramStructure(periodontogramData) {
     if (!periodontogramData || typeof periodontogramData !== 'object') {
       return {
         isValid: false,
@@ -1245,8 +1245,8 @@ export class UniversalToothValidator {
       validatedData,
       totalTeeth: Object.keys(validatedData).length
     };
-  }
-}
+  },
+};
 
 // ============================================================================
 // EXPORTACIONES PARA COMPATIBILIDAD
