@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import plusIcon from '../../../assets/images/icons/plus.svg';
+import { useNestedFormState } from '../../../shared/hooks/useNestedFormState';
 
 const Medic = ({ 
   formData, 
@@ -18,6 +19,11 @@ const Medic = ({
   const [showAlergias, setShowAlergias] = useState(
     Array.isArray(formData.encuesta_medica?.alergias) && formData.encuesta_medica.alergias.length > 0
   );
+
+  // Setter inmutable por ruta: reemplaza el patrón repetido de setFormData
+  // anidado (ver useNestedFormState).
+  const setField = useNestedFormState(setFormData);
+
   return (
     <section className="form-section">
       <h2>Encuesta Médica</h2>
@@ -45,19 +51,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.ultimo_examen_medico?.estado || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               ultimo_examen_medico: {
-                                 ...prev.encuesta_medica.informacion_general?.ultimo_examen_medico,
-                                 estado: e.target.checked
-                               }
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'ultimo_examen_medico', 'estado'], e.target.checked);
                        }}
                      />
                    </div>
@@ -70,19 +64,7 @@ const Medic = ({
                          style={{ width: '200px' }}
                          value={formData.encuesta_medica.informacion_general?.ultimo_examen_medico?.fecha || ""}
                          onChange={(e) => {
-                           setFormData(prev => ({
-                             ...prev,
-                             encuesta_medica: {
-                               ...prev.encuesta_medica,
-                               informacion_general: {
-                                 ...prev.encuesta_medica.informacion_general,
-                                 ultimo_examen_medico: {
-                                   ...prev.encuesta_medica.informacion_general?.ultimo_examen_medico,
-                                   fecha: e.target.value
-                                 }
-                               }
-                             }
-                           }));
+                           setField(['encuesta_medica', 'informacion_general', 'ultimo_examen_medico', 'fecha'], e.target.value);
                          }}
                        />
                      </div>
@@ -95,19 +77,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.en_tratamiento_medico?.estado || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               en_tratamiento_medico: {
-                                 ...prev.encuesta_medica.informacion_general?.en_tratamiento_medico,
-                                 estado: e.target.checked
-                               }
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'en_tratamiento_medico', 'estado'], e.target.checked);
                        }}
                      />
                    </div>
@@ -118,19 +88,7 @@ const Medic = ({
                        <textarea
                          value={formData.encuesta_medica.informacion_general?.en_tratamiento_medico?.explicacion || ""}
                          onChange={(e) => {
-                           setFormData(prev => ({
-                             ...prev,
-                             encuesta_medica: {
-                               ...prev.encuesta_medica,
-                               informacion_general: {
-                                 ...prev.encuesta_medica.informacion_general,
-                                 en_tratamiento_medico: {
-                                   ...prev.encuesta_medica.informacion_general?.en_tratamiento_medico,
-                                   explicacion: e.target.value
-                                 }
-                               }
-                             }
-                           }));
+                           setField(['encuesta_medica', 'informacion_general', 'en_tratamiento_medico', 'explicacion'], e.target.value);
                          }}
                          rows="3"
                          style={{ width: '100%', resize: 'vertical' }}
@@ -145,19 +103,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.hospitalizado_anteriormente?.estado || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               hospitalizado_anteriormente: {
-                                 ...prev.encuesta_medica.informacion_general?.hospitalizado_anteriormente,
-                                 estado: e.target.checked
-                               }
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'hospitalizado_anteriormente', 'estado'], e.target.checked);
                        }}
                      />
                    </div>
@@ -168,19 +114,7 @@ const Medic = ({
                        <textarea
                          value={formData.encuesta_medica.informacion_general?.hospitalizado_anteriormente?.razon || ""}
                          onChange={(e) => {
-                           setFormData(prev => ({
-                             ...prev,
-                             encuesta_medica: {
-                               ...prev.encuesta_medica,
-                               informacion_general: {
-                                 ...prev.encuesta_medica.informacion_general,
-                                 hospitalizado_anteriormente: {
-                                   ...prev.encuesta_medica.informacion_general?.hospitalizado_anteriormente,
-                                   razon: e.target.value
-                                 }
-                               }
-                             }
-                           }));
+                           setField(['encuesta_medica', 'informacion_general', 'hospitalizado_anteriormente', 'razon'], e.target.value);
                          }}
                          rows="3"
                          style={{ width: '100%', resize: 'vertical' }}
@@ -195,16 +129,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.se_cansa_facilmente || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               se_cansa_facilmente: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'se_cansa_facilmente'], e.target.checked);
                        }}
                      />
                    </div>
@@ -215,16 +140,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.cambios_peso_recientes || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               cambios_peso_recientes: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'cambios_peso_recientes'], e.target.checked);
                        }}
                      />
                    </div>
@@ -235,16 +151,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.dolores_perdida_oido || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               dolores_perdida_oido: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'dolores_perdida_oido'], e.target.checked);
                        }}
                      />
                    </div>
@@ -255,16 +162,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.sangrado_excesivo_cortes || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               sangrado_excesivo_cortes: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'sangrado_excesivo_cortes'], e.target.checked);
                        }}
                      />
                    </div>
@@ -275,16 +173,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.hemorragias_espontaneas || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               hemorragias_espontaneas: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'hemorragias_espontaneas'], e.target.checked);
                        }}
                      />
                    </div>
@@ -295,16 +184,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.seropositivo_vih || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               seropositivo_vih: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'seropositivo_vih'], e.target.checked);
                        }}
                      />
                    </div>
@@ -315,16 +195,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.informacion_general?.dolores_cabeza_frecuentes || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               dolores_cabeza_frecuentes: e.target.checked
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'dolores_cabeza_frecuentes'], e.target.checked);
                        }}
                      />
                    </div>
@@ -335,16 +206,7 @@ const Medic = ({
                      <textarea
                        value={formData.encuesta_medica.informacion_general?.observaciones_salud_general || ""}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             informacion_general: {
-                               ...prev.encuesta_medica.informacion_general,
-                               observaciones_salud_general: e.target.value
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'informacion_general', 'observaciones_salud_general'], e.target.value);
                        }}
                        rows="4"
                        style={{ width: '100%', resize: 'vertical' }}
@@ -359,19 +221,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.habitos_estilo_vida?.tabaquismo?.estado || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             habitos_estilo_vida: {
-                               ...prev.encuesta_medica.habitos_estilo_vida,
-                               tabaquismo: {
-                                 ...prev.encuesta_medica.habitos_estilo_vida?.tabaquismo,
-                                 estado: e.target.checked
-                               }
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'habitos_estilo_vida', 'tabaquismo', 'estado'], e.target.checked);
                        }}
                      />
                    </div>
@@ -382,19 +232,7 @@ const Medic = ({
                        <select
                          value={formData.encuesta_medica.habitos_estilo_vida?.tabaquismo?.frecuencia || ""}
                          onChange={(e) => {
-                           setFormData(prev => ({
-                             ...prev,
-                             encuesta_medica: {
-                               ...prev.encuesta_medica,
-                               habitos_estilo_vida: {
-                                 ...prev.encuesta_medica.habitos_estilo_vida,
-                                 tabaquismo: {
-                                   ...prev.encuesta_medica.habitos_estilo_vida?.tabaquismo,
-                                   frecuencia: e.target.value
-                                 }
-                               }
-                             }
-                           }));
+                           setField(['encuesta_medica', 'habitos_estilo_vida', 'tabaquismo', 'frecuencia'], e.target.value);
                          }}
                        >
                          <option value="">Seleccione...</option>
@@ -419,19 +257,7 @@ const Medic = ({
                        type="checkbox"
                        checked={formData.encuesta_medica.habitos_estilo_vida?.alcoholismo?.estado || false}
                        onChange={(e) => {
-                         setFormData(prev => ({
-                           ...prev,
-                           encuesta_medica: {
-                             ...prev.encuesta_medica,
-                             habitos_estilo_vida: {
-                               ...prev.encuesta_medica.habitos_estilo_vida,
-                               alcoholismo: {
-                                 ...prev.encuesta_medica.habitos_estilo_vida?.alcoholismo,
-                                 estado: e.target.checked
-                               }
-                             }
-                           }
-                         }));
+                         setField(['encuesta_medica', 'habitos_estilo_vida', 'alcoholismo', 'estado'], e.target.checked);
                        }}
                      />
                    </div>
@@ -442,19 +268,7 @@ const Medic = ({
                        <select
                          value={formData.encuesta_medica.habitos_estilo_vida?.alcoholismo?.frecuencia || ""}
                          onChange={(e) => {
-                           setFormData(prev => ({
-                             ...prev,
-                             encuesta_medica: {
-                               ...prev.encuesta_medica,
-                               habitos_estilo_vida: {
-                                 ...prev.encuesta_medica.habitos_estilo_vida,
-                                 alcoholismo: {
-                                   ...prev.encuesta_medica.habitos_estilo_vida?.alcoholismo,
-                                   frecuencia: e.target.value
-                                 }
-                               }
-                             }
-                           }));
+                           setField(['encuesta_medica', 'habitos_estilo_vida', 'alcoholismo', 'frecuencia'], e.target.value);
                          }}
                        >
                          <option value="">Seleccione...</option>
@@ -487,13 +301,7 @@ const Medic = ({
                                onChange={(e) => {
                                  const newCirugias = [...formData.encuesta_medica.cirugias_previas];
                                  newCirugias[index] = e.target.value;
-                                 setFormData(prev => ({
-                                   ...prev,
-                                   encuesta_medica: {
-                                     ...prev.encuesta_medica,
-                                     cirugias_previas: newCirugias
-                                   }
-                                 }));
+                                 setField(['encuesta_medica', 'cirugias_previas'], newCirugias);
                                }}
                                placeholder="Tipo de cirugía"
                              />
@@ -634,25 +442,7 @@ const Medic = ({
                               type="checkbox"
                               checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes?.checked || false}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          diabetes: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes,
-                                            checked: e.target.checked
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'checked'], e.target.checked);
                               }}
                             />
                             Diabetes
@@ -661,25 +451,7 @@ const Medic = ({
                             <select
                               value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes?.tipo || ""}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          diabetes: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes,
-                                            tipo: e.target.value
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'tipo'], e.target.value);
                               }}
                             >
                               <option value="">Seleccione tipo</option>
@@ -769,25 +541,7 @@ const Medic = ({
                               type="checkbox"
                               checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis?.checked || false}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          hepatitis: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis,
-                                            checked: e.target.checked
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'checked'], e.target.checked);
                               }}
                             />
                             Hepatitis
@@ -796,25 +550,7 @@ const Medic = ({
                             <select
                               value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis?.tipo || ""}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          hepatitis: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis,
-                                            tipo: e.target.value
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'tipo'], e.target.value);
                               }}
                             >
                               <option value="">Seleccione tipo</option>
@@ -858,25 +594,7 @@ const Medic = ({
                               type="checkbox"
                               checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon?.checked || false}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          infarto_corazon: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon,
-                                            checked: e.target.checked
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'checked'], e.target.checked);
                               }}
                             />
                             Infarto de Corazón
@@ -886,25 +604,7 @@ const Medic = ({
                               type="date"
                               value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon?.fecha || ""}
                               onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  encuesta_medica: {
-                                    ...prev.encuesta_medica,
-                                    informacion_general: {
-                                      ...prev.encuesta_medica.informacion_general,
-                                      enfermedad_grave_adicional: {
-                                        ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional,
-                                        enfermedades_seleccionadas: {
-                                          ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas,
-                                          infarto_corazon: {
-                                            ...prev.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon,
-                                            fecha: e.target.value
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }));
+                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'fecha'], e.target.value);
                               }}
                               placeholder="Fecha del infarto"
                             />
