@@ -77,7 +77,9 @@ function inferArcada(toothNumber) {
   const n = Number.parseInt(toothNumber, 10);
   if (!Number.isFinite(n)) return 'superior';
   const quadrant = Math.floor(n / 10);
-  return quadrant === 1 || quadrant === 2 ? 'superior' : 'inferior';
+  // Superior = cuadrantes 1 y 2 (permanentes) y 5 y 6 (temporales). Antes solo
+  // 1 y 2 → los temporales superiores (51-65) se inferían como 'inferior'.
+  return [1, 2, 5, 6].includes(quadrant) ? 'superior' : 'inferior';
 }
 
 function buildArcadasFromTeeth(teeth) {
@@ -178,7 +180,7 @@ function adaptTeethFromClientPayload(teeth) {
       })(),
       pronostico: (() => {
         const p = (toothVal?.pronostico || toothVal?.prognosis || 'bueno').toString().toLowerCase();
-        const allowed = ['bueno', 'regular', 'malo', 'dudoso'];
+        const allowed = ['bueno', 'regular', 'malo', 'dudoso', 'imposible']; // P6: +imposible
         const v = allowed.includes(p) ? p : 'bueno';
         return v.charAt(0).toUpperCase() + v.slice(1);
       })(),

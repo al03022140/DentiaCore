@@ -6,6 +6,24 @@
 
 ---
 
+## Estado de correcciones — actualización 2026-06-02
+
+| Hallazgo | Estado | Nota |
+|----------|--------|------|
+| CRÍTICO #1 (NIC) | ✅ Aplicado | Unificado a `NIC = PS − MG` (margen firmado) en cliente y backend. |
+| P2 (% > 100%) | ✅ Aplicado | Rama canónica inglés (backend) y validador del cliente filtran a 2 caras por arcada. |
+| P3 (TOCTOU) | ✅ Aplicado | Guards (`estado≠OFICIAL`, `firmadoEn:null`) en el filtro del `findOneAndUpdate` + traducción de E11000 → 409/403, apoyado en el índice único parcial. |
+| P4 (`runValidators`) | ✅ Aplicado | `runValidators:true` en los 3 updates + validación FDI en `validarEntradasOdontograma` (400 claro, no 500). |
+| P5 (ObjectId) | ✅ Aplicado | `mongoose.Types.ObjectId.isValid` en `obtenerSnapshotPorId` y `deleteClinicalHistoryEntry`. |
+| P6 (pronóstico) | ✅ Aplicado | Enum unión `bueno/regular/malo/dudoso/imposible` en cliente (config + validador) y backend (modelo, schema, validator, adaptors). |
+| P7 (ceros) | ✅ Aplicado | `pickFaceTriplesFromFourFaces` devuelve `undefined` para caras **ausentes** (no `[0,0,0]`), para que la cadena `??` siga al respaldo. Tests de normalización/save-flow verdes. |
+| P1 (validador único) | ⏸️ Diferido | Refactor arquitectónico mayor (dos validadores + dos contratos de caras). Requiere harness de tests antes de unificar; alto riesgo de regresión sin él. |
+| Medios | ◑ Parcial | Aplicados: PHI en logs gateados por `NODE_ENV` (periodontogramController), arcada de temporales (`getToothSection` cliente + `inferArcada` backend), namespacing de `localStorage` por paciente. Diferidos (decisión/migración): índice de `versionName`, superficie `'0'` vs `'O'`, estadísticas solo-permanentes. |
+
+> Verificación de esta ronda: `node -c` OK en los 7 archivos server; tests de cliente de periodontograma verdes (13/13 reales). La suite `periodontogram-validation.test.js` falla por "must contain at least one test" — es un script sin bloques `test()`, ya documentado abajo, no una regresión.
+
+---
+
 ## Resumen ejecutivo
 
 - Se aplicaron **3 correcciones seguras** (verificadas, sin dependencia de convención clínica).

@@ -123,7 +123,7 @@ const UNIFIED_TOOTH_SCHEMA = {
   
   pronostico: {
     type: 'string',
-    enum: ['bueno', 'regular', 'malo', 'dudoso'],
+    enum: ['bueno', 'regular', 'malo', 'dudoso', 'imposible'], // P6: +imposible (la UI lo ofrece)
     default: 'bueno'
   },
   
@@ -917,8 +917,31 @@ class UniversalToothValidator {
         });
 
         if (hasCanonical) {
-          // Procesar formato canónico: 5 bloques x 4 caras x tripletas
-          for (const face of CANON_FACES) {
+          // Procesar formato canónico: 5 bloques x caras x tripletas.
+          // P2: el denominador de %SS/%placa es presentTeeth*6 (= 2 caras × 3
+          // sitios). Contar las 4 caras inflaba el numerador hasta ~200%. Igual
+          // que la rama español, se procesan solo las 2 caras de la arcada del
+          // diente (las otras 2 deberían venir vacías, pero no había defensa).
+          const measurementBlocks = ['bleeding', 'plaque', 'suppuration', 'probingDepth', 'gingivalMargin'];
+          const faceHasData = (f) => measurementBlocks.some(k => {
+            const block = toothData && toothData[k];
+            return block && Array.isArray(block[f]);
+          });
+          const inferredArcadeEn = (() => {
+            if (toothData && typeof toothData.arcada === 'string') return toothData.arcada.toLowerCase();
+            const n = Number(toothNumber);
+            if (Number.isFinite(n)) return (n >= 11 && n <= 28) ? 'superior' : 'inferior';
+            return null;
+          })();
+          let facesToProcessEn = CANON_FACES.filter(faceHasData);
+          if (facesToProcessEn.length > 2) {
+            const preferred = inferredArcadeEn === 'superior'
+              ? ['vestibularSuperior', 'palatinoSuperior']
+              : ['vestibularInferior', 'lingualInferior'];
+            const filtered = preferred.filter(f => facesToProcessEn.includes(f));
+            facesToProcessEn = filtered.length > 0 ? filtered : facesToProcessEn.slice(0, 2);
+          }
+          for (const face of facesToProcessEn) {
             // Conteos de sangrado
             const bleedArr = toothData.bleeding && toothData.bleeding[face];
             if (Array.isArray(bleedArr)) {

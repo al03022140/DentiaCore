@@ -23,8 +23,14 @@ export const pickFaceTriplesFromFourFaces = (metricObj, isUpperTooth) => {
   const PS = metricObj.palatinoSuperior;
   const VI = metricObj.vestibularInferior;
   const LI = metricObj.lingualInferior;
-  const vestibular = isUpperTooth ? toTriple(VS) : toTriple(VI);
-  const palatino = isUpperTooth ? toTriple(PS) : toTriple(LI);
+  // P7: convertir a triple SOLO las caras presentes. Una cara ausente devuelve
+  // undefined (no [0,0,0]) para que la cadena de respaldo con `??` en
+  // periodontogram-section continúe hacia otras fuentes (claves canónicas /
+  // legacy) en lugar de cortarse y persistir ceros que pisan datos reales.
+  // (El input completamente inválido sigue devolviendo ceros, arriba.)
+  const tripleOrUndef = (v) => (v == null ? undefined : toTriple(v));
+  const vestibular = isUpperTooth ? tripleOrUndef(VS) : tripleOrUndef(VI);
+  const palatino = isUpperTooth ? tripleOrUndef(PS) : tripleOrUndef(LI);
   return { vestibular, palatino };
 };
 

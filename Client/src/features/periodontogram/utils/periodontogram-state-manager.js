@@ -329,6 +329,16 @@ export class PeriodontogramStateManager {
   // ==========================================
 
   /**
+   * Clave de localStorage con namespacing por paciente. Evita que el estado
+   * (borrador) de un paciente se cargue en la ficha de otro: antes la clave era
+   * fija ('periodontogram_state') y se compartía entre todos los pacientes.
+   */
+  _storageKey() {
+    const pid = this.teeth?.patientId;
+    return pid ? `periodontogram_state_${pid}` : 'periodontogram_state_anon';
+  }
+
+  /**
    * Guarda el estado en localStorage usando configuración centralizada
    */
   saveToLocalStorage() {
@@ -340,7 +350,7 @@ export class PeriodontogramStateManager {
       };
       
       // Guardar directamente en formato frontend (sin transformar)
-      localStorage.setItem('periodontogram_state', JSON.stringify(dataToSave));
+      localStorage.setItem(this._storageKey(), JSON.stringify(dataToSave));
       
       if (LOGGING_CONFIG.enabled && LOGGING_CONFIG.level === 'debug') {
         console.log('Datos guardados en localStorage');
@@ -358,7 +368,7 @@ export class PeriodontogramStateManager {
    */
   loadFromLocalStorage() {
     try {
-      const savedData = localStorage.getItem('periodontogram_state');
+      const savedData = localStorage.getItem(this._storageKey());
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         this.loadData(parsedData);
@@ -373,7 +383,7 @@ export class PeriodontogramStateManager {
    */
   clearLocalStorage() {
     try {
-      localStorage.removeItem('periodontogram_state');
+      localStorage.removeItem(this._storageKey());
     } catch (error) {
       console.error('Error limpiando localStorage:', error);
     }

@@ -189,7 +189,10 @@ const dienteSchema = new mongoose.Schema({
   },
   pronostico: {
     type: String,
-    enum: ['Bueno', 'Regular', 'Malo', 'Dudoso'],
+    // P6: incluye 'Imposible' (la UI lo ofrece en el selector) y conserva
+    // 'Regular' por datos legados → unión, para no perder el dato clínico ni
+    // rechazar pronósticos ya guardados. Antes 'Imposible' se degradaba a 'Bueno'.
+    enum: ['Bueno', 'Regular', 'Malo', 'Dudoso', 'Imposible'],
     default: 'Bueno'
   },
   // Furca: se mantiene estructura con soporte para doble furcación cuando aplique

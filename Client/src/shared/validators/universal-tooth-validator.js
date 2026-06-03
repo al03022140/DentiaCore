@@ -357,7 +357,7 @@ export class UniversalToothValidator {
    * ✅ ESQUEMA UNIFICADO - Validar pronóstico
    */
   static validatePronostico(pronostico) {
-    const validValues = ['bueno', 'regular', 'malo', 'dudoso'];
+    const validValues = ['bueno', 'regular', 'malo', 'dudoso', 'imposible']; // P6: +imposible (la UI lo ofrece)
     const normalizedValue = validValues.includes(pronostico?.toLowerCase()) ? pronostico.toLowerCase() : 'bueno';
     // Capitalizar primera letra para coincidir con backend
     return normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
@@ -986,9 +986,21 @@ export class UniversalToothValidator {
 
         teethWithClinicalData++;
 
+        // P2: contar solo las 2 caras de la arcada del diente, para que el
+        // numerador (sitios con sangrado/placa) y el denominador
+        // (teethWithClinicalData*6 = 2 caras × 3 sitios) usen el mismo nº de
+        // sitios. Antes recorría las 4 caras; con datos en las 4 el % podía
+        // pasar de 100%. Las caras vacías valen [0,0,0] y no inflaban el conteo.
+        const arcadaEn = (typeof toothData.arcada === 'string')
+          ? toothData.arcada.toLowerCase()
+          : (Number(toothNumber) >= 11 && Number(toothNumber) <= 28 ? 'superior' : 'inferior');
+        const facesForTooth = arcadaEn === 'superior'
+          ? faceKeys.filter(f => f.endsWith('Superior'))
+          : faceKeys.filter(f => f.endsWith('Inferior'));
+
         const bleeding = toothData.bleeding;
         if (bleeding && typeof bleeding === 'object' && !Array.isArray(bleeding)) {
-          faceKeys.forEach(faceKey => {
+          facesForTooth.forEach(faceKey => {
             const faceData = bleeding[faceKey];
             if (Array.isArray(faceData)) {
               faceData.forEach(value => {
@@ -1004,7 +1016,7 @@ export class UniversalToothValidator {
 
         const plaque = toothData.plaque;
         if (plaque && typeof plaque === 'object' && !Array.isArray(plaque)) {
-          faceKeys.forEach(faceKey => {
+          facesForTooth.forEach(faceKey => {
             const faceData = plaque[faceKey];
             if (Array.isArray(faceData)) {
               faceData.forEach(value => {
@@ -1020,7 +1032,7 @@ export class UniversalToothValidator {
 
         const probingDepth = toothData.probingDepth || toothData.profundidadSondaje;
         if (probingDepth && typeof probingDepth === 'object' && !Array.isArray(probingDepth)) {
-          faceKeys.forEach(faceKey => {
+          facesForTooth.forEach(faceKey => {
             const faceData = probingDepth[faceKey];
             if (Array.isArray(faceData)) {
               faceData.forEach(depth => {
@@ -1041,7 +1053,7 @@ export class UniversalToothValidator {
         if (probingDepth && gingivalMargin &&
             typeof probingDepth === 'object' && !Array.isArray(probingDepth) &&
             typeof gingivalMargin === 'object' && !Array.isArray(gingivalMargin)) {
-          faceKeys.forEach(faceKey => {
+          facesForTooth.forEach(faceKey => {
             const depthData = probingDepth[faceKey];
             const marginData = gingivalMargin[faceKey];
             if (Array.isArray(depthData) && Array.isArray(marginData)) {

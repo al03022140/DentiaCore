@@ -150,7 +150,12 @@ export class PeriodontogramUtils {
    * Determina la sección del diente (superior/inferior)
    */
   static getToothSection(toothNumber) {
-    return (toothNumber >= 11 && toothNumber <= 28) ? TOOTH_SECTIONS.UPPER : TOOTH_SECTIONS.LOWER;
+    // Superior = cuadrantes FDI 1 y 2 (permanentes 11-28) y 5 y 6 (temporales
+    // 51-65). Antes solo 11-28 contaba como superior, así que los temporales
+    // superiores (51-65) se clasificaban como inferiores → fondo y zona
+    // lingual/palatina equivocados. Se decide por el cuadrante (primer dígito).
+    const q = Math.floor(Number(toothNumber) / 10);
+    return (q === 1 || q === 2 || q === 5 || q === 6) ? TOOTH_SECTIONS.UPPER : TOOTH_SECTIONS.LOWER;
   }
 
   /**

@@ -19,6 +19,12 @@ const debugLog = process.env.NODE_ENV !== 'production' ? console.log.bind(consol
 const TYPE_INITIAL = 'initial';
 const TYPE_CLINIC = 'clinic';
 
+// FDI: permanentes 11-48, deciduos 51-85 (idéntico al validator del modelo
+// odontograma). Se usa en validarEntradasOdontograma para rechazar números de
+// diente inválidos con 400 ANTES de persistir, en vez de un 500 por
+// ValidationError de Mongoose al activar runValidators (P4).
+const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
+
 // ——— Controladores ——————————————————————————————————————————————————————————————
 const verificarOdontogramaInicial = async (req, res, next) => {
   try {
@@ -212,9 +218,18 @@ const guardarOdontogramaInicial = async (req, res, next) => {
     }
 
     const odontograma = await OdontogramaModel.findOneAndUpdate(
-      { patientId: patientId, type: TYPE_INITIAL, deletedAt: null },
+      // P3: el guard `estado: {$ne:'OFICIAL'}` cierra la carrera TOCTOU. Si otra
+      // request firmó el doc entre la verificación previa y este upsert, el
+      // filtro ya no coincide y el upsert intenta INSERTAR, chocando con el
+      // índice único parcial (patientId, type | deletedAt:null) → E11000, que el
+      // catch traduce a 409 (no se pisa un registro ya OFICIAL e inmutable).
+      { patientId: patientId, type: TYPE_INITIAL, deletedAt: null, estado: { $ne: 'OFICIAL' } },
       { $set: { current: snapshot, ...auditFields }, $push: { history: snapshot } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      // P4: runValidators aplica el enum de `estado` y los validadores de
+      // subdocumento al escribir vía $set/$push. La validación fuerte del
+      // número FDI se hace además en validarEntradasOdontograma porque los
+      // validadores de array bajo $push no son del todo fiables en Mongoose.
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
     );
 
     res.status(201).json({
@@ -228,6 +243,18 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       updatedAt: odontograma.updatedAt
     });
   } catch (err) {
+    // P3: un upsert que choca con el índice único significa que el doc pasó a
+    // OFICIAL en una request concurrente entre la verificación y el guardado →
+    // 409 inmutable, en vez de un 500 opaco por duplicate key.
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'ALREADY_SAVED',
+          message: 'El odontograma inicial ya fue guardado y es inmutable. Para corregirlo, archívalo y crea uno nuevo.'
+        }
+      });
+    }
     console.error('[guardarOdontogramaInicial] Error:', err.message);
     next(err);
   }
@@ -295,6 +322,12 @@ const obtenerSnapshotPorId = async (req, res, next) => {
       });
     }
     
+    // P5: un snapshotId que no es ObjectId provocaba CastError → 500. Validar
+    // antes y responder 404 (las entradas válidas no se afectan).
+    if (!mongoose.Types.ObjectId.isValid(snapshotId)) {
+      return res.status(404).json({ exists: false, message: 'Snapshot no encontrado' });
+    }
+
     const odontograma = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_INITIAL,
@@ -377,13 +410,22 @@ const agregarHistorialInicial = async (req, res, next) => {
     };
 
     const updated = await OdontogramaModel.findOneAndUpdate(
-      { patientId: patientId, type: TYPE_INITIAL, deletedAt: null },
+      // P3: guard atómico contra una firma concurrente. Sin upsert: si el doc
+      // pasó a OFICIAL, el filtro no coincide, `updated` es null y respondemos
+      // 409 en vez de pisar un registro ya inmutable.
+      { patientId: patientId, type: TYPE_INITIAL, deletedAt: null, estado: { $ne: 'OFICIAL' } },
       {
         $push: { history: snapshot },
         $set: { modificadoPor: req.user?.id || null, modificadoEn: new Date() }
       },
-      { new: true }
+      { new: true, runValidators: true } // P4: validar al actualizar
     );
+    if (!updated) {
+      return res.status(409).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'El odontograma inicial fue firmado por otra operación. Recarga antes de continuar.' }
+      });
+    }
 
     res.status(201).json({
       exists: true,
@@ -627,9 +669,13 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       updateOps.$push = { history: snapshot };
     }
     const doc = await OdontogramaModel.findOneAndUpdate(
-      { patientId: patientId, type: TYPE_CLINIC, deletedAt: null },
+      // P3: `firmadoEn: null` cierra la carrera TOCTOU. Si otra request firmó el
+      // odontograma clínico entre la verificación previa y este upsert, el filtro
+      // ya no coincide, el upsert intenta INSERTAR y choca con el índice único
+      // → E11000, que el catch traduce a 403 inmutable.
+      { patientId: patientId, type: TYPE_CLINIC, deletedAt: null, firmadoEn: null },
       updateOps,
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true } // P4
     );
     
     // debugLog('💾 [saveClinicalHistoryEntries] Documento guardado en BD:', {
@@ -657,6 +703,14 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
 
     res.status(201).json(responseData);
   } catch (error) {
+    // P3: choque con el índice único = el odontograma clínico fue firmado en una
+    // request concurrente tras la verificación → 403 inmutable (no 500 opaco).
+    if (error && error.code === 11000) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico firmado. Use addendum para correcciones.' }
+      });
+    }
     next(error);
   }
 };
@@ -673,6 +727,14 @@ const deleteClinicalHistoryEntry = async (req, res, next) => {
       });
     }
     
+    // P5: entryId no-ObjectId → 404 en vez de CastError → 500.
+    if (!mongoose.Types.ObjectId.isValid(entryId)) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'ENTRY_NOT_FOUND', message: 'Entrada del historial no encontrada' }
+      });
+    }
+
     const result = await OdontogramaModel.updateOne(
       {
         patientId: patientId,
@@ -868,6 +930,18 @@ const validarEntradasOdontograma = (req, res, next) => {
         error: {
           code: 'INVALID_ENTRY',
           message: `Entry #${i} debe tener 'tooth' y 'damage' (o 'condition')`,
+          invalidEntry: item
+        }
+      });
+    }
+    // P4: rechazar número FDI inválido con un 400 claro. Antes pasaba sin
+    // validar; con runValidators activo produciría un 500 por ValidationError.
+    if (!FDI_TOOTH_REGEX.test(String(item.tooth))) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_TOOTH',
+          message: `Entry #${i}: '${item.tooth}' no es un número FDI válido (11-48, 51-85).`,
           invalidEntry: item
         }
       });

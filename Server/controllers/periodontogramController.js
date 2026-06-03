@@ -13,6 +13,12 @@ const {
   buildArcadasFromTeeth
 } = require('../utils/periodontogramAdaptors');
 
+// PHI en logs (auditoría · medios): varios console.log informativos volcaban
+// req.body / payload / validatedData (mediciones del paciente) a stdout incluso
+// en producción. Se gatean con NODE_ENV. console.error/console.warn se mantienen
+// siempre activos para no perder diagnóstico de fallos.
+const debugLog = process.env.NODE_ENV !== 'production' ? console.log.bind(console) : () => {};
+
 // Helper local: detectar claves legacy no canónicas en cualquier nivel del payload
 // Se evita duplicación: no existe helper similar en utils ni middleware de este controlador
 const FORBIDDEN_LEGACY_KEYS = new Set([
@@ -83,7 +89,7 @@ const ensurePeriodontogramExists = async (patientId, userId = null) => {
     let periodontogram = await Periodontogram.findOne({ patient: patientId });
     
     if (!periodontogram) {
-      console.log('🦷 Periodontograma no encontrado, creando uno nuevo para paciente:', patientId);
+      debugLog('🦷 Periodontograma no encontrado, creando uno nuevo para paciente:', patientId);
       
       // Verificar que el paciente existe
       const patient = await Patient.findById(patientId);
@@ -93,7 +99,7 @@ const ensurePeriodontogramExists = async (patientId, userId = null) => {
 
       // Crear periodontograma inicial
       periodontogram = await Periodontogram.createInitial(patientId, userId);
-      console.log('✅ Periodontograma inicial creado exitosamente con ID:', periodontogram._id);
+      debugLog('✅ Periodontograma inicial creado exitosamente con ID:', periodontogram._id);
     }
     
     return periodontogram;
@@ -142,7 +148,7 @@ exports.getPeriodontogram = [
         .exec();
       
       if (!optimizedPeriodontogram) {
-        console.log('⚠️ Error inesperado: Periodontograma no encontrado después de creación');
+        debugLog('⚠️ Error inesperado: Periodontograma no encontrado después de creación');
         return res.status(500).json({
           success: false,
           message: 'Error interno del servidor'
@@ -186,12 +192,12 @@ exports.getPeriodontogram = [
  * Se espera que en req.body llegue el estado inicial.
  */
 exports.createInitialPeriodontogram = async (req, res) => {
-    console.log('🔍 DEBUG createInitialPeriodontogram:');
-    console.log('  - req.params:', req.params);
-    console.log('  - req.params.id:', req.params.id);
-    console.log('  - req.body:', req.body);
-    console.log('  - req.url:', req.url);
-    console.log('  - req.originalUrl:', req.originalUrl);
+    debugLog('🔍 DEBUG createInitialPeriodontogram:');
+    debugLog('  - req.params:', req.params);
+    debugLog('  - req.params.id:', req.params.id);
+    debugLog('  - req.body:', req.body);
+    debugLog('  - req.url:', req.url);
+    debugLog('  - req.originalUrl:', req.originalUrl);
     
     try {
       const { id } = req.params;
@@ -279,10 +285,10 @@ exports.updateFullPeriodontogram = [
   validatePatientIdAsId,
   checkValidationErrors,
   async (req, res) => {
-    console.log('🔍 DEBUG updateFullPeriodontogram:');
-    console.log('  - req.params:', req.params);
-    console.log('  - req.body keys:', Object.keys(req.body));
-    console.log('  - teeth count:', req.body.teeth ? Object.keys(req.body.teeth).length : 0);
+    debugLog('🔍 DEBUG updateFullPeriodontogram:');
+    debugLog('  - req.params:', req.params);
+    debugLog('  - req.body keys:', Object.keys(req.body));
+    debugLog('  - teeth count:', req.body.teeth ? Object.keys(req.body.teeth).length : 0);
     
     try {
       const { id } = req.params;
@@ -306,13 +312,13 @@ exports.updateFullPeriodontogram = [
         });
       }
       
-      console.log('  - patientId from params:', id);
-      console.log('  - userId:', userId);
+      debugLog('  - patientId from params:', id);
+      debugLog('  - userId:', userId);
       
       // Buscar periodontograma
-      console.log('  - Buscando periodontograma...');
+      debugLog('  - Buscando periodontograma...');
       let periodontogram = await Periodontogram.findOne({ patient: id });
-      console.log('  - Periodontograma encontrado:', !!periodontogram);
+      debugLog('  - Periodontograma encontrado:', !!periodontogram);
 
       // NOM-024: la inmutabilidad aplica sólo a registros REALMENTE firmados
       // (`firmadoEn != null`). Antes el guard usaba `estadoRegistro === 'OFICIAL'`
@@ -336,12 +342,12 @@ exports.updateFullPeriodontogram = [
       }
 
       if (!periodontogram) {
-        console.log('  - Creando nuevo periodontograma...');
+        debugLog('  - Creando nuevo periodontograma...');
         try {
           // Verificar que el paciente existe antes de crear el periodontograma
           const patient = await Patient.findById(id);
           if (!patient) {
-            console.log('  - Paciente no encontrado:', id);
+            debugLog('  - Paciente no encontrado:', id);
             return res.status(404).json({
               success: false,
               message: 'Paciente no encontrado'
@@ -350,7 +356,7 @@ exports.updateFullPeriodontogram = [
           
           // Si no existe, crear uno nuevo
           periodontogram = await Periodontogram.createInitial(id, userId);
-          console.log('  - Nuevo periodontograma creado exitosamente');
+          debugLog('  - Nuevo periodontograma creado exitosamente');
         } catch (createError) {
           console.error('  - Error creando periodontograma:', createError.message);
           throw new Error(`Error al crear periodontograma inicial: ${createError.message}`);
@@ -358,7 +364,7 @@ exports.updateFullPeriodontogram = [
       }
       
       // Actualizar datos básicos
-      console.log('  - Actualizando metadatos...');
+      debugLog('  - Actualizando metadatos...');
       if (date && periodontogram.initial?.metadata) {
         periodontogram.initial.metadata.lastModified = new Date(date);
         periodontogram.initial.metadata.modifiedBy = userId;
@@ -368,9 +374,9 @@ exports.updateFullPeriodontogram = [
       // Procesamiento de datos de dientes individuales ELIMINADO - solo imágenes y estadísticas
       
       // Guardar cambios
-      console.log('  - Guardando cambios...');
+      debugLog('  - Guardando cambios...');
       await periodontogram.save();
-      console.log('  - Cambios guardados exitosamente');
+      debugLog('  - Cambios guardados exitosamente');
       
 
       
@@ -635,7 +641,7 @@ exports.savePeriodontogramData = [
       const normalizedTeethInput = normalizeFurcaInTeeth(adaptedTeeth);
 
       // ✅ ESQUEMA UNIFICADO - Validar datos sin transformaciones
-      console.log('📋 Validando datos con esquema unificado:', payload);
+      debugLog('📋 Validando datos con esquema unificado:', payload);
 
       const validatedData = validatePeriodontogramData({
         pacienteId: patientId,
@@ -644,7 +650,7 @@ exports.savePeriodontogramData = [
         version: payload.versionName || payload.version || generateDefaultVersionName()
       });
 
-      console.log('✅ Datos validados correctamente:', validatedData);
+      debugLog('✅ Datos validados correctamente:', validatedData);
 
       const periodontogram = await ensurePeriodontogramExists(patientId, userId);
 

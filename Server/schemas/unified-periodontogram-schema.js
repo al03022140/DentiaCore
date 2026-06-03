@@ -238,7 +238,7 @@ const UnifiedToothSchema = new mongoose.Schema({
   
   pronostico: {
     type: String,
-    enum: ['Bueno', 'Regular', 'Malo', 'Dudoso'],
+    enum: ['Bueno', 'Regular', 'Malo', 'Dudoso', 'Imposible'], // P6: +Imposible (la UI lo ofrece)
     default: 'Bueno'
   },
   
@@ -470,7 +470,7 @@ function validateToothData(toothData, toothNumber = null) {
     // Normaliza a minúsculas antes de validar para evitar warnings por capitalización
     pronostico: (() => {
       const rawPronostico = typeof toothData.pronostico === 'string' ? toothData.pronostico.toLowerCase() : toothData.pronostico;
-      const pronosticoValue = validateValue(rawPronostico, 'string', { enum: ['bueno', 'regular', 'malo', 'dudoso'], default: 'bueno' });
+      const pronosticoValue = validateValue(rawPronostico, 'string', { enum: ['bueno', 'regular', 'malo', 'dudoso', 'imposible'], default: 'bueno' }); // P6: +imposible
       return pronosticoValue.charAt(0).toUpperCase() + pronosticoValue.slice(1);
     })(),
     fechaUltimaModificacion: new Date()

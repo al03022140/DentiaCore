@@ -155,7 +155,10 @@ MEASUREMENT_LIMITS.margen = MEASUREMENT_LIMITS.margenGingival;
  */
 export const FIELD_OPTIONS = {
   pronostico: {
-    values: ['Bueno', 'Regular', 'Malo', 'Dudoso'],
+    // P6: +Imposible (lo ofrece el selector de la UI) y se conserva 'Regular'
+    // por datos legados. Sin esto, el validador del cliente degradaba
+    // 'Imposible' a 'Bueno' ANTES de mandarlo al backend → pérdida del dato.
+    values: ['Bueno', 'Regular', 'Malo', 'Dudoso', 'Imposible'],
     default: 'Bueno',
     description: 'Pronóstico individual del diente'
   },
