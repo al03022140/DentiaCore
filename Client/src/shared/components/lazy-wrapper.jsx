@@ -1,14 +1,15 @@
 import React, { Suspense, memo } from 'react';
 import './LazyWrapper.css';
+import ErrorBoundary from './error-boundary';
 
 /**
  * Componente wrapper para carga lazy con fallback personalizado
  * Optimiza el rendimiento cargando componentes bajo demanda
  */
-const LazyWrapper = memo(({ 
-  children, 
-  fallback = <DefaultLoadingFallback />, 
-  errorBoundary = true 
+const LazyWrapper = memo(({
+  children,
+  fallback = <DefaultLoadingFallback />,
+  errorBoundary = true
 }) => {
   const content = (
     <Suspense fallback={fallback}>
@@ -17,10 +18,27 @@ const LazyWrapper = memo(({
   );
 
   if (errorBoundary) {
+    // Usa la ErrorBoundary compartida; el fallback recibe `reset` para reintentar
+    // el render del componente lazy sin recargar toda la página.
     return (
-      <LazyErrorBoundary>
+      <ErrorBoundary
+        fallback={({ reset }) => (
+          <div className="lazy-error-container">
+            <div className="lazy-error-icon">⚠️</div>
+            <h3>Error al cargar componente</h3>
+            <p>No se pudo cargar el componente solicitado.</p>
+            <button type="button" className="lazy-error-retry" onClick={reset}>
+              Reintentar
+            </button>
+          </div>
+        )}
+        onError={(error, errorInfo) => {
+          // eslint-disable-next-line no-console
+          console.error('Error en componente lazy:', error, errorInfo);
+        }}
+      >
         {content}
-      </LazyErrorBoundary>
+      </ErrorBoundary>
     );
   }
 
@@ -40,51 +58,13 @@ const DefaultLoadingFallback = () => (
 );
 
 /**
- * Error boundary específico para componentes lazy
- */
-class LazyErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Error en componente lazy:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="lazy-error-container">
-          <div className="lazy-error-icon">⚠️</div>
-          <h3>Error al cargar componente</h3>
-          <p>No se pudo cargar el componente solicitado.</p>
-          <button 
-            className="lazy-error-retry"
-            onClick={() => this.setState({ hasError: false, error: null })}
-          >
-            Reintentar
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-/**
  * HOC para crear componentes lazy con configuración personalizada
  */
 export const createLazyComponent = (importFunction, options = {}) => {
   const LazyComponent = React.lazy(importFunction);
-  
+
   return memo((props) => (
-    <LazyWrapper 
+    <LazyWrapper
       fallback={options.fallback}
       errorBoundary={options.errorBoundary !== false}
     >

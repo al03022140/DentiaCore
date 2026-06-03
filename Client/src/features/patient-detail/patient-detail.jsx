@@ -61,6 +61,7 @@ import { useAuth } from '../../app/auth/AuthContext.jsx';
 import { hasPermission } from '../../app/auth/permissions';
 
 import { getPatientById, deletePatient } from '../../shared/services/patient-service.js';
+import OdontogramErrorBoundary from './components/odontogram-error-boundary.jsx';
 
 const MIN_DELETE_REASON_LENGTH = 10;
 
@@ -73,36 +74,6 @@ Otorgo mi consentimiento expreso para la captura, tratamiento y conservación de
 
 Entiendo que tengo derecho a acceder, rectificar, cancelar u oponerme al tratamiento de mis datos (Derechos ARCO) y que puedo ejercerlos en cualquier momento solicitándolo en este consultorio.`;
 
-
-class OdontogramErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Odontogram Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="error-boundary">
-          <h3>Error en el módulo de odontograma</h3>
-          <p>Por favor, recarga la página o contacta con soporte.</p>
-          <button onClick={() => window.location.reload()}>
-            Recargar página
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 const Loading = () => (
   <div className="loading-container">
