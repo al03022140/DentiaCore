@@ -3043,8 +3043,77 @@ def _find_compatible_python():
     return None
 
 
+def _is_windows_admin():
+    """True si el proceso actual está elevado (Windows). False en otros SO o ante error."""
+    if sys.platform != 'win32':
+        return True
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def _relaunch_as_admin():
+    """
+    Relanza este launcher elevado (prompt UAC) en Windows.
+
+    Necesario porque el instalador (install.ps1) registra MongoDB como SERVICIO
+    de Windows ("MongoDB"), y arrancar/parar servicios (`net start MongoDB`)
+    requiere privilegios de administrador. El acceso directo del Escritorio abre
+    el launcher SIN elevar, así que sin esto el launcher no puede iniciar el
+    mismo servicio que instala el .bat.
+
+    Devuelve True si se lanzó el proceso elevado (este proceso debe terminar),
+    o False si no se pudo elevar (p. ej. el usuario canceló UAC) y se debe
+    continuar en modo no-elevado (degradado).
+    """
+    try:
+        import ctypes
+
+        # Intérprete a relanzar. Si está congelado (PyInstaller) es el propio
+        # .exe; si no, es python.exe/pythonw.exe + la ruta del script.
+        if getattr(sys, 'frozen', False):
+            executable = sys.executable
+            args = list(sys.argv[1:])
+        else:
+            executable = sys.executable  # python.exe / pythonw.exe
+            args = [os.path.abspath(sys.argv[0])] + list(sys.argv[1:])
+
+        # Centinela anti-bucle: si IsUserAnAdmin fallara tras elevar, este flag
+        # evita reintentar la elevación indefinidamente.
+        if '--elevated' not in args:
+            args.append('--elevated')
+
+        params = subprocess.list2cmdline(args)
+        work_dir = str(Path(__file__).resolve().parent)
+
+        # ShellExecuteW con verbo "runas" dispara el UAC. Retorno > 32 = éxito;
+        # <= 32 indica error (1223/ERROR_CANCELLED si el usuario lo rechaza).
+        rc = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", executable, params, work_dir, 1  # SW_SHOWNORMAL
+        )
+        return int(rc) > 32
+    except Exception as e:
+        print(f"⚠️ No se pudo solicitar elevación de administrador: {e}")
+        return False
+
+
 def main():
     """Función principal"""
+    # Windows: elevar a administrador ANTES de abrir la UI. El launcher necesita
+    # privilegios para iniciar el servicio Windows "MongoDB" que crea el
+    # instalador (net start MongoDB). Un único prompt UAC al arrancar.
+    if sys.platform == 'win32' and '--elevated' not in sys.argv:
+        if not _is_windows_admin():
+            if _relaunch_as_admin():
+                # El proceso elevado tomó el control; cerrar esta instancia.
+                sys.exit(0)
+            # UAC cancelado o fallo al elevar: continuar sin privilegios. La app
+            # abre igual, pero si MongoDB es un servicio detenido el usuario
+            # podría tener que iniciarlo manualmente (lo indica el diálogo).
+            print("⚠️ Continuando sin permisos de administrador; iniciar el servicio MongoDB podría fallar.")
+
     # Ensure Homebrew paths are in PATH on macOS (needed when launched from Finder/.app or without shell profile)
     if sys.platform == 'darwin':
         _brew_paths = '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin'
