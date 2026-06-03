@@ -26,9 +26,7 @@ export { Rendering };
 // Operaciones de dientes (desde ToothOperations.js)
 export const Tooth = {
   // Funciones de estado del diente
-  // toggleAbsent: función eliminada - usar PeriodontogramStateManager.toggleToothAbsent
   toggleImplant: ToothOperations.toggleToothImplant,
-  // reset: función eliminada - usar PeriodontogramStateManager.resetToothClinicalData
   
   // Funciones de validación y utilidad
   isValid: isValidToothNumber,
@@ -47,48 +45,32 @@ export const Tooth = {
 };
 
 // Exportaciones individuales para compatibilidad
-// toggleToothAbsent eliminado - usar PeriodontogramStateManager.toggleToothAbsent
 export const { getToothNumberButtonProps } = ToothOperations;
 
-// Exportaciones individuales eliminadas - usar las organizadas por funcionalidad
 
 // Operaciones de indicadores clínicos (desde ClinicalIndicators.js)
 export const Clinical = {
   // Sangrado
   bleeding: {
-    // update: función eliminada - no se manejan datos individuales
-    // setAll: función eliminada - no se manejan datos individuales
-    // calculatePercentage eliminado - Usar UniversalToothValidator.calculateStatistics().bleedingPercentage
     interpretLevel: ClinicalIndicators.getBleedingInterpretation,
-    // clear: función eliminada - no se manejan datos individuales
   },
   
   // Placa
   plaque: {
-    // update: función eliminada - no se manejan datos individuales
-    // setAll: función eliminada - no se manejan datos individuales
-    // calculatePercentage eliminado - Usar UniversalToothValidator.calculateStatistics().plaquePercentage
     interpretLevel: ClinicalIndicators.getPlaqueInterpretation,
-    // clear: función eliminada - no se manejan datos individuales
   },
   
   // Movilidad
   mobility: {
-    // update: función eliminada - no se manejan datos individuales
-    // increment: función eliminada - no se manejan datos individuales
-    // decrement: función eliminada - no se manejan datos individuales
     getStatistics: ClinicalIndicators.getMobilityStatistics,
-    // clear: función eliminada - no se manejan datos individuales
   },
   
 // Lesiones de furca
   furca: {
-    // update: función eliminada - no se manejan datos individuales
     canHave: ClinicalIndicators.canHaveFurca,
     needsDouble: ClinicalIndicators.needsDoubleFurca,
     getInfo: ClinicalIndicators.getFurcaInfo,
     getStatistics: ClinicalIndicators.getFurcaStatistics,
-    // clear: función eliminada - no se manejan datos individuales
   }
 };
 
@@ -160,19 +142,13 @@ export const Render = {
   }
 };
 
-// UtilityFunctions eliminado - funciones duplicadas ya disponibles en Tooth
 
-// StatisticalFunctions eliminado - funciones duplicadas ya disponibles en Clinical y Clinical_Measurements
 
 // ============================================================================
 // FUNCIONES DE LIMPIEZA
 // ============================================================================
 
 export const CleanupFunctions = {
-  // clearAllBleeding: función eliminada - no se manejan datos individuales
-  // clearAllPlaque: función eliminada - no se manejan datos individuales
-  // clearAllMobility: función eliminada - no se manejan datos individuales
-  // clearAllFurca: función eliminada - no se manejan datos individuales
   
   // Función consolidada para limpiar todos los datos clínicos
   clearAllClinicalData: (periodontogramData) => {
@@ -285,7 +261,6 @@ export const DataUtilityOperations = {
   // Funciones principales de utilidades de datos desde ToothOperations
   normalize: ToothOperations.normalizeToothData,
   validate: (toothData) => UniversalToothValidator.validateCompleteToothData(toothData),
-  // reset eliminado - usar PeriodontogramStateManager.resetToothClinicalData
 };
 
 // Exportación consolidada de todas las operaciones de renderizado - SIMPLIFICADA
