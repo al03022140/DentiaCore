@@ -6,6 +6,7 @@ import defaultAvatar from "../../assets/images/icons/Profile Default.svg";
 import "./styles/add-patient.css";
 import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
+import { invalidatePatientsCache } from '../../shared/services/patient-service';
 
 // Importar componentes de las secciones
 import Identification from './sections/identification';
@@ -1070,6 +1071,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       }
 
       const data = res.data;
+      // Invalidar la cache de la lista de pacientes: el alta/edición va por API
+      // directa (no por patient-service), así que sin esto la lista cacheada
+      // (2 min) quedaría desactualizada tras crear o editar un paciente.
+      invalidatePatientsCache();
       message.success(patientToEdit ? "Paciente actualizado correctamente" : "Paciente guardado correctamente");
 
       // Solo navegar si no se está usando como modal
