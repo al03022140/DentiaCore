@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const uniqueValidator = require('mongoose-unique-validator');
 const fs = require('fs');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 
@@ -995,11 +994,13 @@ PatientSchema.index({
 
 // ─── Configuración final del modelo ───────────────────────────────────────────
 
-// Aplicar el plugin de validación única
-PatientSchema.plugin(uniqueValidator, { 
-    message: 'El {PATH} ya está en uso.',
-    type: 'mongoose-unique-validator'
-});
+// Unicidad garantizada por los índices únicos a nivel de BD (`paciente_id` y
+// `documento.numero` declarados con `unique: true`) + el manejo de E11000 en
+// patientsController (→ 409 DUPLICATE_KEY) y el reintento de paciente_id en
+// savePatientWithRetry. Se retiró mongoose-unique-validator: añadía una query
+// extra por cada campo único en CADA save (latencia en el alta) sin aportar
+// garantía real — la barrera efectiva contra duplicados es el índice único de
+// Mongo, no una comprobación previa sujeta a race conditions.
 
 // Configurar opciones de transformación JSON
 PatientSchema.set('toJSON', {

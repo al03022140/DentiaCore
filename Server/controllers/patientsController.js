@@ -453,10 +453,15 @@ exports.createPatient = async (req, res) => {
         // Asegurar estructura de carpetas (multer pudo haber creado profile-pic ya)
         const patientFolderPath = resolveUploadsPath('pacientes', patientIdStr);
         try {
-            await ensureUploadsPath('pacientes');
-            await ensureUploadsPath('pacientes', patientIdStr);
-            await ensureUploadsPath('pacientes', patientIdStr, 'odontograma-inicial');
-            await ensureUploadsPath('pacientes', patientIdStr, 'profile-pic');
+            // ensureDir (fs-extra) crea toda la cadena de padres, así que basta
+            // con asegurar las dos carpetas hoja; las lanzamos en paralelo en
+            // vez de 4 awaits secuenciales (cada uno era un round-trip de I/O a
+            // disco en el camino crítico del alta). Ambas crean además
+            // `pacientes/` y `pacientes/<id>` como padres.
+            await Promise.all([
+                ensureUploadsPath('pacientes', patientIdStr, 'odontograma-inicial'),
+                ensureUploadsPath('pacientes', patientIdStr, 'profile-pic'),
+            ]);
             newPatient.ruta_archivos = patientFolderPath;
         } catch (err) {
             console.error('❌ Error al crear carpetas del paciente:', err);
