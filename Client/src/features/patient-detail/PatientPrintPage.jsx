@@ -8,7 +8,7 @@ import API from '../../shared/services/axios-instance.js';
 import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
 import { useAuth } from '../../app/auth/AuthContext';
 import { getSettings } from '../../shared/services/settingsService';
-import { getPatientById } from '../../shared/services/api.js';
+import { getPatientById } from '../../shared/services/patient-service.js';
 
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';

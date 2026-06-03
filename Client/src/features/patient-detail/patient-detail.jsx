@@ -60,7 +60,7 @@ import DoctorSignStep from '../../shared/components/DoctorSignStep.jsx';
 import { useAuth } from '../../app/auth/AuthContext.jsx';
 import { hasPermission } from '../../app/auth/permissions';
 
-import { getPatientById, deletePatient } from '../../shared/services/api.js';
+import { getPatientById, deletePatient } from '../../shared/services/patient-service.js';
 
 const MIN_DELETE_REASON_LENGTH = 10;
 

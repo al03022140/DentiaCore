@@ -13,7 +13,7 @@ import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 
 // Utilidades y API
 import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
-import { getAllPatients } from '../../shared/services/api';
+import { getAllPatients } from '../../shared/services/patient-service';
 
 // Formato compacto DD/MM/YY para que la fecha quepa en el chip de
 // "última visita" sin desbordar la card (el row tiene overflow:hidden y

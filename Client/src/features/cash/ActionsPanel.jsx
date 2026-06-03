@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descriptions, Statistic } from 'antd';
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, SearchOutlined, LockOutlined } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
-import { getAllPatients } from '../../shared/services/api';
+import { getAllPatients } from '../../shared/services/patient-service';
 import { formatMoney } from '../../shared/utils/money';
 
 const { confirm } = Modal;
