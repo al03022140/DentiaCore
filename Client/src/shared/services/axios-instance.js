@@ -100,6 +100,15 @@ API.interceptors.response.use(
     return response;
   },
   error => {
+    // Propaga el mensaje del servidor a `error.message` preservando el
+    // AxiosError completo (response/config/etc). Reemplaza al segundo
+    // interceptor que vivía en services/api.js y que devolvía un objeto plano
+    // (perdiendo el prototipo del AxiosError).
+    const serverMessage = error?.response?.data?.message;
+    if (serverMessage) {
+      error.message = serverMessage;
+    }
+
     if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
       console.error('API Error:', error.response?.status, error.config?.url, error.message);
     }
