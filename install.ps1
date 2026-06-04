@@ -48,7 +48,7 @@ function Run-NpmInstall {
     Write-Step "Ejecutando 'npm install' en $TargetDir..."
     Push-Location $TargetDir
     try {
-        $output = npm install --no-audit --no-fund 2>&1
+        $output = npm.cmd install --no-audit --no-fund 2>&1
     } catch {
         $output = $_ | Out-String
     }
@@ -381,7 +381,7 @@ try {
         Push-Location $ClientDir
         $BuildOut = $null
         try {
-            $BuildOut = & npm run build 2>&1 | Out-String
+            $BuildOut = & npm.cmd run build 2>&1 | Out-String
         } catch {
             $BuildOut = $_ | Out-String
         }
