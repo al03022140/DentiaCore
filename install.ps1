@@ -190,6 +190,14 @@ try {
         if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
         if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
 
+        # Config con rutas ABSOLUTAS y sin BOM. Critico: como servicio de Windows,
+        # mongod corre con working dir en C:\Windows\System32, asi que rutas
+        # relativas (dbPath: DB) apuntarian a System32\DB y el servicio moriria al
+        # arrancar. Se define aqui para usarlo tanto al crear como al normalizar.
+        $ConfigPath = Join-Path $RepoRoot "mongod.cfg"
+        $LogFile = "$LogDir\mongod.log"
+        $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
+
         $Service = Get-Service "MongoDB" -ErrorAction SilentlyContinue
 
         if (-not $Service) {
@@ -200,11 +208,6 @@ try {
             }
 
             if ($LocalMongoBin -and (Test-Path $LocalMongoBin)) {
-                $ConfigPath = Join-Path $RepoRoot "mongod.cfg"
-
-                $LogFile = "$LogDir\mongod.log"
-                $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
-
                 Write-Utf8NoBom -Path $ConfigPath -Content $ConfigContent
                 # Quotear paths para soportar rutas con espacios (ej. C:\Program Files\...).
                 # Sin esto, sc.exe/New-Service trunca el binPath en el primer espacio
@@ -219,23 +222,37 @@ try {
                 throw "mongod_not_found"
             }
         } else {
-            Write-Ok "Servicio MongoDB ya existe."
+            Write-Ok "Servicio MongoDB ya existe. Normalizando configuracion..."
             $WmiService = Get-WmiObject win32_service -Filter "Name='MongoDB'" -ErrorAction SilentlyContinue
             if ($WmiService) {
                 $PathName = $WmiService.PathName
-                if ($PathName -match 'config\s+(.+?)\s+--service') {
-                    $ExistingCfg = $matches[1].Trim('"')
-                    if (Test-Path $ExistingCfg) {
-                        $Content = Get-Content $ExistingCfg -Raw
-                        if ($Content -notmatch "0.0.0.0") {
-                            Write-Step "Actualizando bindIp a 0.0.0.0..."
-                            $Content = $Content -replace "bindIp:.*", "bindIp: 0.0.0.0"
-                            Write-Utf8NoBom -Path $ExistingCfg -Content $Content
-                            Restart-Service "MongoDB" -Force -ErrorAction SilentlyContinue
-                            Write-Ok "Servicio reiniciado."
-                        }
+
+                # Detectar el cfg que usa el servicio (entrecomillado o no).
+                $ExistingCfg = $null
+                if ($PathName -match '--config\s+"([^"]+)"') { $ExistingCfg = $matches[1] }
+                elseif ($PathName -match '--config\s+([^\s"]+)') { $ExistingCfg = $matches[1] }
+
+                # Reescribir SIEMPRE el cfg del servicio con rutas ABSOLUTAS y sin BOM.
+                # Esto arregla servicios viejos que quedaron con rutas relativas
+                # (dbPath: DB) y por eso no arrancaban (working dir del servicio = System32).
+                $TargetCfg = if ($ExistingCfg) { $ExistingCfg } else { $ConfigPath }
+                Write-Step "Reescribiendo cfg del servicio a rutas absolutas: $TargetCfg"
+                Write-Utf8NoBom -Path $TargetCfg -Content $ConfigContent
+
+                # Si el servicio no apuntaba a ningun --config, re-apuntarlo al cfg absoluto.
+                if (-not $ExistingCfg) {
+                    $ExistingBin = $null
+                    if ($PathName -match '^"([^"]+)"') { $ExistingBin = $matches[1] }
+                    elseif ($PathName -match '^(\S+)') { $ExistingBin = $matches[1] }
+                    if ($ExistingBin) {
+                        $NewBinPath = '"' + $ExistingBin + '" --config "' + $ConfigPath + '" --service'
+                        & sc.exe config MongoDB binPath= "$NewBinPath" | Out-Null
                     }
                 }
+
+                Write-Step "Reiniciando servicio MongoDB..."
+                Restart-Service "MongoDB" -Force -ErrorAction SilentlyContinue
+                Write-Ok "Configuracion normalizada y servicio reiniciado."
             }
         }
 
