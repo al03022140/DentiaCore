@@ -2331,7 +2331,11 @@ function parseAndValidateBirthDate(input) {
   } else if (typeof input === 'string') {
     const trimmed = input.trim();
     const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    // Acepta YYYY-MM-DD y también ISO-8601 con hora (YYYY-MM-DDTHH:mm…) o un
+    // espacio + hora: formatos inequívocos. El cliente envía YYYY-MM-DD, pero la
+    // BD/consumidores por API pueden mandar el ISO completo. Se sigue rechazando
+    // texto ambiguo ("Jan 5 2010", "5-6-2010"); sólo se usa la parte y-m-d.
+    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
     if (dmy) {
       const d = parseInt(dmy[1], 10);
       const m = parseInt(dmy[2], 10);
