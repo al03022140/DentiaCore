@@ -196,7 +196,7 @@ try {
         # arrancar. Se define aqui para usarlo tanto al crear como al normalizar.
         $ConfigPath = Join-Path $RepoRoot "mongod.cfg"
         $LogFile = "$LogDir\mongod.log"
-        $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 0.0.0.0`n  port: 27017"
+        $ConfigContent = "systemLog:`n  destination: file`n  path: $LogFile`n  logAppend: true`nstorage:`n  dbPath: $DataDir`nnet:`n  bindIp: 127.0.0.1`n  port: 27017"
 
         $Service = Get-Service "MongoDB" -ErrorAction SilentlyContinue
 
