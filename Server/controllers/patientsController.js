@@ -687,6 +687,9 @@ exports.updatePatient = async (req, res) => {
         // resolver el conflicto en lugar de pisar cambios ajenos. El campo
         // es opcional para no romper clientes existentes.
         const expectedUpdatedAtRaw = updateData.expectedUpdatedAt;
+        // Se eleva al scope de la función para reutilizarlo como guarda ATÓMICA
+        // en el findOneAndUpdate de más abajo (cierre del TOCTOU).
+        let expectedUpdatedAtDate = null;
         if (expectedUpdatedAtRaw !== undefined && expectedUpdatedAtRaw !== null) {
             const expectedDate = new Date(expectedUpdatedAtRaw);
             if (Number.isNaN(expectedDate.getTime())) {
@@ -711,6 +714,10 @@ exports.updatePatient = async (req, res) => {
                     serverUpdatedAt: current.updatedAt
                 });
             }
+            // Valor autoritativo del servidor para la guarda atómica de abajo:
+            // si entre este control y el update otra sesión escribe, updatedAt
+            // cambiará y el filtro del findOneAndUpdate no matcheará.
+            expectedUpdatedAtDate = new Date(current.updatedAt);
         }
 
         // Whitelist: el cliente sólo puede tocar campos clínicos/demográficos.
@@ -829,13 +836,37 @@ exports.updatePatient = async (req, res) => {
         setPayload.modificadoPor = req.user?.id || null;
         setPayload.modificadoEn = new Date();
 
+        const updateFilter = { _id: req.params.id, deletedAt: null };
+        if (expectedUpdatedAtDate) {
+            // Cierre ATÓMICO del TOCTOU (ver control de concurrencia arriba):
+            // exigir que updatedAt siga siendo el leído en el control. Si otra
+            // sesión guardó en la ventana entre ambos, el filtro no matchea y
+            // no se pisan sus cambios.
+            updateFilter.updatedAt = expectedUpdatedAtDate;
+        }
+
         const updatedPatient = await Patient.findOneAndUpdate(
-            { _id: req.params.id, deletedAt: null },
+            updateFilter,
             { $set: setPayload },
             { new: true, runValidators: true, context: 'query' }
         );
 
         if (!updatedPatient) {
+            // Si pedíamos guarda de concurrencia y no hubo match, distinguir
+            // entre "no existe / borrado" (404) y "cambió en la ventana TOCTOU"
+            // (409 PATIENT_STALE), para no reportar 404 ante una colisión.
+            if (expectedUpdatedAtDate) {
+                const stillExists = await Patient.findOne(
+                    { _id: req.params.id, deletedAt: null }
+                ).select('updatedAt').lean();
+                if (stillExists) {
+                    return res.status(409).json({
+                        message: 'El paciente fue modificado por otra sesión. Recarga para ver los cambios antes de guardar.',
+                        code: 'PATIENT_STALE',
+                        serverUpdatedAt: stillExists.updatedAt
+                    });
+                }
+            }
             return res.status(404).json({ message: "Paciente no encontrado" });
         }
 
