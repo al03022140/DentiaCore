@@ -55,6 +55,21 @@ exports.deleteAllPatients = async (req, res) => {
         
         // Borrar todos los pacientes
         const result = await Patient.deleteMany({});
+
+        // Cascada (dev-only): al borrar TODOS los pacientes, limpiar también las
+        // colecciones relacionadas para no dejar citas/odontogramas/perio/cargos/
+        // adjuntos huérfanos. (deletePatient hace soft-delete por-paciente; aquí
+        // es un wipe total de desarrollo.)
+        const Odontograma = require('../models/odontograma.js');
+        const PatientCharge = require('../models/patientCharge.js');
+        const PatientAttachment = require('../models/patientAttachment.js');
+        await Promise.all([
+            Appointment.deleteMany({}),
+            Periodontogram.deleteMany({}),
+            Odontograma.deleteMany({}),
+            PatientCharge.deleteMany({}),
+            PatientAttachment.deleteMany({}),
+        ]);
         
         // Borrar archivos asociados
     const pacientesDir = resolveUploadsPath('pacientes');
@@ -395,7 +410,7 @@ exports.createPatient = async (req, res) => {
         // Si el usuario sólo tiene `patients.create.basic` (recepcionista),
         // restringimos aún más a la ficha básica de identificación —
         // roles.MD: "Crear pacientes (ficha básica, sin historia clínica)".
-        const hasFullCreate = hasPermission(req.user?.permissions, ['patients.create']);
+        const hasFullCreate = hasPermission(getEffectivePermissions(req.user), ['patients.create']);
         const allowedFields = hasFullCreate ? CREATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
         const safePatientData = {};
         for (const key of allowedFields) {
@@ -606,10 +621,38 @@ exports.createPatients = async (req, res) => {
             patientsToInsert.push(newPatient);
         }
 
-        const newPatients = await Patient.insertMany(patientsToInsert);
-        res.status(201).json({
-            message: "Pacientes creados correctamente",
-            patients: newPatients
+        // Best-effort: ordered:false inserta todos los válidos y reporta los
+        // que fallan, en vez de abortar el lote completo en el primer duplicado
+        // (con ordered:true el cliente recibía 500 sin saber qué se insertó y
+        // reintentaba creando duplicados / quemando paciente_id). Devolvemos
+        // inserted + failed[] para que el importador reconcilie.
+        let insertedDocs = [];
+        let failed = [];
+        try {
+            insertedDocs = await Patient.insertMany(patientsToInsert, { ordered: false });
+        } catch (bulkErr) {
+            insertedDocs = Array.isArray(bulkErr.insertedDocs) ? bulkErr.insertedDocs : [];
+            const writeErrors = bulkErr.writeErrors
+                || (bulkErr.result && typeof bulkErr.result.getWriteErrors === 'function' ? bulkErr.result.getWriteErrors() : [])
+                || [];
+            // Si no es un fallo parcial reconocible (p. ej. error de conexión),
+            // delegar al catch externo.
+            if (!writeErrors.length && !insertedDocs.length) throw bulkErr;
+            failed = writeErrors.map((we) => ({
+                index: we.index,
+                code: we.code,
+                message: we.errmsg || (we.err && we.err.errmsg) || 'Error de inserción',
+                keyValue: (we.err && we.err.keyValue) || we.keyValue || null
+            }));
+        }
+
+        return res.status(failed.length === 0 ? 201 : 207).json({
+            message: failed.length === 0
+                ? 'Pacientes creados correctamente'
+                : `Creados ${insertedDocs.length} de ${patientsToInsert.length}; ${failed.length} fallaron`,
+            inserted: insertedDocs.length,
+            failed,
+            patients: insertedDocs
         });
 
     } catch (error) {
@@ -727,7 +770,7 @@ exports.updatePatient = async (req, res) => {
         // es la barrera principal.
         // Si el usuario sólo tiene `patients.update.basic` (recepcionista),
         // restringimos a la ficha básica — sin tocar el expediente clínico.
-        const hasFullUpdate = hasPermission(req.user?.permissions, ['patients.update']);
+        const hasFullUpdate = hasPermission(getEffectivePermissions(req.user), ['patients.update']);
         const allowedUpdateFields = hasFullUpdate ? UPDATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
         const safeUpdate = {};
         for (const key of allowedUpdateFields) {
@@ -2314,8 +2357,11 @@ function parseAndValidateBirthDate(input) {
         return null;
       }
     } else {
-      const candidate = new Date(trimmed);
-      if (!isNaN(candidate.getTime())) date = candidate;
+      // Estricto: sólo aceptamos DD/MM/YYYY o YYYY-MM-DD. Se eliminó el
+      // fallback `new Date(trimmed)`, que aceptaba formatos ambiguos
+      // ("Jan 5 2010", "5-6-2010", "2010/06/05") con semántica de
+      // timezone/locale y producía fecha_nacimiento/edad inconsistentes.
+      return null;
     }
   } else if (input != null) {
     const candidate = new Date(input);
