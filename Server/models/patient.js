@@ -995,12 +995,14 @@ PatientSchema.index({
 
 // ─── Configuración final del modelo ───────────────────────────────────────────
 
-// Unicidad de `paciente_id` y `documento.numero`: la garantizan los índices
-// únicos declarados a nivel de campo (Mongo lanza E11000 en la inserción).
-// Se quitó `mongoose-unique-validator`: en cada save hacía un countDocuments
-// extra por cada campo único (round-trips de más a Mongo en cada alta) y era
-// racy. El alta ya maneja el E11000 — paciente_id con reintento
-// (savePatientWithRetry) y documento.numero con un 409 claro en el controlador.
+// Unicidad de `paciente_id` y `documento.numero`: garantizada por los índices
+// únicos declarados a nivel de campo (`unique: true`) — Mongo lanza E11000 en la
+// inserción — más el manejo en patientsController (paciente_id con reintento en
+// savePatientWithRetry; documento.numero con un 409 DUPLICATE_KEY claro).
+// Se retiró `mongoose-unique-validator`: hacía un countDocuments extra por cada
+// campo único en CADA save (latencia de más en el alta) y era racy. La barrera
+// efectiva contra duplicados es el índice único de Mongo, no una comprobación
+// previa sujeta a race conditions.
 
 // Configurar opciones de transformación JSON
 PatientSchema.set('toJSON', {

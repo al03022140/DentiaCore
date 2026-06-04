@@ -56,6 +56,21 @@ exports.deleteAllPatients = async (req, res) => {
         
         // Borrar todos los pacientes
         const result = await Patient.deleteMany({});
+
+        // Cascada (dev-only): al borrar TODOS los pacientes, limpiar también las
+        // colecciones relacionadas para no dejar citas/odontogramas/perio/cargos/
+        // adjuntos huérfanos. (deletePatient hace soft-delete por-paciente; aquí
+        // es un wipe total de desarrollo.)
+        const Odontograma = require('../models/odontograma.js');
+        const PatientCharge = require('../models/patientCharge.js');
+        const PatientAttachment = require('../models/patientAttachment.js');
+        await Promise.all([
+            Appointment.deleteMany({}),
+            Periodontogram.deleteMany({}),
+            Odontograma.deleteMany({}),
+            PatientCharge.deleteMany({}),
+            PatientAttachment.deleteMany({}),
+        ]);
         
         // Borrar archivos asociados
     const pacientesDir = resolveUploadsPath('pacientes');
@@ -406,7 +421,7 @@ exports.createPatient = async (req, res) => {
         // Si el usuario sólo tiene `patients.create.basic` (recepcionista),
         // restringimos aún más a la ficha básica de identificación —
         // roles.MD: "Crear pacientes (ficha básica, sin historia clínica)".
-        const hasFullCreate = hasPermission(req.user?.permissions, ['patients.create']);
+        const hasFullCreate = hasPermission(getEffectivePermissions(req.user), ['patients.create']);
         const allowedFields = hasFullCreate ? CREATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
         const safePatientData = {};
         for (const key of allowedFields) {
@@ -489,10 +504,15 @@ exports.createPatient = async (req, res) => {
         // Asegurar estructura de carpetas (multer pudo haber creado profile-pic ya)
         const patientFolderPath = resolveUploadsPath('pacientes', patientIdStr);
         try {
-            await ensureUploadsPath('pacientes');
-            await ensureUploadsPath('pacientes', patientIdStr);
-            await ensureUploadsPath('pacientes', patientIdStr, 'odontograma-inicial');
-            await ensureUploadsPath('pacientes', patientIdStr, 'profile-pic');
+            // ensureDir (fs-extra) crea toda la cadena de padres, así que basta
+            // con asegurar las dos carpetas hoja; las lanzamos en paralelo en
+            // vez de 4 awaits secuenciales (cada uno era un round-trip de I/O a
+            // disco en el camino crítico del alta). Ambas crean además
+            // `pacientes/` y `pacientes/<id>` como padres.
+            await Promise.all([
+                ensureUploadsPath('pacientes', patientIdStr, 'odontograma-inicial'),
+                ensureUploadsPath('pacientes', patientIdStr, 'profile-pic'),
+            ]);
             newPatient.ruta_archivos = patientFolderPath;
         } catch (err) {
             console.error('❌ Error al crear carpetas del paciente:', err);
@@ -642,10 +662,38 @@ exports.createPatients = async (req, res) => {
             patientsToInsert.push(newPatient);
         }
 
-        const newPatients = await Patient.insertMany(patientsToInsert);
-        res.status(201).json({
-            message: "Pacientes creados correctamente",
-            patients: newPatients
+        // Best-effort: ordered:false inserta todos los válidos y reporta los
+        // que fallan, en vez de abortar el lote completo en el primer duplicado
+        // (con ordered:true el cliente recibía 500 sin saber qué se insertó y
+        // reintentaba creando duplicados / quemando paciente_id). Devolvemos
+        // inserted + failed[] para que el importador reconcilie.
+        let insertedDocs = [];
+        let failed = [];
+        try {
+            insertedDocs = await Patient.insertMany(patientsToInsert, { ordered: false });
+        } catch (bulkErr) {
+            insertedDocs = Array.isArray(bulkErr.insertedDocs) ? bulkErr.insertedDocs : [];
+            const writeErrors = bulkErr.writeErrors
+                || (bulkErr.result && typeof bulkErr.result.getWriteErrors === 'function' ? bulkErr.result.getWriteErrors() : [])
+                || [];
+            // Si no es un fallo parcial reconocible (p. ej. error de conexión),
+            // delegar al catch externo.
+            if (!writeErrors.length && !insertedDocs.length) throw bulkErr;
+            failed = writeErrors.map((we) => ({
+                index: we.index,
+                code: we.code,
+                message: we.errmsg || (we.err && we.err.errmsg) || 'Error de inserción',
+                keyValue: (we.err && we.err.keyValue) || we.keyValue || null
+            }));
+        }
+
+        return res.status(failed.length === 0 ? 201 : 207).json({
+            message: failed.length === 0
+                ? 'Pacientes creados correctamente'
+                : `Creados ${insertedDocs.length} de ${patientsToInsert.length}; ${failed.length} fallaron`,
+            inserted: insertedDocs.length,
+            failed,
+            patients: insertedDocs
         });
 
     } catch (error) {
@@ -732,6 +780,9 @@ exports.updatePatient = async (req, res) => {
         // resolver el conflicto en lugar de pisar cambios ajenos. El campo
         // es opcional para no romper clientes existentes.
         const expectedUpdatedAtRaw = updateData.expectedUpdatedAt;
+        // Se eleva al scope de la función para reutilizarlo como guarda ATÓMICA
+        // en el findOneAndUpdate de más abajo (cierre del TOCTOU).
+        let expectedUpdatedAtDate = null;
         if (expectedUpdatedAtRaw !== undefined && expectedUpdatedAtRaw !== null) {
             const expectedDate = new Date(expectedUpdatedAtRaw);
             if (Number.isNaN(expectedDate.getTime())) {
@@ -756,6 +807,10 @@ exports.updatePatient = async (req, res) => {
                     serverUpdatedAt: current.updatedAt
                 });
             }
+            // Valor autoritativo del servidor para la guarda atómica de abajo:
+            // si entre este control y el update otra sesión escribe, updatedAt
+            // cambiará y el filtro del findOneAndUpdate no matcheará.
+            expectedUpdatedAtDate = new Date(current.updatedAt);
         }
 
         // Whitelist: el cliente sólo puede tocar campos clínicos/demográficos.
@@ -765,7 +820,7 @@ exports.updatePatient = async (req, res) => {
         // es la barrera principal.
         // Si el usuario sólo tiene `patients.update.basic` (recepcionista),
         // restringimos a la ficha básica — sin tocar el expediente clínico.
-        const hasFullUpdate = hasPermission(req.user?.permissions, ['patients.update']);
+        const hasFullUpdate = hasPermission(getEffectivePermissions(req.user), ['patients.update']);
         const allowedUpdateFields = hasFullUpdate ? UPDATE_ALLOWED_FIELDS : BASIC_PATIENT_WRITE_FIELDS;
         const safeUpdate = {};
         for (const key of allowedUpdateFields) {
@@ -894,13 +949,37 @@ exports.updatePatient = async (req, res) => {
         setPayload.modificadoPor = req.user?.id || null;
         setPayload.modificadoEn = new Date();
 
+        const updateFilter = { _id: req.params.id, deletedAt: null };
+        if (expectedUpdatedAtDate) {
+            // Cierre ATÓMICO del TOCTOU (ver control de concurrencia arriba):
+            // exigir que updatedAt siga siendo el leído en el control. Si otra
+            // sesión guardó en la ventana entre ambos, el filtro no matchea y
+            // no se pisan sus cambios.
+            updateFilter.updatedAt = expectedUpdatedAtDate;
+        }
+
         const updatedPatient = await Patient.findOneAndUpdate(
-            { _id: req.params.id, deletedAt: null },
+            updateFilter,
             { $set: setPayload },
             { new: true, runValidators: true, context: 'query' }
         );
 
         if (!updatedPatient) {
+            // Si pedíamos guarda de concurrencia y no hubo match, distinguir
+            // entre "no existe / borrado" (404) y "cambió en la ventana TOCTOU"
+            // (409 PATIENT_STALE), para no reportar 404 ante una colisión.
+            if (expectedUpdatedAtDate) {
+                const stillExists = await Patient.findOne(
+                    { _id: req.params.id, deletedAt: null }
+                ).select('updatedAt').lean();
+                if (stillExists) {
+                    return res.status(409).json({
+                        message: 'El paciente fue modificado por otra sesión. Recarga para ver los cambios antes de guardar.',
+                        code: 'PATIENT_STALE',
+                        serverUpdatedAt: stillExists.updatedAt
+                    });
+                }
+            }
             return res.status(404).json({ message: "Paciente no encontrado" });
         }
 
@@ -2322,7 +2401,11 @@ function parseAndValidateBirthDate(input) {
   } else if (typeof input === 'string') {
     const trimmed = input.trim();
     const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    // Acepta YYYY-MM-DD y también ISO-8601 con hora (YYYY-MM-DDTHH:mm…) o un
+    // espacio + hora: formatos inequívocos. El cliente envía YYYY-MM-DD, pero la
+    // BD/consumidores por API pueden mandar el ISO completo. Se sigue rechazando
+    // texto ambiguo ("Jan 5 2010", "5-6-2010"); sólo se usa la parte y-m-d.
+    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
     if (dmy) {
       const d = parseInt(dmy[1], 10);
       const m = parseInt(dmy[2], 10);
@@ -2348,8 +2431,11 @@ function parseAndValidateBirthDate(input) {
         return null;
       }
     } else {
-      const candidate = new Date(trimmed);
-      if (!isNaN(candidate.getTime())) date = candidate;
+      // Estricto: sólo aceptamos DD/MM/YYYY o YYYY-MM-DD. Se eliminó el
+      // fallback `new Date(trimmed)`, que aceptaba formatos ambiguos
+      // ("Jan 5 2010", "5-6-2010", "2010/06/05") con semántica de
+      // timezone/locale y producía fecha_nacimiento/edad inconsistentes.
+      return null;
     }
   } else if (input != null) {
     const candidate = new Date(input);

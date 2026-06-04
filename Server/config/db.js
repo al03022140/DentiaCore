@@ -42,6 +42,29 @@ const connectDB = async (options = {}) => {
             logger.info('🔄 Intentando conectar a MongoDB (intento %d/%d)...', attempt, maxRetries);
             await mongoose.connect(uri, mongooseOptions);
             logger.info('✅ Conectado a MongoDB');
+
+            // Asegurar los índices únicos críticos del modelo Patient.
+            // `autoIndex` está deshabilitado en producción (ver patient.js), así
+            // que sin esto los índices `unique` de `paciente_id` y
+            // `documento.numero` pueden NO existir en una BD de producción: se
+            // colarían pacientes/documentos duplicados en silencio y el manejo
+            // de E11000 → 409 del controller nunca dispararía. createIndexes()
+            // SOLO crea los índices que falten (no borra otros, a diferencia de
+            // syncIndexes), y es best-effort: si ya hubiera duplicados
+            // preexistentes la construcción del índice único fallará — lo
+            // registramos de forma prominente pero NO abortamos el arranque,
+            // para que la clínica pueda seguir operando mientras se depura.
+            try {
+                const Patient = require('../models/patient');
+                await Patient.createIndexes();
+                logger.info('✅ Índices únicos de Patient asegurados');
+            } catch (indexError) {
+                logger.error(
+                    '⚠️  No se pudieron crear los índices de Patient. Si es por duplicados preexistentes en paciente_id o documento.numero, la unicidad NO queda garantizada hasta resolverlos.',
+                    { error: indexError }
+                );
+            }
+
             return mongoose.connection;
         } catch (error) {
             logger.error('❌ Error al conectar con MongoDB (intento %d/%d)', attempt, maxRetries, { error });

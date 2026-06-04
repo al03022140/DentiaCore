@@ -64,7 +64,9 @@ const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 // Middleware de validación de ID
 const validateId = (req, res, next) => {
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+  // 24-hex estricto: ObjectId.isValid() acepta cualquier string de 12 bytes
+  // (p. ej. "patientidxx!"), que luego castea y da 404 en vez de un 400 claro.
+  if (!/^[a-fA-F0-9]{24}$/.test(req.params.id || '')) {
     return res.status(400).json({ 
       success: false, 
       error: { 
@@ -91,7 +93,12 @@ const uploadFoto = multer({
     },
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, `foto-${uniqueSuffix}${path.extname(file.originalname)}`);
+      // Seguridad: NO derivar la extensión de originalname (controlado por el
+      // cliente). El fileFilter ya restringe el mimetype a JPG/PNG; usamos ESE
+      // valor para fijar la extensión, así un originalname tipo "x.svg"/"x.html"
+      // no se guarda ni se sirve como SVG/HTML (XSS almacenado vía /uploads).
+      const ext = file.mimetype === 'image/png' ? '.png' : '.jpg';
+      cb(null, `foto-${uniqueSuffix}${ext}`);
     }
   }),
   limits: {
@@ -189,10 +196,14 @@ if (process.env.NODE_ENV !== 'production') {
   router.delete('/', writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 }
 
-router.post('/batch', writeLimiter, authorize(['patients.create']), uploadFoto.array('fotos', 10), handleMulterError, patientCtrl.createPatients);
+// /batch es JSON puro: createPatients lee req.body como array y NO maneja
+// fotos. Antes tenía uploadFoto.array('fotos',10), que escribía a disco fotos
+// que el controller nunca asociaba ni limpiaba → archivos PII huérfanos. Se
+// quita el multer; el alta con foto va por POST '/' (createPatient).
+router.post('/batch', writeLimiter, authorize(['patients.create']), patientCtrl.createPatients);
 
 // Búsqueda server-side de pacientes — para inputs con debounce.
-router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), patientCtrl.searchPatients);
+router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.searchPatients);
 
 // ── Rutas de paciente específico ─────────────────────────────────
 router
