@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const uniqueValidator = require('mongoose-unique-validator');
 const fs = require('fs');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 
@@ -861,14 +860,15 @@ PatientSchema.pre('save', async function(next) {
         //     this.odontogramaClinico.fechaActualizacion = new Date();
         // }
         
-        // Crear carpeta de uploads si es nuevo paciente
-        if (this.isNew) {
-            // Crear la ruta principal en uploads/pacientes/<id>
+        // Crear carpeta de uploads si es nuevo paciente — sólo si nadie la creó
+        // antes. createPatient ya hace el ensureUploadsPath (con subcarpetas) y
+        // setea ruta_archivos ANTES del save, así que en el alta normal este
+        // bloque se salta y no duplicamos el trabajo de disco. Se mantiene como
+        // red de seguridad para cualquier otro path que haga new Patient().save().
+        if (this.isNew && !this.ruta_archivos) {
             const rutaArchivos = resolveUploadsPath('pacientes', this._id.toString());
             await ensureUploadsPath('pacientes', this._id.toString());
             this.ruta_archivos = rutaArchivos;
-            
-            // Carpetas de uploads creadas
         }
         
         next();
@@ -995,11 +995,12 @@ PatientSchema.index({
 
 // ─── Configuración final del modelo ───────────────────────────────────────────
 
-// Aplicar el plugin de validación única
-PatientSchema.plugin(uniqueValidator, { 
-    message: 'El {PATH} ya está en uso.',
-    type: 'mongoose-unique-validator'
-});
+// Unicidad de `paciente_id` y `documento.numero`: la garantizan los índices
+// únicos declarados a nivel de campo (Mongo lanza E11000 en la inserción).
+// Se quitó `mongoose-unique-validator`: en cada save hacía un countDocuments
+// extra por cada campo único (round-trips de más a Mongo en cada alta) y era
+// racy. El alta ya maneja el E11000 — paciente_id con reintento
+// (savePatientWithRetry) y documento.numero con un 409 claro en el controlador.
 
 // Configurar opciones de transformación JSON
 PatientSchema.set('toJSON', {

@@ -346,6 +346,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
         enfermedad_grave_adicional: {
           opcion_principal: "no", // "no" o "otras_enfermedades"
           enfermedades_seleccionadas: {
+            trastornos_neurologicos: false,
+            enfermedades_autoinmunes: false,
+            enfermedades_respiratorias: false,
+            problemas_renales: false,
+            problemas_hepaticos: false,
+            tratamiento_oncologico: false,
             sinusitis: false,
             convulsiones_epilepsia: false,
             tuberculosis: false,
@@ -1232,7 +1238,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
               pensionado: field === 'pensionado',
               desempleado: field === 'desempleado',
               jubilado: field === 'jubilado'
-            }
+            },
+            // Si deja de ser "empleado", limpiar ocupacion: el campo se oculta y
+            // no debe persistir un valor heredado de un empleo anterior.
+            ocupacion: field === 'empleado' ? prev.ocupacion : ''
           }));
         }}
       />

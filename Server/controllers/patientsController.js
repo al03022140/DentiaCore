@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
+const { isJpegOrPng } = require('../utils/imageSignature');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
 const { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash } = require('../utils/saveSignatureImage');
@@ -358,6 +359,16 @@ exports.createPatient = async (req, res) => {
             }
         }
 
+        // Defensa-en-profundidad: el fileFilter de multer solo mira el mimetype
+        // declarado por el cliente (spoofeable). Verificamos la firma real del
+        // archivo; si no es JPEG/PNG, rechazamos (el finally limpia la carpeta).
+        if (req.file && !isJpegOrPng(req.file.path)) {
+            return res.status(415).json({
+                message: 'El archivo de foto no es una imagen JPEG o PNG válida',
+                code: 'INVALID_IMAGE'
+            });
+        }
+
         // Sanitizar y limitar tamaño de payload
         const payloadSize = estimatePayloadSize(patientData);
         const MAX_PAYLOAD_SIZE_BYTES = 2 * 1024 * 1024;
@@ -418,12 +429,37 @@ exports.createPatient = async (req, res) => {
         }
         safePatientData.fecha_nacimiento = parsed.date;
 
-        // Normalizar documento.numero (trim + uppercase) ANTES del unique-validator
-        // para que la detección de duplicados sea case-insensitive de facto.
+        // Normalizar documento.numero (trim + uppercase) ANTES de insertar para
+        // que el índice único de Mongo detecte duplicados de facto sin importar
+        // mayúsculas/espacios (siempre se almacena normalizado).
         if (safePatientData.documento && safePatientData.documento.numero != null) {
             safePatientData.documento.numero = String(safePatientData.documento.numero).trim().toUpperCase();
             if (!safePatientData.documento.numero) {
                 return res.status(400).json({ message: "Número de documento es obligatorio" });
+            }
+        }
+
+        // Chequeo de duplicado a nivel de aplicación (legacy-safe). En una BD
+        // legacy el índice único de documento.numero puede no existir
+        // (autoIndex off en prod), así que no podemos depender solo del E11000.
+        // Esta consulta —indexada cuando el índice existe— atrapa el caso común
+        // (alta secuencial en recepción) y da un 409 claro. La carrera entre dos
+        // altas concurrentes la sigue cubriendo el índice único + el retry.
+        // Sin filtro deletedAt: el índice único reserva el número aunque el
+        // paciente esté dado de baja, así que lo reflejamos igual.
+        if (safePatientData.documento && safePatientData.documento.numero) {
+            const dupe = await Patient.findOne({
+                'documento.numero': safePatientData.documento.numero
+            }).select('_id deletedAt').lean();
+            if (dupe) {
+                return res.status(409).json({
+                    message: dupe.deletedAt
+                        ? `El documento ${safePatientData.documento.numero} pertenece a un paciente dado de baja. Restáuralo en lugar de crear uno nuevo.`
+                        : `Ya existe un paciente con el documento ${safePatientData.documento.numero}`,
+                    code: 'DUPLICATE_DOCUMENT',
+                    field: 'documento.numero',
+                    existingPatientId: dupe._id
+                });
             }
         }
 
@@ -483,7 +519,12 @@ exports.createPatient = async (req, res) => {
         // debe abortar la creación), lo disparamos SIN await: el paciente ya
         // quedó persistido y el 201 vuelve de inmediato. El .catch() evita que
         // un fallo quede como unhandledRejection.
-        Periodontogram.createInitial(newPatient._id)
+        // Envuelto en Promise.resolve().then() para que un throw SÍNCRONO dentro
+        // de createInitial (su preludio computa estadísticas antes del create)
+        // se convierta en un rechazo capturado por el .catch() y NUNCA propague
+        // al catch externo —que respondería 500 con el paciente YA guardado.
+        Promise.resolve()
+            .then(() => Periodontogram.createInitial(newPatient._id))
             .then((initialPeriodontogram) => {
                 debugLog("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
             })
@@ -651,6 +692,15 @@ exports.updatePatient = async (req, res) => {
             }
         }
 
+        // Defensa-en-profundidad: verificar la firma real del archivo subido
+        // (no confiar en el mimetype declarado). El finally limpia el huérfano.
+        if (uploadedFile && !isJpegOrPng(uploadedFile.path)) {
+            return res.status(415).json({
+                message: 'El archivo de foto no es una imagen JPEG o PNG válida',
+                code: 'INVALID_IMAGE'
+            });
+        }
+
         // 🔒 Limitar y sanitizar payload para evitar errores por formularios grandes o XSS
         const payloadSize = estimatePayloadSize(updateData);
         const MAX_PAYLOAD_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
@@ -763,6 +813,26 @@ exports.updatePatient = async (req, res) => {
                 return res.status(400).json({ message: 'Número de documento es obligatorio' });
             }
             safeUpdate.documento.numero = norm;
+        }
+
+        // Dup-check legacy-safe al cambiar el documento: excluye al propio
+        // paciente. Igual que en create, no depende del índice único (que en
+        // legacy puede faltar); la carrera concurrente la cubre el índice/E11000.
+        if (safeUpdate.documento && safeUpdate.documento.numero) {
+            const dupe = await Patient.findOne({
+                'documento.numero': safeUpdate.documento.numero,
+                _id: { $ne: req.params.id }
+            }).select('_id deletedAt').lean();
+            if (dupe) {
+                return res.status(409).json({
+                    message: dupe.deletedAt
+                        ? `El documento ${safeUpdate.documento.numero} pertenece a un paciente dado de baja.`
+                        : `Ya existe otro paciente con el documento ${safeUpdate.documento.numero}`,
+                    code: 'DUPLICATE_DOCUMENT',
+                    field: 'documento.numero',
+                    existingPatientId: dupe._id
+                });
+            }
         }
 
         // Foto: ruta servible. Sólo `photoURL` existe en el schema.
@@ -2305,11 +2375,14 @@ async function savePatientWithRetry(newPatient, maxAttempts = 5) {
       return;
     } catch (err) {
       lastErr = err;
-      const isE11000 = err?.code === 11000;
+      // Colisión de paciente_id: ahora siempre llega como E11000 del índice
+      // único. (Antes mongoose-unique-validator también la reportaba como
+      // ValidationError kind:'unique'; ese plugin se quitó por costo/race.)
+      // Regeneramos el id y reintentamos.
       const e11000Key = err?.keyPattern || err?.keyValue || {};
-      const isPacienteIdDupe = isE11000 && Object.prototype.hasOwnProperty.call(e11000Key, 'paciente_id');
-      const isUVPacienteId = err?.name === 'ValidationError' && err?.errors?.paciente_id?.kind === 'unique';
-      if ((isPacienteIdDupe || isUVPacienteId) && attempt < maxAttempts) {
+      const isPacienteIdDupe = err?.code === 11000
+        && Object.prototype.hasOwnProperty.call(e11000Key, 'paciente_id');
+      if (isPacienteIdDupe && attempt < maxAttempts) {
         newPatient.paciente_id = await newPatient.constructor.generateUniquePatientId();
         continue;
       }
