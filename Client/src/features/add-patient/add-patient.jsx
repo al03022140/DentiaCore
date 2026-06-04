@@ -42,6 +42,26 @@ const PHONE_ALLOWED_CHARS = /^[\d\s\-+()]+$/;
 const PHONE_MIN_DIGITS = 7;
 const PHONE_MAX_DIGITS = 15;
 
+// Deep-merge: parte de `base` (plantilla por defecto con TODA la estructura
+// anidada) y superpone `source` (datos del paciente, posiblemente parciales).
+// Gana `source`; los arrays se reemplazan; las sub-claves anidadas que faltan
+// en `source` se conservan de `base`. Se usa al inicializar la edición para que
+// registros viejos sin algún sub-objeto (embarazo, consumo_azucar, etc.) no
+// rompan lecturas profundas a.b.c en las secciones.
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const deepMerge = (base, source) => {
+  if (!isPlainObject(base) || !isPlainObject(source)) {
+    return source === undefined ? base : source;
+  }
+  const out = { ...base };
+  for (const key of Object.keys(source)) {
+    out[key] = isPlainObject(base[key]) && isPlainObject(source[key])
+      ? deepMerge(base[key], source[key])
+      : source[key];
+  }
+  return out;
+};
+
 const validateFormat = (data) => {
   const errors = [];
   if (data.email && !EMAIL_REGEX.test(data.email)) {
@@ -55,15 +75,51 @@ const validateFormat = (data) => {
     }
   }
   if (data.fecha_nacimiento) {
-    const birthDate = new Date(data.fecha_nacimiento);
+    // Parsear YYYY-MM-DD en hora LOCAL (no UTC) para alinear con el backend y
+    // evitar el corrimiento de un día en zonas con offset negativo. Edad por
+    // calendario, no resta cruda de años.
+    const raw = String(data.fecha_nacimiento).slice(0, 10);
+    const md = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const birthDate = md
+      ? new Date(Number(md[1]), Number(md[2]) - 1, Number(md[3]))
+      : new Date(data.fecha_nacimiento);
     const today = new Date();
-    if (birthDate > today) {
-      errors.push({ label: 'La fecha de nacimiento no puede ser futura' });
+    if (!Number.isNaN(birthDate.getTime())) {
+      if (birthDate > today) {
+        errors.push({ label: 'La fecha de nacimiento no puede ser futura' });
+      }
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+      if (age > 120) {
+        errors.push({ label: 'La fecha de nacimiento implica una edad mayor a 120 años' });
+      }
     }
-    const age = today.getFullYear() - birthDate.getFullYear();
-    if (age > 120) {
-      errors.push({ label: 'La fecha de nacimiento implica una edad mayor a 120 años' });
-    }
+  }
+  // Filas incompletas: el backend descarta en silencio contactos de emergencia
+  // y antecedentes a los que les falta un campo requerido. Avisar para no
+  // perder datos sin que el usuario lo note (vería "guardado correctamente").
+  if (Array.isArray(data.contactos_emergencia)) {
+    data.contactos_emergencia.forEach((c, i) => {
+      if (!c) return;
+      const vals = [c.nombre, c.parentesco, c.telefono];
+      const some = vals.some((v) => v && String(v).trim());
+      const all = vals.every((v) => v && String(v).trim());
+      if (some && !all) {
+        errors.push({ label: `Contacto de emergencia #${i + 1}: completa nombre, parentesco y teléfono (o elimínalo).` });
+      }
+    });
+  }
+  if (Array.isArray(data.antecedentes_heredo_familiares)) {
+    data.antecedentes_heredo_familiares.forEach((a, i) => {
+      if (!a) return;
+      const p = a.parentesco && String(a.parentesco).trim();
+      const ant = a.antecedentes && String(a.antecedentes).trim();
+      const esp = a.parentesco_especifico && String(a.parentesco_especifico).trim();
+      if ((p || ant || esp) && (!p || !ant || (p === 'Otros' && !esp))) {
+        errors.push({ label: `Antecedente familiar #${i + 1}: completa parentesco y antecedente${p === 'Otros' ? ', y especifica el parentesco' : ''} (o elimínalo).` });
+      }
+    });
   }
   return errors;
 };
@@ -516,7 +572,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   // useEffect para inicializar el formulario con datos del paciente cuando se está editando
   useEffect(() => {
     if (patientToEdit) {
-      setFormData({
+      // deepMerge sobre `prev` (la plantilla por defecto completa) para que un
+      // registro viejo sin algún sub-objeto clínico (embarazo, consumo_azucar,
+      // problemas_tratamientos_previos, etc.) no rompa lecturas profundas a.b.c
+      // en las secciones. El componente se monta por paciente, así que `prev`
+      // es el default pristino en su (única) ejecución de edición.
+      setFormData((prev) => deepMerge(prev, {
         documento: {
           tipo: patientToEdit.documento?.tipo || "",
           numero: patientToEdit.documento?.numero || "",
@@ -772,7 +833,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
           toma_anticonceptivos: false
         },
         photoURL: patientToEdit.photoURL || patientToEdit.fotoUrl || ""
-      });
+      }));
     }
   }, [patientToEdit]);
 
@@ -842,7 +903,31 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     // que tiene `lowercase: true` — antes el usuario veía 'User@x.com' en
     // el form y al recargar aparecía 'user@x.com', confuso.
     const normalized = name === 'email' ? value.toLowerCase() : value;
-    setFormData((prev) => ({ ...prev, [name]: normalized }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: normalized };
+      // Al cambiar el sexo a algo distinto de Femenino, limpiar los datos
+      // específicos de mujer: WomenSection se oculta, pero sin esto los valores
+      // ya capturados (parto, menstruación, embarazo) se seguían enviando,
+      // guardando un paciente Masculino con datos femeninos incoherentes.
+      if (name === 'sexo' && normalized !== 'Femenino') {
+        next.informacion_femenina = {
+          ha_estado_embarazada: false,
+          como_fue_parto: "",
+          tipo_parto_detallado: "",
+          complicaciones_parto: "",
+          fecha_ultimo_parto: "",
+          menopausia: false,
+          alteraciones_ciclo_menstrual: false,
+          fecha_ultima_menstruacion: "",
+          toma_anticonceptivos: false
+        };
+        next.encuesta_medica = {
+          ...prev.encuesta_medica,
+          embarazo: { estado: false, semanas_gestacion: "" }
+        };
+      }
+      return next;
+    });
   };
 
   /** Maneja cambios en campos anidados */
