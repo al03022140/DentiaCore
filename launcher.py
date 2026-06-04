@@ -2274,8 +2274,24 @@ class DentiaCoreLauncher:
                 if self._wait_for_mongo_ready(timeout=20):
                     return True
 
-            # Servicio existe pero no responde — leer su log y reportar
-            return self._mongo_service_failure_dialog()
+            # El servicio existe pero NO responde en 27017. En vez de dead-end con
+            # error (lo de antes: dejaba el launcher inutil), hacemos FALLBACK al
+            # arranque MANUAL de mongod — como funcionaba en versiones viejas.
+            # Es seguro: si el puerto sigue cerrado, el mongod del servicio no esta
+            # sirviendo; paramos el servicio y matamos zombies para liberar el lock
+            # del --dbpath antes de arrancar manualmente (mas abajo, paso 4).
+            print("⚠️ Servicio MongoDB no respondió — fallback a arranque manual de mongod")
+            try:
+                subprocess.run(['net', 'stop', 'MongoDB'], shell=True,
+                               capture_output=True, text=True, timeout=20, check=False)
+            except Exception:
+                pass
+            try:
+                subprocess.run(['taskkill', '/F', '/IM', 'mongod.exe'], shell=True,
+                               capture_output=True, text=True, timeout=15, check=False)
+            except Exception:
+                pass
+            # (no return: cae a la sección de arranque manual de abajo)
 
         # 3) Proceso vivo sin servicio (raro pero posible)
         if self._is_mongod_process_running_win():
