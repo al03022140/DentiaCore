@@ -17,6 +17,11 @@ const buildPatientFullName = (p) => {
     .trim();
 };
 
+// Clave estable por nota: usamos _id (real en notas guardadas) y caemos a un
+// índice solo para notas sin _id. Debe coincidir entre el render de las cards,
+// la selección de casillas y el filtro de impresión para no desincronizarse.
+const noteKeyOf = (n, idx) => (n && n._id) ? n._id : `note-${idx}`;
+
 const PatientEvolutionNote = ({
   patientId,
   initialEvolutionNotes = [],
@@ -49,6 +54,40 @@ const PatientEvolutionNote = ({
       return next;
     });
   };
+
+  // Selección de notas a imprimir (casillas). Vacío = imprimir todas.
+  const [selectedNoteKeys, setSelectedNoteKeys] = useState(() => new Set());
+
+  const toggleNoteSelected = (key) => {
+    setSelectedNoteKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const allNoteKeys = useMemo(
+    () => (Array.isArray(notes) ? notes.map((n, idx) => noteKeyOf(n, idx)) : []),
+    [notes]
+  );
+  const selectedCount = selectedNoteKeys.size;
+  const allSelected = allNoteKeys.length > 0 && allNoteKeys.every(k => selectedNoteKeys.has(k));
+
+  const toggleSelectAll = () => {
+    setSelectedNoteKeys(allSelected ? new Set() : new Set(allNoteKeys));
+  };
+
+  // Notas que realmente se imprimen: las seleccionadas, o TODAS si no hay
+  // ninguna marcada (así el botón sigue funcionando como antes por defecto).
+  const notesToPrint = useMemo(() => {
+    if (!Array.isArray(notes)) return [];
+    if (selectedNoteKeys.size === 0) return notes;
+    return notes.filter((n, idx) => selectedNoteKeys.has(noteKeyOf(n, idx)));
+  }, [notes, selectedNoteKeys]);
+
+  // Nombre del profesional para la etiqueta bajo la línea de firma del doctor.
+  const doctorDisplayName = user?.nombre || 'Profesional tratante';
 
   // Flujo de firma:
   //   null     → estado inicial (form editable)
@@ -235,17 +274,99 @@ const PatientEvolutionNote = ({
     }
   };
 
+  // Imprime SOLO las notas seleccionadas dentro de un IFRAME aislado.
+  //
+  // Por qué un iframe y no clonar al <body>: la app tiene reglas globales de
+  // `@media print` (p. ej. en patient-print.css: `body * { visibility:hidden }`
+  // y solo se vuelve visible lo que está dentro de `.patient-print-page`). Esas
+  // reglas también se cargan en el expediente normal, así que cualquier nodo que
+  // pusiéramos en el <body> —fuera de `.patient-print-page`— salía INVISIBLE y la
+  // vista previa aparecía en blanco. Un iframe tiene su propio documento: las
+  // hojas de estilo del padre no le aplican, y como no tocamos el <body> ni
+  // clases globales, esta impresión tampoco puede dañar la del expediente.
   const handlePrint = () => {
     const printContent = document.querySelector('.printable-evolution-notes');
     if (!printContent) return;
-    const clone = printContent.cloneNode(true);
-    clone.classList.add('printing-portal');
-    clone.style.display = 'block';
-    document.body.appendChild(clone);
-    document.body.classList.add('printing-evolution-mode');
-    window.print();
-    document.body.removeChild(clone);
-    document.body.classList.remove('printing-evolution-mode');
+    if (!Array.isArray(notesToPrint) || notesToPrint.length === 0) {
+      message.info('No hay notas para imprimir.');
+      return;
+    }
+
+    // Estilos autocontenidos (sin variables de la app, que no existen dentro del
+    // iframe). Colores fijos para que siempre salga legible en papel.
+    const printStyles = `
+      * { box-sizing: border-box; }
+      @page { size: letter; margin: 1.5cm; }
+      html, body { margin: 0; padding: 0; background: #fff; color: #000;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h1 { text-align: center; text-transform: uppercase; font-size: 18px; margin: 0 0 16px; }
+      .print-patient-line { margin: 0 0 16px; font-size: 12px; }
+      .print-note { border: 1px solid #000; border-radius: 4px; padding: 12px 14px;
+        margin-bottom: 22px; page-break-inside: avoid; break-inside: avoid; }
+      .print-note__head { display: flex; justify-content: space-between; align-items: baseline;
+        gap: 12px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e0; font-size: 12px; }
+      .print-note__num { font-weight: 700; text-transform: uppercase; }
+      .print-note__date { color: #4a5568; }
+      .print-note__table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+      .print-note__table th, .print-note__table td { border: 1px solid #000; padding: 6px;
+        text-align: left; vertical-align: top; }
+      .print-note__table th { width: 26%; white-space: nowrap; background: #e9edf2; }
+      .print-note__table td { width: 74%; white-space: pre-wrap; word-break: break-word; }
+      .signatures-container { display: flex; justify-content: space-between; gap: 40px;
+        margin-top: 26px; page-break-inside: avoid; break-inside: avoid; }
+      .signature-block { flex: 1; text-align: center; }
+      .signature-line { border-bottom: 1px solid #000; margin-bottom: 8px; height: 40px; }
+      .signature-label { font-weight: 600; margin: 0 0 4px; font-size: 12px; }
+      .signature-title { font-size: 11px; color: #555; margin: 0; }
+      .print-date { text-align: right; margin-top: 20px; font-size: 10px; color: #666;
+        border-top: 1px solid #ddd; padding-top: 5px; }
+      .print-empty { text-align: center; color: #666; margin: 24px 0; }
+    `;
+
+    // Reutilizamos el HTML ya renderizado por React (escapado) como cuerpo.
+    const docHtml = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+      + '<title>Notas de Evolución</title><style>' + printStyles + '</style></head>'
+      + '<body>' + printContent.innerHTML + '</body></html>';
+
+    // Limpia cualquier iframe que haya quedado de una impresión previa.
+    const prev = document.getElementById('evolution-print-iframe');
+    if (prev) prev.remove();
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'evolution-print-iframe';
+    // Fuera de pantalla con tamaño real (NO display:none) para que el contenido
+    // se renderice; si no, algunos navegadores imprimen en blanco.
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;height:600px;border:0;';
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    const cleanup = () => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); };
+
+    let started = false;
+    const run = () => {
+      if (started) return;
+      started = true;
+      const win = iframe.contentWindow;
+      if (!win) { cleanup(); return; }
+      win.onafterprint = cleanup;
+      win.focus();
+      win.print();
+      // Respaldo por si onafterprint no dispara en algún navegador.
+      setTimeout(cleanup, 3000);
+    };
+
+    iframe.onload = run;
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(docHtml);
+      doc.close();
+    }
+    // Respaldo: si onload no se dispara tras doc.write, lanza la impresión igual
+    // (run está protegido contra doble ejecución).
+    setTimeout(run, 400);
   };
 
   const patientConsentText = (
@@ -271,7 +392,7 @@ const PatientEvolutionNote = ({
         <h2>Notas de evolución</h2>
         {!hideForm && (
           <button type="button" className="Boton_Imprimir" onClick={handlePrint}>
-            Imprimir
+            {selectedCount > 0 ? `Imprimir (${selectedCount})` : 'Imprimir'}
           </button>
         )}
       </div>
@@ -347,6 +468,28 @@ const PatientEvolutionNote = ({
 
       <div className="patient-evolution-note__history">
         <h3>Historial</h3>
+
+        {!hideForm && Array.isArray(notes) && notes.length > 0 && (
+          <div className="evolution-note-select-bar no-print">
+            <label className="evolution-note-select-all">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = selectedCount > 0 && !allSelected;
+                }}
+                onChange={toggleSelectAll}
+              />
+              Seleccionar todas
+            </label>
+            <span className="evolution-note-select-hint">
+              {selectedCount > 0
+                ? `${selectedCount} nota${selectedCount > 1 ? 's' : ''} seleccionada${selectedCount > 1 ? 's' : ''} para imprimir`
+                : 'Marca las notas que quieres imprimir y firmar (si no marcas ninguna, se imprimen todas)'}
+            </span>
+          </div>
+        )}
+
         <div className="patient-evolution-note__cards">
           {Array.isArray(notes) && notes.length > 0 ? (
             notes.map((n, idx) => {
@@ -371,6 +514,18 @@ const PatientEvolutionNote = ({
                   className={`evolution-note-card${isExpanded ? ' is-expanded' : ''}`}
                 >
                   <header className="evolution-note-card__header">
+                    {!hideForm && (
+                      <label
+                        className="evolution-note-card__select no-print"
+                        title="Seleccionar esta nota para imprimir"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedNoteKeys.has(noteKey)}
+                          onChange={() => toggleNoteSelected(noteKey)}
+                        />
+                      </label>
+                    )}
                     <h3 className="evolution-note-card__title">
                       Nota <span className="evolution-note-card__num">#{num}</span>
                       {date && (
@@ -492,47 +647,55 @@ const PatientEvolutionNote = ({
       {!hideForm && (
       <div className="printable-evolution-notes">
         <h1>Notas de Evolución</h1>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Fecha</th>
-              <th>Procedimiento</th>
-              <th>Observaciones</th>
-              <th>Correcciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.isArray(notes) && notes.length > 0 ? (
-              notes.map((n, idx) => (
-                <tr key={idx}>
-                  <td>{n.numero_procedimiento ?? '—'}</td>
-                  <td>{n.fechaFormateada || n.fecha || ''}</td>
-                  <td>{n.procedimiento || ''}</td>
-                  <td>{n.observaciones || ''}</td>
-                  <td>{n.correcciones || ''}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" style={{ textAlign: 'center' }}>Sin notas registradas</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <p className="print-patient-line">
+          <strong>Paciente:</strong> {patientFullName || '—'}
+        </p>
 
-        <div className="signatures-container">
-          <div className="signature-block">
-            <div className="signature-line"></div>
-            <p className="signature-label">{patientFullName}</p>
-            <p className="signature-title">Firma del Paciente</p>
-          </div>
-          <div className="signature-block">
-            <div className="signature-line"></div>
-            <p className="signature-label">Dr. Jeferson Arley Ramirez Mejia</p>
-            <p className="signature-title">Firma del Doctor</p>
-          </div>
-        </div>
+        {Array.isArray(notesToPrint) && notesToPrint.length > 0 ? (
+          notesToPrint.map((n, idx) => {
+            const num = n.numero_procedimiento ?? '—';
+            const fecha = n.fechaFormateada || n.fecha || '';
+            const docName = n.firmadoPor?.nombre || doctorDisplayName;
+            return (
+              <div className="print-note" key={n._id || `print-${idx}`}>
+                <div className="print-note__head">
+                  <span className="print-note__num">Nota #{num}</span>
+                  {fecha && <span className="print-note__date">{fecha}</span>}
+                </div>
+                <table className="print-note__table">
+                  <tbody>
+                    <tr>
+                      <th>Procedimiento</th>
+                      <td>{n.procedimiento || '—'}</td>
+                    </tr>
+                    <tr>
+                      <th>Observaciones</th>
+                      <td>{n.observaciones || '—'}</td>
+                    </tr>
+                    <tr>
+                      <th>Correcciones</th>
+                      <td>{n.correcciones || '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="signatures-container">
+                  <div className="signature-block">
+                    <div className="signature-line"></div>
+                    <p className="signature-label">{patientFullName}</p>
+                    <p className="signature-title">Firma del Paciente</p>
+                  </div>
+                  <div className="signature-block">
+                    <div className="signature-line"></div>
+                    <p className="signature-label">{docName}</p>
+                    <p className="signature-title">Firma del Doctor</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <p className="print-empty">Sin notas registradas</p>
+        )}
 
         <div className="print-date">
           Fecha de impresión: {new Date().toLocaleDateString()}
