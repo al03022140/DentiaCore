@@ -100,11 +100,12 @@ const statisticsCache = new StatisticsCache();
 // LOGGING CENTRALIZADO
 // ============================================================================
 
-class ValidationLogger {
-  static log(level, message, data = null) {
+// Namespace de logging (antes clase con métodos estáticos, 0 `new`). Es un objeto
+// de funciones: `this` dentro de error/warn/info apunta al objeto en `ValidationLogger.x()`,
+// así que `this.log(...)` sigue resolviendo igual que con la clase.
+const ValidationLogger = {
+  log(level, message, data = null) {
     const timestamp = new Date().toISOString();
-    const logEntry = { timestamp, level, message, data };
-    
     // Solo mostrar errores críticos en producción
     if (level === 'error') {
       console.error(`[${timestamp}] VALIDATION ERROR: ${message}`, data);
@@ -113,12 +114,12 @@ class ValidationLogger {
     } else if (level === 'info' && process.env.NODE_ENV === 'development') {
       logger.log(`[${timestamp}] VALIDATION: ${message}`, data);
     }
-  }
-  
-  static error(message, data) { this.log('error', message, data); }
-  static warn(message, data) { this.log('warn', message, data); }
-  static info(message, data) { this.log('info', message, data); }
-}
+  },
+
+  error(message, data) { this.log('error', message, data); },
+  warn(message, data) { this.log('warn', message, data); },
+  info(message, data) { this.log('info', message, data); }
+};
 
 // ============================================================================
 // MIGRACIÓN DE DATOS LEGACY
