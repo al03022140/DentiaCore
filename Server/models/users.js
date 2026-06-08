@@ -126,8 +126,10 @@ const userSchema = new mongoose.Schema({
     },
     // Dispositivo preferido para capturar firmas. Cambia el comportamiento
     // del pad de firma: en 'tablet' se aplica scroll-lock, pointer-capture
-    // y canvas a ancho completo; en 'touch' se optimiza para tap rápido.
-    signatureInput: { type: String, enum: ['mouse', 'tablet', 'touch'], default: 'mouse' }
+    // y canvas a ancho completo; en 'touch' se optimiza para tap rápido;
+    // en 'stu' se usa una tableta de firmas Wacom STU (pantalla LCD) vía
+    // WebHID (requiere navegador Chromium y contexto seguro).
+    signatureInput: { type: String, enum: ['mouse', 'tablet', 'touch', 'stu'], default: 'mouse' }
   },
   fecha_registro: {
     type: Date,

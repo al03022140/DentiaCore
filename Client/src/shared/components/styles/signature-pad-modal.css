@@ -308,3 +308,69 @@
   padding: 0.4rem 0.85rem;
   font-size: 0.825rem;
 }
+
+/* ── Modo Wacom STU (tableta de firmas con pantalla LCD, vía WebHID) ──────── */
+.signature-pad-stu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.signature-pad-stu-device {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #4a5568);
+}
+
+.signature-pad-stu-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-border-medium, #cbd5e0);
+  flex: 0 0 auto;
+}
+
+.signature-pad-stu-dot.is-on {
+  background: #38a169; /* verde = conectado */
+  box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.18);
+}
+
+.signature-pad-stu-device-name {
+  font-weight: 500;
+}
+
+/* El recuadro de firma reusa .signature-pad-canvas-wrap pero con altura fija
+   (no hay canvas interno que dicte el tamaño; mostramos un <img> de preview). */
+.signature-pad-canvas-wrap--stu {
+  min-height: 220px;
+  align-items: center;
+}
+
+.signature-pad-stu-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.signature-pad-stu-placeholder {
+  color: var(--color-text-muted, #718096);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.signature-pad-stu-notice {
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.signature-pad-stu-notice--warn {
+  background: #fff8e1;
+  color: #5b4a00;
+  border: 1px solid #f5d97b;
+}
