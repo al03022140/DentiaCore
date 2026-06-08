@@ -4,15 +4,12 @@ import { Modal, Input, Select, Popconfirm, message } from 'antd';
 import { getAllChargesWithMeta, addPayment, getChargesByPatient } from '../../shared/services/patientChargeService';
 import { formatMoney } from '../../shared/utils/money';
 import userNot from '../../assets/images/icons/Profile Default.svg';
+import { calculateAgeYears } from '../../shared/utils/formatters';
 
 const CONFIRM_PHRASE = 'CONFIRMO';
 const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
 
-const calculateAge = (fechaNacimiento) => {
-  if (!fechaNacimiento) return null;
-  const diff = Date.now() - new Date(fechaNacimiento).getTime();
-  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-};
+const calculateAge = (fechaNacimiento) => calculateAgeYears(fechaNacimiento);
 
 const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   const navigate = useNavigate();

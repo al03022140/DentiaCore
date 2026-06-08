@@ -24,18 +24,14 @@ import {
   getAppointmentActivity
 } from '../../shared/services/appointment-service';
 import CreateAppointmentModal from './components/CreateAppointmentModal';
+import { calculateAgeYears } from '../../shared/utils/formatters';
 
 const formatTime = (dateStr) => {
   const d = new Date(dateStr);
   return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
-const calculateAge = (fechaNacimiento) => {
-  if (!fechaNacimiento) return '—';
-  const birth = new Date(fechaNacimiento);
-  const diff = Date.now() - birth.getTime();
-  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-};
+const calculateAge = (fechaNacimiento) => calculateAgeYears(fechaNacimiento, '—');
 
 const getPatientName = (apt) => {
   const p = apt.paciente_id;

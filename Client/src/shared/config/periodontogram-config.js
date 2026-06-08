@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 /**
  * 🔧 CONFIGURACIÓN CENTRALIZADA DEL PERIODONTOGRAMA
  * 
@@ -583,7 +584,7 @@ export default PERIODONTOGRAM_CONFIG;
 
 // Validar que todas las configuraciones estén correctamente definidas
 if (typeof window !== 'undefined' && DEV_CONFIG.enableDebugMode) {
-  console.log('🔧 Configuración del periodontograma cargada:', {
+  logger.log('🔧 Configuración del periodontograma cargada:', {
     permanentTeeth: PERMANENT_TEETH.length,
     temporaryTeeth: TEMPORARY_TEETH.length,
     totalValidTeeth: ALL_VALID_TEETH.length,

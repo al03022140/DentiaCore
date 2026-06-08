@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import SectionHeader from './section-header';
 import "../styles/patient-female-info.css";
+import { formatDateEs } from '../../../shared/utils/formatters';
 
 // Componente para mostrar información específica femenina
 const PatientFemaleInfo = ({ informacion_femenina = null, sexo = "" }) => {
@@ -24,10 +25,7 @@ const PatientFemaleInfo = ({ informacion_femenina = null, sexo = "" }) => {
     toma_anticonceptivos
   } = informacion_femenina;
 
-  const formatDate = (date) => {
-    if (!date) return 'No especificado';
-    return new Date(date).toLocaleDateString('es-ES');
-  };
+  const formatDate = (date) => formatDateEs(date);
 
   const formatBoolean = (value) => {
     return value ? 'Sí' : 'No';

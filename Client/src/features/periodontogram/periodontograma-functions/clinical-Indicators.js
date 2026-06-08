@@ -233,34 +233,23 @@ export const getFurcaStatistics = (periodontogramData) => {
 // ============================================================================
 
 export const BleedingOperations = {
-  // Funciones de actualización de dientes individuales eliminadas
-  // calculatePercentage eliminado - Usar UniversalToothValidator.calculateStatistics().bleedingPercentage
   getInterpretation: getBleedingInterpretation
-  // clearAll eliminada - no se manejan datos de dientes individuales
 };
 
 export const PlaqueOperations = {
-  // Funciones de actualización de dientes individuales eliminadas
-  // calculatePercentage eliminado - Usar UniversalToothValidator.calculateStatistics().plaquePercentage
-  // calculateOLearyIndex eliminada - usar UniversalToothValidator.calculateStatistics().plaquePercentage
   getInterpretation: getPlaqueInterpretation
-  // clearAll eliminada - no se manejan datos de dientes individuales
 };
 
 export const MobilityOperations = {
-  // Funciones de actualización de dientes individuales eliminadas
   getInfo: getMobilityInfo,
   getStatistics: getMobilityStatistics
-  // clearAll eliminada - no se manejan datos de dientes individuales
 };
 
 export const FurcaOperations = {
-  // Función update eliminada - no se manejan datos de dientes individuales
   canHave: canHaveFurca,
   needsDouble: needsDoubleFurca,
   getInfo: getFurcaInfo,
   getStatistics: getFurcaStatistics
-  // clearAll eliminada - no se manejan datos de dientes individuales
 };
 
 export const ClinicalIndicators = {

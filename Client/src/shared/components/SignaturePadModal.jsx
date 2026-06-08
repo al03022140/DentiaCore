@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../../app/auth/AuthContext';
+import WacomStuPanel from './WacomStuPanel.jsx';
 import './styles/signature-pad-modal.css';
 
 /**
@@ -10,12 +11,15 @@ import './styles/signature-pad-modal.css';
  * Devuelve la firma como dataURL PNG en `onConfirm(pngDataUrl)`.
  *
  * El comportamiento se adapta al dispositivo configurado en
- * `user.preferences.signatureInput` ('mouse' | 'tablet' | 'touch'):
+ * `user.preferences.signatureInput` ('mouse' | 'tablet' | 'touch' | 'stu'):
  *  - tablet: bloquea el scroll del body, captura el lápiz con
  *    setPointerCapture, canvas más grande, no re-mide al recibir
  *    `resize` (drivers de tableta los disparan al mostrar OSD), y
  *    muestra un indicador de hover cuando el lápiz se acerca.
  *  - touch: optimiza para dedo (mismas protecciones de scroll-lock).
+ *  - stu: tableta de firmas Wacom STU (con pantalla LCD) vía WebHID. El
+ *    paciente firma en el dispositivo y aquí se muestra un preview en vivo.
+ *    Delega en <WacomStuPanel/>. Requiere Chrome/Edge + contexto seguro.
  *  - mouse: comportamiento clásico (default).
  *
  * Además, si en `mouse` detecta que el primer trazo viene de un lápiz
@@ -58,6 +62,7 @@ export default function SignaturePadModal({
 
   const isTablet = device === 'tablet';
   const isTouch = device === 'touch';
+  const isStu = device === 'stu';
   // En modo tablet o touch aplicamos las protecciones (scroll-lock, capture).
   const lockInteractions = isTablet || isTouch;
 
@@ -375,7 +380,22 @@ export default function SignaturePadModal({
           )}
         </div>
 
-        {!consentAccepted ? (
+        {isStu ? (
+          // ── Modo Wacom STU: tableta de firmas con pantalla LCD. El paciente
+          // firma en el dispositivo; WacomStuPanel maneja conexión, preview en
+          // vivo y la generación del PNG. Fallback al pad on-screen si WebHID
+          // no está disponible o el usuario prefiere firmar en pantalla.
+          <WacomStuPanel
+            onCapture={onConfirm}
+            onCancel={onClose}
+            onFallback={() => setDevice('mouse')}
+            signerName={signerName}
+            signerRole={signerRole}
+            consentText={consentText}
+            loading={loading}
+            confirmLabel={confirmLabel}
+          />
+        ) : !consentAccepted ? (
           // ── Step 1: lectura del consentimiento (solo tablet + consentText).
           // Damos el texto a pantalla completa y un botón claro de "Aceptar y
           // firmar" para liberar todo el espacio vertical al pad en el step 2.

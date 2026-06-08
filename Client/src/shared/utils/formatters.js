@@ -132,6 +132,32 @@ export const calculateAge = (birthDate) => {
 };
 
 /**
+ * Calcula la edad en AÑOS COMPLETOS (número entero) a partir de una fecha de
+ * nacimiento. Devuelve `fallback` si no hay fecha. Misma fórmula que las
+ * implementaciones locales que reemplaza (diff / 365.25 días).
+ * @param {string|Date} birthDate
+ * @param {*} [fallback=null] valor a devolver cuando no hay fecha
+ * @returns {number|*} años completos o `fallback`
+ */
+export const calculateAgeYears = (birthDate, fallback = null) => {
+  if (!birthDate) return fallback;
+  const diff = Date.now() - new Date(birthDate).getTime();
+  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+};
+
+/**
+ * Formatea una fecha con el formato por defecto del locale es-ES
+ * (p. ej. "3/6/2026", sin relleno de ceros). Devuelve `empty` si no hay fecha.
+ * @param {string|Date} date
+ * @param {string} [empty='No especificado']
+ * @returns {string}
+ */
+export const formatDateEs = (date, empty = 'No especificado') => {
+  if (!date) return empty;
+  return new Date(date).toLocaleDateString('es-ES');
+};
+
+/**
  * Formatea un número de teléfono
  * @param {string} phone - Número de teléfono
  * @returns {string} Número formateado

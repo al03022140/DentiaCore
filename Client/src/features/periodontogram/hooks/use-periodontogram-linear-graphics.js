@@ -10,6 +10,7 @@ import { useRef, useEffect, useCallback, useMemo } from 'react';
 import ExtendedRealTimeGraphicsUpdater from '../utils/extended-real-time-graphics-updater.js';
 import { UniversalToothValidator } from '../../../shared/validators/universal-tooth-validator.js';
 import { PeriodontogramLinearGraphics } from '../utils/periodontogram-linear-graphics.js';
+import { logger } from '../../../shared/utils/logger';
 import { 
   LINEAR_GRAPHICS_CONFIG,
   ADVANCED_POLYGON_CONFIG,
@@ -70,11 +71,11 @@ export const usePeriodontogramLinearGraphics = ({
       
       surfaceSections.forEach(({ selector, surface, section: sectionType }) => {
         const section = containerRef.current.querySelector(selector);
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🔍 [initializeLinearGraphics] Buscando sección: ${selector} (${sectionType} - ${surface}) - Encontrada: ${!!section}`);
+        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🔍 [initializeLinearGraphics] Buscando sección: ${selector} (${sectionType} - ${surface}) - Encontrada: ${!!section}`);
         
         if (section) {
           const canvasElements = section.querySelectorAll('canvas[data-tooth]');
-          if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🎨 [initializeLinearGraphics] Canvas encontrados en ${selector} (${sectionType} - ${surface}): ${canvasElements.length}`);
+          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🎨 [initializeLinearGraphics] Canvas encontrados en ${selector} (${sectionType} - ${surface}): ${canvasElements.length}`);
           
           canvasElements.forEach(canvas => {
             const toothNumber = canvas.getAttribute('data-tooth');
@@ -96,7 +97,7 @@ export const usePeriodontogramLinearGraphics = ({
               canvasMap.set(canvasKey, canvas);
               totalCanvasFound++;
               
-              if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`✅ [initializeLinearGraphics] Canvas registrado: ${canvasKey}`);
+              if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`✅ [initializeLinearGraphics] Canvas registrado: ${canvasKey}`);
             }
           });
         } else {
@@ -104,8 +105,8 @@ export const usePeriodontogramLinearGraphics = ({
         }
       });
       
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`📊 [initializeLinearGraphics] Total canvas encontrados: ${totalCanvasFound}`);
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🗺️ [initializeLinearGraphics] Canvas registrados:`, Array.from(canvasMap.keys()));
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`📊 [initializeLinearGraphics] Total canvas encontrados: ${totalCanvasFound}`);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🗺️ [initializeLinearGraphics] Canvas registrados:`, Array.from(canvasMap.keys()));
       
       if (totalCanvasFound === 0) {
         console.error('❌ [initializeLinearGraphics] No se encontraron canvas. Abortando inicialización.');
@@ -123,7 +124,7 @@ export const usePeriodontogramLinearGraphics = ({
       );
       
       isInitializedRef.current = true;
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🎉 [initializeLinearGraphics] Sistema de gráficas lineales inicializado correctamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('🎉 [initializeLinearGraphics] Sistema de gráficas lineales inicializado correctamente');
 
       const initialDataset = pendingDataRef.current || latestDataRef.current;
       if (initialDataset) {
@@ -295,13 +296,13 @@ export const usePeriodontogramLinearGraphics = ({
         const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
         const surfaces = isUpperTooth ? ['vestibular', 'palatine'] : ['vestibular', 'lingual'];
         
-        if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🦷 [updateToothLinearGraphics] Diente ${toothNumber} - Tipo: ${isUpperTooth ? 'Superior' : 'Inferior'} - Superficies: [${surfaces.join(', ')}]`);
+        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🦷 [updateToothLinearGraphics] Diente ${toothNumber} - Tipo: ${isUpperTooth ? 'Superior' : 'Inferior'} - Superficies: [${surfaces.join(', ')}]`);
         
         surfaces.forEach(surface => {
           const canvasKey = `${toothNumber}-${surface}`;
           const linearGraphicsInstance = realTimeUpdaterRef.current.linearGraphicsInstances.get(canvasKey);
           
-          if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`🎨 [updateToothLinearGraphics] Buscando canvas: ${canvasKey} - Encontrado: ${!!linearGraphicsInstance}`);
+          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`🎨 [updateToothLinearGraphics] Buscando canvas: ${canvasKey} - Encontrado: ${!!linearGraphicsInstance}`);
           
           if (linearGraphicsInstance) {
             // Extraer datos específicos para esta superficie
@@ -314,7 +315,7 @@ export const usePeriodontogramLinearGraphics = ({
               probingDepth: pdAllZero ? [null, null, null] : pd
             };
             
-            if (ADVANCED_LOGGING_CONFIG.enabled) console.log(`📊 [updateToothLinearGraphics] Datos para ${canvasKey}:`, linearData);
+            if (ADVANCED_LOGGING_CONFIG.enabled) logger.log(`📊 [updateToothLinearGraphics] Datos para ${canvasKey}:`, linearData);
             
             // Actualizar esta instancia específica
             linearGraphicsInstance.updateToothLinearGraphics(parseInt(toothNumber), linearData);
@@ -701,7 +702,7 @@ export const usePeriodontogramLinearGraphics = ({
     if (!realTimeUpdaterRef.current) return;
     
     try {
-      console.log('Limpiando gráficas lineales');
+      logger.log('Limpiando gráficas lineales');
       
       // Limpiar todas las instancias de gráficas lineales
       if (realTimeUpdaterRef.current.linearGraphicsInstances) {
@@ -717,7 +718,7 @@ export const usePeriodontogramLinearGraphics = ({
         realTimeUpdaterRef.current.clearCaches();
       }
       
-      console.log('Gráficas lineales limpiadas correctamente');
+      logger.log('Gráficas lineales limpiadas correctamente');
     } catch (error) {
       console.error('Error al limpiar gráficas lineales:', error);
     }

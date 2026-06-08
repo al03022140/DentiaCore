@@ -82,7 +82,10 @@ const accountCreationLimiter = rateLimit({
 
 const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 120,
+  // 300 (antes 120): la captura inicial de una clínica (alta de cientos de
+  // pacientes seguidos) topaba 120/15min y devolvía 429. 300 ≈ 1 cada 3s,
+  // holgado para data-entry humano sin abrir la puerta a abuso automatizado.
+  max: 300,
   message: msg('Demasiadas operaciones de escritura. Intente nuevamente en 15 minutos.'),
   standardHeaders: true,
   legacyHeaders: false,

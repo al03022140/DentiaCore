@@ -7,6 +7,7 @@ import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
 import PropTypes from 'prop-types';
+import { logger } from '../../../shared/utils/logger';
 
 // --- Función Auxiliar (Definida al principio) ---
 const getDamageNameFromIdInternal = (damageId, engineInstance) => {
@@ -62,7 +63,7 @@ const OdontogramClinicalSection = ({
 }) => {
     
     // ---> LOG PROP RECIBIDA <-----
-    // console.log(`[OdontoClinical] Renderizando. Prop clinicalData (Canvas State) RECIBIDA (${Array.isArray(clinicalData) ? clinicalData.length : 'No Array'} items):`, clinicalData);
+    // logger.log(`[OdontoClinical] Renderizando. Prop clinicalData (Canvas State) RECIBIDA (${Array.isArray(clinicalData) ? clinicalData.length : 'No Array'} items):`, clinicalData);
     // -----------------------------
 
     // --- Estados ---
@@ -329,9 +330,9 @@ const OdontogramClinicalSection = ({
 
     // Normaliza los datos para el engine y la tabla. No depende de clinicalData, así evitamos reinstanciar el engine.
     const normalizeForEngine = useCallback(entries => {
-        // console.log('[OdontoClinical] normalizeForEngine - entries recibidas:', entries);
+        // logger.log('[OdontoClinical] normalizeForEngine - entries recibidas:', entries);
         const result = (Array.isArray(entries) ? entries : []).flatMap((e, i) => {
-            // console.log(`[OdontoClinical] normalizeForEngine - procesando entrada ${i}:`, e);
+            // logger.log(`[OdontoClinical] normalizeForEngine - procesando entrada ${i}:`, e);
             
             // Detectar si los datos vienen del engine (formato simple) o del servidor (formato complejo)
             const isEngineData = e.tooth && !e.engineTeeth;
@@ -352,14 +353,14 @@ const OdontogramClinicalSection = ({
                 if (!engineTeeth || !Array.isArray(engineTeeth) || engineTeeth.length === 0) {
                     if (e.tooth) {
                         engineTeeth = [e.tooth];
-                        // console.log(`[OdontoClinical] normalizeForEngine - creando engineTeeth desde tooth: [${e.tooth}]`);
+                        // logger.log(`[OdontoClinical] normalizeForEngine - creando engineTeeth desde tooth: [${e.tooth}]`);
                     } else {
                         console.warn(`[OdontoClinical] normalizeForEngine - entrada ${i} no tiene engineTeeth ni tooth válido, saltando...`);
                         return [];
                     }
                 }
                 
-                // console.log(`[OdontoClinical] normalizeForEngine - engineTeeth final:`, engineTeeth);
+                // logger.log(`[OdontoClinical] normalizeForEngine - engineTeeth final:`, engineTeeth);
                 
                 return engineTeeth.map(toothNum => ({
                     key: `${patientId}-${toothNum}-${e.damage || e.tipo}-${e.surface || e.superficie || '0'}-${e.fecha || ''}-${i}`,
@@ -371,7 +372,7 @@ const OdontogramClinicalSection = ({
                 }));
             }
         });
-        // console.log('[OdontoClinical] normalizeForEngine - resultado final:', result);
+        // logger.log('[OdontoClinical] normalizeForEngine - resultado final:', result);
         return result;
     }, [patientId]);
 
@@ -417,12 +418,12 @@ const OdontogramClinicalSection = ({
             engine.setPatientId(patientId);
             // Usa clinicalData para cargar en el engine
             const engineData = normalizeForEngine(clinicalData);
-            // console.log('[OdontoClinical] Cargando datos en engine:', engineData);
+            // logger.log('[OdontoClinical] Cargando datos en engine:', engineData);
             if (engineData.length > 0) {
                 engine.loadOdontogramaData(engineData);
-                // console.log('[OdontoClinical] Datos cargados en engine exitosamente');
+                // logger.log('[OdontoClinical] Datos cargados en engine exitosamente');
             } else {
-                // console.log('[OdontoClinical] No hay datos para cargar en el engine');
+                // logger.log('[OdontoClinical] No hay datos para cargar en el engine');
             }
             engine.start();
             // Cada click marca dirty (ref para handlers + state para badge)
@@ -611,8 +612,8 @@ const OdontogramClinicalSection = ({
     }, [onDataSave, patientId, isSaving]);
 
     // --- JSX --- 
-    // console.log('[OdontoClinical] Antes de RETURN. Estado Canvas (canvasData):', canvasData);
-    // console.log('[OdontoClinical] Antes de RETURN. Historial Tabla (clinicalTableHistory):', clinicalTableHistory);
+    // logger.log('[OdontoClinical] Antes de RETURN. Estado Canvas (canvasData):', canvasData);
+    // logger.log('[OdontoClinical] Antes de RETURN. Historial Tabla (clinicalTableHistory):', clinicalTableHistory);
     // Datos del estado actual del canvas (en tiempo real)
     const tableData = useMemo(() => {
         // Usar currentCanvasData si tiene datos, sino usar clinicalData

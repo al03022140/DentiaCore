@@ -10,7 +10,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import { getLastMovements, updateMovement } from '../../shared/services/cashService';
-import { getAllPatients } from '../../shared/services/api';
+import { getAllPatients } from '../../shared/services/patient-service';
 
 import { formatMoney } from '../../shared/utils/money';
 

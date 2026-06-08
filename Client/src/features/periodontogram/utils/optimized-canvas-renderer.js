@@ -12,6 +12,7 @@
 // import PeriodontogramLogger from './logger.js';
 import { VALIDATION_RANGES, ZONE_CONFIG } from '../constants/periodontogram-constants.js';
 import { getAllTeethData } from './periodontogram-utils.js';
+import { logger } from '../../../shared/utils/logger';
 
 class OptimizedCanvasRenderer {
   constructor(canvas, options = {}) {
@@ -99,7 +100,7 @@ class OptimizedCanvasRenderer {
       this.setupToothRegions();
       this.setupLayerCache();
       
-      console.log('OptimizedCanvasRenderer inicializado correctamente');
+      logger.log('OptimizedCanvasRenderer inicializado correctamente');
     } catch (error) {
       console.error('Error durante la inicialización:', error);
       throw error;
@@ -127,7 +128,7 @@ class OptimizedCanvasRenderer {
       this.toothRegions.set(toothNumber, region);
     });
     
-    console.log(`Configuradas ${this.toothRegions.size} regiones de dientes`);
+    logger.log(`Configuradas ${this.toothRegions.size} regiones de dientes`);
   }
   
   /**
@@ -201,7 +202,7 @@ class OptimizedCanvasRenderer {
       });
     });
     
-    console.log('Cache de capas configurado');
+    logger.log('Cache de capas configurado');
   }
   
   /**
@@ -230,7 +231,7 @@ class OptimizedCanvasRenderer {
     this.scheduleRender();
     
     if (this.options.debugMode) {
-      console.debug(`Región marcada como sucia: diente ${toothNumber}, tipo ${regionType}`);
+      logger.debug(`Región marcada como sucia: diente ${toothNumber}, tipo ${regionType}`);
     }
   }
   
@@ -352,7 +353,7 @@ class OptimizedCanvasRenderer {
     });
     
     if (this.options.debugMode) {
-      console.debug('Renderizado completo realizado');
+      logger.debug('Renderizado completo realizado');
     }
   }
   
@@ -382,7 +383,7 @@ class OptimizedCanvasRenderer {
     });
     
     if (this.options.debugMode) {
-      console.debug(`Renderizado selectivo: ${this.dirtyRegions.size} regiones`);
+      logger.debug(`Renderizado selectivo: ${this.dirtyRegions.size} regiones`);
     }
   }
   
@@ -700,7 +701,7 @@ class OptimizedCanvasRenderer {
     this.lastRenderTime = renderTime;
     
     if (this.options.logPerformance) {
-      console.debug(`Renderizado completado en ${renderTime.toFixed(2)}ms`);
+      logger.debug(`Renderizado completado en ${renderTime.toFixed(2)}ms`);
     }
   }
   
@@ -903,7 +904,7 @@ class OptimizedCanvasRenderer {
       this.dirtyRegions.clear();
       this.toothRegions.clear();
       
-      console.log('OptimizedCanvasRenderer limpiado correctamente');
+      logger.log('OptimizedCanvasRenderer limpiado correctamente');
     } catch (error) {
       console.error('Error durante la limpieza:', error);
     }

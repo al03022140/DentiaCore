@@ -1,3 +1,4 @@
+import { logger } from '../../../shared/utils/logger';
 /**
  * RealTimeGraphicsUpdater.js
  * Sistema de actualización en tiempo real para gráficas del periodontograma
@@ -58,7 +59,7 @@ class RealTimeGraphicsUpdater {
     }
     
     this.setupRealTimeEventListeners();
-    console.log('RealTimeGraphicsUpdater inicializado');
+    logger.log('RealTimeGraphicsUpdater inicializado');
   }
   
   /**
@@ -76,7 +77,7 @@ class RealTimeGraphicsUpdater {
     this.inputListeners.set('input', inputHandler);
     this.inputListeners.set('change', inputHandler);
     
-    console.log('Event listeners configurados para actualización en tiempo real');
+    logger.log('Event listeners configurados para actualización en tiempo real');
   }
   
   /**
@@ -409,7 +410,7 @@ class RealTimeGraphicsUpdater {
     this.inputListeners.clear();
     this.dirtyRegions.clear();
     
-    console.log('RealTimeGraphicsUpdater limpiado');
+    logger.log('RealTimeGraphicsUpdater limpiado');
   }
 }
 

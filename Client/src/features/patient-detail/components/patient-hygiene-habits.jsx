@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import "../styles/patient-hygiene-habits.css";
+import { formatDateEs } from '../../../shared/utils/formatters';
 
 // Componente para mostrar hábitos de higiene bucodental completos
 const PatientHygieneHabits = ({ habitos_higiene = null }) => {
@@ -39,10 +40,7 @@ const PatientHygieneHabits = ({ habitos_higiene = null }) => {
     motivo_consulta_odontologica
   } = habitos_higiene;
 
-  const formatDate = (date) => {
-    if (!date) return 'No especificado';
-    return new Date(date).toLocaleDateString('es-ES');
-  };
+  const formatDate = (date) => formatDateEs(date);
 
   const formatBoolean = (value) => {
     return value ? 'Sí' : 'No';

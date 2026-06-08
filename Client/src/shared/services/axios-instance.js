@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { clearAccessToken, getAccessToken, setAccessToken } from './auth-token';
+import { logger } from '../utils/logger';
 
 const API_URL = (
   typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL
@@ -78,7 +79,7 @@ export const triggerTokenRefresh = () => {
 // Interceptor para logging de peticiones (solo en desarrollo)
 if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
   API.interceptors.request.use(request => {
-    console.log('Starting Request:', request.method?.toUpperCase(), request.url);
+    logger.log('Starting Request:', request.method?.toUpperCase(), request.url);
     return request;
   });
 }
@@ -94,11 +95,20 @@ API.interceptors.request.use(config => {
 API.interceptors.response.use(
   response => {
     if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
-      console.log('Response:', response.status, response.config.url);
+      logger.log('Response:', response.status, response.config.url);
     }
     return response;
   },
   error => {
+    // Propaga el mensaje del servidor a `error.message` preservando el
+    // AxiosError completo (response/config/etc). Reemplaza al segundo
+    // interceptor que vivía en services/api.js y que devolvía un objeto plano
+    // (perdiendo el prototipo del AxiosError).
+    const serverMessage = error?.response?.data?.message;
+    if (serverMessage) {
+      error.message = serverMessage;
+    }
+
     if (import.meta.env.DEV || process.env.NODE_ENV === 'development') {
       console.error('API Error:', error.response?.status, error.config?.url, error.message);
     }

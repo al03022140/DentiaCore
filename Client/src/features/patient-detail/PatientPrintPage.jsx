@@ -8,7 +8,7 @@ import API from '../../shared/services/axios-instance.js';
 import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
 import { useAuth } from '../../app/auth/AuthContext';
 import { getSettings } from '../../shared/services/settingsService';
-import { getPatientById } from '../../shared/services/api.js';
+import { getPatientById } from '../../shared/services/patient-service.js';
 
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';
@@ -26,36 +26,7 @@ import PatientDentalEvaluation from './components/patient-dental-evaluation.jsx'
 import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientChargesCard from './components/patient-charges-card.jsx';
-
-class OdontogramErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Odontogram Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="error-boundary">
-          <h3>Error en el módulo de odontograma</h3>
-          <p>Por favor, recarga la página o contacta con soporte.</p>
-          <button type="button" onClick={() => window.location.reload()}>
-            Recargar página
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import OdontogramErrorBoundary from './components/odontogram-error-boundary.jsx';
 
 const Loading = () => (
   <div className="loading-container">

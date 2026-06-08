@@ -6,7 +6,7 @@ import './shared/styles/index.css';
 import { patchEnginePrototype } from './features/odontogram/utils/odontogram-utils';
 import { AuthProvider } from './app/auth/AuthContext';
 import { LockScreenProvider } from './shared/components/LockScreen';
-import { ThemeProvider } from './shared/context/ThemeContext';
+import { ThemeProvider } from './shared/contexts/ThemeContext';
 import { useSessionKeepAlive } from './shared/hooks/useSessionKeepAlive';
 patchEnginePrototype();
 

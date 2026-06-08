@@ -1669,7 +1669,7 @@ class DentiaCoreLauncher:
             messagebox.showwarning("Advertencia", "No se pudo determinar la URL de la aplicación")
             return
 
-        webbrowser.open(self._normalize_browser_url(target_url))
+        self._open_browser_prefer_chromium(target_url)
 
     def _normalize_browser_url(self, url):
         """
@@ -1685,11 +1685,62 @@ class DentiaCoreLauncher:
     def _auto_open_browser(self, url):
         """Auto-abre el browser tras un arranque exitoso. Silencioso si falla."""
         try:
-            safe_url = self._normalize_browser_url(url)
-            print(f"🌐 Abriendo navegador en {safe_url}")
-            webbrowser.open(safe_url)
+            print(f"🌐 Abriendo navegador en {self._normalize_browser_url(url)}")
+            self._open_browser_prefer_chromium(url)
         except Exception as e:
             print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}")
+
+    def _open_browser_prefer_chromium(self, url):
+        """
+        Abre la app preferentemente en un navegador Chromium (Chrome/Edge).
+        DentiaCore usa WebHID para la tableta de firmas Wacom STU, y WebHID solo
+        existe en navegadores basados en Chromium (no en Safari ni Firefox). Si no
+        se encuentra ninguno, cae al navegador por defecto del sistema.
+        """
+        safe_url = self._normalize_browser_url(url)
+        if self._try_open_chromium(safe_url):
+            return True
+        try:
+            webbrowser.open(safe_url)
+            return True
+        except Exception as e:
+            print(f"⚠️ No se pudo abrir el navegador: {e}")
+            return False
+
+    def _try_open_chromium(self, url):
+        """Intenta abrir Chrome/Edge/Brave/Chromium según el SO. True si lo logró."""
+        import os
+        import sys
+        import shutil
+        import subprocess
+        try:
+            if sys.platform == 'darwin':
+                for app in ('Google Chrome', 'Microsoft Edge', 'Brave Browser', 'Chromium'):
+                    if os.path.exists(f'/Applications/{app}.app'):
+                        subprocess.Popen(['open', '-a', app, url])
+                        return True
+            elif sys.platform == 'win32':
+                candidates = []
+                for env_var in ('ProgramFiles', 'ProgramFiles(x86)', 'LocalAppData'):
+                    base = os.environ.get(env_var)
+                    if not base:
+                        continue
+                    candidates.append(os.path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe'))
+                    candidates.append(os.path.join(base, 'Microsoft', 'Edge', 'Application', 'msedge.exe'))
+                for exe in candidates:
+                    if os.path.exists(exe):
+                        subprocess.Popen([exe, url])
+                        return True
+            else:  # Linux y otros Unix
+                for binname in ('google-chrome', 'google-chrome-stable', 'microsoft-edge',
+                                'microsoft-edge-stable', 'chromium', 'chromium-browser', 'brave-browser'):
+                    path = shutil.which(binname)
+                    if path:
+                        subprocess.Popen([path, url])
+                        return True
+        except Exception as e:
+            print(f"⚠️ No se pudo abrir un navegador Chromium: {e}")
+        return False
 
     def _mongo_service_failure_dialog(self):
         """

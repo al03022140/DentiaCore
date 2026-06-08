@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import { useLockScreen } from './LockScreen';
-import { useSidebar } from '../context/SidebarContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
 import '../styles/header.css';
 

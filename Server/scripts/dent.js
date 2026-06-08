@@ -17,6 +17,7 @@ const { getUploadsBase } = require('../utils/uploads');
 
 // Importaciones de configuración
 const connectDB = require('../config/db');
+const { ensureCriticalIndexes } = require('../utils/ensureIndexes');
 const configureRoutes = require('../config/routes');
 const googleRouter = require('../routes/googleRoutes');
 const { getJwtSecret } = require('../utils/crypto');
@@ -307,6 +308,19 @@ if (process.env.NODE_ENV !== 'test') {
                 throw new Error('La base de datos no está en estado "Connected"');
             }
             logger.info('✅ Auditoría de DB: Conexión establecida y lista para escritura.');
+
+            // Construir los índices declarados (incl. los ÚNICOS de paciente_id
+            // y documento.numero). En producción `autoIndex` está apagado, así
+            // que sin esto los índices nunca se crean en una BD legacy. Es
+            // legacy-safe: si un índice único choca con duplicados preexistentes
+            // se avisa y se continúa (NO se tumba el arranque). Ver
+            // utils/ensureIndexes.js y scripts/findPatientDuplicates.js.
+            try {
+                const Patient = require('../models/patient');
+                await ensureCriticalIndexes([Patient]);
+            } catch (idxErr) {
+                logger.warn('No se pudieron asegurar los índices al inicio: %s', idxErr?.message || idxErr);
+            }
         } catch (err) {
             logger.error('🛑 Falló la conexión a MongoDB al inicio', { err });
             process.exit(1);

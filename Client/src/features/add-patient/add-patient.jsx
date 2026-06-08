@@ -6,6 +6,7 @@ import defaultAvatar from "../../assets/images/icons/Profile Default.svg";
 import "./styles/add-patient.css";
 import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
+import { invalidatePatientsCache } from '../../shared/services/patient-service';
 
 // Importar componentes de las secciones
 import Identification from './sections/identification';
@@ -401,6 +402,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
         enfermedad_grave_adicional: {
           opcion_principal: "no", // "no" o "otras_enfermedades"
           enfermedades_seleccionadas: {
+            trastornos_neurologicos: false,
+            enfermedades_autoinmunes: false,
+            enfermedades_respiratorias: false,
+            problemas_renales: false,
+            problemas_hepaticos: false,
+            tratamiento_oncologico: false,
             sinusitis: false,
             convulsiones_epilepsia: false,
             tuberculosis: false,
@@ -1155,6 +1162,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       }
 
       const data = res.data;
+      // Invalidar la cache de la lista de pacientes: el alta/edición va por API
+      // directa (no por patient-service), así que sin esto la lista cacheada
+      // (2 min) quedaría desactualizada tras crear o editar un paciente.
+      invalidatePatientsCache();
       message.success(patientToEdit ? "Paciente actualizado correctamente" : "Paciente guardado correctamente");
 
       // Solo navegar si no se está usando como modal
@@ -1312,7 +1323,10 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
               pensionado: field === 'pensionado',
               desempleado: field === 'desempleado',
               jubilado: field === 'jubilado'
-            }
+            },
+            // Si deja de ser "empleado", limpiar ocupacion: el campo se oculta y
+            // no debe persistir un valor heredado de un empleo anterior.
+            ocupacion: field === 'empleado' ? prev.ocupacion : ''
           }));
         }}
       />

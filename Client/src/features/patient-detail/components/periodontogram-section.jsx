@@ -12,6 +12,7 @@ import { toTriple, pickFaceTriplesFromFourFaces } from '../../../shared/utils/pe
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import '../styles/periodontogram-section.css';
+import { logger } from '../../../shared/utils/logger';
 
 const FIELD_ALIAS_MAP = {
   bleeding: 'sangrado',
@@ -44,7 +45,7 @@ const applyFieldAlias = (toothData, field) => {
 };
 
 const PeriodontogramSection = ({ patientId }) => {
-  if (ADVANCED_LOGGING_CONFIG.enabled) console.log('🚀 PeriodontogramSection montado con patientId:', patientId);
+  if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('🚀 PeriodontogramSection montado con patientId:', patientId);
   
   // Estados principales
   const [periodontogramData, setPeriodontogramData] = useState(null);
@@ -259,7 +260,7 @@ const PeriodontogramSection = ({ patientId }) => {
        setSelectedVersion(previousData.selectedVersion);
        setEditMode(previousData.editMode);
        setPreviousData(null);
-       if (ADVANCED_LOGGING_CONFIG.enabled) console.log('Datos restaurados al estado anterior');
+       if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('Datos restaurados al estado anterior');
      }
    }, [previousData]);
 
@@ -566,10 +567,10 @@ const PeriodontogramSection = ({ patientId }) => {
         try {
           await PeriodontogramService.createPeriodontogram(patientId);
           setPeriodontogramExists(true);
-          if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma creado exitosamente en el backend');
+          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Periodontograma creado exitosamente en el backend');
         } catch (createError) {
           if (createError.response?.status === 409) {
-            if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📝 Periodontograma ya existe, continuando con guardado');
+            if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📝 Periodontograma ya existe, continuando con guardado');
             setPeriodontogramExists(true);
           } else {
             throw createError;
@@ -578,7 +579,7 @@ const PeriodontogramSection = ({ patientId }) => {
       }
 
       if (ADVANCED_LOGGING_CONFIG.enabled) {
-        console.log('🔍 DATOS ANTES DE TRANSFORMAR:', {
+        logger.log('🔍 DATOS ANTES DE TRANSFORMAR:', {
           periodontogramData,
           teeth: periodontogramData.teeth
         });
@@ -767,7 +768,7 @@ const PeriodontogramSection = ({ patientId }) => {
         version: new Date().toISOString().replace(/[:.-]/g, '')
       });
       
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('📋 Datos unificados y validados:', validatedData);
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📋 Datos unificados y validados:', validatedData);
       
       // Recalcular estadísticas para asegurar consistencia
   // Calcular estadísticas desde la estructura de UI (campos ingleses con 4-caras)
@@ -803,7 +804,7 @@ const PeriodontogramSection = ({ patientId }) => {
       draft.clearDraft();
       message.success('Periodontograma guardado');
 
-      if (ADVANCED_LOGGING_CONFIG.enabled) console.log('✅ Periodontograma guardado exitosamente');
+      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Periodontograma guardado exitosamente');
     } catch (err) {
         rollbackData(); // Restaurar estado anterior en caso de error
         handleError(err, 'guardado de datos');

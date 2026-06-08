@@ -14,6 +14,7 @@
 // PeriodontogramData ahora se maneja completamente en el backend
 import { clonePeriodontogramData, getToothData, updateToothData } from '../utils/periodontogram-utils';
 import { isValidToothNumber, getToothPosition, getToothSection } from '../utils/periodontogram-utils';
+import { logger } from '../../../shared/utils/logger';
 // import PeriodontogramLogger from '../logger';
 
 // ============================================================================
@@ -44,7 +45,7 @@ export const toggleToothImplant = (periodontogramData, toothNumber, isImplant = 
       absent: false
     });
     
-    console.log(`Diente ${toothNumber} marcado como ${isImplant ? 'implante' : 'diente natural'}`);
+    logger.log(`Diente ${toothNumber} marcado como ${isImplant ? 'implante' : 'diente natural'}`);
     return updatedData;
   } catch (error) {
     console.error('Error al marcar implante:', error);

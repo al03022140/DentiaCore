@@ -328,6 +328,11 @@ const ProfessionalProfileSection = () => {
             title: 'Pantalla táctil',
             desc: 'iPad, Surface o cualquier pantalla táctil. Optimiza para dedo o lápiz capacitivo.',
           },
+          {
+            value: 'stu',
+            title: 'Tableta de firmas Wacom STU',
+            desc: 'Pad de firma con pantalla (STU-430/500/530/540). El paciente firma en el dispositivo. Requiere Chrome o Edge.',
+          },
         ].map((opt) => (
           <label
             key={opt.value}

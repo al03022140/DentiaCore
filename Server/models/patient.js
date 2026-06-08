@@ -860,14 +860,15 @@ PatientSchema.pre('save', async function(next) {
         //     this.odontogramaClinico.fechaActualizacion = new Date();
         // }
         
-        // Crear carpeta de uploads si es nuevo paciente
-        if (this.isNew) {
-            // Crear la ruta principal en uploads/pacientes/<id>
+        // Crear carpeta de uploads si es nuevo paciente — sólo si nadie la creó
+        // antes. createPatient ya hace el ensureUploadsPath (con subcarpetas) y
+        // setea ruta_archivos ANTES del save, así que en el alta normal este
+        // bloque se salta y no duplicamos el trabajo de disco. Se mantiene como
+        // red de seguridad para cualquier otro path que haga new Patient().save().
+        if (this.isNew && !this.ruta_archivos) {
             const rutaArchivos = resolveUploadsPath('pacientes', this._id.toString());
             await ensureUploadsPath('pacientes', this._id.toString());
             this.ruta_archivos = rutaArchivos;
-            
-            // Carpetas de uploads creadas
         }
         
         next();
@@ -994,13 +995,14 @@ PatientSchema.index({
 
 // ─── Configuración final del modelo ───────────────────────────────────────────
 
-// Unicidad garantizada por los índices únicos a nivel de BD (`paciente_id` y
-// `documento.numero` declarados con `unique: true`) + el manejo de E11000 en
-// patientsController (→ 409 DUPLICATE_KEY) y el reintento de paciente_id en
-// savePatientWithRetry. Se retiró mongoose-unique-validator: añadía una query
-// extra por cada campo único en CADA save (latencia en el alta) sin aportar
-// garantía real — la barrera efectiva contra duplicados es el índice único de
-// Mongo, no una comprobación previa sujeta a race conditions.
+// Unicidad de `paciente_id` y `documento.numero`: garantizada por los índices
+// únicos declarados a nivel de campo (`unique: true`) — Mongo lanza E11000 en la
+// inserción — más el manejo en patientsController (paciente_id con reintento en
+// savePatientWithRetry; documento.numero con un 409 DUPLICATE_KEY claro).
+// Se retiró `mongoose-unique-validator`: hacía un countDocuments extra por cada
+// campo único en CADA save (latencia de más en el alta) y era racy. La barrera
+// efectiva contra duplicados es el índice único de Mongo, no una comprobación
+// previa sujeta a race conditions.
 
 // Configurar opciones de transformación JSON
 PatientSchema.set('toJSON', {

@@ -62,3 +62,6 @@ vite-build.log
 
 # Bundle de macOS generado en instalación (no versionar)
 DentiaCore.app/
+
+# Documentación interna / reportes de auditoría — se mantienen locales
+docs-locales/

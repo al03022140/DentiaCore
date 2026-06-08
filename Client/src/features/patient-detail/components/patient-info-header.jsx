@@ -2,30 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import "../styles/patient-info-header.css";
 import { formatDate, formatDateTime, formatAge } from '../../../shared/utils/formatters';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    // Aquí podrías registrar el error
-
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return <div className="error-fallback">No se pudo cargar la información del paciente</div>;
-    }
-
-    return this.props.children;
-  }
-}
+import ErrorBoundary from '../../../shared/components/error-boundary';
 
 // Componente para mostrar la cabecera de información del paciente
 const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, userNot }) => {
@@ -44,8 +21,8 @@ const PatientInfoHeader = ({ patient, proximaCita = null, ultimaCita = null, use
   } = patient;
 
   return (
-    <ErrorBoundary>
-      <section 
+    <ErrorBoundary fallback={<div className="error-fallback">No se pudo cargar la información del paciente</div>}>
+      <section
         className="patient-detail__info"
         aria-labelledby="patient-info-header"
       >
