@@ -254,6 +254,17 @@
   max-width: 100%;
 }
 
+/* Layout amplio UNIFORME: el modal y el área de firma se ven igual de grandes
+   en todos los modos (mouse/touch/tablet/Wacom). El paso de consentimiento
+   previo libera el espacio vertical para el pad en grande. */
+.signature-pad-card--wide {
+  width: min(820px, 96vw);
+}
+
+.signature-pad-canvas-wrap--wide {
+  max-width: 100%;
+}
+
 .signature-pad-device-hint {
   margin: 0.5rem 0 0;
   font-size: 0.825rem;

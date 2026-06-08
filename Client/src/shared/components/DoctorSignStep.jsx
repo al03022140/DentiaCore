@@ -30,12 +30,17 @@ export default function DoctorSignStep({
   onConfirm,
   title = 'Firma del doctor',
   subtitle = 'Confirma la autoría con tu PIN o redibujando tu firma.',
+  consentText,
   loading = false,
 }) {
   const { user } = useAuth();
   // El usuario logueado puede firmar oficialmente como sí mismo (doctor).
   // Sólo se usa para preseleccionar su ficha y como fallback si la lista falla.
   const isSelfDoctor = hasPermission(user?.permissions, ['consultas.create']);
+  // Si la cuenta tiene la tableta Wacom STU configurada, la pestaña de firma
+  // manuscrita se etiqueta "Firmar con Wacom" (dentro del pad se podrá elegir
+  // entre la tableta y la pantalla). Con cualquier otro dispositivo: "pad".
+  const stuConfigured = user?.preferences?.signatureInput === 'stu';
 
   const [doctors, setDoctors] = useState([]);
   const [doctorsLoading, setDoctorsLoading] = useState(false);
@@ -210,7 +215,7 @@ export default function DoctorSignStep({
                 onClick={() => setMethod('pad')}
                 disabled={loading}
               >
-                Firmar con pad
+                {stuConfigured ? 'Firmar con Wacom' : 'Firmar con pad'}
               </button>
             </div>
 
@@ -257,7 +262,11 @@ export default function DoctorSignStep({
               </form>
             ) : (
               <div className="doctor-sign-pad-prompt">
-                <p>El doctor dibujará su firma en el pad.</p>
+                <p>
+                  {stuConfigured
+                    ? 'El doctor firmará en la tableta Wacom (o podrá pasar a firmar en pantalla).'
+                    : 'El doctor dibujará su firma en el pad.'}
+                </p>
                 {submitError && <p className="signature-pad-error">{submitError}</p>}
                 <div className="signature-pad-actions">
                   <button
@@ -274,7 +283,7 @@ export default function DoctorSignStep({
                     onClick={() => setPadOpen(true)}
                     disabled={loading || (!useSelfFallback && !selectedDoctorId)}
                   >
-                    Abrir pad
+                    {stuConfigured ? 'Abrir tableta Wacom' : 'Abrir pad'}
                   </button>
                 </div>
               </div>
@@ -291,6 +300,7 @@ export default function DoctorSignStep({
         subtitle="Dibuja la firma para autorizar"
         signerName={effectiveDoctor?.nombre || ''}
         signerRole={effectiveDoctor?.cedulaProfesional ? `Cédula ${effectiveDoctor.cedulaProfesional}` : 'Doctor'}
+        consentText={consentText}
         confirmLabel="Firmar y guardar"
         loading={loading}
       />

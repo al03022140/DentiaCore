@@ -384,6 +384,23 @@ const PatientEvolutionNote = ({
     </>
   );
 
+  // Enunciado del DOCTOR — paralelo al del paciente. Se muestra como paso
+  // previo a la firma con pad/Wacom para que el flujo sea idéntico (leer lo
+  // que se firma → aceptar → firmar). En el método PIN no aplica (no hay pad).
+  const doctorConsentText = (
+    <>
+      <p>
+        Como <strong>profesional tratante</strong>, confirmo que soy el autor de esta nota de
+        evolución y que el procedimiento, observaciones y correcciones aquí registrados
+        corresponden a la atención clínica brindada al paciente en esta fecha.
+      </p>
+      <p>
+        Firmo para dar validez oficial a este registro en el expediente clínico
+        (NOM-004-SSA3-2012).
+      </p>
+    </>
+  );
+
   return (
     <section
       className={`patient-detail__section patient-evolution-note${hideForm ? ' patient-evolution-note--history-only' : ''}`}
@@ -726,6 +743,7 @@ const PatientEvolutionNote = ({
         subtitle={canSignOfficial
           ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
           : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
+        consentText={doctorConsentText}
         loading={loading}
       />
 
@@ -752,6 +770,7 @@ const PatientEvolutionNote = ({
         subtitle={canSignOfficial
           ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
           : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
+        consentText={doctorConsentText}
         loading={loading}
       />
     </section>

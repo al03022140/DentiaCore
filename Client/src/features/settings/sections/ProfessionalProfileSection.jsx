@@ -125,10 +125,10 @@ const ProfessionalProfileSection = () => {
       const el = padWrapRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      // Cap a 560px — mismo valor que SignaturePadModal para que ambos
-      // pads se vean exactamente del mismo tamaño.
-      const w = Math.max(280, Math.min(560, Math.floor(rect.width)));
-      const h = Math.max(180, Math.min(320, Math.round(w * 0.4)));
+      // Mismas dimensiones que SignaturePadModal (720px, ratio 0.55, cap 480)
+      // para que el pad de firma y el de configuración se vean idénticos.
+      const w = Math.max(280, Math.min(720, Math.floor(rect.width)));
+      const h = Math.max(180, Math.min(480, Math.round(w * 0.55)));
       setCanvasSize({ w, h });
     };
     measure();

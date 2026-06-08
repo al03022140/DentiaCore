@@ -63,6 +63,10 @@ export default function SignaturePadModal({
   const isTablet = device === 'tablet';
   const isTouch = device === 'touch';
   const isStu = device === 'stu';
+  // ¿El dispositivo configurado es la tableta Wacom STU? Lo guardamos aparte
+  // de `device` porque, al elegir "Firmar en pantalla", cambiamos `device` a
+  // 'mouse' (canvas) — pero seguimos queriendo ofrecer "Volver a la Wacom".
+  const stuPreferred = (inputDeviceOverride || preferredDevice) === 'stu';
   // En modo tablet o touch aplicamos las protecciones (scroll-lock, capture).
   const lockInteractions = isTablet || isTouch;
 
@@ -81,12 +85,12 @@ export default function SignaturePadModal({
   // resize. En modo tablet bloqueamos el listener tras la primera medición
   // para no resetear el trazo cuando el driver de la tableta dispara resizes.
   const [canvasSize, setCanvasSize] = useState({ w: 600, h: 240 });
-  // Paso previo de consentimiento. En modo tableta, si hay `consentText`,
-  // el usuario debe leerlo y presionar "Aceptar y firmar" antes de que
-  // aparezca el pad. Así liberamos espacio vertical para un canvas más alto
-  // y aseguramos que el consentimiento sea leído conscientemente. En mouse
-  // y touch mantenemos el flujo clásico (consent inline arriba del pad).
-  const requiresConsentStep = isTablet && Boolean(consentText);
+  // Paso previo de consentimiento — UNIFICADO para todos los modos de firma
+  // (mouse, touch, tablet y Wacom STU). Si hay `consentText`, el firmante
+  // primero lee lo que va a firmar y presiona "Aceptar y firmar"; recién
+  // entonces aparece el área de firma a pantalla completa. Así el flujo es
+  // idéntico sin importar el dispositivo configurado.
+  const requiresConsentStep = Boolean(consentText);
   const [consentAccepted, setConsentAccepted] = useState(!requiresConsentStep);
 
   // Medir el contenedor para ajustar el canvas (responsivo).
@@ -102,18 +106,17 @@ export default function SignaturePadModal({
       // el canvas queda 4px más grande que el área disponible y el flex
       // contenedor lo encajaría en otra posición.
       const inner = el.clientWidth;
-      // En modo tablet usamos todo el ancho disponible del modal (hasta
-      // ~720px) para que el lápiz tenga más precisión: la tableta mapea
-      // toda su área activa al canvas, así que canvas grande = más
-      // precisión y menos sensación de "se mueve todo".
-      const maxW = isTablet ? 720 : 560;
+      // Tamaño del pad UNIFICADO ("en grande") para todos los modos: el área
+      // de firma se ve igual de amplia con mouse, touch, tableta o Wacom. El
+      // clamp por el ancho del contenedor mantiene la responsividad en
+      // pantallas pequeñas (el card se encoge y el canvas con él).
+      const maxW = 720;
       const w = Math.max(280, Math.min(maxW, Math.floor(inner)));
-      // En modo tableta con consentimiento ya aceptado, el card ya no
-      // contiene el bloque de consent → tenemos espacio vertical libre y
-      // hacemos el canvas más alto (ratio 0.55, cap 480) para que la firma
-      // se sienta más natural. En el resto de casos: ratio clásico 0.4.
-      const heightRatio = isTablet ? 0.55 : 0.4;
-      const maxH = isTablet ? 480 : 360;
+      // Como el consentimiento se lee en el paso previo, el área de firma
+      // dispone de todo el espacio vertical → canvas alto (ratio 0.55, cap 480)
+      // para que la firma se sienta natural en cualquier dispositivo.
+      const heightRatio = 0.55;
+      const maxH = 480;
       const h = Math.max(180, Math.min(maxH, Math.round(w * heightRatio)));
       setCanvasSize({ w, h });
     };
@@ -133,14 +136,17 @@ export default function SignaturePadModal({
   // Reset al abrir.
   useEffect(() => {
     if (isOpen) {
+      // Cada apertura parte del dispositivo configurado. Si en una firma previa
+      // se hizo fallback a "pantalla" (mouse), al reabrir volvemos a la Wacom.
+      setDevice(inputDeviceOverride || preferredDevice);
       setEmpty(true);
       setError('');
       setPenHint(false);
       setHoverDot(null);
-      // Si entramos al modal en modo tableta con consentimiento, partimos
-      // en el step de consent. En cualquier otro caso, directo al pad.
-      // Intencionalmente NO depende de isTablet / consentText: el cambio
-      // de modo mid-modal (via penHint) no debe reabrir el consent step.
+      // Si hay consentimiento, partimos en el step de lectura (cualquier modo);
+      // si no, directo al área de firma. El cambio de dispositivo mid-modal
+      // (penHint, o pantalla⇄Wacom) NO reabre el consent: consentAccepted solo
+      // se reinicia al abrir el modal, no al togglear `device`.
       setConsentAccepted(!requiresConsentStep);
       penHintShownRef.current = false;
       setTimeout(() => sigRef.current?.clear?.(), 0);
@@ -347,16 +353,18 @@ export default function SignaturePadModal({
     deviceHint = 'Firma con el dedo o lápiz capacitivo. El desplazamiento de la página está bloqueado mientras firmas.';
   }
 
+  // Layout amplio uniforme: el modal y el área de firma se ven igual de
+  // grandes en todos los modos (mouse/touch/tablet/Wacom).
   const cardClass = [
     'signature-pad-card',
-    isTablet ? 'signature-pad-card--tablet' : '',
+    'signature-pad-card--wide',
     isTouch ? 'signature-pad-card--touch' : '',
   ].filter(Boolean).join(' ');
 
   const wrapClass = [
     'signature-pad-canvas-wrap',
-    isTablet ? 'signature-pad-canvas-wrap--tablet' : '',
-  ].filter(Boolean).join(' ');
+    'signature-pad-canvas-wrap--wide',
+  ].join(' ');
 
   return (
     <div
@@ -380,25 +388,11 @@ export default function SignaturePadModal({
           )}
         </div>
 
-        {isStu ? (
-          // ── Modo Wacom STU: tableta de firmas con pantalla LCD. El paciente
-          // firma en el dispositivo; WacomStuPanel maneja conexión, preview en
-          // vivo y la generación del PNG. Fallback al pad on-screen si WebHID
-          // no está disponible o el usuario prefiere firmar en pantalla.
-          <WacomStuPanel
-            onCapture={onConfirm}
-            onCancel={onClose}
-            onFallback={() => setDevice('mouse')}
-            signerName={signerName}
-            signerRole={signerRole}
-            consentText={consentText}
-            loading={loading}
-            confirmLabel={confirmLabel}
-          />
-        ) : !consentAccepted ? (
-          // ── Step 1: lectura del consentimiento (solo tablet + consentText).
-          // Damos el texto a pantalla completa y un botón claro de "Aceptar y
-          // firmar" para liberar todo el espacio vertical al pad en el step 2.
+        {!consentAccepted ? (
+          // ── Step 1: lectura del consentimiento — UNIVERSAL (todos los modos:
+          // mouse, touch, tablet y Wacom). Damos el texto a pantalla completa y
+          // un botón claro de "Aceptar y firmar" para liberar todo el espacio
+          // vertical al área de firma del step 2, sin importar el dispositivo.
           <>
             <div className="signature-pad-consent signature-pad-consent--standalone">
               {consentText}
@@ -426,10 +420,23 @@ export default function SignaturePadModal({
               </button>
             </div>
           </>
+        ) : isStu ? (
+          // ── Step 2a (Wacom STU): ya leído y aceptado el consentimiento, el
+          // firmante firma en la tableta. WacomStuPanel maneja conexión, preview
+          // en vivo y el PNG. "Firmar en pantalla" hace fallback al canvas — y
+          // desde el canvas se puede volver a la Wacom (banner stuPreferred).
+          <WacomStuPanel
+            onCapture={onConfirm}
+            onCancel={onClose}
+            onFallback={() => setDevice('mouse')}
+            signerName={signerName}
+            signerRole={signerRole}
+            loading={loading}
+            confirmLabel={confirmLabel}
+          />
         ) : (
-          // ── Step 2: pad de firma. En tablet ya no mostramos el consent
-          // inline (el usuario lo aceptó en el step 1). En mouse/touch el
-          // consent inline se mantiene como antes.
+          // ── Step 2b: área de firma on-screen (mouse / touch / tablet). El
+          // consent ya se mostró y aceptó en el step 1 (no se repite inline).
           <>
             {penHint && (
               <div className="signature-pad-pen-hint" role="status">
@@ -453,8 +460,20 @@ export default function SignaturePadModal({
               </div>
             )}
 
-            {consentText && !isTablet && (
-              <div className="signature-pad-consent">{consentText}</div>
+            {stuPreferred && (
+              <div className="signature-pad-pen-hint" role="status">
+                <span>Estás firmando en pantalla. ¿Prefieres usar la tableta Wacom?</span>
+                <div className="signature-pad-pen-hint-actions">
+                  <button
+                    type="button"
+                    className="signature-pad-btn signature-pad-btn-confirm"
+                    onClick={() => setDevice('stu')}
+                    disabled={loading}
+                  >
+                    Volver a la tableta Wacom
+                  </button>
+                </div>
+              </div>
             )}
 
             <div className={wrapClass} ref={wrapRef}>
