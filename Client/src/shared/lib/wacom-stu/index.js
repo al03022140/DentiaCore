@@ -15,7 +15,12 @@
  *   await session.disconnect();
  */
 
-import { WacomStuDriver, isWebHidAvailable } from './wacomStuDriver.js';
+import {
+  WacomStuDriver,
+  isWebHidAvailable,
+  WACOM_VENDOR_ID,
+  KNOWN_STU_PRODUCT_IDS,
+} from './wacomStuDriver.js';
 import { StuSignatureRenderer } from './stuSignatureRenderer.js';
 
 export { isWebHidAvailable } from './wacomStuDriver.js';
@@ -29,6 +34,25 @@ export { StuSignatureRenderer } from './stuSignatureRenderer.js';
  */
 export function isWacomStuSupported() {
   return isWebHidAvailable();
+}
+
+/**
+ * ¿Hay ya una tableta STU con permiso concedido en una sesión previa?
+ * Usa `getDevices()` — NO muestra ningún diálogo. Sirve para decidir si vale la
+ * pena intentar la reconexión silenciosa (sin construir una sesión completa)
+ * antes de caer al botón manual "Conectar".
+ * @returns {Promise<boolean>}
+ */
+export async function hasAuthorizedStu() {
+  if (!isWebHidAvailable()) return false;
+  try {
+    const devices = await navigator.hid.getDevices();
+    return devices.some(
+      (d) => d.vendorId === WACOM_VENDOR_ID && KNOWN_STU_PRODUCT_IDS.has(d.productId),
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -73,6 +97,20 @@ export function createStuSession(opts = {}) {
     previewCb(renderer.toFullDataUrl());
   }
 
+  // Crea el renderer dimensionado a las capacidades reales del dispositivo y
+  // engancha el flujo de datos del lápiz. Compartido por connect()/reconnect().
+  function wireRenderer() {
+    const info = driver.getTabletInfo();
+    renderer = new StuSignatureRenderer({
+      width: info?.width || 800,
+      height: info?.height || 480,
+      inkColor,
+    });
+    renderer.onChange(emitPreview);
+    driver.onPenData((pen) => renderer.addPenPoint(pen));
+    return info;
+  }
+
   return {
     /** ¿El navegador soporta WebHID? */
     isSupported() {
@@ -93,15 +131,17 @@ export function createStuSession(opts = {}) {
     async connect() {
       const ok = await driver.connect();
       if (!ok) return null;
-      const info = driver.getTabletInfo();
-      renderer = new StuSignatureRenderer({
-        width: info?.width || 800,
-        height: info?.height || 480,
-        inkColor,
-      });
-      renderer.onChange(emitPreview);
-      driver.onPenData((pen) => renderer.addPenPoint(pen));
-      return info;
+      return wireRenderer();
+    },
+
+    /**
+     * Reconexión SILENCIOSA a una STU ya autorizada (sin diálogo ni clic).
+     * Devuelve info del dispositivo, o null si no hay ninguna autorizada / falla.
+     */
+    async reconnect() {
+      const ok = await driver.reconnect();
+      if (!ok) return null;
+      return wireRenderer();
     },
 
     isConnected() {

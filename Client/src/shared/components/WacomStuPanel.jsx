@@ -3,14 +3,17 @@ import {
   createStuSession,
   isWacomStuSupported,
   getWacomStuUnavailabilityReason,
+  hasAuthorizedStu,
 } from '../lib/wacom-stu/index.js';
 
 /**
  * Panel de captura de firma con tableta de firmas Wacom STU (vía WebHID).
  *
  * Se monta dentro de SignaturePadModal cuando el dispositivo de firma es 'stu'.
- * Maneja todo el ciclo de vida del dispositivo: conectar (gesto del usuario),
- * preview en vivo del trazo, limpiar, confirmar y desconectar.
+ * Maneja todo el ciclo de vida del dispositivo: auto-reconexión silenciosa al
+ * montar si ya hay permiso concedido (sin diálogo ni clic), conexión manual
+ * (gesto del usuario) la primera vez, preview en vivo del trazo, limpiar,
+ * confirmar y desconectar.
  *
  * Produce un PNG dataURL idéntico al del pad on-screen, así que el backend no
  * cambia. Si WebHID no está disponible (Safari/Firefox, o contexto no seguro),
@@ -59,12 +62,15 @@ export default function WacomStuPanel({
     };
   }, []);
 
-  const handleConnect = async () => {
-    if (!supported) return;
+  // Abre una sesión STU. silent=true usa la reconexión silenciosa (getDevices,
+  // sin diálogo ni clic); silent=false abre el selector WebHID (gesto manual).
+  const openSession = async ({ silent }) => {
+    if (!supported) return false;
     setError('');
-    setStatus('connecting');
+    if (!silent) setStatus('connecting');
+    let session = null;
     try {
-      const session = createStuSession({ inkColor });
+      session = createStuSession({ inkColor });
       session.onPreview((dataUrl) => {
         setPreview(dataUrl);
         setEmpty(session.isEmpty());
@@ -75,12 +81,14 @@ export default function WacomStuPanel({
           setError('La tableta se desconectó. Vuelve a conectarla e inténtalo de nuevo.');
         }
       });
-      const info = await session.connect();
+      const info = silent ? await session.reconnect() : await session.connect();
       if (!info) {
-        // El usuario canceló el diálogo de selección.
+        // Volvemos a 'idle' (botón manual disponible). silent: la tableta
+        // autorizada desapareció entre la comprobación y la apertura. manual:
+        // el usuario canceló el diálogo de selección.
         setStatus('idle');
         await session.disconnect().catch(() => {});
-        return;
+        return false;
       }
       sessionRef.current = session;
       setDeviceName(info.deviceName || 'Wacom STU');
@@ -88,15 +96,51 @@ export default function WacomStuPanel({
       setEmpty(true);
       setPreview(null);
       setStatus('ready');
+      return true;
     } catch (e) {
+      if (session) await session.disconnect().catch(() => {});
+      if (silent) {
+        // Falla silenciosa: dejamos el botón manual disponible sin alarmar.
+        setStatus('idle');
+        return false;
+      }
       setStatus('error');
       setError(
         e?.message
           ? `No se pudo conectar con la tableta: ${e.message}`
           : 'No se pudo conectar con la tableta Wacom. Verifica el cable USB y que ninguna otra aplicación la esté usando.',
       );
+      return false;
     }
   };
+
+  // Auto-reconexión SILENCIOSA al montar: si ya se concedió permiso a la tableta
+  // en una firma previa, getDevices() la encuentra sin diálogo y la abrimos sola
+  // → el firmante llega al panel y ya está "lista para firmar", sin clics. Si no
+  // hay permiso aún (primera vez), queda el botón "Conectar tableta Wacom".
+  useEffect(() => {
+    if (!supported) return undefined;
+    let cancelled = false;
+    (async () => {
+      const authorized = await hasAuthorizedStu();
+      // En StrictMode (dev) el primer montaje se cancela aquí, antes de abrir el
+      // dispositivo; el segundo montaje (cancelled=false) es el que conecta.
+      if (cancelled || !authorized) return;
+      // Ya sabemos que hay tableta autorizada: mostramos "Conectando…" para no
+      // parpadear el botón manual mientras se abre sola.
+      setStatus('connecting');
+      const ok = await openSession({ silent: true });
+      // Si el panel se desmontó mientras conectábamos, soltar el dispositivo.
+      if (ok && cancelled && sessionRef.current) {
+        sessionRef.current.disconnect().catch(() => {});
+        sessionRef.current = null;
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported]);
+
+  const handleConnect = () => openSession({ silent: false });
 
   const handleClear = async () => {
     const s = sessionRef.current;

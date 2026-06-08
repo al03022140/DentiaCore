@@ -78,6 +78,8 @@ export class WacomStuDriver {
     this.onPenDataCb = null;
     this.onHidChangeCb = null;
     this._inputHandler = null;
+    this._onHidConnect = null;
+    this._onHidDisconnect = null;
 
     // Capacidades; se rellenan en connect() leyendo el dispositivo. Los valores
     // por defecto corresponden al STU-540 y solo se usan si el dispositivo no
@@ -97,10 +99,16 @@ export class WacomStuDriver {
       eSerial: null,
     };
 
-    // Listeners globales de conexión/desconexión HID.
+    // Listeners globales de conexión/desconexión HID. Guardamos las referencias
+    // para poder removerlas en disconnect(): cada createStuSession() crea un
+    // driver nuevo y el panel de firma abre una sesión en CADA montaje, así que
+    // sin remover se acumularían (y cada driver quedaría retenido vivo por el
+    // closure del listener global, sin recolectarse).
+    this._onHidConnect = (e) => this._handleHidChange('connect', e.device);
+    this._onHidDisconnect = (e) => this._handleHidChange('disconnect', e.device);
     if (typeof navigator !== 'undefined' && navigator.hid) {
-      navigator.hid.addEventListener('connect', (e) => this._handleHidChange('connect', e.device));
-      navigator.hid.addEventListener('disconnect', (e) => this._handleHidChange('disconnect', e.device));
+      navigator.hid.addEventListener('connect', this._onHidConnect);
+      navigator.hid.addEventListener('disconnect', this._onHidDisconnect);
     }
   }
 
@@ -128,7 +136,8 @@ export class WacomStuDriver {
   /**
    * Conecta al dispositivo. Muestra el diálogo de selección WebHID filtrando
    * por el VID de Wacom (cualquier STU es seleccionable). Requiere gesto del
-   * usuario (click).
+   * usuario (click). Es la PRIMERA conexión: tras ella el permiso queda
+   * concedido para el origen y `reconnect()` ya puede abrir en silencio.
    * @returns {Promise<boolean>} true si quedó conectado
    */
   async connect() {
@@ -140,7 +149,47 @@ export class WacomStuDriver {
     });
     if (!picked || picked.length === 0 || picked[0] == null) return false;
 
-    this.device = picked[0];
+    return this._attachDevice(picked[0]);
+  }
+
+  /**
+   * Reconexión SILENCIOSA. Si en una sesión previa ya se concedió permiso a una
+   * STU (vía `requestDevice` con gesto del usuario), `getDevices()` la lista sin
+   * mostrar ningún diálogo y la abrimos directamente — sin selector y sin clic.
+   * `open()` no exige gesto del usuario (solo `requestDevice()` lo hace).
+   *
+   * Devuelve false en silencio si no hay ninguna STU autorizada (primera vez /
+   * navegador nuevo) o si la apertura falla (p.ej. otra app la está usando): en
+   * ese caso el usuario siempre puede conectar manualmente con `connect()`.
+   * @returns {Promise<boolean>} true si quedó conectado a una STU ya autorizada
+   */
+  async reconnect() {
+    if (this.checkConnected()) return true;
+    if (!isWebHidAvailable()) return false;
+    try {
+      const devices = await navigator.hid.getDevices();
+      const stu = devices.find(
+        (d) => d.vendorId === WACOM_VENDOR_ID && KNOWN_STU_PRODUCT_IDS.has(d.productId),
+      );
+      if (!stu) return false;
+      return await this._attachDevice(stu);
+    } catch {
+      // Limpieza defensiva: si la apertura silenciosa falló a medias, soltamos
+      // el dispositivo para que el botón manual quede operativo.
+      await this.disconnect().catch(() => {});
+      return false;
+    }
+  }
+
+  /**
+   * Abre el HIDDevice ya elegido (por `requestDevice` o `getDevices`), engancha
+   * el listener de reportes del lápiz y lee las capacidades reales (resolución,
+   * factor de presión). Compartido por `connect()` y `reconnect()`.
+   * @param {HIDDevice} device
+   * @returns {Promise<boolean>}
+   */
+  async _attachDevice(device) {
+    this.device = device;
     if (!this.device.opened) await this.device.open();
 
     this._inputHandler = (event) => this._onInputReport(event);
@@ -305,6 +354,13 @@ export class WacomStuDriver {
       } catch {
         /* ignore */
       }
+    }
+    // Remueve los listeners globales registrados en el constructor para que no
+    // se acumulen entre sesiones. Mientras el dispositivo está conectado siguen
+    // activos, así que la desconexión física se detecta hasta el teardown.
+    if (typeof navigator !== 'undefined' && navigator.hid) {
+      navigator.hid.removeEventListener('connect', this._onHidConnect);
+      navigator.hid.removeEventListener('disconnect', this._onHidDisconnect);
     }
     this.device = null;
     this._inputHandler = null;
