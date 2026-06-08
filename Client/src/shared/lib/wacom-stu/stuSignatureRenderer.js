@@ -143,9 +143,12 @@ export class StuSignatureRenderer {
   redrawAll() {
     this._resetCanvas();
     for (const stroke of this._strokes) {
+      // Reusa la lógica incremental acumulando los puntos en un array que se
+      // reaprovecha (push O(1)) en vez de un slice por punto — antes era O(n²)
+      // por trazo. _drawIncremental solo mira los últimos puntos de _current.
+      this._current = [];
       for (let i = 0; i < stroke.length; i += 1) {
-        // Reusa la lógica incremental simulando el avance del trazo.
-        this._current = stroke.slice(0, i + 1);
+        this._current.push(stroke[i]);
         this._drawIncremental();
       }
     }

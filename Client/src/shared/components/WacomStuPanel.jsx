@@ -45,15 +45,20 @@ export default function WacomStuPanel({
   const unsupportedReason = supported ? null : getWacomStuUnavailabilityReason();
 
   const sessionRef = useRef(null);
+  const mountedRef = useRef(false); // ¿el panel sigue montado? (lo usa openSession)
   const [status, setStatus] = useState(supported ? 'idle' : 'unsupported'); // idle|connecting|ready|error|unsupported
   const [deviceName, setDeviceName] = useState('');
   const [preview, setPreview] = useState(null); // dataURL del trazo en vivo
   const [empty, setEmpty] = useState(true);
   const [error, setError] = useState('');
 
-  // Limpieza: al desmontar, desconectar el dispositivo SIEMPRE.
+  // Marca de montaje + limpieza: al desmontar, desconectar el dispositivo
+  // SIEMPRE. mountedRef permite a openSession soltar el equipo si el panel se
+  // desmonta mientras la conexión estaba en curso (en cualquier ruta).
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       const s = sessionRef.current;
       if (s) {
         s.disconnect().catch(() => {});
@@ -68,6 +73,16 @@ export default function WacomStuPanel({
     if (!supported) return false;
     setError('');
     if (!silent) setStatus('connecting');
+    // Libera cualquier sesión previa antes de abrir otra. Sin esto, reconectar
+    // tras una desconexión física (status 'error', con la sesión muerta aún en
+    // sessionRef) sobrescribiría la referencia sin desconectarla: su driver
+    // quedaría huérfano y nunca se le llamaría disconnect(), dejando colgados
+    // sus listeners globales de HID (la misma fuga que evita disconnect()).
+    const stale = sessionRef.current;
+    if (stale) {
+      sessionRef.current = null;
+      await stale.disconnect().catch(() => {});
+    }
     let session = null;
     try {
       session = createStuSession({ inkColor });
@@ -82,6 +97,12 @@ export default function WacomStuPanel({
         }
       });
       const info = silent ? await session.reconnect() : await session.connect();
+      // Si el panel se desmontó mientras conectábamos (ruta silenciosa O manual),
+      // soltamos el dispositivo y salimos sin tocar el estado de React.
+      if (!mountedRef.current) {
+        await session.disconnect().catch(() => {});
+        return false;
+      }
       if (!info) {
         // Volvemos a 'idle' (botón manual disponible). silent: la tableta
         // autorizada desapareció entre la comprobación y la apertura. manual:
@@ -127,14 +148,10 @@ export default function WacomStuPanel({
       // dispositivo; el segundo montaje (cancelled=false) es el que conecta.
       if (cancelled || !authorized) return;
       // Ya sabemos que hay tableta autorizada: mostramos "Conectando…" para no
-      // parpadear el botón manual mientras se abre sola.
+      // parpadear el botón manual mientras se abre sola. Si el panel se desmonta
+      // mientras conecta, openSession lo detecta (mountedRef) y suelta el equipo.
       setStatus('connecting');
-      const ok = await openSession({ silent: true });
-      // Si el panel se desmontó mientras conectábamos, soltar el dispositivo.
-      if (ok && cancelled && sessionRef.current) {
-        sessionRef.current.disconnect().catch(() => {});
-        sessionRef.current = null;
-      }
+      await openSession({ silent: true });
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

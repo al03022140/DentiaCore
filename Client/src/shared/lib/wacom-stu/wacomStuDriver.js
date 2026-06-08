@@ -114,8 +114,12 @@ export class WacomStuDriver {
 
   _handleHidChange(kind, device) {
     if (!device || device.vendorId !== WACOM_VENDOR_ID) return;
-    // Aceptamos cualquier PID del VID de Wacom; si conocemos el set de STU,
-    // priorizamos esos, pero no descartamos modelos nuevos.
+    // 'disconnect' solo nos importa si es EL dispositivo que tenemos abierto:
+    // que se desconecte OTRA Wacom (p.ej. una tableta de dibujo del mismo VID)
+    // no debe reportarse como "se desconectó la tableta de firma".
+    if (kind === 'disconnect' && device !== this.device) return;
+    // Para 'connect' aceptamos cualquier PID del VID de Wacom; si conocemos el
+    // set de STU lo priorizamos, pero no descartamos modelos nuevos.
     if (this.onHidChangeCb) this.onHidChangeCb(kind, device);
   }
 
