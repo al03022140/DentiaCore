@@ -54,6 +54,10 @@ const PeriodontogramSection = ({ patientId }) => {
   const [errorType, setErrorType] = useState(null); // 'network', 'validation', 'server', 'unknown'
   const [periodontogramExists, setPeriodontogramExists] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Un fallo de carga NO equivale a "paciente sin periodontograma": si se
+  // permitiera guardar sobre el vacío resultante, la nueva "última versión"
+  // quedaría en blanco. Este flag bloquea Guardar/Limpiar hasta reintentar.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Estados para el sistema de versiones JSON
   const [editMode, setEditMode] = useState('guardado');
@@ -281,6 +285,7 @@ const PeriodontogramSection = ({ patientId }) => {
     setIsLoading(true);
     setError(null);
     setErrorType(null);
+    setLoadFailed(false);
 
     try {
       const versionsResponse = await PeriodontogramService.getDataVersions(patientId, { signal }).catch((err) => {
@@ -308,7 +313,10 @@ const PeriodontogramSection = ({ patientId }) => {
           setSelectedVersion(latestVersion);
         } catch (loadErr) {
           if (isAborted() || loadErr?.code === 'ERR_CANCELED' || loadErr?.name === 'CanceledError') return;
-          console.warn('No se pudo cargar la última versión, iniciando vacío:', loadErr);
+          // El periodontograma EXISTE pero no se pudo leer: mostrar el error
+          // y bloquear el guardado en vez de presentar uno vacío editable.
+          handleError(loadErr, 'carga de la última versión');
+          setLoadFailed(true);
           setPeriodontogramData(createEmptyPeriodontogram());
           setSelectedVersion(null);
         }
@@ -323,6 +331,9 @@ const PeriodontogramSection = ({ patientId }) => {
     } catch (err) {
       if (isAborted() || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return;
       handleError(err, 'carga inicial');
+      // No sabemos si el paciente tiene periodontograma (la lista de
+      // versiones no respondió): bloquear guardado hasta reintentar.
+      setLoadFailed(true);
       setPeriodontogramData(createEmptyPeriodontogram());
       setPeriodontogramExists(false);
       setVersionList([]);
@@ -554,6 +565,10 @@ const PeriodontogramSection = ({ patientId }) => {
   /* --------------------------- GUARDAR --------------------------- */
   const handleSave = useCallback(async () => {
     if (!periodontogramData) return;
+    if (loadFailed) {
+      message.error('No se pudo cargar el periodontograma existente. Reintente la carga antes de guardar.');
+      return;
+    }
     setIsSaving(true);
     setError(null);
     setErrorType(null);
@@ -811,7 +826,7 @@ const PeriodontogramSection = ({ patientId }) => {
       } finally {
       setIsSaving(false);
     }
-  }, [patientId, periodontogramData, periodontogramExists, saveStateForRollback, rollbackData, handleError, sortVersionsDesc]);
+  }, [patientId, periodontogramData, periodontogramExists, loadFailed, saveStateForRollback, rollbackData, handleError, sortVersionsDesc]);
 
   // beforeunload: bloquear navegación nativa del navegador (cerrar pestaña,
   // recargar) si hay cambios sin guardar. No previene cambios de ruta SPA;
@@ -884,14 +899,14 @@ const PeriodontogramSection = ({ patientId }) => {
                 <button
                   className="button-primary"
                   onClick={handleSave}
-                  disabled={isSaving || isLoading}
+                  disabled={isSaving || isLoading || loadFailed}
                 >
                   {isSaving ? 'Guardando…' : 'Guardar'}
                 </button>
                 <button
                   className="button-secondary"
                   onClick={handleClear}
-                  disabled={isSaving || isLoading}
+                  disabled={isSaving || isLoading || loadFailed}
                 >
                   Limpiar
                 </button>
@@ -925,10 +940,10 @@ const PeriodontogramSection = ({ patientId }) => {
              errorType === 'server' ? '🔧' : '❌'}
           </span>
           <span className="error__message">{error}</span>
-          {errorType === 'network' && (
-            <button 
-              className="error__retry" 
-              onClick={() => window.location.reload()}
+          {(errorType === 'network' || loadFailed) && (
+            <button
+              className="error__retry"
+              onClick={() => loadPeriodontogram()}
             >
               Reintentar
             </button>

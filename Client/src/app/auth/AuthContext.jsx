@@ -2,6 +2,30 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import API, { triggerTokenRefresh } from '../../shared/services/axios-instance';
 import { clearAccessToken, getAccessToken, setAccessToken } from '../../shared/services/auth-token';
 import { clearAllDrafts } from '../../shared/hooks/useDraftPersistence';
+import { invalidateSettingsCache } from '../../shared/services/settingsService';
+
+// Claves de localStorage con PHI o credenciales de terceros que NO deben
+// sobrevivir al cierre de sesión en una estación compartida (M-14 extendido):
+//  - accessToken: access token de Google (calendario+email del profesional)
+//  - calendarEvents: caché de eventos con nombres de paciente y motivo (1 mes)
+//  - google_connected_email / google_selected_calendar: identidad de Google
+const SHARED_STATION_KEYS = [
+  'accessToken',
+  'calendarEvents',
+  'google_connected_email',
+  'google_selected_calendar',
+];
+
+const clearSharedStationStorage = () => {
+  try {
+    SHARED_STATION_KEYS.forEach((key) => localStorage.removeItem(key));
+    // Persistencia paralela del periodontograma (periodontogram_state_<id>):
+    // hoy sin uso activo, pero si existe contiene mediciones clínicas.
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('periodontogram_state_'))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch { /* storage no disponible: nada que limpiar */ }
+};
 
 const AuthContext = createContext(null);
 
@@ -33,6 +57,11 @@ export const AuthProvider = ({ children }) => {
       clearAccessToken();
       // M-14: limpiar drafts con PHI de localStorage al cerrar sesión.
       clearAllDrafts();
+      // El siguiente usuario de la estación no debe heredar el calendario de
+      // Google ni la caché de eventos (PHI) del usuario anterior.
+      clearSharedStationStorage();
+      // La caché de settings (3 min) no debe cruzar sesiones de usuario.
+      invalidateSettingsCache();
       setUser(null);
     }
   }, []);

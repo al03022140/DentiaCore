@@ -81,12 +81,17 @@ const handleApiError = (error) => {
 // Se usa SÓLO sobre arrays ya pasados por normalizeEntriesForEngine, así que
 // `damage` ya es un código numérico en formato string.
 function mapToBackend(entry) {
-  return {
+  const mapped = {
     tooth: entry.tooth ?? entry.diente ?? '',
     damage: entry.damage ?? entry.tipo ?? '',
     surface: entry.surface ?? entry.superficie ?? '0',
     note: entry.note ?? entry.nota ?? ''
   };
+  // Daños inter-dentales (diastema, prótesis fija…): el engine los identifica
+  // por `space` y NO traen `tooth`. Descartar `space` aquí los perdía en cada
+  // guardado (llegaban con tooth:'' y la recarga los filtraba).
+  if (entry.space) mapped.space = String(entry.space);
+  return mapped;
 }
 
 // Garantiza que el payload al backend lleve `damage` como código numérico
@@ -99,7 +104,7 @@ function buildBackendEntries(rawEntries) {
 // Utilidad para normalizar payloads del backend al frontend
 function mapFromBackend(entry) {
   const toothValue = entry.tooth ?? entry.diente ?? '';
-  return {
+  const mapped = {
     tooth: toothValue,
     damage: entry.damage ?? entry.tipo ?? '',
     surface: entry.surface ?? entry.superficie ?? '0',
@@ -107,6 +112,10 @@ function mapFromBackend(entry) {
     engineTeeth: entry.engineTeeth ?? entry.teeth ?? (toothValue ? [toothValue] : []),
     fecha: entry.fecha ?? entry.date ?? ''
   };
+  // Propagar `space` para que normalizeEntriesForEngine reconstruya los
+  // daños inter-dentales al recargar.
+  if (entry.space) mapped.space = String(entry.space);
+  return mapped;
 }
 
 /**

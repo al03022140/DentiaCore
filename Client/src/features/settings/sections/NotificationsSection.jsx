@@ -3,7 +3,9 @@ import { useAuth } from '../../../app/auth/AuthContext';
 import { updateMyPreferences } from '../../../shared/services/settingsService';
 
 const NotificationsSection = () => {
-  const { user, refreshUser } = useAuth();
+  // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
+  // hacía que el user del front no se actualizara tras guardar.
+  const { user, refreshProfile } = useAuth();
   const prefs = user?.preferences?.reminders || {};
 
   const [pendingDrafts, setPendingDrafts] = useState(prefs.pendingDrafts ?? true);
@@ -19,7 +21,7 @@ const NotificationsSection = () => {
       await updateMyPreferences({
         reminders: { pendingDrafts, upcomingAppointments, endOfDay },
       });
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setMsg({ type: 'success', text: 'Notificaciones actualizadas' });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Modal } from 'antd';
 import API from '../../shared/services/axios-instance';
 import PermissionGate from '../../app/auth/PermissionGate';
 import './users.css';
@@ -17,6 +18,11 @@ const UsersPage = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [creating, setCreating] = useState(false);
+  // Guard síncrono: dos clicks rápidos en "Crear usuario" colaban dos POST
+  // (el segundo fallaba con un error confuso de email duplicado).
+  const creatingRef = useRef(false);
+  const [disablingId, setDisablingId] = useState(null);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -45,6 +51,7 @@ const UsersPage = () => {
 
   const handleCreate = async (event) => {
     event.preventDefault();
+    if (creatingRef.current) return;
     setError(null);
     if (!/^\d{4}$/.test(form.pin)) {
       setError('El PIN es obligatorio y debe tener 4 dígitos');
@@ -54,6 +61,8 @@ const UsersPage = () => {
       setError('La confirmación del PIN no coincide');
       return;
     }
+    creatingRef.current = true;
+    setCreating(true);
     try {
       await API.post('/users', {
         nombre: form.nombre,
@@ -66,16 +75,31 @@ const UsersPage = () => {
       await loadUsers();
     } catch (err) {
       setError(err?.response?.data?.message || 'No se pudo crear el usuario');
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
     }
   };
 
-  const handleDisable = async (id) => {
-    try {
-      await API.patch(`/users/${id}/disable`);
-      await loadUsers();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'No se pudo desactivar el usuario');
-    }
+  const handleDisable = (user) => {
+    Modal.confirm({
+      title: `¿Desactivar a ${user.nombre}?`,
+      content: 'El usuario no podrá iniciar sesión hasta que se reactive su cuenta.',
+      okText: 'Desactivar',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        setDisablingId(user._id);
+        try {
+          await API.patch(`/users/${user._id}/disable`);
+          await loadUsers();
+        } catch (err) {
+          setError(err?.response?.data?.message || 'No se pudo desactivar el usuario');
+        } finally {
+          setDisablingId(null);
+        }
+      }
+    });
   };
 
   const renderStatus = (active) => (active ? 'Activo' : 'Desactivado');
@@ -155,7 +179,9 @@ const UsersPage = () => {
               </option>
             ))}
           </select>
-          <button type="submit">Crear usuario</button>
+          <button type="submit" disabled={creating}>
+            {creating ? 'Creando…' : 'Crear usuario'}
+          </button>
         </form>
       </PermissionGate>
 
@@ -188,10 +214,10 @@ const UsersPage = () => {
                       <button
                         type="button"
                         className="users-disable"
-                        onClick={() => handleDisable(user._id)}
-                        disabled={!user.active}
+                        onClick={() => handleDisable(user)}
+                        disabled={!user.active || disablingId === user._id}
                       >
-                        Desactivar
+                        {disablingId === user._id ? 'Desactivando…' : 'Desactivar'}
                       </button>
                     </PermissionGate>
                   </td>

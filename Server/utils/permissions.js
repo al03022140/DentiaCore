@@ -342,14 +342,22 @@ const SUPERADMIN_ONLY_PERMISSIONS = ['*', 'system.*', 'maintenance.*'];
  *  1. `permissions` debe ser un array de strings.
  *  2. Solo se aceptan permisos conocidos (lista blanca `ALL_KNOWN_PERMISSIONS`).
  *  3. Los permisos peligrosos solo los puede otorgar un superadmin.
- *  4. Un actor no-superadmin no puede otorgar un permiso que él mismo no posee
- *     (no se puede dar lo que no se tiene → no hay auto-escalada).
+ *  4. Un actor no-superadmin no puede OTORGAR un permiso que él mismo no posee
+ *     (no se puede dar lo que no se tiene → no hay auto-escalada). La regla
+ *     aplica SOLO a los permisos AÑADIDOS respecto al conjunto efectivo ACTUAL
+ *     del rol/usuario objetivo (`targetCurrentPermissions`): mantener un permiso
+ *     que el objetivo ya posee — o quitárselo — no es otorgar nada nuevo. Sin
+ *     esta distinción, un administrador no podía guardar el rol Doctor (cuyos
+ *     defaults incluyen escrituras clínicas que él no posee) ni siquiera para
+ *     QUITAR un toggle → 403 siempre.
  *
  * @param {string[]} requestedPermissions - permisos a asignar (del cliente)
  * @param {Object} actor - { role, permissions } del usuario autenticado (req.user)
+ * @param {string[]} [targetCurrentPermissions] - conjunto efectivo ACTUAL del
+ *        rol/usuario objetivo (defaults del rol + overrides existentes)
  * @returns {{ valid: boolean, message?: string }}
  */
-const validatePermissionAssignment = (requestedPermissions, actor = {}) => {
+const validatePermissionAssignment = (requestedPermissions, actor = {}, targetCurrentPermissions = []) => {
   if (!Array.isArray(requestedPermissions)) {
     return { valid: false, message: 'permissions debe ser un array' };
   }
@@ -372,8 +380,10 @@ const validatePermissionAssignment = (requestedPermissions, actor = {}) => {
       return { valid: false, message: `No tiene permitido otorgar el permiso: ${perm}` };
     }
 
-    // 4. No se puede otorgar lo que no se tiene (superadmin tiene '*' → todo)
-    if (!isSuperadmin && !hasPermission(actorPermissions, [perm])) {
+    // 4. No se puede otorgar lo que no se tiene (superadmin tiene '*' → todo).
+    //    Solo cuenta como "otorgar" si el objetivo NO lo posee ya.
+    const alreadyHeldByTarget = hasPermission(targetCurrentPermissions, [perm]);
+    if (!isSuperadmin && !alreadyHeldByTarget && !hasPermission(actorPermissions, [perm])) {
       return { valid: false, message: `No puede otorgar un permiso que usted no posee: ${perm}` };
     }
   }

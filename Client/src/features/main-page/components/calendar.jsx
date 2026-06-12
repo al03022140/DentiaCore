@@ -1,5 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import '../Styles/Calendar.css';
+import {
+  getStoredGoogleToken as getStoredToken,
+  renewGoogleAccessToken,
+  fetchGoogleSessionToken,
+} from '../../../shared/services/googleTokenService';
+import '../styles/calendar.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5002';
 
@@ -17,35 +22,10 @@ const setAuthFetchInProgress = (value) => {
 };
 
 // ── Token storage ──────────────────────────────────────────────────────────────
-// A-3/A-4: el refresh token de Google NUNCA se guarda en el cliente. Vive sólo
-// en la cookie httpOnly `google_refresh_token` (server-side). Guardamos un
-// MARCADOR no-secreto ('cookie') para que la lógica de renovación existente
-// (que se apoya en `refreshToken` para decidir si puede renovar) siga
-// funcionando, pero sin exponer ningún secreto a XSS/localStorage.
-const REFRESH_MARKER = 'cookie';
-const storeTokenWithExpiration = (token, expiresIn = 3600) => {
-  const expirationTime = Date.now() + expiresIn * 1000;
-  localStorage.setItem('accessToken', JSON.stringify({ token, expiration: expirationTime, refreshToken: REFRESH_MARKER }));
-};
-
-const getStoredToken = () => {
-  try {
-    const tokenData = localStorage.getItem('accessToken');
-    if (!tokenData) return null;
-    if (!tokenData.startsWith('{')) return tokenData;
-    const parsed = JSON.parse(tokenData);
-    if (!parsed.token || !parsed.expiration) return parsed.token || parsed;
-    const timeUntilExpiry = parsed.expiration - Date.now();
-    if (timeUntilExpiry > 0) {
-      return { token: parsed.token, refreshToken: parsed.refreshToken, needsRefresh: timeUntilExpiry < 5 * 60 * 1000 };
-    }
-    if (!parsed.refreshToken) localStorage.removeItem('accessToken');
-    return parsed.refreshToken ? { token: null, refreshToken: parsed.refreshToken, needsRefresh: true } : null;
-  } catch {
-    localStorage.removeItem('accessToken');
-    return null;
-  }
-};
+// A-3/A-4: el refresh token de Google NUNCA se guarda en el cliente; vive en la
+// cookie httpOnly `google_refresh_token`. La lógica de almacenamiento/renovación
+// se movió a shared/services/googleTokenService.js (compartida con
+// CreateAppointmentModal) — aquí sólo se importa.
 
 const storeEventsLocally = (fetchedEvents) => {
   const expiration = new Date();
@@ -67,6 +47,16 @@ const loadLocalEvents = () => {
 };
 
 // ── Format helpers ─────────────────────────────────────────────────────────────
+// Serializa una fecha como YYYY-MM-DD en hora LOCAL. No usar
+// toISOString().split('T')[0]: serializa en UTC y a partir de las 18:00
+// (UTC-6) devuelve el día siguiente.
+const toLocalDateString = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const formatTime = (dateTimeStr) => {
   if (!dateTimeStr) return null;
   const d = new Date(dateTimeStr);
@@ -182,28 +172,14 @@ const Calendar = () => {
     return stored?.token || null;
   }, []);
 
-  // A-4: la renovación usa la cookie httpOnly `google_refresh_token` (enviada
-  // automáticamente con credentials:'include'); ya no se manda el refresh token
-  // en el body. El parámetro se conserva por compatibilidad con los call sites
-  // existentes, pero su valor (el marcador) no se usa.
+  // A-4: la renovación usa la cookie httpOnly `google_refresh_token`; ya no se
+  // manda el refresh token en el body. Va por la instancia compartida de axios
+  // porque el endpoint exige la sesión de la app (JWT en Authorization), que
+  // sólo vive en memoria y la adjunta su interceptor. El parámetro se conserva
+  // por compatibilidad con los call sites existentes, pero su valor (el
+  // marcador) no se usa.
   const renewAccessToken = useCallback(async (_refreshMarker) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/google/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({}),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        storeTokenWithExpiration(data.accessToken, data.expiresIn);
-        return data.accessToken;
-      }
-      localStorage.removeItem('accessToken');
-      return null;
-    } catch {
-      return null;
-    }
+    return renewGoogleAccessToken();
   }, []);
 
   const fetchUserInfo = useCallback(async (token) => {
@@ -343,30 +319,27 @@ const Calendar = () => {
       authAttemptedRef.current = true;
       (async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/google/auth/token`, {
-            credentials: 'include',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            // A-4: /auth/token ya no devuelve refreshToken; el refresh vive en
-            // la cookie httpOnly. Sólo persistimos el access token + expiración.
-            storeTokenWithExpiration(data.accessToken, data.expiresIn);
-            fetchUserInfo(data.accessToken);
-            fetchCalendarEvents(data.accessToken);
-            // If there's a saved return path (e.g. from Settings), navigate there
-            const returnPath = localStorage.getItem('google_auth_return_path');
-            if (returnPath) {
-              localStorage.removeItem('google_auth_return_path');
-              // Small delay to ensure token is persisted before navigating
-              setTimeout(() => { window.location.replace(returnPath); }, 300);
-            }
-          } else {
-            setSyncStatus('error');
-            setSyncMessage('No se pudo leer el token de Google.');
+          // A-4: /auth/token ya no devuelve refreshToken; el refresh vive en la
+          // cookie httpOnly. El endpoint exige la sesión de la app (JWT), por
+          // eso va por la instancia de axios (vía googleTokenService), que
+          // adjunta el Bearer y persiste el access token + expiración.
+          const data = await fetchGoogleSessionToken();
+          fetchUserInfo(data.accessToken);
+          fetchCalendarEvents(data.accessToken);
+          // If there's a saved return path (e.g. from Settings), navigate there
+          const returnPath = localStorage.getItem('google_auth_return_path');
+          if (returnPath) {
+            localStorage.removeItem('google_auth_return_path');
+            // Small delay to ensure token is persisted before navigating
+            setTimeout(() => { window.location.replace(returnPath); }, 300);
           }
-        } catch {
+        } catch (err) {
           setSyncStatus('error');
-          setSyncMessage('Error al obtener el token de Google.');
+          // Con respuesta del server (p. ej. aún no hay cookie de Google) es un
+          // problema de lectura del token; sin respuesta es un error de red.
+          setSyncMessage(err?.response
+            ? 'No se pudo leer el token de Google.'
+            : 'Error al obtener el token de Google.');
         }
       })();
       return;
@@ -533,7 +506,7 @@ const Calendar = () => {
 
   // ── Filtered events for selected day ──────────────────────────────────────
   const eventsForSelectedDay = useMemo(() => {
-    const selectedDayStr = currentDate.toISOString().split('T')[0];
+    const selectedDayStr = toLocalDateString(currentDate);
     return events
       .filter(event => {
         if (event.status === 'cancelled') return false;
@@ -552,7 +525,7 @@ const Calendar = () => {
 
   // ── Create event ───────────────────────────────────────────────────────────
   const openEventModal = () => {
-    const dateStr = currentDate.toISOString().split('T')[0];
+    const dateStr = toLocalDateString(currentDate);
     setEventForm({ summary: '', description: '', date: dateStr, startTime: '09:00', endTime: '10:00', location: '' });
     setShowEventModal(true);
   };

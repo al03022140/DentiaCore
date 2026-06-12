@@ -167,7 +167,10 @@ export function createStuSession(opts = {}) {
         await driver.setInking(true);
         // Modo 1 = lápiz suave con timing extra (mejores trazos).
         await driver.setWritingMode(1);
-      } catch {
+      } catch (err) {
+        // Un timeout HID (driver) = tableta colgada: lo propagamos para que el
+        // panel muestre el error en vez de pasar a "listo" sin captura.
+        if (err?.code === 'WACOM_TIMEOUT') throw err;
         /* algunos comandos de LCD son específicos por modelo: no es crítico */
       }
     },

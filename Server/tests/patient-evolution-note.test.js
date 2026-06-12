@@ -39,11 +39,13 @@ describe('POST /api/patients/:id/evolution-note', () => {
     });
 
     // Create a doctor user for authentication
+    // cedulaProfesional: obligatoria para doctores desde feat(firma Wacom)
     const user = await Usuario.create({
       nombre: 'Dr. Test',
       email: `evo-test-${Date.now()}@test.com`,
       contraseña: 'Password123!',
-      rol: 'doctor'
+      rol: 'doctor',
+      cedulaProfesional: 'CED-TEST-EVO'
     });
     authToken = makeToken(user);
   });

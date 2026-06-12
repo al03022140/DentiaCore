@@ -143,74 +143,6 @@ function ensureArray3(value, defaultValue = 0) {
   return [defaultValue, defaultValue, defaultValue];
 }
 
-/**
- * Convierte estructuras de 4-caras a arrays de 3-elementos
- * CORRIGE LA INCONSISTENCIA CRÍTICA - OPCIÓN 1 MEJORADA
- */
-function convertFourFaceToThreeElement(fourFaceData, defaultValue = 0) {
-  if (!fourFaceData || typeof fourFaceData !== 'object') {
-    return [defaultValue, defaultValue, defaultValue];
-  }
-  
-  // Mapeo de 4-caras a 3-elementos
-  // 4-caras: vestibularSuperior[3], palatinoSuperior[3], vestibularInferior[3], lingualInferior[3]
-  // 3-elementos: [Mesial, Central, Distal]
-  
-  const result = [defaultValue, defaultValue, defaultValue];
-  
-  // Tomar datos de cualquier cara disponible (prioridad: vestibular > palatino/lingual)
-  let sourceArray = null;
-  if (Array.isArray(fourFaceData.vestibularSuperior)) {
-    sourceArray = fourFaceData.vestibularSuperior;
-  } else if (Array.isArray(fourFaceData.vestibularInferior)) {
-    sourceArray = fourFaceData.vestibularInferior;
-  } else if (Array.isArray(fourFaceData.palatinoSuperior)) {
-    sourceArray = fourFaceData.palatinoSuperior;
-  } else if (Array.isArray(fourFaceData.lingualInferior)) {
-    sourceArray = fourFaceData.lingualInferior;
-  }
-  
-  if (sourceArray) {
-    for (let i = 0; i < Math.min(3, sourceArray.length); i++) {
-      result[i] = sourceArray[i] !== undefined ? sourceArray[i] : defaultValue;
-    }
-  }
-  
-  return result;
-}
-
-/**
- * Convierte arrays de 3-elementos a estructuras de 4-caras
- * PARA COMPATIBILIDAD CON FRONTEND LEGACY
- */
-function convertThreeElementToFourFace(threeElementArray, toothNumber) {
-  if (!Array.isArray(threeElementArray) || threeElementArray.length !== 3) {
-    return {
-      vestibularSuperior: [false, false, false],
-      palatinoSuperior: [false, false, false],
-      vestibularInferior: [false, false, false],
-      lingualInferior: [false, false, false]
-    };
-  }
-  
-  const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
-  
-  if (isUpperTooth) {
-    return {
-      vestibularSuperior: [threeElementArray[0], threeElementArray[1], threeElementArray[2]],
-      palatinoSuperior: [threeElementArray[0], threeElementArray[1], threeElementArray[2]],
-      vestibularInferior: [false, false, false],
-      lingualInferior: [false, false, false]
-    };
-  } else {
-    return {
-      vestibularSuperior: [false, false, false],
-      palatinoSuperior: [false, false, false],
-      vestibularInferior: [threeElementArray[0], threeElementArray[1], threeElementArray[2]],
-      lingualInferior: [threeElementArray[0], threeElementArray[1], threeElementArray[2]]
-    };
-  }
-}
 
 // ============================================================================
 // VALIDADOR UNIVERSAL CONSOLIDADO
@@ -221,353 +153,7 @@ function convertThreeElementToFourFace(threeElementArray, toothNumber) {
  */
 export const UniversalToothValidator = {
   
-  // ==========================================================================
-  // TRANSFORMADORES BIDIRECCIONALES CORREGIDOS
-  // ==========================================================================
   
-  /**
-   * Transforma datos del frontend al formato del backend
-   * CORRIGE LA CONVERSIÓN DE 4-CARAS A ESTRUCTURAS VESTIBULAR/PALATINO
-   */
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar datos sin transformaciones
-   * Reemplaza transformToBackend para usar el esquema unificado directamente
-   */
-  validateUnifiedData(data) {
-    try {
-      if (!data || typeof data !== 'object') {
-        ValidationLogger.error('Datos inválidos para validación unificada', data);
-        throw new Error('Datos inválidos');
-      }
-      
-      // Validar estructura básica
-      const validatedData = {
-        pacienteId: data.pacienteId || data.patientId,
-        teeth: data.teeth || {},
-        statistics: data.statistics || {},
-        version: data.version || data.versionName || new Date().toISOString().replace(/[:.-]/g, '')
-      };
-      
-      // Validar cada diente usando el esquema unificado
-      Object.entries(validatedData.teeth).forEach(([toothNumber, toothData]) => {
-        if (toothData && typeof toothData === 'object') {
-          validatedData.teeth[toothNumber] = this.validateUnifiedTooth(toothData, toothNumber);
-        }
-      });
-      
-      ValidationLogger.info('Datos validados con esquema unificado', {
-        teethCount: Object.keys(validatedData.teeth).length,
-        version: validatedData.version
-      });
-      
-      return validatedData;
-    } catch (error) {
-      ValidationLogger.error('Error validando datos unificados', { data, error: error.message });
-      throw error;
-    }
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar un diente individual
-   */
-  validateUnifiedTooth(toothData, toothNumber) {
-    const validated = {
-      toothNumber: parseInt(toothNumber),
-      absent: Boolean(toothData.ausente || toothData.absent),
-      implant: Boolean(toothData.implante || toothData.implant),
-      mobility: Math.max(0, Math.min(3, parseInt(toothData.movilidad || toothData.mobility || 0))),
-      gumWidth: Math.max(MEASUREMENT_LIMITS.anchuraEncia.min, Math.min(MEASUREMENT_LIMITS.anchuraEncia.max, parseFloat(toothData.anchuraEncia || toothData.gumWidth || MEASUREMENT_LIMITS.anchuraEncia.default))),
-      furca: this.validateFurcaData(toothData.furca),
-      prognosis: this.validatePronostico(toothData.pronostico || toothData.prognosis)
-    };
-    
-    // Agregar estructura de 4 caras canónica
-    this.addCanonicalFaceStructure(validated, toothData);
-    
-    return validated;
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Agregar estructura canónica de 4 caras
-   */
-  addCanonicalFaceStructure(validated, toothData) {
-    const faces = ['mesial', 'distal', 'vestibular', 'lingual'];
-    
-    faces.forEach(face => {
-      const faceData = toothData[face] || toothData[this.getFaceLegacyName(face)] || {};
-      validated[face] = this.validateCanonicalFaceData(faceData);
-    });
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Mapear nombres legacy de caras
-   */
-  getFaceLegacyName(face) {
-    const mapping = {
-      'lingual': 'palatino',
-      'vestibular': 'vestibular',
-      'mesial': 'mesial',
-      'distal': 'distal'
-    };
-    return mapping[face] || face;
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar datos de una cara dental (estructura canónica)
-   */
-  validateCanonicalFaceData(faceData) {
-    if (!faceData || typeof faceData !== 'object') {
-      return {
-        probingDepth: [0, 0, 0],
-        gingivalMargin: [0, 0, 0],
-        bleeding: [0, 0, 0],
-        suppuration: [0, 0, 0],
-        plaque: [0, 0, 0]
-      };
-    }
-    
-    return {
-        probingDepth: this.validateProbingDepthArray(faceData.profundidadSondaje || faceData.probingDepth),
-        gingivalMargin: this.validateGingivalMarginArray(faceData.margenGingival || faceData.gingivalMargin),
-        bleeding: this.validateBleedingArray(faceData.sangrado || faceData.bleeding),
-        suppuration: this.validateBinaryArray(faceData.supuracion || faceData.suppuration),
-        plaque: this.validateBinaryArray(faceData.placa || faceData.plaque)
-      };
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar datos de furca
-   */
-  validateFurcaData(furcaData) {
-    if (!furcaData) {
-      return { vestibular: 0, lingual: 0, mesial: 0 };
-    }
-    
-    if (typeof furcaData === 'number') {
-      const value = Math.max(0, Math.min(3, parseInt(furcaData)));
-      return { vestibular: value, lingual: value, mesial: value };
-    }
-    
-    return {
-      vestibular: Math.max(0, Math.min(3, parseInt(furcaData.vestibular || 0))),
-      lingual: Math.max(0, Math.min(3, parseInt(furcaData.lingual || 0))),
-      mesial: Math.max(0, Math.min(3, parseInt(furcaData.mesial || 0)))
-    };
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar pronóstico
-   */
-  validatePronostico(pronostico) {
-    const validValues = ['bueno', 'regular', 'malo', 'dudoso', 'imposible']; // P6: +imposible (la UI lo ofrece)
-    const normalizedValue = validValues.includes(pronostico?.toLowerCase()) ? pronostico.toLowerCase() : 'bueno';
-    // Capitalizar primera letra para coincidir con backend
-    return normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar array de mediciones [mesial, central, distal]
-   */
-  validateMeasurementArray(data) {
-    if (!Array.isArray(data) || data.length !== 3) {
-      return [0, 0, 0];
-    }
-    return data.map(val => Math.max(0, Math.min(20, parseFloat(val) || 0)));
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar array binario [mesial, central, distal]
-   */
-  validateBinaryArray(data) {
-    if (!Array.isArray(data) || data.length !== 3) {
-      return [0, 0, 0];
-    }
-    return data.map(val => val ? 1 : 0);
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar array de sangrado (rango 0-3)
-   */
-  validateBleedingArray(data) {
-    if (!Array.isArray(data) || data.length !== 3) {
-      return [0, 0, 0];
-    }
-    return data.map(val => Math.max(0, Math.min(3, parseInt(val) || 0)));
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar array de profundidad de sondaje (rango -9 a 9)
-   */
-  validateProbingDepthArray(data) {
-    if (!Array.isArray(data) || data.length !== 3) {
-      return [0, 0, 0];
-    }
-    return data.map(val => Math.max(-9, Math.min(9, parseFloat(val) || 0)));
-  },
-  
-  /**
-   * ✅ ESQUEMA UNIFICADO - Validar array de margen gingival (rango -9 a 9)
-   */
-  validateGingivalMarginArray(data) {
-    if (!Array.isArray(data) || data.length !== 3) {
-      return [0, 0, 0];
-    }
-    return data.map(val => Math.max(-9, Math.min(9, parseFloat(val) || 0)));
-  },
-  
-  /**
-   * @deprecated - Usar validateUnifiedData en su lugar
-   * Mantenido solo para compatibilidad temporal
-   */
-  transformToBackend(frontendData) {
-    ValidationLogger.warn('transformToBackend está deprecado, usar validateUnifiedData');
-    return this.validateUnifiedData(frontendData);
-  },
-  
-  /**
-   * Transforma datos del backend al formato del frontend
-   * MAPEA CORRECTAMENTE ESTRUCTURAS VESTIBULAR/PALATINO A 4-CARAS PARA COMPATIBILIDAD LEGACY
-   */
-  transformToFrontend(backendData, useLegacyFormat = false) {
-    try {
-      if (!backendData || typeof backendData !== 'object') {
-        ValidationLogger.error('Datos del backend inválidos', backendData);
-        return this.getDefaultToothData();
-      }
-      
-      const frontendData = {};
-
-      const normalizedBackend = { ...backendData };
-
-      // --- MAPEAR 'ausente' (backend) -> 'available' y 'absent' (frontend) ---
-      const ausenteVal = normalizedBackend.ausente;
-      if (normalizedBackend.available === undefined) {
-        if (ausenteVal !== undefined) {
-          const isAbsent = (ausenteVal === 1 || ausenteVal === "1" || ausenteVal === true || ausenteVal === "true");
-          normalizedBackend.available = !isAbsent;
-        } else {
-          normalizedBackend.available = true; // Valor por defecto
-        }
-      }
-      if (normalizedBackend.absent === undefined) {
-        if (ausenteVal !== undefined) {
-          normalizedBackend.absent = (ausenteVal === 1 || ausenteVal === "1" || ausenteVal === true || ausenteVal === "true");
-        } else {
-          normalizedBackend.absent = false;
-        }
-      }
-
-      // Alias canónicos a nombres esperados en frontend
-      if (normalizedBackend.toothNumber === undefined && normalizedBackend.numeroDiente !== undefined) {
-        normalizedBackend.toothNumber = normalizedBackend.numeroDiente;
-      }
-      if (normalizedBackend.numeroDiente === undefined && normalizedBackend.toothNumber !== undefined) {
-        normalizedBackend.numeroDiente = normalizedBackend.toothNumber;
-      }
-      if (normalizedBackend.anchuraEncia === undefined && normalizedBackend.gumWidth !== undefined) {
-        normalizedBackend.anchuraEncia = normalizedBackend.gumWidth;
-      }
-      if (normalizedBackend.movilidad === undefined && normalizedBackend.mobility !== undefined) {
-        normalizedBackend.movilidad = normalizedBackend.mobility;
-      }
-      if (normalizedBackend.pronostico === undefined && normalizedBackend.prognosis !== undefined) {
-        normalizedBackend.pronostico = normalizedBackend.prognosis;
-      }
-      if (normalizedBackend.implante === undefined && normalizedBackend.implant !== undefined) {
-        normalizedBackend.implante = normalizedBackend.implant;
-      }
-
-      // Transformar cada propiedad según el esquema
-      Object.entries(UNIFIED_TOOTH_SCHEMA).forEach(([key, schema]) => {
-        let value = normalizedBackend[key];
-
-        if (value !== undefined) {
-          value = this.validateValue(value, schema, key);
-          frontendData[key] = value;
-        } else {
-          frontendData[key] = schema.default;
-        }
-      });
-
-      if (normalizedBackend.numeroDiente !== undefined && frontendData.numeroDiente === undefined) {
-        frontendData.numeroDiente = Number(normalizedBackend.numeroDiente);
-      }
-      if (frontendData.toothNumber === undefined && normalizedBackend.toothNumber !== undefined) {
-        frontendData.toothNumber = Number(normalizedBackend.toothNumber);
-      }
-      if (normalizedBackend.available !== undefined) {
-        frontendData.available = Boolean(normalizedBackend.available);
-      } else if (frontendData.available === undefined) {
-        frontendData.available = !frontendData.ausente;
-      }
-      if (normalizedBackend.absent !== undefined) {
-        frontendData.absent = Boolean(normalizedBackend.absent);
-      } else if (frontendData.absent === undefined) {
-        frontendData.absent = Boolean(frontendData.ausente);
-      }
-
-      // COMPATIBILIDAD LEGACY: Mapear estructuras vestibular/palatino a 4-caras del frontend
-      // Canonizar claves clínicas en español y caras definitivas, manteniendo alias en inglés para compatibilidad
-      if (useLegacyFormat) {
-        const ensureTriplet = (arr) => {
-          if (!Array.isArray(arr)) return [0, 0, 0];
-          const trio = arr.slice(0, 3).map(v => {
-            const num = Number(v);
-            return Number.isFinite(num) ? num : 0;
-          });
-          while (trio.length < 3) trio.push(0);
-          return trio;
-        };
-
-        // Alias en inglés para compatibilidad temporal con UI existente
-        const fourFaceFields = {
-          sangrado: 'bleeding',
-          supuracion: 'suppuration',
-          placa: 'plaque',
-          profundidadSondaje: 'probingDepth',
-          margenGingival: 'gingivalMargin'
-        };
-
-        const canonicalFaces = {
-          vestibularSuperior: frontendData.vestibularSuperior || normalizedBackend.vestibularSuperior,
-          palatinoSuperior: frontendData.palatinoSuperior || normalizedBackend.palatinoSuperior || frontendData.palatino || normalizedBackend.palatino,
-          vestibularInferior: frontendData.vestibularInferior || normalizedBackend.vestibularInferior,
-          lingualInferior: frontendData.lingualInferior || normalizedBackend.lingualInferior || frontendData.lingual || normalizedBackend.lingualPalatino || normalizedBackend.lingual
-        };
-        const aggregatedFaces = {
-          vestibular: normalizedBackend.vestibular || {},
-          palatino: normalizedBackend.palatino || normalizedBackend.lingualPalatino || {}
-        };
-
-        Object.entries(fourFaceFields).forEach(([backendKey, frontendKey]) => {
-          const upperVest = canonicalFaces.vestibularSuperior?.[backendKey] ?? aggregatedFaces.vestibular?.[backendKey];
-          const upperPal = canonicalFaces.palatinoSuperior?.[backendKey] ?? aggregatedFaces.palatino?.[backendKey];
-          const lowerVest = canonicalFaces.vestibularInferior?.[backendKey] ?? aggregatedFaces.vestibular?.[backendKey];
-          const lowerPal = canonicalFaces.lingualInferior?.[backendKey] ?? aggregatedFaces.palatino?.[backendKey];
-
-          const fourFaceStructure = {
-            vestibularSuperior: ensureTriplet(upperVest),
-            palatinoSuperior: ensureTriplet(upperPal),
-            vestibularInferior: ensureTriplet(lowerVest),
-            lingualInferior: ensureTriplet(lowerPal)
-          };
-
-          frontendData[frontendKey] = fourFaceStructure;
-        });
-      }
-      
-      ValidationLogger.info('Datos transformados a frontend exitosamente', { 
-        toothNumber: frontendData.toothNumber,
-        useLegacyFormat,
-        fieldsTransformed: Object.keys(frontendData).length
-      });
-      
-      return frontendData;
-    } catch (error) {
-      ValidationLogger.error('Error crítico transformando a frontend', { backendData, error: error.message });
-      return this.getDefaultToothData(backendData?.toothNumber);
-    }
-  },
   
   // ==========================================================================
   // VALIDACIÓN Y SANITIZACIÓN ROBUSTAS
@@ -962,6 +548,16 @@ export const UniversalToothValidator = {
 
       const faceKeys = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
 
+      // Convención compartida con la capa de gráficas (normalizeZeroTriples):
+      // una cara con [0,0,0] se considera NO medida — el esquema rellena 0 por
+      // defecto en los sitios sin captura, y contarlos como "0 mm" reales
+      // subestimaba los promedios de PS y NIC (un diente sondeado sólo por
+      // vestibular aportaba 3 sitios fantasma de la otra cara).
+      const isUnmeasuredTriple = (arr) => Array.isArray(arr) && arr.every((value) => {
+        const n = parseFloat(value);
+        return isNaN(n) || n === 0;
+      });
+
       PERMANENT_TEETH_LIST.forEach(toothNumber => {
         const toothData = teethData[toothNumber];
         const hasToothData = toothData && typeof toothData === 'object';
@@ -1036,7 +632,7 @@ export const UniversalToothValidator = {
         if (probingDepth && typeof probingDepth === 'object' && !Array.isArray(probingDepth)) {
           facesForTooth.forEach(faceKey => {
             const faceData = probingDepth[faceKey];
-            if (Array.isArray(faceData)) {
+            if (Array.isArray(faceData) && !isUnmeasuredTriple(faceData)) {
               faceData.forEach(depth => {
                 const numDepth = parseFloat(depth);
                 if (!isNaN(numDepth) && numDepth !== 999) {
@@ -1058,7 +654,9 @@ export const UniversalToothValidator = {
           facesForTooth.forEach(faceKey => {
             const depthData = probingDepth[faceKey];
             const marginData = gingivalMargin[faceKey];
-            if (Array.isArray(depthData) && Array.isArray(marginData)) {
+            // NIC sólo sobre caras con PS medido; un margen 0 sí es válido
+            // (margen en la unión amelocementaria) cuando hay sondaje real.
+            if (Array.isArray(depthData) && Array.isArray(marginData) && !isUnmeasuredTriple(depthData)) {
               for (let i = 0; i < Math.min(depthData.length, marginData.length); i++) {
                 const depth = parseFloat(depthData[i]);
                 const margin = parseFloat(marginData[i]);

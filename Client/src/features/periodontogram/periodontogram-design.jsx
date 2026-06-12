@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, memo, useRef } from 'react';
 import { perfMonitor, withRenderCount } from './utils/perf-monitor';
-import PeriodontogramUtils from "./utils/periodontogram-utils";
-import { getToothNumberButtonProps } from './periodontograma-functions/tooth-operations';
+import PeriodontogramUtils, { getToothNumberButtonProps, getToothAvailability } from './utils/periodontogram-utils';
 import { VALIDATION_RANGES, ZONE_CONFIG, SELECT_OPTIONS, ROW_DEFINITIONS, FIELD_TYPE_MAP, RESPONSIVE_CONFIG } from './constants/periodontogram-constants';
 import { LINEAR_GRAPHICS_CONFIG } from './utils/config';
 import BleedingMultiStateCheckbox from './components/bleeding-multi-state-checkbox';
@@ -9,7 +8,6 @@ import MeasurementInput from './components/measurement-input';
 import MiniInputCell from './components/mini-input-cell';
 import TextInputCell from './components/text-input-cell';
 import usePeriodontogramLinearGraphics from './hooks/use-periodontogram-linear-graphics';
-import { getToothAvailability } from './utils/periodontogram-state-manager.js';
 import './styles/periodontogram-design.css';
 import './styles/periodontogram-linear-graphics.css';
 
@@ -522,6 +520,14 @@ const PeriodontogramDesign = ({
     return normalized;
   }, [periodontogramData, emptyNormalizedTooth]);
 
+  // Clamp al rango clínico en el punto de entrada: el esquema recorta al
+  // guardar, así que sin esto la UI y las estadísticas en vivo mostrarían
+  // un valor distinto del que realmente se persiste.
+  const clampToRange = (numeric, range) => {
+    if (!range || !Number.isFinite(numeric)) return numeric;
+    return Math.min(Math.max(numeric, range.min), range.max);
+  };
+
   // Actualizar datos de un diente con soporte a estructuras nuevas y legacy
   const updateToothData = useCallback((toothNumber, field, value, side = null, index = null) => {
     if (readOnly) return;
@@ -566,7 +572,10 @@ const PeriodontogramDesign = ({
       } else if (['suppuration','plaque'].includes(field)) {
         updated[faceKey][index] = value ? 1 : 0; // boolean -> 0/1
       } else {
-        updated[faceKey][index] = Number(value) || 0; // mediciones
+        const range = field === 'gingivalMargin'
+          ? VALIDATION_RANGES.GINGIVAL_MARGIN
+          : VALIDATION_RANGES.PROBING_DEPTH;
+        updated[faceKey][index] = clampToRange(Number(value) || 0, range); // mediciones
       }
 
       onToothUpdate?.(toothNumber, field, updated);
@@ -672,7 +681,11 @@ const PeriodontogramDesign = ({
                     value={value}
                     onChange={(newValue) => {
                       const updatedField = { ...fieldData };
-                      if (!updatedField[faceKey]) updatedField[faceKey] = [0, 0, 0];
+                      // Copiar la cara antes de escribir: el spread fue shallow
+                      // y el array aún es el del estado de React.
+                      updatedField[faceKey] = Array.isArray(updatedField[faceKey])
+                        ? [...updatedField[faceKey]]
+                        : [0, 0, 0];
                       updatedField[faceKey][index] = newValue;
                       updateToothData(toothNumber, row.key, updatedField);
                     }}
@@ -693,7 +706,11 @@ const PeriodontogramDesign = ({
                   checked={Number(value) > 0}
                   onChange={(e) => {
                     const updatedField = { ...fieldData };
-                    if (!updatedField[faceKey]) updatedField[faceKey] = [0, 0, 0];
+                    // Copiar la cara antes de escribir: el spread fue shallow
+                    // y el array aún es el del estado de React.
+                    updatedField[faceKey] = Array.isArray(updatedField[faceKey])
+                      ? [...updatedField[faceKey]]
+                      : [0, 0, 0];
                     updatedField[faceKey][index] = e.target.checked ? 1 : 0;
                     updateToothData(toothNumber, row.key, updatedField);
                   }}

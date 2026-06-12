@@ -30,6 +30,16 @@ class ErrorBoundary extends React.Component {
     }
   }
 
+  // Auto-reset cuando cambia `resetKey` (p.ej. location.pathname): tras un
+  // crash, navegar a otra ruta reintenta el render en vez de dejar TODAS las
+  // pantallas mostrando "Algo salió mal" hasta recargar. Solo actúa si hay un
+  // error activo, así el subtree sano no se ve afectado por cambios de key.
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.reset();
+    }
+  }
+
   // Permite que un fallback ofrezca "reintentar" sin recargar toda la página.
   reset() {
     this.setState({ hasError: false, error: null, errorInfo: null });
@@ -81,7 +91,10 @@ ErrorBoundary.propTypes = {
   // Nodo a renderizar, o función ({ error, errorInfo, reset }) => node.
   fallback: PropTypes.oneOfType([PropTypes.node, PropTypes.func]),
   // Callback opcional de logging; si se omite, se registra en consola.
-  onError: PropTypes.func
+  onError: PropTypes.func,
+  // Cuando cambia (p.ej. la ruta actual) y hay un error activo, el boundary
+  // se resetea y reintenta renderizar los children.
+  resetKey: PropTypes.any
 };
 
 export default ErrorBoundary;

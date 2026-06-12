@@ -31,7 +31,10 @@ describe('UniversalToothValidator.calculateStatistics - attachment level', () =>
     expect(stats.absentTeeth).toBe(4);
   });
 
-  it('sums probing depth and gingival margin for clinical attachment level', () => {
+  // NIC = PS − MG con margen FIRMADO (recesión negativa) — la convención del
+  // código vivo (calculateStatistics). Las expectativas anteriores databan de
+  // la fórmula vieja PS + MG y fallaban contra la implementación correcta.
+  it('computes clinical attachment level as probing depth minus signed gingival margin', () => {
     const stats = UniversalToothValidator.calculateStatistics({
       teeth: {
         11: {
@@ -46,7 +49,8 @@ describe('UniversalToothValidator.calculateStatistics - attachment level', () =>
       }
     });
 
-    expect(stats.averageAttachmentLevel).toBeCloseTo(5.33, 2);
+    // (4−2) + (5−(−1)) + (6−0) = 2 + 6 + 6 = 14 → 14/3 ≈ 4.67
+    expect(stats.averageAttachmentLevel).toBeCloseTo(4.67, 2);
   });
 
   it('ignores sentinel values when computing attachment level', () => {
@@ -64,7 +68,32 @@ describe('UniversalToothValidator.calculateStatistics - attachment level', () =>
       }
     });
 
-    // Only two valid sites should be considered: (3+1)=4 and (4-2)=2 -> average = 3
+    // Only two valid sites should be considered: (3−1)=2 and (4−(−2))=6 -> average = 4
+    expect(stats.averageAttachmentLevel).toBeCloseTo(4, 5);
+  });
+
+  it('treats all-zero face triples as unmeasured defaults, not real 0 mm readings', () => {
+    const stats = UniversalToothValidator.calculateStatistics({
+      teeth: {
+        11: {
+          ...baseTooth,
+          probingDepth: {
+            vestibularSuperior: [3, 3, 3],
+            // Cara sin captura: el esquema rellena [0,0,0] por defecto.
+            // No debe diluir los promedios como si fueran 0 mm reales.
+            palatinoSuperior: [0, 0, 0]
+          },
+          gingivalMargin: {
+            vestibularSuperior: [0, 0, 0],
+            palatinoSuperior: [0, 0, 0]
+          }
+        }
+      }
+    });
+
+    expect(stats.averageProbingDepth).toBeCloseTo(3, 5);
+    // NIC sólo sobre la cara sondeada: margen 0 (unión amelocementaria) es
+    // un valor válido cuando hay sondaje real → (3−0) en los 3 sitios.
     expect(stats.averageAttachmentLevel).toBeCloseTo(3, 5);
   });
 });

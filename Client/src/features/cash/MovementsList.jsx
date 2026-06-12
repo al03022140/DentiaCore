@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { List, Avatar, Typography, Tag, Button, Modal, Form, InputNumber, Input, Radio, Tooltip, message, Select } from 'antd';
 import {
   UserOutlined,
@@ -49,6 +49,8 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // movement object o null
   const [saving, setSaving] = useState(false);
+  // Guard síncrono contra doble submit (el estado `saving` se lee stale).
+  const savingRef = useRef(false);
   const [patients, setPatients] = useState([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [form] = Form.useForm();
@@ -117,7 +119,11 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
 
   const handleSubmit = async () => {
     if (!editing) return;
-    if (saving) return; // guard contra doble submit
+    // Guard con ref síncrono: `saving` (estado) se lee de un closure stale y
+    // setSaving(true) ocurre tras el await de validateFields — dos clicks
+    // rápidos pasaban ambos el chequeo de estado.
+    if (savingRef.current) return;
+    savingRef.current = true;
     try {
       const values = await form.validateFields();
       setSaving(true);
@@ -147,6 +153,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
       if (err?.errorFields) return; // validation
       message.error(err.response?.data?.message || 'No se pudo editar el movimiento');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

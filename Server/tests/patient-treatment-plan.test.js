@@ -39,11 +39,13 @@ describe('POST /api/patients/:id/treatment-plan', () => {
     });
 
     // Create a doctor user for authentication
+    // cedulaProfesional: obligatoria para doctores desde feat(firma Wacom)
     const user = await Usuario.create({
       nombre: 'Dr. Test',
       email: `tp-test-${Date.now()}@test.com`,
       contraseña: 'Password123!',
-      rol: 'doctor'
+      rol: 'doctor',
+      cedulaProfesional: 'CED-TEST-TP'
     });
     authToken = makeToken(user);
   });

@@ -455,6 +455,15 @@ export function validateValue(value, schema, fieldName = 'unknown') {
       case 'string': {
         const stringValue = String(value);
         if (schema.enum && !schema.enum.includes(stringValue)) {
+          // La UI maneja enums en minúscula ('malo') y el esquema/backend en
+          // capitalizado ('Malo'): canonicalizar por casing antes de caer al
+          // default, que destruía el pronóstico guardado en cada guardado.
+          const canonical = schema.enum.find(
+            (option) => String(option).toLowerCase() === stringValue.toLowerCase()
+          );
+          if (canonical !== undefined) {
+            return canonical;
+          }
           return resolveDefaultValue(schema) || schema.enum[0];
         }
         return stringValue;

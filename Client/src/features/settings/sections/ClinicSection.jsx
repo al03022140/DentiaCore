@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getSettings, updateSettings, uploadLogo, deleteLogo, getLogoUrl } from '../../../shared/services/settingsService';
+import { getSettings, updateSettings, uploadLogo, deleteLogo, fetchLogoBlobUrl } from '../../../shared/services/settingsService';
 
 const ClinicSection = () => {
   const [form, setForm] = useState({ clinicName: '', address: '', phone: '' });
   const [hasLogo, setHasLogo] = useState(false);
   const [logoKey, setLogoKey] = useState(0);
+  // Preview del logo persistido. Se descarga AUTENTICADO (vía axios →
+  // fetchLogoBlobUrl) y se guarda como object URL. Antes se usaba un
+  // `<img src>` directo al endpoint protegido (solo header Bearer), que
+  // devuelve 401 sin el token → el logo nunca se veía.
+  const [logoPreview, setLogoPreview] = useState(null);
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -19,6 +24,30 @@ const ClinicSection = () => {
       .catch(() => setMsg({ type: 'error', text: 'Error al cargar configuración' }))
       .finally(() => setLoading(false));
   }, []);
+
+  // Descargar el logo persistido de forma autenticada y exponerlo como object
+  // URL. Se reejecuta cuando cambia el logo (logoKey tras subir uno nuevo).
+  // Mismo patrón (con revoke al desmontar/reemplazar) que la firma en
+  // ProfessionalProfileSection.
+  useEffect(() => {
+    if (!hasLogo) {
+      setLogoPreview(null);
+      return undefined;
+    }
+    let objectUrl = null;
+    let cancelled = false;
+    fetchLogoBlobUrl()
+      .then((url) => {
+        if (cancelled) { URL.revokeObjectURL(url); return; }
+        objectUrl = url;
+        setLogoPreview(url);
+      })
+      .catch(() => { if (!cancelled) setLogoPreview(null); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [hasLogo, logoKey]);
 
   const handleChange = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
@@ -90,11 +119,11 @@ const ClinicSection = () => {
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
       <h3 style={{ marginBottom: '1rem' }}>Logo de la clínica</h3>
-      {hasLogo && (
+      {hasLogo && logoPreview && (
         <div style={{ marginBottom: '1rem' }}>
           <img
             key={logoKey}
-            src={`${getLogoUrl()}?t=${logoKey}`}
+            src={logoPreview}
             alt="Logo de la clínica"
             style={{ maxWidth: '200px', maxHeight: '120px', objectFit: 'contain', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-light)' }}
           />

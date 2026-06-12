@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descriptions, Statistic } from 'antd';
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, SearchOutlined, LockOutlined } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
@@ -20,6 +20,10 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [summaryVisible, setSummaryVisible] = useState(false);
   const [closeSummary, setCloseSummary] = useState(null);
+  // Guard síncrono contra doble submit: el await de validateFields cede el
+  // hilo ANTES de que confirmLoading deshabilite el botón OK, así que un
+  // doble click rápido colaría dos POST (movimiento duplicado en el ledger).
+  const submittingRef = useRef(false);
 
   const fetchPatients = useCallback(async () => {
     setPatientsLoading(true);
@@ -43,6 +47,8 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
   };
 
   const handleOk = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       const values = await form.validateFields();
       setLoading(true);
@@ -56,9 +62,13 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
       setIsModalOpen(false);
       onMovementAdded();
     } catch (error) {
+      // Reject de validateFields (campos incompletos): el Form ya muestra los
+      // errores inline — no confundir con un error de servidor.
+      if (error?.errorFields) return;
       console.error(error);
       message.error(error.response?.data?.message || 'Error al registrar movimiento');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

@@ -98,6 +98,12 @@ function normalizeEntry(entry) {
     surface: entry.surface ?? entry.superficie ?? '0',
     note:    entry.note    ?? entry.nota     ?? ''
   };
+  // Daños inter-dentales (diastema, prótesis fija, ortodoncia, transposición):
+  // el engine los identifica por `space` (ID de 4 dígitos = dientes FDI
+  // adyacentes, p.ej. "1817") en lugar de `tooth`. Sin propagarlo aquí se
+  // perdían en cada guardado.
+  const space = String(entry.space ?? entry.espacio ?? '').trim();
+  if (space) out.space = space;
   // Exponer `fecha` cuando exista en el documento persistido. El cliente la usa para
   // mostrar la fecha real de cada fila (no la de "hoy"). El servidor es quien la fija
   // al guardar; aquí sólo la propagamos al frontend.

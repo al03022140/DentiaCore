@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import esES from 'antd/locale/es_ES';
 import Sidebar from '../shared/components/sidebar';
@@ -73,21 +73,26 @@ const antdTheme = {
   },
 };
 
-const AppLayout = () => (
-  <SidebarProvider>
-    <div className="dashboard">
-      <Sidebar />
-      <div className="main">
-        <Header />
-        <div className="content">
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
+const AppLayout = () => {
+  // resetKey por ruta: tras un crash en una página, navegar a otra reintenta
+  // el render en lugar de dejar "Algo salió mal" en todas las rutas.
+  const location = useLocation();
+  return (
+    <SidebarProvider>
+      <div className="dashboard">
+        <Sidebar />
+        <div className="main">
+          <Header />
+          <div className="content">
+            <ErrorBoundary resetKey={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
-    </div>
-  </SidebarProvider>
-);
+    </SidebarProvider>
+  );
+};
 
 const App = () => {
   return (

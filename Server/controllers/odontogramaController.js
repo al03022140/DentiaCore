@@ -25,6 +25,11 @@ const TYPE_CLINIC = 'clinic';
 // ValidationError de Mongoose al activar runValidators (P4).
 const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
 
+// Espacios inter-dentales del engine: dos números FDI adyacentes concatenados
+// (p.ej. "1817" = espacio entre 18 y 17). Identifican daños como diastema,
+// prótesis fija, ortodoncia fija o transposición.
+const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
+
 // ——— Controladores ——————————————————————————————————————————————————————————————
 const verificarOdontogramaInicial = async (req, res, next) => {
   try {
@@ -181,6 +186,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
     const savedAt = new Date();
     const datos = req.validatedEntries.map(e => ({
       tooth: e.tooth,
+      space: e.space || '',
       damage: e.damage,
       surface: e.surface,
       note: e.note,
@@ -395,6 +401,7 @@ const agregarHistorialInicial = async (req, res, next) => {
     const savedAt = new Date();
     const entries = req.validatedEntries.map(normalizeEntry).map(e => ({
       tooth: e.tooth,
+      space: e.space || '',
       damage: e.damage,
       surface: e.surface,
       note: e.note,
@@ -565,6 +572,7 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
             const normalized = normalizeEntry(entry);
             return {
                 tooth: normalized.tooth,
+                space: normalized.space || '',
                 damage: normalized.damage,
                 surface: normalized.surface,
                 note: normalized.note,
@@ -655,8 +663,9 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
     // history. Antes cada click "Guardar" sin cambios reales sumaba un
     // snapshot duplicado al historial (bloat).
     const isIdenticalToCurrent = (existing, nextEntries) => {
-      const prev = (existing?.current?.datos || []).map(e => `${e.tooth}|${e.damage}|${e.surface}|${e.note || ''}`).sort();
-      const next = nextEntries.map(e => `${e.tooth}|${e.damage}|${e.surface}|${e.note || ''}`).sort();
+      const entryKey = (e) => `${e.space || ''}|${e.tooth || ''}|${e.damage}|${e.surface}|${e.note || ''}`;
+      const prev = (existing?.current?.datos || []).map(entryKey).sort();
+      const next = nextEntries.map(entryKey).sort();
       if (prev.length !== next.length) return false;
       return prev.every((v, i) => v === next[i]);
     };
@@ -890,26 +899,29 @@ const validarEntradasOdontograma = (req, res, next) => {
     return mapped;
   });
 
-  // Filtrar duplicados basándose en tooth, damage y surface
+  // Filtrar duplicados. La clave espeja la del cliente (normalizeEntriesForEngine):
+  // objetivo (espacio o diente) + daño + superficie + nota. Incluir `note` evita
+  // descartar una entrada sólo-nota que comparte diente/daño con otra.
   const uniqueEntries = [];
   const seenEntries = new Set();
-  
+
   for (const entry of mappedEntries) {
-    // Crear una clave única basada en tooth, damage y surface
-    const entryKey = `${entry.tooth}-${entry.damage}-${entry.surface}`;
-    
+    const target = entry.space ? `s:${entry.space}` : `t:${entry.tooth}`;
+    const entryKey = `${target}|${entry.damage}|${entry.surface}|${entry.note || ''}`;
+
     if (!seenEntries.has(entryKey)) {
       seenEntries.add(entryKey);
       uniqueEntries.push(entry);
     } else {
       console.warn(`[DUPLICATE FILTER] Entrada duplicada detectada y filtrada:`, {
         tooth: entry.tooth,
+        space: entry.space,
         damage: entry.damage,
         surface: entry.surface
       });
     }
   }
-  
+
   req.validatedEntries = uniqueEntries;
 
   // debugLog('[DEBUG] Todas las entries validadas:', req.validatedEntries);
@@ -923,25 +935,50 @@ const validarEntradasOdontograma = (req, res, next) => {
     //   hasDamage: item.damage !== '',
     //   damageType: typeof item.damage
     // });
-    if (!item.tooth || item.damage === '') {
+    // Una entrada identifica su objetivo por `tooth` (diente) O por `space`
+    // (daño inter-dental: diastema, prótesis fija…). Y debe aplicar algo:
+    // un daño, o al menos una nota (entradas sólo-nota del textBox del engine).
+    if (!item.tooth && !item.space) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_ENTRY',
+          message: `Entry #${i} debe tener 'tooth' o 'space'`,
+          invalidEntry: item
+        }
+      });
+    }
+    if (item.damage === '' && !(item.note && String(item.note).trim())) {
       // debugLog(`[ERROR] Entry #${i} inválida:`, item);
       return res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_ENTRY',
-          message: `Entry #${i} debe tener 'tooth' y 'damage' (o 'condition')`,
+          message: `Entry #${i} debe tener 'damage' (o 'condition') o una 'note'`,
           invalidEntry: item
         }
       });
     }
     // P4: rechazar número FDI inválido con un 400 claro. Antes pasaba sin
     // validar; con runValidators activo produciría un 500 por ValidationError.
-    if (!FDI_TOOTH_REGEX.test(String(item.tooth))) {
+    if (item.tooth && !FDI_TOOTH_REGEX.test(String(item.tooth))) {
       return res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_TOOTH',
           message: `Entry #${i}: '${item.tooth}' no es un número FDI válido (11-48, 51-85).`,
+          invalidEntry: item
+        }
+      });
+    }
+    // Espacios inter-dentales: ID de 4 dígitos = dos números FDI adyacentes
+    // concatenados (p.ej. "1817"), tal como los emite el engine.
+    if (item.space && !FDI_SPACE_REGEX.test(String(item.space))) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_SPACE',
+          message: `Entry #${i}: '${item.space}' no es un espacio inter-dental válido (dos números FDI concatenados).`,
           invalidEntry: item
         }
       });

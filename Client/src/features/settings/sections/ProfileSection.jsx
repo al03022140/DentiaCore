@@ -3,7 +3,9 @@ import { useAuth } from '../../../app/auth/AuthContext';
 import { updateMyProfile, changeMyPassword, changeMyPin } from '../../../shared/services/settingsService';
 
 const ProfileSection = () => {
-  const { user, refreshUser } = useAuth();
+  // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
+  // hacía que el user del front no se actualizara tras guardar el perfil.
+  const { user, refreshProfile } = useAuth();
 
   const [nombre, setNombre] = useState(user?.nombre || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -27,7 +29,7 @@ const ProfileSection = () => {
     setProfileMsg(null);
     try {
       await updateMyProfile({ nombre, email });
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setProfileMsg({ type: 'success', text: 'Perfil actualizado' });
     } catch (err) {
       setProfileMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });

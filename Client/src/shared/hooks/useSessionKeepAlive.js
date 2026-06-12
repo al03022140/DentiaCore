@@ -36,6 +36,12 @@ export const useSessionKeepAlive = () => {
   const tryRefresh = useCallback(async (reason) => {
     if (!user) return;
     if (!getAccessToken()) return;
+    // Pantalla bloqueada por inactividad (LockScreen): NO renovar. El lock es
+    // el control de estación desatendida — mantener vivo el token mientras
+    // está bloqueada lo socavaba (la sesión nunca caducaba sola). Se lee el
+    // flag de sessionStorage (la fuente que LockScreen mantiene en sync)
+    // porque este hook se monta fuera del LockScreenProvider.
+    if (sessionStorage.getItem('dentiacore_locked') === 'true') return;
     if (inFlightRef.current) return;
     const now = Date.now();
     if (now - lastRefreshRef.current < MIN_INTERVAL_MS) return;

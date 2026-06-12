@@ -24,6 +24,39 @@ import {
 } from '../utils/config.js';
 
 
+// Trata las tripletas todo-cero como "sin dato" para que la gráfica no dibuje
+// líneas por defecto. IMPORTANTE: los dientes provienen del estado de React y
+// los alias canónicos comparten arrays — se copian campo y caras antes de
+// sustituir, nunca se muta el dataset de entrada.
+const GRAPHIC_FACE_KEYS = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
+const GRAPHIC_FIELD_KEYS = ['gingivalMargin', 'probingDepth'];
+
+const normalizeZeroTriples = (dataset) => {
+  const out = {};
+  Object.entries(dataset || {}).forEach(([tooth, t]) => {
+    if (!t || typeof t !== 'object') { return; }
+    const clone = { ...t };
+    GRAPHIC_FIELD_KEYS.forEach((field) => {
+      const v = clone[field];
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const fieldCopy = { ...v };
+        GRAPHIC_FACE_KEYS.forEach((faceKey) => {
+          const arr = fieldCopy[faceKey];
+          if (Array.isArray(arr) && arr.length === 3) {
+            const allZero = arr.every((n) => Number(n) === 0);
+            if (allZero) {
+              fieldCopy[faceKey] = [null, null, null];
+            }
+          }
+        });
+        clone[field] = fieldCopy;
+      }
+    });
+    out[tooth] = clone;
+  });
+  return out;
+};
+
 export const usePeriodontogramLinearGraphics = ({
   containerRef,
   periodontogramData,
@@ -129,32 +162,6 @@ export const usePeriodontogramLinearGraphics = ({
       const initialDataset = pendingDataRef.current || latestDataRef.current;
       if (initialDataset) {
         try {
-          // Normalize: treat zero triples as no-data so nothing draws by default
-          const normalizeZeroTriples = (dataset) => {
-            const out = {};
-            Object.entries(dataset || {}).forEach(([tooth, t]) => {
-              if (!t || typeof t !== 'object') { return; }
-              const clone = { ...t };
-              const faces = ['vestibularSuperior','palatinoSuperior','vestibularInferior','lingualInferior'];
-              const fields = ['gingivalMargin','probingDepth'];
-              fields.forEach((field) => {
-                const v = clone[field];
-                if (v && typeof v === 'object' && !Array.isArray(v)) {
-                  faces.forEach((faceKey) => {
-                    const arr = v[faceKey];
-                    if (Array.isArray(arr) && arr.length === 3) {
-                      const allZero = arr.every((n) => Number(n) === 0);
-                      if (allZero) {
-                        v[faceKey] = [null, null, null];
-                      }
-                    }
-                  });
-                }
-              });
-              out[tooth] = clone;
-            });
-            return out;
-          };
           const normalizedInitial = normalizeZeroTriples(initialDataset);
           realTimeUpdaterRef.current.updateAllLinearGraphics(normalizedInitial);
           lastDataRef.current = normalizedInitial;
@@ -192,32 +199,6 @@ export const usePeriodontogramLinearGraphics = ({
       }
       
       updateLinearGraphics.timeoutId = setTimeout(() => {
-        // Normalize: treat zero triples as no-data so nothing draws by default
-        const normalizeZeroTriples = (dataset) => {
-          const out = {};
-          Object.entries(dataset || {}).forEach(([tooth, t]) => {
-            if (!t || typeof t !== 'object') { return; }
-            const clone = { ...t };
-            const faces = ['vestibularSuperior','palatinoSuperior','vestibularInferior','lingualInferior'];
-            const fields = ['gingivalMargin','probingDepth'];
-            fields.forEach((field) => {
-              const v = clone[field];
-              if (v && typeof v === 'object' && !Array.isArray(v)) {
-                faces.forEach((faceKey) => {
-                  const arr = v[faceKey];
-                  if (Array.isArray(arr) && arr.length === 3) {
-                    const allZero = arr.every((n) => Number(n) === 0);
-                    if (allZero) {
-                      v[faceKey] = [null, null, null];
-                    }
-                  }
-                });
-              }
-            });
-            out[tooth] = clone;
-          });
-          return out;
-        };
         const normalizedData = normalizeZeroTriples(data);
         // MEJORA IMPLEMENTADA: Renderizar polígonos continuos si están habilitados
         if (ADVANCED_POLYGON_CONFIG.enabled) {

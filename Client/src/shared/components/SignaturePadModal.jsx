@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../../app/auth/AuthContext';
 import WacomStuPanel from './WacomStuPanel.jsx';
@@ -72,7 +72,19 @@ export default function SignaturePadModal({
 
   const sigRef = useRef(null);
   const wrapRef = useRef(null);
-  const canvasElRef = useRef(null);
+  // Nodo <canvas> real del pad, en ESTADO (no en un ref) para que el efecto
+  // de Pointer Events se re-ejecute exactamente cuando el canvas se monta,
+  // desmonta o remonta. Con deps indirectas (isOpen/device/…) quedaban
+  // ventanas sin listeners: al reabrir el modal con `consentAccepted` aún en
+  // true se montaba un canvas A (con listeners), el reset lo desmontaba, y el
+  // canvas B de después de aceptar el consentimiento nacía SIN listeners
+  // porque ninguna dep del efecto había cambiado.
+  const [canvasEl, setCanvasEl] = useState(null);
+  const setSigRef = useCallback((instance) => {
+    // react-signature-canvas expone el canvas DOM vía getCanvas().
+    sigRef.current = instance;
+    setCanvasEl(instance?.getCanvas?.() || null);
+  }, []);
   const [empty, setEmpty] = useState(true);
   const [error, setError] = useState('');
   // Sugerencia de cambio de modo cuando detectamos un lápiz pero el usuario
@@ -131,7 +143,11 @@ export default function SignaturePadModal({
       return () => window.removeEventListener('resize', measure);
     }
     return undefined;
-  }, [isOpen, isTablet, consentAccepted]);
+    // `device` en deps: al hacer fallback STU → "Firmar en pantalla" el wrap
+    // del canvas recién se monta con el cambio de device; sin re-medir aquí,
+    // el canvas quedaba con el tamaño default (600×240) sin ajustarse al
+    // contenedor.
+  }, [isOpen, isTablet, consentAccepted, device]);
 
   // Reset al abrir.
   useEffect(() => {
@@ -182,10 +198,9 @@ export default function SignaturePadModal({
   //    en mouse pero está firmando con lápiz.
   useEffect(() => {
     if (!isOpen) return undefined;
-    // react-signature-canvas expone el canvas DOM vía getCanvas().
-    const canvas = sigRef.current?.getCanvas?.();
+    // `canvasEl` viene del callback ref: es el canvas ACTUALMENTE montado.
+    const canvas = canvasEl;
     if (!canvas) return undefined;
-    canvasElRef.current = canvas;
 
     const onPointerDown = (e) => {
       // Solo el primer pointer activo (evita multi-touch dibujando varias
@@ -269,7 +284,9 @@ export default function SignaturePadModal({
       canvas.removeEventListener('pointermove', onCanvasPointerMoveCapture, true);
       document.removeEventListener('mousemove', onDocMouseMove, true);
     };
-  }, [isOpen, device, isTablet, canvasSize.w, canvasSize.h]);
+    // Sin canvasSize en deps: cambiar width/height NO reemplaza el nodo, así
+    // que los listeners siguen vigentes. `canvasEl` cubre todos los remounts.
+  }, [isOpen, canvasEl, device, isTablet]);
 
   if (!isOpen) return null;
 
@@ -478,7 +495,7 @@ export default function SignaturePadModal({
 
             <div className={wrapClass} ref={wrapRef}>
               <SignatureCanvas
-                ref={sigRef}
+                ref={setSigRef}
                 // key fuerza remount si el modo cambia (típicamente vía
                 // penHint mouse→tablet): sin remount, signature_pad no
                 // recomputa el throttle interno y los nuevos valores no

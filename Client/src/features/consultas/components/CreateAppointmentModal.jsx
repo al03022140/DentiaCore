@@ -5,7 +5,7 @@ import {
   searchPatients
 } from '../../../shared/services/appointment-service';
 import { getSettings, getDoctors } from '../../../shared/services/settingsService';
-import API from '../../../shared/services/axios-instance';
+import { getFreshGoogleToken } from '../../../shared/services/googleTokenService';
 import userNot from '../../../assets/images/icons/Profile Default.svg';
 import './CreateAppointmentModal.css';
 import { calculateAgeYears } from '../../../shared/utils/formatters';
@@ -188,51 +188,24 @@ const CreateAppointmentModal = ({
   }, 0);
 
   // ── Google Calendar helpers (sólo en create por ahora) ──
-  const getGoogleToken = () => {
-    try {
-      const raw = localStorage.getItem('accessToken');
-      if (!raw) return null;
-      if (!raw.startsWith('{')) return raw;
-      const parsed = JSON.parse(raw);
-      if (parsed.token && parsed.expiration && parsed.expiration > Date.now()) return parsed.token;
-      return null;
-    } catch {
-      return null;
-    }
-  };
-
-  const refreshGoogleToken = async () => {
-    try {
-      const raw = localStorage.getItem('accessToken');
-      if (!raw || !raw.startsWith('{')) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed.refreshToken) return null;
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
-      const res = await fetch(`${API_URL}/api/google/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: parsed.refreshToken }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const expiration = Date.now() + (data.expiresIn || 3600) * 1000;
-      localStorage.setItem('accessToken', JSON.stringify({
-        token: data.accessToken, expiration, refreshToken: data.refreshToken || parsed.refreshToken,
-      }));
-      return data.accessToken;
-    } catch { return null; }
-  };
+  // La obtención/renovación del access token de Google vive en
+  // shared/services/googleTokenService.js (compartido con calendar.jsx). La
+  // renovación va por la instancia de axios (el endpoint exige el JWT de la
+  // app) y el refresh token de Google viaja en cookie httpOnly — nunca en el
+  // body.
 
   // Devuelve { status }:
   //  - 'not-connected': no hay token de Google (ni siquiera con refresh)
   //  - 'ok': evento creado en Google Calendar
   //  - 'failed': hubo token pero la API de Google rechazó
   const syncToGoogle = async (gcalEvent) => {
-    let googleToken = getGoogleToken();
-    if (!googleToken) googleToken = await refreshGoogleToken();
+    const googleToken = await getFreshGoogleToken();
     if (!googleToken) return { status: 'not-connected' };
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
     try {
+      // fetch a propósito (no la instancia de axios): este endpoint espera el
+      // token de GOOGLE en Authorization y el interceptor de axios lo pisaría
+      // con el JWT de la app.
       const resp = await fetch(`${API_URL}/api/google/calendar/events`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${googleToken}`, 'Content-Type': 'application/json' },

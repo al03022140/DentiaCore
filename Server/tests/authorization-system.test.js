@@ -48,6 +48,11 @@ async function createUser(overrides = {}) {
     rol: 'doctor',
     ...overrides,
   };
+  // El modelo exige cédula profesional para roles clínicos (feat firma Wacom);
+  // sin esto, todo test que crea un doctor fallaba en el setup.
+  if (['doctor', 'doctor_admin'].includes(base.rol) && !base.cedulaProfesional) {
+    base.cedulaProfesional = `CED-${Math.random().toString(36).slice(2, 10)}`;
+  }
   const user = await Usuario.create(base);
   const token = makeToken(user);
   return { user, token };
@@ -645,6 +650,7 @@ describe('Audit Logs', () => {
       email: `audit-${Date.now()}@test.com`,
       contraseña: 'AuditPass123!',
       rol: 'doctor',
+      cedulaProfesional: 'CED-AUDIT-1',
     });
 
     // Login

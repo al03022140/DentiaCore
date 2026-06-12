@@ -264,15 +264,22 @@ const OdontogramInitialSection = ({
       const rawData = engine.getData() || [];
 
       // Normalizar: el engine puede devolver `damage` como número o string.
-      // Filtrar entradas sin diente o sin daño.
+      // Conservar (a) entradas de espacio inter-dental (`space`, sin tooth:
+      // diastema, prótesis fija…) y (b) entradas sólo-nota (damage '' con
+      // note, el textBox del diente). Como el inicial se guarda UNA sola vez
+      // (NOM-024), filtrarlas aquí era pérdida permanente e irrecuperable.
       const entries = rawData
-        .map((item) => ({
-          tooth: String(item.tooth ?? ''),
-          damage: String(item.damage ?? ''),
-          surface: String(item.surface ?? 'O'),
-          note: String(item.note ?? ''),
-        }))
-        .filter((e) => e.tooth && e.damage !== '');
+        .map((item) => {
+          const entry = {
+            tooth: String(item.tooth ?? ''),
+            damage: String(item.damage ?? ''),
+            surface: String(item.surface ?? 'O'),
+            note: String(item.note ?? ''),
+          };
+          if (item.space) entry.space = String(item.space);
+          return entry;
+        })
+        .filter((e) => (e.tooth || e.space) && (e.damage !== '' || e.note.trim() !== ''));
 
       // El backend ahora acepta entries=[]: registra captura inicial sin
       // hallazgos sin contaminar el odontograma con un daño-fantasma ('Sano')
@@ -294,7 +301,10 @@ const OdontogramInitialSection = ({
     } catch (err) {
       // Si el error es 409 (ya existe), tratarlo como éxito de "ya guardado"
       // para forzar el switch a view-mode en el padre, evitando reintentos.
-      const status = err?.response?.status;
+      // OJO: handleApiError del servicio APLANA el axios error — el status
+      // vive en err.status, NO en err.response.status (ese path siempre era
+      // undefined y el 409 caía al mensaje de error genérico con reintento).
+      const status = err?.status ?? err?.response?.status;
       if (status === 409) {
         message.warning('Este paciente ya tiene un odontograma inicial guardado. Refrescando…');
         draft.clearDraft();
@@ -337,6 +347,9 @@ const OdontogramInitialSection = ({
 
   const statusLine = useMemo(() => {
     if (initialSnapshotStatus === 'loading') return 'Comprobando odontograma inicial guardado…';
+    // Error de carga ≠ "no existe": NO ofrecer captura desde cero (el
+    // registro podría existir y la captura es única por NOM-024).
+    if (initialSnapshotStatus === 'error') return 'No se pudo comprobar el odontograma inicial. Verifica tu conexión y recarga la página antes de capturar.';
     if (mode === 'view') return 'Odontograma inicial guardado (sólo lectura). Este registro es permanente.';
     return 'Marca los dientes en el canvas y pulsa «Capturar Odontograma». Sólo se puede guardar una vez y no podrá modificarse.';
   }, [initialSnapshotStatus, mode]);
@@ -369,7 +382,7 @@ const OdontogramInitialSection = ({
                 type="button"
                 className="button-primary capture-button"
                 onClick={handleOpenConfirm}
-                disabled={saving || savedOnceRef.current || !!engineError}
+                disabled={saving || savedOnceRef.current || !!engineError || initialSnapshotStatus !== 'none'}
               >
                 {saving ? 'Guardando...' : 'Capturar Odontograma'}
               </button>
@@ -518,7 +531,7 @@ OdontogramInitialSection.propTypes = {
   initialTableData: PropTypes.array,
   exists: PropTypes.bool,
   onSaveSuccess: PropTypes.func,
-  initialSnapshotStatus: PropTypes.oneOf(['loading', 'saved', 'none']),
+  initialSnapshotStatus: PropTypes.oneOf(['loading', 'saved', 'none', 'error']),
   areScriptsReady: PropTypes.bool,
 };
 

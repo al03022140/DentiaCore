@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Input, message } from 'antd';
 import SectionHeader from './section-header';
@@ -17,6 +17,7 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
   // Confirm modal state
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
+  const submittingRef = useRef(false);
   
   const sectionId = `treatment-plan-${React.useId()}`;
 
@@ -43,11 +44,15 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
   // normaliza con toLowerCase() así que ambos pasan. El placeholder sigue
   // mostrando "Confirmar" para mantener la pista visual.
   const handleConfirmOk = async () => {
+    // Guard síncrono: sin él, doble click en "Confirmar" disparaba dos POST
+    // → plan de tratamiento duplicado en el expediente clínico.
+    if (submittingRef.current) return;
     if (confirmationText.trim().toLowerCase() !== 'confirmar') {
       message.warning("Debes escribir 'Confirmar' para guardar.");
       return;
     }
 
+    submittingRef.current = true;
     setIsLoading(true);
     setError(null);
 
@@ -95,6 +100,7 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
       setError('Error al guardar el plan de tratamiento. Por favor intente nuevamente.');
       message.error('Error al guardar el plan de tratamiento.');
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -170,6 +176,7 @@ const PatientTreatmentPlan = ({ patientId, initialTreatmentPlan = null }) => {
         onCancel={handleConfirmCancel}
         okText="Confirmar"
         cancelText="Cancelar"
+        confirmLoading={isLoading}
       >
         <p>Para confirmar el guardado del plan de tratamiento, escribe exactamente: <strong>Confirmar</strong></p>
         <Input

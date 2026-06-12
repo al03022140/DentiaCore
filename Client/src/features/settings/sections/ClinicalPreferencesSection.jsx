@@ -6,7 +6,9 @@ import NoteTemplateEditor from '../components/NoteTemplateEditor';
 const DURATIONS = [15, 20, 30, 45, 60, 90];
 
 const ClinicalPreferencesSection = () => {
-  const { user, refreshUser } = useAuth();
+  // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
+  // hacía que el user del front no se actualizara tras guardar.
+  const { user, refreshProfile } = useAuth();
   const prefs = user?.preferences || {};
 
   const [duration, setDuration] = useState(prefs.defaultAppointmentDuration || 30);
@@ -24,7 +26,7 @@ const ClinicalPreferencesSection = () => {
         defaultAppointmentDuration: Number(duration),
         prescriptionDefaults: { header, footer },
       });
-      if (refreshUser) await refreshUser();
+      await refreshProfile?.();
       setMsg({ type: 'success', text: 'Preferencias clínicas actualizadas' });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });

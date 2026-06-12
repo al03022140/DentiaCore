@@ -1,4 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  getStoredGoogleToken,
+  getFreshGoogleToken,
+  fetchGoogleSessionToken,
+} from '../../../shared/services/googleTokenService';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5002';
 
@@ -14,44 +19,15 @@ const setAuthFetchInProgress = (v) => {
   else localStorage.removeItem(AUTH_FETCH_PROGRESS_KEY);
 };
 
-const storeTokenWithExpiration = (token, expiresIn = 3600, refreshToken = null) => {
-  const expirationTime = Date.now() + expiresIn * 1000;
-  localStorage.setItem('accessToken', JSON.stringify({ token, expiration: expirationTime, refreshToken }));
-};
-
-const getStoredToken = () => {
-  try {
-    const tokenData = localStorage.getItem('accessToken');
-    if (!tokenData) return null;
-    if (!tokenData.startsWith('{')) return tokenData;
-    const parsed = JSON.parse(tokenData);
-    if (!parsed.token || !parsed.expiration) return parsed.token || parsed;
-    const timeUntilExpiry = parsed.expiration - Date.now();
-    if (timeUntilExpiry > 0) {
-      return { token: parsed.token, refreshToken: parsed.refreshToken, needsRefresh: timeUntilExpiry < 5 * 60 * 1000 };
-    }
-    if (!parsed.refreshToken) localStorage.removeItem('accessToken');
-    return parsed.refreshToken ? { token: null, refreshToken: parsed.refreshToken, needsRefresh: true } : null;
-  } catch {
-    localStorage.removeItem('accessToken');
-    return null;
-  }
-};
-
+// A-3/A-4: el almacenamiento/renovación del token de Google vive en
+// shared/services/googleTokenService.js (compartido con calendar.jsx). El
+// refresh token NUNCA se persiste en el cliente — viaja en cookie httpOnly y
+// los endpoints /auth/token y /refresh-token exigen la sesión de la app (JWT),
+// que sólo adjunta el interceptor de axios.
 const getAccessToken = () => {
-  const stored = getStoredToken();
+  const stored = getStoredGoogleToken();
   if (typeof stored === 'string') return stored;
   return stored?.token || null;
-};
-
-const getRefreshToken = () => {
-  try {
-    const tokenData = localStorage.getItem('accessToken');
-    if (!tokenData || !tokenData.startsWith('{')) return null;
-    return JSON.parse(tokenData).refreshToken || null;
-  } catch {
-    return null;
-  }
 };
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -69,37 +45,8 @@ const GoogleCalendarSection = () => {
   const [saving, setSaving] = useState(false);
   const authAttemptedRef = useRef(false);
 
-  // ── Token refresh ──────────────────────────────────────────────────────────
-  const renewAccessToken = useCallback(async (refreshToken) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/google/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        storeTokenWithExpiration(data.accessToken, data.expiresIn, data.refreshToken);
-        return data.accessToken;
-      }
-      localStorage.removeItem('accessToken');
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // ── Get a valid token (refresh if needed) ──────────────────────────────────
-  const getValidToken = useCallback(async () => {
-    const stored = getStoredToken();
-    if (!stored) return null;
-    if (typeof stored === 'string') return stored;
-    if (stored.token && !stored.needsRefresh) return stored.token;
-    if (stored.refreshToken) {
-      return await renewAccessToken(stored.refreshToken);
-    }
-    return stored.token || null;
-  }, [renewAccessToken]);
+  // ── Get a valid token (renueva vía cookie httpOnly si hace falta) ──────────
+  const getValidToken = useCallback(async () => getFreshGoogleToken(), []);
 
   // ── Fetch user info ────────────────────────────────────────────────────────
   const fetchUserInfo = useCallback(async (token) => {
@@ -235,24 +182,22 @@ const GoogleCalendarSection = () => {
       authAttemptedRef.current = true;
       (async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/google/auth/token`, {
-            credentials: 'include',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            storeTokenWithExpiration(data.accessToken, data.expiresIn, data.refreshToken);
-            setConnectedEmail(null); // will be fetched below
-            setStatus('connected');
-            setMsg({ type: 'success', text: 'Cuenta de Google conectada exitosamente.' });
-            fetchUserInfo(data.accessToken);
-            fetchCalendars(data.accessToken);
-          } else {
-            setStatus('error');
-            setMsg({ type: 'error', text: 'No se pudo leer el token de Google.' });
-          }
-        } catch {
+          // A-4: el endpoint exige la sesión de la app (JWT en Authorization),
+          // por eso va por la instancia de axios (vía googleTokenService).
+          const data = await fetchGoogleSessionToken();
+          setConnectedEmail(null); // will be fetched below
+          setStatus('connected');
+          setMsg({ type: 'success', text: 'Cuenta de Google conectada exitosamente.' });
+          fetchUserInfo(data.accessToken);
+          fetchCalendars(data.accessToken);
+        } catch (err) {
           setStatus('error');
-          setMsg({ type: 'error', text: 'Error al obtener el token de Google.' });
+          setMsg({
+            type: 'error',
+            text: err?.response
+              ? 'No se pudo leer el token de Google.'
+              : 'Error al obtener el token de Google.',
+          });
         }
       })();
       return;

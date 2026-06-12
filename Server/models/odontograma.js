@@ -30,17 +30,40 @@ const { Schema, Types } = mongoose;
 //   permanentes 11-18, 21-28, 31-38, 41-48
 //   deciduos    51-55, 61-65, 71-75, 81-85
 const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
+// Espacios inter-dentales: dos números FDI adyacentes concatenados ("1817").
+// El engine identifica así los daños entre dientes (diastema, prótesis fija,
+// ortodoncia fija, transposición), que no pertenecen a una pieza única.
+const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
 
 const entrySchema = new Schema({
+  // Una entrada identifica su objetivo por `tooth` O por `space` (inter-dental).
   tooth:   {
     type: String,
-    required: true,
+    default: '',
+    required: function () { return !this.space; },
     validate: {
-      validator: v => FDI_TOOTH_REGEX.test(v),
+      validator: function (v) {
+        if (!v) return Boolean(this.space); // vacío sólo en entradas de espacio
+        return FDI_TOOTH_REGEX.test(v);
+      },
       message: props => `'${props.value}' no es un número FDI válido (11-18, 21-28, 31-38, 41-48, 51-55, 61-65, 71-75, 81-85).`
     }
   },
-  damage:  { type: String, required: true },
+  space:   {
+    type: String,
+    default: '',
+    validate: {
+      validator: v => !v || FDI_SPACE_REGEX.test(v),
+      message: props => `'${props.value}' no es un espacio inter-dental válido (dos números FDI concatenados, p.ej. "1817").`
+    }
+  },
+  // `damage` vacío se permite SOLO en entradas sólo-nota (el textBox del
+  // diente que emite el engine con damage '').
+  damage:  {
+    type: String,
+    default: '',
+    required: function () { return !(this.note && this.note.trim()); }
+  },
   surface: { type: String, default: 'O' }, // 'O' por Oclusal como default común
   note:    { type: String, default: '' },
   // Fecha en que se registró/persistió esta entrada. El servidor la estampa con `new Date()`

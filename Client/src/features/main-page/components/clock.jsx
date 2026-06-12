@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Styles/clock.css'; // Importar los estilos del reloj
+import '../styles/clock.css'; // Importar los estilos del reloj
 
 const Clock = () => {
   const [time, setTime] = useState(new Date());

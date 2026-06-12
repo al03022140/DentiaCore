@@ -170,8 +170,13 @@ const PatientDetail = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
-  const [fetchedInitial, setFetchedInitial] = useState(false);
-  /** 'loading' | 'saved' | 'none' — resultado de GET /odontograma-inicial para la UI */
+  // Ref (NO estado): si fuera estado, la identidad de checkInitialOdontogram
+  // cambiaría al fetchear → el efecto de useOdontogramSetup (que depende de
+  // ella) se re-disparaba → fetchPatientData → loading → se DESMONTABA todo
+  // el árbol de pestañas tras cada guardado del odontograma inicial,
+  // perdiendo texto sin guardar en notas/plan/odontograma clínico.
+  const fetchedInitialRef = useRef(false);
+  /** 'loading' | 'saved' | 'none' | 'error' — resultado de GET /odontograma-inicial para la UI */
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
@@ -302,9 +307,9 @@ const PatientDetail = () => {
   }, [loadScript, verifyEngineLoaded]);
 
   const checkInitialOdontogram = useCallback(async (forceRefresh = false) => {
-    if (!forceRefresh && fetchedInitial) return;
+    if (!forceRefresh && fetchedInitialRef.current) return;
     if (!patientId) return;
-    setFetchedInitial(true);
+    fetchedInitialRef.current = true;
     setInitialOdontogramLoadStatus('loading');
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
@@ -320,20 +325,24 @@ const PatientDetail = () => {
         setInitialOdontogramLoadStatus('none');
       }
     } catch {
+      // Un fallo de red/500 NO es lo mismo que "el paciente no tiene
+      // odontograma inicial": marcar 'error' (la sección bloquea la captura
+      // y ofrece reintentar) en vez de presentar un editor desde cero.
       resetOdontogramState();
-      setInitialOdontogramLoadStatus('none');
+      setInitialOdontogramLoadStatus('error');
+      fetchedInitialRef.current = false; // permitir reintento
     }
-  }, [patientId, normalizeHistory, resetOdontogramState, fetchedInitial]);
+  }, [patientId, normalizeHistory, resetOdontogramState]);
 
   const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
     setInitialData(datos || []);
     setInitialExists(true);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setInitialOdontogramLoadStatus('saved');
-    setFetchedInitial(false);
     try {
       // Refresca desde el servidor para asegurar que estamos viendo el estado real
       // (importante si la respuesta del POST cambia algo o si vino de 409).
+      // Sólo recarga el odontograma inicial — NO el expediente completo.
       await checkInitialOdontogram(true);
     } catch (err) {
       console.error('Error al refrescar datos del odontograma inicial:', err);
@@ -342,7 +351,7 @@ const PatientDetail = () => {
 
   useEffect(() => {
     resetOdontogramState();
-    setFetchedInitial(false);
+    fetchedInitialRef.current = false;
     setInitialOdontogramLoadStatus('loading');
   }, [patientId, resetOdontogramState]);
 
@@ -778,6 +787,10 @@ const PatientDetail = () => {
           onCancel={() => setIsEditModalOpen(false)}
           footer={null}
           width={1600}
+          // Sin esto, antd conserva el contenido montado tras cerrar: al
+          // reabrir aparecían las ediciones DESCARTADAS con Cancelar como si
+          // fueran datos reales (y el wizard reabría en el paso donde quedó).
+          destroyOnClose
         >
           {patientData && patientData.patient && (
             <AddPatient

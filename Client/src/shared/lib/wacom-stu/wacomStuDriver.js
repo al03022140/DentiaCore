@@ -57,6 +57,26 @@ const COMMAND = {
   penDataTiming: 0x34,
 };
 
+// Timeout para las transferencias HID del camino de conexión/configuración
+// (open + feature reports). Una tableta colgada (o un hub USB en mal estado)
+// deja sendFeatureReport/receiveFeatureReport pendientes PARA SIEMPRE — y a
+// la UI atascada en "Conectando…" con el botón deshabilitado. Con esto la
+// promesa rechaza con `code = 'WACOM_TIMEOUT'` y el panel muestra su error.
+// NO aplica al stream del lápiz (inputreport): es por eventos, no se await-ea.
+const HID_TRANSFER_TIMEOUT_MS = 6000;
+
+function withHidTimeout(promise, ms = HID_TRANSFER_TIMEOUT_MS) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error('La tableta Wacom no respondió a tiempo. Desconéctala, vuelve a conectarla e inténtalo de nuevo.');
+      err.code = 'WACOM_TIMEOUT';
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * ¿El navegador soporta WebHID en contexto seguro?
  * WebHID solo existe en Chromium (Chrome/Edge) y exige secure context
@@ -194,12 +214,20 @@ export class WacomStuDriver {
    */
   async _attachDevice(device) {
     this.device = device;
-    if (!this.device.opened) await this.device.open();
+    try {
+      if (!this.device.opened) await withHidTimeout(this.device.open());
 
-    this._inputHandler = (event) => this._onInputReport(event);
-    this.device.addEventListener('inputreport', this._inputHandler);
+      this._inputHandler = (event) => this._onInputReport(event);
+      this.device.addEventListener('inputreport', this._inputHandler);
 
-    await this._readCapabilities();
+      await this._readCapabilities();
+    } catch (err) {
+      // Conexión colgada o a medias (típico: WACOM_TIMEOUT): soltamos el
+      // dispositivo y los listeners para no dejar nada huérfano — el botón
+      // "Conectar" del panel queda operativo para reintentar.
+      await this.disconnect().catch(() => {});
+      throw err;
+    }
     return true;
   }
 
@@ -218,7 +246,10 @@ export class WacomStuDriver {
           this.config.scaleFactor = this.config.tabletWidth / this.config.width;
         }
       }
-    } catch {
+    } catch (err) {
+      // Un timeout = tableta colgada → falla la conexión (no es lo mismo que
+      // "este modelo no expone el reporte", que sí se tolera con defaults).
+      if (err?.code === 'WACOM_TIMEOUT') throw err;
       /* algunos modelos/firmwares no exponen este reporte: usamos defaults */
     }
     // Información (nombre y firmware) — best effort.
@@ -228,14 +259,16 @@ export class WacomStuDriver {
         this.config.deviceName = this._dataViewString(dv, 1, 7);
         this.config.firmware = `${dv.getUint8(8)}.${dv.getUint8(9)}.${dv.getUint8(10)}.${dv.getUint8(11)}`;
       }
-    } catch {
+    } catch (err) {
+      if (err?.code === 'WACOM_TIMEOUT') throw err;
       /* opcional */
     }
     // Número de serie — best effort.
     try {
       const dv = await this.readData(COMMAND.eSerial);
       if (dv) this.config.eSerial = this._dataViewString(dv, 1);
-    } catch {
+    } catch (err) {
+      if (err?.code === 'WACOM_TIMEOUT') throw err;
       /* opcional */
     }
   }
@@ -375,12 +408,12 @@ export class WacomStuDriver {
 
   async sendData(reportId, data) {
     if (!this.checkConnected()) return;
-    await this.device.sendFeatureReport(reportId, data);
+    await withHidTimeout(this.device.sendFeatureReport(reportId, data));
   }
 
   async readData(reportId) {
     if (!this.checkConnected()) return null;
-    return this.device.receiveFeatureReport(reportId);
+    return withHidTimeout(this.device.receiveFeatureReport(reportId));
   }
 
   _makePacket(len) {

@@ -5,7 +5,10 @@ const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
 const { validatePasswordStrength } = require('../utils/crypto');
-const { VALID_ROLES, normalizeRole, validatePermissionAssignment, isOverrideProtectedRole } = require('../utils/permissions');
+const {
+  VALID_ROLES, normalizeRole, validatePermissionAssignment, isOverrideProtectedRole,
+  getPermissionsForRole, getEffectivePermissions
+} = require('../utils/permissions');
 
 let bcrypt;
 try { bcrypt = require('bcrypt'); } catch (_e) { bcrypt = require('bcryptjs'); }
@@ -132,13 +135,21 @@ exports.updateRolePermissions = async (req, res) => {
     }
 
     // Prevenir escalada de privilegios (C-2): lista blanca de permisos +
-    // el actor no puede otorgar permisos peligrosos ni que él mismo no posea.
-    const check = validatePermissionAssignment(permissions, req.user);
+    // el actor no puede otorgar permisos peligrosos ni AÑADIR permisos que él
+    // mismo no posea. La regla se evalúa contra el conjunto efectivo ACTUAL
+    // del rol (override existente o, si nunca se configuró, sus defaults):
+    // mantener o quitar permisos que el rol ya tiene NO es otorgar — sin esto
+    // un administrador no podía guardar el rol Doctor (403 siempre).
+    const settings = await ClinicSettings.getSettings();
+    const existingOverride = settings.rolePermissionOverrides.get(normalizeRole(role));
+    const currentRolePerms = Array.isArray(existingOverride)
+      ? existingOverride
+      : getPermissionsForRole(role);
+    const check = validatePermissionAssignment(permissions, req.user, currentRolePerms);
     if (!check.valid) {
       return res.status(403).json({ message: check.message });
     }
 
-    const settings = await ClinicSettings.getSettings();
     settings.rolePermissionOverrides.set(normalizeRole(role), permissions);
     await settings.save();
     res.json({ message: 'Permisos actualizados', role: normalizeRole(role), permissions });
@@ -335,9 +346,17 @@ exports.updateUserPermissions = async (req, res) => {
     }
     const { permissions } = req.body;
 
+    const targetUser = await Usuario.findById(userId).select('rol permissions');
+    if (!targetUser) return res.status(404).json({ message: 'Usuario no encontrado' });
+
     // Prevenir escalada de privilegios (C-2): lista blanca de permisos +
-    // el actor no puede otorgar permisos peligrosos ni que él mismo no posea.
-    const check = validatePermissionAssignment(permissions, req.user);
+    // el actor no puede otorgar permisos peligrosos ni AÑADIR permisos que él
+    // mismo no posea. La regla se evalúa contra los permisos efectivos ACTUALES
+    // del usuario objetivo (rol + overrides): mantener o quitar permisos que
+    // ya posee NO es otorgar.
+    const settings = await ClinicSettings.getSettings();
+    const currentEffective = getEffectivePermissions(targetUser, settings.rolePermissionOverrides);
+    const check = validatePermissionAssignment(permissions, req.user, currentEffective);
     if (!check.valid) {
       return res.status(403).json({ message: check.message });
     }

@@ -121,7 +121,10 @@ const PatientPrintPage = () => {
   const [initialData, setInitialData] = useState([]);
   const [initialExists, setInitialExists] = useState(false);
   const [odontogramHistory, setOdontogramHistory] = useState([]);
-  const [fetchedInitial, setFetchedInitial] = useState(false);
+  // Ref (NO estado): igual que en patient-detail.jsx, si fuera estado la
+  // identidad de checkInitialOdontogram cambiaría y el efecto de setup se
+  // re-dispararía duplicando todas las cargas.
+  const fetchedInitialRef = useRef(false);
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [, setClinicalOdontogramExists] = useState(false);
@@ -234,9 +237,9 @@ const PatientPrintPage = () => {
   }, [loadScript, verifyEngineLoaded]);
 
   const checkInitialOdontogram = useCallback(async (forceRefresh = false) => {
-    if (!forceRefresh && fetchedInitial) return;
+    if (!forceRefresh && fetchedInitialRef.current) return;
     if (!patientId) return;
-    setFetchedInitial(true);
+    fetchedInitialRef.current = true;
     setInitialOdontogramLoadStatus('loading');
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
@@ -251,17 +254,19 @@ const PatientPrintPage = () => {
         setInitialOdontogramLoadStatus('none');
       }
     } catch {
+      // Error de carga ≠ "no existe": en la vista de impresión basta con
+      // marcar 'error' (aquí no se captura, sólo se imprime).
       resetOdontogramState();
-      setInitialOdontogramLoadStatus('none');
+      setInitialOdontogramLoadStatus('error');
+      fetchedInitialRef.current = false; // permitir reintento
     }
-  }, [patientId, normalizeHistory, resetOdontogramState, fetchedInitial]);
+  }, [patientId, normalizeHistory, resetOdontogramState]);
 
   const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
     setInitialData(datos || []);
     setInitialExists(true);
     setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setInitialOdontogramLoadStatus('saved');
-    setFetchedInitial(false);
     try {
       await checkInitialOdontogram(true);
     } catch (err) {

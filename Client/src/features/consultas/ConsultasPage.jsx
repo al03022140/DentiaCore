@@ -139,9 +139,15 @@ const ConsultasPage = () => {
     const now = new Date();
     const isToday = startOfDay(currentDate).getTime() === startOfDay(now).getTime();
 
-    const upcoming = agenda.filter(a =>
-      !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado) &&
-      (!isToday || new Date(a.fecha_hora) >= now || a.estado === 'EnCurso')
+    // Citas en estado activo (Pendiente/Confirmada/EnCurso). Se mantienen
+    // gestionables aunque su hora haya pasado — ver upcomingConsultations.
+    const active = agenda.filter(a => !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado));
+    // "Siguiente paciente" diverge a propósito de la lista "Próximas": aquí sí
+    // se exige hora futura (o EnCurso). Una cita de hoy ya atrasada sigue
+    // visible y accionable en la lista, pero anunciarla como "Siguiente" con
+    // una hora que ya pasó sería engañoso.
+    const upcoming = active.filter(a =>
+      !isToday || new Date(a.fecha_hora) >= now || a.estado === 'EnCurso'
     );
     const closed = agenda.filter(a => ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado));
 
@@ -149,9 +155,9 @@ const ConsultasPage = () => {
     // siempre toma la versión fresca (puede haber cambiado de estado, motivo, etc.).
     const refreshed = (prev) => prev ? agenda.find(a => a._id === prev._id) : null;
 
-    if (upcoming.length > 0) {
-      setNextPatient(upcoming[0]);
-      setSelectedConsultation(prev => refreshed(prev) || upcoming[0]);
+    if (active.length > 0) {
+      setNextPatient(upcoming[0] || null);
+      setSelectedConsultation(prev => refreshed(prev) || upcoming[0] || active[0]);
     } else if (closed.length > 0) {
       setNextPatient(null);
       setSelectedConsultation(prev => refreshed(prev) || closed[0]);
@@ -368,13 +374,14 @@ const ConsultasPage = () => {
     return items;
   };
 
-  const now = new Date();
-  const isToday = startOfDay(currentDate).getTime() === startOfDay(now).getTime();
-
+  // Próximas: toda cita en estado activo (Pendiente/Confirmada/EnCurso),
+  // aunque su hora de inicio ya haya pasado. Antes se ocultaban las de hoy con
+  // hora pasada y, como "Realizadas" sólo lista estados terminales, quedaban
+  // invisibles: recepción no podía iniciarlas ni cancelarlas cuando el
+  // paciente llegaba tarde. Permanecen aquí hasta alcanzar un estado terminal.
   const upcomingConsultations = useMemo(() => agenda.filter(a =>
-    !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado) &&
-    (!isToday || new Date(a.fecha_hora) >= now || a.estado === 'EnCurso')
-  ), [agenda, isToday]); // eslint-disable-line react-hooks/exhaustive-deps
+    !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado)
+  ), [agenda]);
 
   const completedConsultations = useMemo(() => agenda.filter(a =>
     ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado)
@@ -512,7 +519,9 @@ const ConsultasPage = () => {
                 <p className="next-patient-empty-caption">
                   {agendaIsEmpty
                     ? 'Crea una cita con «Nueva cita» en la agenda.'
-                    : 'Las citas restantes ya fueron atendidas o canceladas.'}
+                    : upcomingConsultations.length > 0
+                      ? 'Quedan citas atrasadas en la agenda — puedes iniciarlas o cancelarlas desde la lista.'
+                      : 'Las citas restantes ya fueron atendidas o canceladas.'}
                 </p>
               </div>
             </div>

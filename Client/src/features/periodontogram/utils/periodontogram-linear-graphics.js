@@ -79,9 +79,11 @@ export class PeriodontogramLinearGraphics extends OptimizedCanvasRenderer {
     this.toothNumber = toothNumber;
     this.surface = surface;
     
-    // Inicializar el renderizador base sin datos
-    this.initialize();
-    
+    // NO llamar this.initialize() del renderer base: configura el pipeline de
+    // capas (setupToothRegions + setupLayerCache) que esta subclase nunca
+    // invoca, y su layerCache creaba 5 canvases offscreen POR INSTANCIA
+    // (×64 instancias ≈ 320 canvases sin uso). Esta clase sólo necesita el
+    // ctx del constructor base y su propia capa 'linearGraphics'.
     this.initializeLinearGraphics();
   }
   

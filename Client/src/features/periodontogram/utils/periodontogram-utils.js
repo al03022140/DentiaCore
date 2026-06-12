@@ -508,34 +508,6 @@ export const getToothData = (periodontogramData, toothNumber) => {
 };
 
 /**
- * Actualiza datos de un diente usando validación consolidada
- */
-export const updateToothData = (periodontogramData, toothNumber, updates) => {
-  if (!periodontogramData || !UniversalToothValidator.isValidToothNumber(toothNumber)) {
-    return periodontogramData;
-  }
-  
-  // Validar y sanitizar actualizaciones
-  const validation = UniversalToothValidator.validateCompleteToothData(
-    { ...periodontogramData.teeth?.[toothNumber], ...updates, toothNumber },
-    { strict: false, logWarnings: true }
-  );
-  
-  if (!validation.isValid) {
-    console.warn(`[PeriodontogramUtils] Validación fallida para diente ${toothNumber}:`, validation.errors);
-    return periodontogramData;
-  }
-  
-  const clonedData = clonePeriodontogramData(periodontogramData);
-  if (!clonedData.teeth) {
-    clonedData.teeth = {};
-  }
-  
-  clonedData.teeth[toothNumber] = validation.sanitizedData;
-  return clonedData;
-};
-
-/**
  * Obtiene todos los datos de dientes
  */
 export const getAllTeethData = (periodontogramData) => {
@@ -556,5 +528,20 @@ export const createInitialToothData = (toothNumber) => UniversalToothValidator.g
 
 // Exportar constantes para compatibilidad
 export { UPPER_TEETH, LOWER_TEETH };
+
+// Rescatadas de periodontograma-functions/tooth-operations.js y
+// periodontogram-state-manager.js (módulos muertos eliminados): eran sus
+// únicos exports con uso vivo (periodontogram-design.jsx).
+export const getToothNumberButtonProps = (toothNumber, isAbsent) => {
+  return {
+    'aria-pressed': isAbsent,
+    'aria-label': `Diente ${toothNumber}, ${isAbsent ? 'ausente' : 'presente'}. Clic para ${isAbsent ? 'marcar como presente' : 'marcar como ausente'}`,
+    'role': 'button',
+    'tabIndex': 0
+  };
+};
+
+// Convierte el estado 'absent' a la semántica 'disponible/presente'.
+export const getToothAvailability = (absent) => !absent;
 
 export default PeriodontogramUtils;

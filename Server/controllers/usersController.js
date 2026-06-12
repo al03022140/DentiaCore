@@ -1,6 +1,7 @@
 const Usuario = require('../models/users');
+const ClinicSettings = require('../models/clinicSettings');
 const { validatePasswordStrength } = require('../utils/crypto');
-const { isAdminRole, validatePermissionAssignment } = require('../utils/permissions');
+const { isAdminRole, validatePermissionAssignment, getEffectivePermissions } = require('../utils/permissions');
 
 // Role hierarchy: higher index = more privileged
 // doctor_admin va entre doctor y administrador: el dentista-director tiene
@@ -118,9 +119,13 @@ const createUser = async (req, res) => {
     }
 
     // Prevent privilege escalation via the `permissions` field (C-2):
-    // an actor cannot grant dangerous or self-not-held permissions.
+    // an actor cannot grant dangerous or self-not-held permissions. La regla
+    // solo aplica a permisos que EXCEDEN el conjunto efectivo del rol asignado
+    // (defaults + override del rol): incluir lo que el rol ya posee no es otorgar.
     if (permissions !== undefined) {
-      const permCheck = validatePermissionAssignment(permissions, req.user);
+      const { rolePermissionOverrides } = await ClinicSettings.getSettings();
+      const rolePerms = getEffectivePermissions({ rol }, rolePermissionOverrides);
+      const permCheck = validatePermissionAssignment(permissions, req.user, rolePerms);
       if (!permCheck.valid) {
         return res.status(403).json({ message: permCheck.message });
       }
@@ -211,12 +216,16 @@ const updateUser = async (req, res) => {
 
     // Prevent privilege escalation via the `permissions` field (C-2):
     // an actor cannot grant dangerous or self-not-held permissions, and
-    // cannot edit their own individual permission overrides.
+    // cannot edit their own individual permission overrides. La regla solo
+    // aplica a permisos AÑADIDOS respecto a los efectivos ACTUALES del usuario
+    // objetivo (rol + overrides): mantener o quitar lo que ya posee no es otorgar.
     if (permissions !== undefined) {
       if (isSelf) {
         return res.status(403).json({ message: 'No puede modificar sus propios permisos' });
       }
-      const permCheck = validatePermissionAssignment(permissions, req.user);
+      const { rolePermissionOverrides } = await ClinicSettings.getSettings();
+      const currentEffective = getEffectivePermissions(user, rolePermissionOverrides);
+      const permCheck = validatePermissionAssignment(permissions, req.user, currentEffective);
       if (!permCheck.valid) {
         return res.status(403).json({ message: permCheck.message });
       }

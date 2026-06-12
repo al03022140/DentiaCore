@@ -179,8 +179,21 @@ export const deleteLogo = async () => {
   return data;
 };
 
+// ⚠️ GET /settings/logo está detrás de `authenticate` (header Bearer). Un
+// `<img src>` directo NO envía ese header → 401 y el logo nunca se ve. Igual
+// que con la firma, usa `fetchLogoBlobUrl` para mostrar el logo persistido.
+// Se conserva esta función por compatibilidad.
 export const getLogoUrl = () =>
   `${API.defaults.baseURL}/settings/logo`;
+
+// Descarga el logo de la clínica AUTENTICADO (el interceptor de axios adjunta
+// el Bearer token) y devuelve un object URL listo para usar como `<img src>`.
+// Mismo patrón que `fetchFirmaBlobUrl`. El llamador es responsable de hacer
+// URL.revokeObjectURL cuando ya no lo use.
+export const fetchLogoBlobUrl = async () => {
+  const { data } = await API.get('/settings/logo', { responseType: 'blob' });
+  return URL.createObjectURL(data);
+};
 
 // ── Note Templates ───────────────────────────────────────────
 
