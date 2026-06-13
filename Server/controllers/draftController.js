@@ -243,6 +243,16 @@ const listDrafts = async (req, res) => {
         .lean();
 
       docs.forEach(doc => {
+        // Un periodontograma BORRADOR sin mediciones reales NO es un pendiente
+        // de firma: son los vacíos que generaban las fuentes ya corregidas (GET
+        // y alta de paciente). Quedan así ocultos del Centro de Firmas aunque
+        // persistan docs vacíos legacy en BD. Con .lean() el Map current.teeth
+        // llega como objeto plano, por eso basta con contar sus llaves.
+        if (type === 'periodontograma') {
+          const teeth = doc.current?.teeth;
+          const tieneMediciones = teeth && Object.keys(teeth).length > 0;
+          if (!tieneMediciones) return;
+        }
         drafts.push({
           _id: doc._id,
           resourceType: type,

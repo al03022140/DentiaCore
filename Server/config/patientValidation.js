@@ -3,31 +3,11 @@
  * Centraliza todas las reglas de validación y configuraciones
  */
 
-// Expresiones regulares para validaciones
-const REGEX_PATTERNS = {
-    // Teléfono mexicano (10 dígitos, puede empezar con +52)
-    TELEFONO_MEXICANO: /^(\+52)?[1-9]\d{9}$/,
-    
-    // CURP mexicano
-    CURP: /^[A-Z]{1}[AEIOU]{1}[A-Z]{2}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|1[0-9]|2[0-9]|3[0-1])[HM]{1}(AS|BC|BS|CC|CS|CH|CL|CM|DF|DG|GT|GR|HG|JC|MC|MN|MS|NT|NL|OC|PL|QT|QR|SP|SL|SR|TC|TS|TL|VZ|YN|ZS|NE)[B-DF-HJ-NP-TV-Z]{3}[0-9A-Z]{1}$/,
-    
-    // RFC mexicano
-    RFC: /^[A-ZÑ&]{3,4}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{2}[0-9A]$/,
-    
-    // Email
-    EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-    
-    // Código postal mexicano
-    CODIGO_POSTAL: /^[0-9]{5}$/,
-    
-    // Solo letras y espacios (para nombres)
-    SOLO_LETRAS: /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/,
-    
-    // Números de diente válidos - Notación FDI:
-    // Permanentes: 11-18, 21-28, 31-38, 41-48
-    // Temporales: 51-55, 61-65, 71-75, 81-85
-    NUMERO_DIENTE: /^([1-4][1-8]|[5-8][1-5])$/
-};
+// NOTA: REGEX_PATTERNS y VALIDATORS se eliminaron (código muerto). Eran
+// validadores de PII (TELEFONO_MEXICANO de 10 dígitos exactos, CURP, RFC) que
+// NO se importaban en ninguna ruta y validaban campos inexistentes (el modelo
+// Patient no tiene CURP ni RFC). La validación REAL de email/teléfono vive
+// ahora a nivel de schema en models/patient.js, con las reglas del front.
 
 // Listas de valores válidos
 const VALID_VALUES = {
@@ -101,72 +81,6 @@ const LIMITS = {
     MAX_LONG_TEXT_LENGTH: 2000,
     MIN_PHONE_LENGTH: 10,
     MAX_PHONE_LENGTH: 13
-};
-
-// Funciones de validación personalizadas
-const VALIDATORS = {
-    /**
-     * Valida que la fecha no sea futura
-     */
-    notFutureDate: (date) => {
-        if (!date) return true;
-        return new Date(date) <= new Date();
-    },
-    
-    /**
-     * Valida edad calculada
-     */
-    validAge: (birthDate) => {
-        if (!birthDate) return true;
-        const age = Math.floor((new Date() - new Date(birthDate)) / (365.25 * 24 * 60 * 60 * 1000));
-        return age >= LIMITS.MIN_AGE && age <= LIMITS.MAX_AGE;
-    },
-    
-    /**
-     * Valida teléfono mexicano
-     */
-    mexicanPhone: (phone) => {
-        if (!phone) return true;
-        const cleanPhone = phone.replace(/[\s\-()]/g, '');
-        return REGEX_PATTERNS.TELEFONO_MEXICANO.test(cleanPhone);
-    },
-    
-    /**
-     * Valida CURP mexicano
-     */
-    validCURP: (curp) => {
-        if (!curp) return true;
-        return REGEX_PATTERNS.CURP.test(curp.toUpperCase());
-    },
-    
-    /**
-     * Valida RFC mexicano
-     */
-    validRFC: (rfc) => {
-        if (!rfc) return true;
-        return REGEX_PATTERNS.RFC.test(rfc.toUpperCase());
-    },
-    
-    /**
-     * Valida número de diente
-     */
-    validToothNumber: (toothNumber) => {
-        if (!toothNumber) return true;
-        return REGEX_PATTERNS.NUMERO_DIENTE.test(toothNumber.toString());
-    },
-    
-    /**
-     * Valida URL de imagen
-     */
-    validImageUrl: (url) => {
-        if (!url) return true;
-        try {
-            const urlObj = new URL(url);
-            return ['http:', 'https:'].includes(urlObj.protocol);
-        } catch {
-            return false;
-        }
-    }
 };
 
 // Funciones de sanitización
@@ -273,11 +187,9 @@ const INDEXES = {
 };
 
 module.exports = {
-    REGEX_PATTERNS,
     VALID_VALUES,
     ERROR_MESSAGES,
     LIMITS,
-    VALIDATORS,
     SANITIZERS,
     INDEXES
 };

@@ -9,6 +9,7 @@ const fsExtra = require('fs-extra');
 const OdontogramaModel = require('../models/odontograma');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
+const { computeContentHash } = require('../utils/signing');
 
 // Logging gated por NODE_ENV: los console.log informativos filtraban
 // patientId y otros datos a stdout en producción. console.error y
@@ -25,9 +26,11 @@ const TYPE_CLINIC = 'clinic';
 // ValidationError de Mongoose al activar runValidators (P4).
 const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
 
-// Espacios inter-dentales del engine: dos números FDI adyacentes concatenados
+// Espacios inter-dentales del engine: dos números FDI válidos concatenados
 // (p.ej. "1817" = espacio entre 18 y 17). Identifican daños como diastema,
-// prótesis fija, ortodoncia fija o transposición.
+// prótesis fija, ortodoncia fija o transposición. Validación de FORMATO, no de
+// adyacencia (ver nota extensa en models/odontograma.js): el engine es el único
+// productor y emite un conjunto cerrado de IDs.
 const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
 
 // ——— Controladores ——————————————————————————————————————————————————————————————
@@ -237,6 +240,23 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       // validadores de array bajo $push no son del todo fiables en Mongoose.
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
     );
+
+    // Integridad NOM-024: el odontograma inicial es de captura única e
+    // inmutable, pero antes nacía sin prueba criptográfica (contentHash null →
+    // audit/verify daba siempre ok:false). Sellamos el hash sobre el doc YA
+    // persistido (para que verify recalcule el mismo valor). Es integridad sin
+    // firma con PIN: el inicial es un snapshot de estado capturado por el
+    // clínico (creadoPor/savedBy), no una nota narrativa. Solo cuando nace
+    // OFICIAL (un asistente lo deja en BORRADOR y se firmará después).
+    if (estadoRegistro === 'OFICIAL' && !odontograma.firmadoEn && !odontograma.contentHash) {
+      const hash = computeContentHash(odontograma, 'odontograma');
+      await OdontogramaModel.updateOne(
+        { _id: odontograma._id },
+        { $set: { contentHash: hash, integrityHash: hash } }
+      );
+      odontograma.contentHash = hash;
+      odontograma.integrityHash = hash;
+    }
 
     res.status(201).json({
       exists: true,

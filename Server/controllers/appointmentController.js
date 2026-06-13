@@ -15,7 +15,11 @@ const mongoose = require('mongoose');
 const DOCTOR_ROLES = new Set(['doctor', 'doctor_admin']);
 
 // ───────── Constantes ─────────
-const PATIENT_FIELDS = 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento sexo';
+// `sexo` se quitó del populate: es PII que NINGÚN consumidor del front usa
+// desde las citas (verificado). `fecha_nacimiento` se conserva porque la UI de
+// citas calcula la edad con ella (ConsultasPage y el modal en edición), y la
+// recepcionista está autorizada a verla por política (BASIC_PATIENT_FIELDS).
+const PATIENT_FIELDS = 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento';
 const DOCTOR_FIELDS = 'nombre';
 const ESTADOS_VIVOS = ['Pendiente', 'Confirmada', 'EnCurso'];
 const ESTADOS_CERRADOS = ['Pasada', 'NoShow', 'Cancelada'];

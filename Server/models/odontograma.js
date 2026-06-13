@@ -30,9 +30,15 @@ const { Schema, Types } = mongoose;
 //   permanentes 11-18, 21-28, 31-38, 41-48
 //   deciduos    51-55, 61-65, 71-75, 81-85
 const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5])$/;
-// Espacios inter-dentales: dos números FDI adyacentes concatenados ("1817").
-// El engine identifica así los daños entre dientes (diastema, prótesis fija,
-// ortodoncia fija, transposición), que no pertenecen a una pieza única.
+// Espacios inter-dentales: dos números FDI válidos concatenados ("1817"). El
+// engine identifica así los daños entre dientes (diastema, prótesis fija,
+// ortodoncia fija, transposición). Esta validación es de FORMATO, no de
+// adyacencia: el ÚNICO productor de `space` es el engine, que emite IDs de un
+// conjunto cerrado y conocido (48 valores, incluidos los cruces de línea media
+// 1121/4131/5161/8171). Validar adyacencia algorítmica aquí (p.ej. |a-b|==1)
+// rechazaría esos cruces y rompería daños interdentales legítimos, sin ganar
+// nada real: un humano nunca teclea este campo. Si en el futuro se quisiera
+// endurecer, usar una lista blanca de los 48 IDs del engine, no aritmética.
 const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
 
 const entrySchema = new Schema({

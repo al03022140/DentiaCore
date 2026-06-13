@@ -110,6 +110,18 @@ const ensurePeriodontogramExists = async (patientId, userId = null) => {
 };
 
 /**
+ * Versión de LECTURA: devuelve el periodontograma existente o, si no existe,
+ * uno vacío EN MEMORIA (no lo persiste). Los GET deben ser idempotentes: antes
+ * usaban ensurePeriodontogramExists y creaban un BORRADOR vacío con solo abrir
+ * la pestaña, contaminando el Centro de Firmas. La creación real ocurre solo al
+ * primer guardado (savePeriodontogramData) o vía POST explícito.
+ */
+const getPeriodontogramForRead = async (patientId, userId = null) => {
+  const existing = await Periodontogram.findOne({ patient: patientId });
+  return existing || Periodontogram.buildEmptyInMemory(patientId, userId);
+};
+
+/**
  * Obtener el periodontograma de un paciente.
  * Se espera que en la URL se reciba el id del paciente.
  */
@@ -129,7 +141,7 @@ exports.getPeriodontogram = [
       // Asegurar que existe un periodontograma, crearlo si no existe
       let periodontogram;
       try {
-        periodontogram = await ensurePeriodontogramExists(id, userId);
+        periodontogram = await getPeriodontogramForRead(id, userId);
       } catch (ensureError) {
         console.error('❌ Error al asegurar periodontograma:', ensureError.message);
         return res.status(404).json({
@@ -843,7 +855,7 @@ exports.getPeriodontogramData = [
       if (legacyInQuery.length > 0) {
         return res.status(400).json({ success: false, message: `Parámetros de consulta no permitidos: ${legacyInQuery.join(', ')}` });
       }
-      const periodontogram = await ensurePeriodontogramExists(patientId, req.user?.id);
+      const periodontogram = await getPeriodontogramForRead(patientId, req.user?.id);
 
       if (listVersions === 'true') {
         const versions = await PeriodontogramHistory.find({ patient: patientId })
@@ -933,7 +945,7 @@ exports.getPeriodontogramStatistics = [
       const patientId = req.params.id;
       const versionParam = req.params.version;
 
-      const periodontogram = await ensurePeriodontogramExists(patientId, req.user?.id);
+      const periodontogram = await getPeriodontogramForRead(patientId, req.user?.id);
 
       if (versionParam) {
         const historyEntry = await PeriodontogramHistory.findOne({ patient: patientId, versionName: versionParam })

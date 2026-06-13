@@ -551,11 +551,22 @@ PeriodontogramSchema.pre('save', function(next) {
   }
 });
 
-// Fábrica simplificada para crear periodontograma inicial
-PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
-  const _emptyData = UniversalToothValidator ? UniversalToothValidator.getDefaultToothData() : {};
+// Payload de un periodontograma vacío (compartido por createInitial y
+// buildEmptyInMemory para que ambos produzcan EXACTAMENTE la misma forma).
+function buildEmptyPeriodontogramPayload(patientId, userId) {
   const emptyStatistics = computeCurrentStatistics(new Map());
-  return this.create({
+  const stats = {
+    totalTeeth: emptyStatistics.totalTeeth,
+    presentTeeth: emptyStatistics.presentTeeth,
+    placaTotal: emptyStatistics.placaTotal,
+    sangradoTotal: emptyStatistics.sangradoTotal,
+    supuracionTotal: emptyStatistics.supuracionTotal,
+    bleedingPercentage: emptyStatistics.bleedingPercentage,
+    plaquePercentage: emptyStatistics.plaquePercentage,
+    averageProbingDepth: emptyStatistics.averageProbingDepth,
+    averageGingivalMargin: emptyStatistics.averageGingivalMargin
+  };
+  return {
     patient: patientId,
     estadoRegistro: 'BORRADOR',
     creadoPor: userId || null,
@@ -568,38 +579,32 @@ PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
         modifiedBy: userId
       },
       teeth: new Map(),
-      statistics: {
-        totalTeeth: emptyStatistics.totalTeeth,
-        presentTeeth: emptyStatistics.presentTeeth,
-        placaTotal: emptyStatistics.placaTotal,
-        sangradoTotal: emptyStatistics.sangradoTotal,
-        supuracionTotal: emptyStatistics.supuracionTotal,
-        bleedingPercentage: emptyStatistics.bleedingPercentage,
-        plaquePercentage: emptyStatistics.plaquePercentage,
-        averageProbingDepth: emptyStatistics.averageProbingDepth,
-        averageGingivalMargin: emptyStatistics.averageGingivalMargin
-      }
+      statistics: { ...stats }
     },
     status: 'draft',
     current: {
       teeth: new Map(),
-      statistics: {
-        placaTotal: emptyStatistics.placaTotal,
-        sangradoTotal: emptyStatistics.sangradoTotal,
-        supuracionTotal: emptyStatistics.supuracionTotal,
-        totalTeeth: emptyStatistics.totalTeeth,
-        presentTeeth: emptyStatistics.presentTeeth,
-        bleedingPercentage: emptyStatistics.bleedingPercentage,
-        plaquePercentage: emptyStatistics.plaquePercentage,
-        averageProbingDepth: emptyStatistics.averageProbingDepth,
-        averageGingivalMargin: emptyStatistics.averageGingivalMargin
-      },
+      statistics: { ...stats },
       createdAt: new Date(),
       updatedAt: new Date(),
       versionName: 'v1',
       needsStatisticsRecalc: false
     }
-  });
+  };
+}
+
+// Fábrica que PERSISTE un periodontograma inicial. Usar SOLO en el camino de
+// escritura (primer guardado real); las lecturas usan buildEmptyInMemory.
+PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
+  return this.create(buildEmptyPeriodontogramPayload(patientId, userId));
+};
+
+// Igual que createInitial pero NO persiste: devuelve un doc en memoria con la
+// misma forma. Para que los GET (lectura) puedan responder un periodontograma
+// vacío sin escribir en BD — antes los GET auto-creaban un BORRADOR que
+// contaminaba el Centro de Firmas con solo abrir la pestaña.
+PeriodontogramSchema.statics.buildEmptyInMemory = function(patientId, userId) {
+  return new this(buildEmptyPeriodontogramPayload(patientId, userId));
 };
 
 // Stats helpers

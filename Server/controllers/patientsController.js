@@ -542,25 +542,12 @@ exports.createPatient = async (req, res) => {
         savedSuccessfully = true;
         debugLog("✅ Paciente guardado exitosamente con ID:", newPatient._id);
 
-        // Periodontograma inicial: best-effort y FUERA de la ruta crítica.
-        // Antes se await-eaba aquí, sumando una segunda escritura a Mongo antes
-        // de responder; con mongod lento eso alargaba el guardado y ayudaba a
-        // gatillar el timeout del cliente. Como su error ya se ignora (nunca
-        // debe abortar la creación), lo disparamos SIN await: el paciente ya
-        // quedó persistido y el 201 vuelve de inmediato. El .catch() evita que
-        // un fallo quede como unhandledRejection.
-        // Envuelto en Promise.resolve().then() para que un throw SÍNCRONO dentro
-        // de createInitial (su preludio computa estadísticas antes del create)
-        // se convierta en un rechazo capturado por el .catch() y NUNCA propague
-        // al catch externo —que respondería 500 con el paciente YA guardado.
-        Promise.resolve()
-            .then(() => Periodontogram.createInitial(newPatient._id))
-            .then((initialPeriodontogram) => {
-                debugLog("✅ Periodontograma inicial creado con ID:", initialPeriodontogram._id);
-            })
-            .catch((periodontogramError) => {
-                console.error("⚠️ Error al crear periodontograma inicial:", periodontogramError.message);
-            });
+        // NO se crea el periodontograma aquí. Antes se hacía createInitial en
+        // cada alta, generando un BORRADOR vacío que contaminaba el Centro de
+        // Firmas (aparecía como pendiente de firma sin que nadie lo hubiera
+        // tocado). El periodontograma se crea solo en el PRIMER guardado real
+        // (savePeriodontogramData es idempotente vía ensurePeriodontogramExists);
+        // las lecturas devuelven uno vacío en memoria sin persistir.
 
         return res.status(201).json({
             message: "✅ Paciente creado correctamente",

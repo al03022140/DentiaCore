@@ -40,7 +40,18 @@ const PatientSchema = new mongoose.Schema({
   lugar_nacimiento: { type: String, default: "" },
   escolaridad: { type: String, default: "" },
   ocupacion: { type: String, default: "" },
-  email: { type: String, default: "", trim: true, lowercase: true },
+  email: {
+    type: String, default: "", trim: true, lowercase: true,
+    // Validación de formato alineada EXACTA con el front (add-patient.jsx).
+    // Permite vacío (campo opcional). Como updatePatient usa
+    // findOneAndUpdate({runValidators:true}) con campos aplanados, este
+    // validador SOLO corre cuando el email está en el $set — editar otra
+    // sección de un paciente legacy con email no estándar NO lo dispara.
+    validate: {
+      validator: (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      message: 'El email no tiene un formato válido'
+    }
+  },
   
   // 📌 Situación Laboral
   situacion_laboral: {
@@ -55,7 +66,23 @@ const PatientSchema = new mongoose.Schema({
 
   // 📌 Información de Contacto
   contacto: {
-      telefono: { type: String, default: "", trim: true },
+      telefono: {
+        type: String, default: "", trim: true,
+        // Reglas del front (add-patient.jsx): caracteres permitidos
+        // [dígitos, espacios, - + ()] y entre 7 y 15 dígitos REALES. Permite
+        // vacío. NO se usa el validador "mexicanPhone" de 10 dígitos exactos
+        // (rompería fijos, internacionales y datos legacy). Solo valida cuando
+        // el teléfono está en el $set (legacy-safe).
+        validate: {
+          validator: (v) => {
+            if (!v) return true;
+            if (!/^[\d\s\-+()]+$/.test(v)) return false;
+            const digits = String(v).replace(/\D/g, '').length;
+            return digits >= 7 && digits <= 15;
+          },
+          message: 'El teléfono debe tener entre 7 y 15 dígitos y solo caracteres válidos'
+        }
+      },
       direccion: { type: String, default: "" },
       codigo_postal: { type: String, default: "" },
       colonia: { type: String, default: "" },

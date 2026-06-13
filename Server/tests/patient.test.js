@@ -7,11 +7,13 @@
  */
 
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const Patient = require('../models/patient');
-const { migratePatient } = require('../scripts/migratePatientData');
-
-// Configuración de pruebas
-const TEST_DB_URI = process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/DentiaCore_test';
+// NOTA: se eliminó `require('../scripts/migratePatientData')` y sus 2 tests:
+// ese script ya no existe (código muerto removido hace tiempo), lo que hacía
+// que TODA esta suite fallara al cargar y nunca corriera. Ahora usa
+// MongoMemoryServer (como authorization-system/cash-flow) para no depender de
+// un mongod local.
 
 // Helper: datos mínimos válidos para crear un paciente (campos requeridos)
 let docCounter = 0;
@@ -32,13 +34,19 @@ function validPatientData(overrides = {}) {
 
 describe('Patient Model - Mejoras y Compatibilidad', () => {
     
+    let mongoServer;
+
     beforeAll(async () => {
-        await mongoose.connect(TEST_DB_URI);
+        mongoServer = await MongoMemoryServer.create();
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.disconnect();
+        }
+        await mongoose.connect(mongoServer.getUri());
     });
-    
+
     afterAll(async () => {
-        await mongoose.connection.dropDatabase();
-        await mongoose.connection.close();
+        await mongoose.disconnect();
+        if (mongoServer) await mongoServer.stop();
     });
     
     beforeEach(async () => {
@@ -233,49 +241,9 @@ describe('Patient Model - Mejoras y Compatibilidad', () => {
         });
     });
     
-    describe('Script de Migración', () => {
-        
-        test('migratePatient debe convertir estructura legacy (async)', async () => {
-            const legacyData = {
-                paciente_id: '9999',
-                primer_nombre: 'Pedro',
-                apellido_paterno: 'Ramírez',
-                fecha_nacimiento: new Date('1987-06-15'),
-                sexo: 'masculino',
-                email: 'pedro@test.com',
-                contacto: { telefono: '5557778899' },
-                encuesta_medica: {
-                    habitos_estilo_vida: {
-                        tabaquismo: { estado: true },
-                        alcoholismo: { estado: false }
-                    }
-                }
-            };
-            
-            const migrated = await migratePatient(legacyData);
-            
-            // migratePatient convierte flat → informacion_personal/informacion_medica
-            // Si patient already has informacion_personal, returns null
-            // Otherwise creates the modular structure
-            if (migrated) {
-                expect(migrated.informacion_personal).toBeDefined();
-                expect(migrated.informacion_personal.primer_nombre).toBe('Pedro');
-            }
-        });
-        
-        test('migratePatient debe omitir datos ya migrados (async)', async () => {
-            const alreadyMigrated = {
-                informacion_personal: {
-                    primer_nombre: 'Ana',
-                    apellido_paterno: 'Torres'
-                }
-            };
-            
-            const result = await migratePatient(alreadyMigrated);
-            expect(result).toBeNull();
-        });
-    });
-    
+    // (Eliminado el describe 'Script de Migración': probaba migratePatient de un
+    // script ya inexistente — código muerto que rompía la carga de la suite.)
+
     describe('Rendimiento', () => {
         
         test('Debe generar paciente_id único eficientemente', async () => {
@@ -395,5 +363,48 @@ describe('Integración Completa', () => {
         // Verificar que los virtuales funcionan
         expect(updated.emailVirtual).toBe('integracion@test.com');
         expect(updated.telefonoVirtual).toBe('5551234567');
+    });
+
+    // ── Validación de PII a nivel schema (P4) ────────────────────────────
+    describe('Validación de email y teléfono (P4)', () => {
+        test('rechaza email con formato inválido al crear', async () => {
+            await expect(
+                Patient.create(validPatientData({ email: 'no-es-un-email' }))
+            ).rejects.toThrow();
+        });
+
+        test('rechaza teléfono fuera de rango (menos de 7 dígitos) al crear', async () => {
+            await expect(
+                Patient.create(validPatientData({ contacto: { telefono: '12345' } }))
+            ).rejects.toThrow();
+        });
+
+        test('acepta email vacío y teléfono válido con formato visible', async () => {
+            const p = await Patient.create(validPatientData({
+                email: '',
+                contacto: { telefono: '55 1234 5678' }
+            }));
+            expect(p.contacto.telefono).toBe('55 1234 5678');
+        });
+
+        test('legacy-safe: editar OTRA sección de un paciente con teléfono inválido NO falla', async () => {
+            // Insertar bypasseando validación (simula dato legacy)
+            const data = validPatientData({ contacto: { telefono: '999' } });
+            const { insertedId } = await Patient.collection.insertOne({
+                ...data,
+                paciente_id: 100000 + docCounter,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+            // Editar otro campo con runValidators: el validador de teléfono NO
+            // debe dispararse porque telefono no está en el $set.
+            await expect(
+                Patient.findByIdAndUpdate(
+                    insertedId,
+                    { $set: { ocupacion: 'Editado' } },
+                    { runValidators: true, new: true }
+                )
+            ).resolves.toBeTruthy();
+        });
     });
 });
