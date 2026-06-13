@@ -300,11 +300,12 @@ const signDraft = async (req, res) => {
       return res.status(400).json({ message: 'Debe configurar su PIN antes de firmar' });
     }
 
+    // verificarPin → verificarPinDetallado ya incrementa pinFailedAttempts y
+    // aplica el lockout internamente (con save). NO volver a incrementar aquí:
+    // contaba doble cada PIN errado, bloqueando al doctor a los ~3 intentos en
+    // vez de 5 (e incoherente con signingController).
     const pinValid = await user.verificarPin(pin);
     if (!pinValid) {
-      user.pinFailedAttempts = (user.pinFailedAttempts || 0) + 1;
-      await user.save();
-
       auditLogger.registrarManual(req, 'pin_fallo', {
         resourceType: 'session',
         detalles: { contexto: 'firma_borrador' },
@@ -312,10 +313,6 @@ const signDraft = async (req, res) => {
 
       return res.status(401).json({ message: 'PIN incorrecto' });
     }
-
-    // Resetear intentos
-    user.pinFailedAttempts = 0;
-    await user.save();
 
     // ── Notas de evolución (subdoc) ────────────────────────────
     if (resourceType === NOTE_RESOURCE) {
@@ -451,11 +448,10 @@ const batchSign = async (req, res) => {
       return res.status(400).json({ message: 'Debe configurar su PIN antes de firmar en lote' });
     }
 
+    // verificarPin ya incrementa intentos y aplica lockout internamente —
+    // no re-incrementar (evita el doble conteo que bloqueaba prematuramente).
     const pinValid = await user.verificarPin(pin);
     if (!pinValid) {
-      user.pinFailedAttempts = (user.pinFailedAttempts || 0) + 1;
-      await user.save();
-
       auditLogger.registrarManual(req, 'pin_fallo', {
         resourceType: 'session',
         detalles: { contexto: 'firma_lote', totalIntentados: draftIds.length },
@@ -463,9 +459,6 @@ const batchSign = async (req, res) => {
 
       return res.status(401).json({ message: 'PIN incorrecto' });
     }
-
-    user.pinFailedAttempts = 0;
-    await user.save();
 
     // Procesar cada borrador
     const resultados = [];

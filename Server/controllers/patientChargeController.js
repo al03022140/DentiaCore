@@ -7,6 +7,19 @@ const { resolvePatientAppointmentId } = require('../utils/appointmentValidation'
 const CONFIRM_PHRASE = 'CONFIRMO';
 const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 
+// Efectivo físico disponible en una sesión = inicial + (ingresos − egresos) en
+// EFECTIVO. Se recalcula desde la BD para reflejar movimientos concurrentes.
+// (Misma fórmula que summarizeMovements.cashOnHand en cashController.)
+async function getCashOnHand(sessionId, initialAmount) {
+  const movements = await CashMovement.find({ boxSessionId: sessionId });
+  let cashNet = 0;
+  for (const m of movements) {
+    if (m.paymentMethod !== 'CASH') continue;
+    cashNet += (m.type === 'INCOME' ? 1 : -1) * (Number.isFinite(m.amount) ? m.amount : 0);
+  }
+  return round2((Number.isFinite(initialAmount) ? initialAmount : 0) + cashNet);
+}
+
 // GET /patient-charges  — paginado. ?pendingOnly=true filtra saldoPendiente > 0
 exports.getAllCharges = async (req, res) => {
   try {
@@ -426,10 +439,29 @@ exports.cancelCharge = async (req, res) => {
 
       const chargeRef = `#${String(charge._id).slice(-6)}`;
       let reverseInterrupted = false;
+      let skippedInsufficientFunds = 0;
       for (const pago of charge.pagos) {
+        const monto = round2(pago.monto);
+        const esEfectivo = pago.paymentMethod === 'CASH';
+
+        // A-2: validar fondos ANTES de crear un EXPENSE en EFECTIVO. Si el
+        // dinero ya no está en la caja actual (p.ej. el pago original fue en
+        // una sesión anterior ya cerrada, o el efectivo se retiró), revertirlo
+        // dejaría cashOnHand —y el corte— en negativo (efectivo físico
+        // imposible). Los reversos DIGITALES no tocan el efectivo, así que no
+        // necesitan este chequeo. El pago no revertido se informa para reverso
+        // manual (ajuste explícito) en vez de corromper el balance.
+        if (esEfectivo) {
+          const cashOnHand = await getCashOnHand(activeSession._id, activeSession.initialAmount);
+          if (cashOnHand < monto) {
+            skippedInsufficientFunds++;
+            continue;
+          }
+        }
+
         try {
           const expense = await CashMovement.create({
-            amount: round2(pago.monto),
+            amount: monto,
             type: 'EXPENSE',
             paymentMethod: pago.paymentMethod,
             concept: `Reverso pago ${chargeRef} · ${motivoTrim}`.slice(0, 200),
@@ -453,6 +485,20 @@ exports.cancelCharge = async (req, res) => {
             reverseInterrupted = true;
             break;
           }
+
+          // A-2 (post-insert): cerrar el race de retiros concurrentes en
+          // efectivo. Si tras este EXPENSE el efectivo quedó negativo, otro
+          // movimiento se intercaló — revertimos este y lo marcamos pendiente.
+          if (esEfectivo) {
+            const cashOnHandAfter = await getCashOnHand(activeSession._id, activeSession.initialAmount);
+            if (cashOnHandAfter < 0) {
+              try { await CashMovement.deleteOne({ _id: expense._id }); }
+              catch (rbErr) { console.error('CRITICAL: rollback reverso (fondos) falló:', { movementId: expense._id, rbErr }); }
+              skippedInsufficientFunds++;
+              continue;
+            }
+          }
+
           reversedMovementIds.push(expense._id);
         } catch (revErr) {
           // Loguear y continuar — los pagos restantes deben intentar revertirse.
@@ -465,6 +511,15 @@ exports.cancelCharge = async (req, res) => {
           charge,
           reverseStatus: 'partial',
           reverseMessage: 'Cobro cancelado. La caja se cerró durante el reverso: algunos pagos NO se revirtieron a caja. Complete el reverso manualmente con la caja abierta.',
+          reversedMovementIds
+        });
+      }
+
+      if (skippedInsufficientFunds > 0) {
+        return res.json({
+          charge,
+          reverseStatus: 'partial',
+          reverseMessage: `Cobro cancelado. ${skippedInsufficientFunds} pago(s) en efectivo NO se revirtieron por fondos insuficientes en la caja actual (el efectivo ya no está disponible). Regístrelo como ajuste manual.`,
           reversedMovementIds
         });
       }

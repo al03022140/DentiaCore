@@ -839,6 +839,49 @@ describe('GET /api/users/doctors (selector de firma)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// 11b. Anti-escalada de privilegios en gestión de usuarios (A-1)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('Anti-escalada en /api/users (A-1)', () => {
+  test('Doctor NO puede resetear la contraseña del administrador (rol superior)', async () => {
+    // doctor tiene users.update por defecto, pero no debe poder tocar a un
+    // usuario de rol superior. Antes esto permitía toma de control de la cuenta.
+    const { token: doctorToken } = await createUser({ rol: 'doctor', nombre: 'Dr. Atacante' });
+    const { user: admin } = await createUser({ rol: 'administrador', nombre: 'Dueño' });
+
+    const res = await request(app)
+      .put(`/api/users/${admin._id}`)
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({ contraseña: 'Hackeada123!' });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('Doctor NO puede desactivar al administrador', async () => {
+    const { token: doctorToken } = await createUser({ rol: 'doctor', nombre: 'Dr. Atacante2' });
+    const { user: admin } = await createUser({ rol: 'administrador', nombre: 'Dueño2' });
+
+    const res = await request(app)
+      .patch(`/api/users/${admin._id}/disable`)
+      .set('Authorization', `Bearer ${doctorToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  test('Administrador SÍ puede modificar a un doctor (rol inferior)', async () => {
+    const { token: adminToken } = await createUser({ rol: 'administrador', nombre: 'Admin OK' });
+    const { user: doctor } = await createUser({ rol: 'doctor', nombre: 'Dr. Editable' });
+
+    const res = await request(app)
+      .put(`/api/users/${doctor._id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ nombre: 'Dr. Editado' });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // 12. isSignerRole (unit)
 // ═══════════════════════════════════════════════════════════════════════
 

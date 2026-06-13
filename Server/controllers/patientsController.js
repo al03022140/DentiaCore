@@ -123,9 +123,19 @@ exports.getAllPatients = async (req, res) => {
     try {
         debugLog("📡 Solicitando todos los pacientes...");
 
-        // Implementar paginación opcional
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 0; // 0 significa sin límite
+        // Paginación con tope de seguridad. El cliente actual pide la lista
+        // completa y pagina en memoria, así que NO imponemos un default chico
+        // (rompería la lista). Pero sí un backstop duro: antes `limit=0` traía
+        // la colección ENTERA sin tope (riesgo de memoria/latencia y de
+        // descarga masiva de PII). MAX_LIMIT acota incluso el caso "sin limit".
+        // (Para clínicas muy grandes, lo ideal es migrar el front a paginación
+        // server-side y usar ?page/?limit explícitos.)
+        const MAX_LIMIT = 5000;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const requestedLimit = parseInt(req.query.limit);
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+            ? Math.min(requestedLimit, MAX_LIMIT)
+            : MAX_LIMIT;
         const skip = (page - 1) * limit;
 
         // Construir la consulta base (excluir pacientes dados de baja).

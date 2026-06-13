@@ -38,6 +38,16 @@ try {
 // 1) Inicializar Express
 const app = express();
 
+// trust proxy: por defecto OFF (la app corre mono-máquina sin proxy, así que
+// req.ip = IP del socket, correcto para el rate limiting por IP). Si se
+// despliega DETRÁS de un reverse-proxy (nginx/Caddy con HTTPS), poner
+// TRUST_PROXY=1 (o el nº de saltos) para que req.ip lea X-Forwarded-For y el
+// rate limiting no agrupe a todos los usuarios bajo la IP del proxy.
+if (process.env.TRUST_PROXY) {
+    const tp = process.env.TRUST_PROXY;
+    app.set('trust proxy', /^\d+$/.test(tp) ? parseInt(tp, 10) : tp);
+}
+
 // 2) Middlewares globales
 app.use(helmet({
     contentSecurityPolicy: {

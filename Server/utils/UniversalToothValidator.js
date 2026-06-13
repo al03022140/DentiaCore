@@ -19,6 +19,7 @@
  * @author Sistema de Validación Unificada
  */
 
+const crypto = require('crypto');
 const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
 // Caras canónicas reutilizables en validación/estadísticas
 const CANON_FACES = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
@@ -1107,14 +1108,18 @@ class UniversalToothValidator {
     
     // Guardar en caché
     statisticsCache.set(cacheKey, statistics, dataHash);
-    
-    console.log('[VALIDATION] Estadísticas calculadas exitosamente según especificaciones SEPA', {
-      presentTeeth: statistics.presentTeeth,
-      totalCasillasPosibles,
-      bleedingCount,
-      bleedingPercentage: statistics.bleedingPercentage
-    });
-    
+
+    // Log de depuración solo fuera de producción (antes era incondicional y
+    // ruidoso en cada cálculo de estadísticas en prod).
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[VALIDATION] Estadísticas calculadas exitosamente según especificaciones SEPA', {
+        presentTeeth: statistics.presentTeeth,
+        totalCasillasPosibles,
+        bleedingCount,
+        bleedingPercentage: statistics.bleedingPercentage
+      });
+    }
+
     return statistics;
   }
   
@@ -1165,19 +1170,17 @@ class UniversalToothValidator {
       // Normalizar datos antes de generar hash
       const normalizedData = this.normalizeDataForHash(data);
       const jsonString = JSON.stringify(normalizedData);
-      
-      // Generar hash más robusto
-      let hash = 0;
-      for (let i = 0; i < jsonString.length; i++) {
-        const char = jsonString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convertir a 32bit integer
-      }
-      
-      return Math.abs(hash).toString(36);
+
+      // SHA-256, no un DJB2 de 32 bits. La clave de caché es global a todos
+      // los pacientes; con 32 bits dos datasets distintos podían colisionar y
+      // servir las estadísticas (PS/SS/NIC) de un paciente a otro. SHA-256
+      // hace esa colisión criptográficamente inviable. El pacienteId, si viene
+      // en `data`, ya entra en el hash al serializar el objeto completo.
+      return crypto.createHash('sha256').update(jsonString).digest('hex');
     } catch (error) {
       console.error('Error generando hash de datos:', error);
-      return Date.now().toString();
+      // Fallback único e irrepetible para forzar cache-miss (nunca colisiona).
+      return crypto.randomBytes(16).toString('hex');
     }
   }
   

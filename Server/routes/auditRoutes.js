@@ -15,6 +15,10 @@ router.get('/', readLimiter, authorize(['audit.read.full']), auditController.get
 router.get('/users', readLimiter, authorize(['audit.read.full']), auditController.getUsers);
 router.get('/patients', readLimiter, authorize(['audit.read.full']), auditController.searchPatients);
 
+// Verificación de la cadena completa de auditoría (anti-borrado/edición).
+// Antes que /verify/:resourceType para que "verify-chain" no caiga en esa ruta.
+router.get('/verify-chain', readLimiter, authorize(['audit.read.full']), auditController.verifyChain);
+
 // Verificación de integridad de un documento
 router.get('/verify/:resourceType/:resourceId', readLimiter, authorize(['audit.read.full']), auditController.verifyIntegrity);
 

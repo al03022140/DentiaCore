@@ -53,41 +53,65 @@ function getSignableFields(resourceType) {
 }
 
 /**
- * Serializa un valor de forma canónica (llaves ordenadas recursivamente).
- * Funciones, undefined y Mongoose internos se omiten.
+ * Normaliza un valor a una forma JSON-serializable y determinista en UNA sola
+ * pasada: ordena llaves recursivamente Y convierte los tipos especiales de
+ * BSON/Mongoose (Map, ObjectId, Date, Buffer, Decimal128) a su representación
+ * estable.
+ *
+ * CRÍTICO (NOM-024): esta normalización DEBE ocurrir en la misma pasada que el
+ * ordenamiento de llaves. La versión anterior ordenaba primero con
+ * `Object.keys()` — que sobre un Map o un ObjectId devuelve `[]` — reduciendo
+ * `current.teeth` (mediciones del periodontograma) y todos los ObjectId
+ * (`patientId`, `doctor_id`) a `{}` ANTES de que el replacer de JSON.stringify
+ * pudiera convertirlos. Resultado: el hash de integridad era ciego a las
+ * mediciones clínicas y al paciente. Ver utils/integrity.test.js.
+ *
+ * @param {*} value
+ * @returns {*} valor normalizado, listo para JSON.stringify determinista
+ */
+function normalizeForHash(value) {
+  if (value === null || value === undefined) return value;
+
+  // Primitivos
+  if (typeof value !== 'object') return value;
+
+  // Tipos especiales (antes de tratar como objeto plano)
+  if (value instanceof Date) return value.toISOString();
+  if (Buffer.isBuffer(value)) return value.toString('base64');
+  // ObjectId / Decimal128 / Long y demás tipos BSON: tienen _bsontype y un
+  // toString() estable. (El bug original comparaba contra 'ObjectID' con D
+  // mayúscula; bson actual usa 'ObjectId'. Pato-tipado lo cubre sin acoplar.)
+  if (value._bsontype) return value.toString();
+  if (typeof value.toHexString === 'function') return value.toHexString();
+
+  // Map → objeto plano con llaves ordenadas
+  if (value instanceof Map) {
+    const out = {};
+    for (const key of [...value.keys()].sort()) {
+      out[key] = normalizeForHash(value.get(key));
+    }
+    return out;
+  }
+
+  // Array → normaliza cada elemento (preserva orden, NO se reordena)
+  if (Array.isArray(value)) return value.map(normalizeForHash);
+
+  // Objeto plano → llaves ordenadas
+  const out = {};
+  for (const key of Object.keys(value).sort()) {
+    out[key] = normalizeForHash(value[key]);
+  }
+  return out;
+}
+
+/**
+ * Serializa un valor de forma canónica (llaves ordenadas, tipos BSON
+ * normalizados). Determinista para el mismo contenido lógico.
  * @param {*} value
  * @returns {string}
  */
 function canonicalize(value) {
-  return JSON.stringify(value, (_key, val) => {
-    // Convertir ObjectId a string
-    if (val && typeof val === 'object' && val._bsontype === 'ObjectID') {
-      return val.toString();
-    }
-    // Convertir Map a objeto plano
-    if (val instanceof Map) {
-      const obj = {};
-      for (const [k, v] of val) obj[k] = v;
-      return obj;
-    }
-    return val;
-  }, 0);
-}
-
-/**
- * Sortea las llaves de un objeto recursivamente para garantizar orden canónico.
- * @param {*} obj
- * @returns {*}
- */
-function sortKeys(obj) {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(sortKeys);
-  if (obj instanceof Date) return obj;
-  const sorted = {};
-  for (const key of Object.keys(obj).sort()) {
-    sorted[key] = sortKeys(obj[key]);
-  }
-  return sorted;
+  return JSON.stringify(normalizeForHash(value));
 }
 
 /**
@@ -110,7 +134,7 @@ function computeIntegrityHash(doc, resourceType) {
     }
   }
 
-  const canonical = canonicalize(sortKeys(subset));
+  const canonical = canonicalize(subset);
   return crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
@@ -125,17 +149,30 @@ function computeIntegrityHash(doc, resourceType) {
 function computeEntryHash(logData) {
   const secret = getAuditHmacSecret();
 
-  // Campos que participan en el HMAC (los más críticos del entry)
+  // El HMAC cubre TODA la evidencia sensible, no solo los 6 campos básicos.
+  // Antes quedaban fuera `detalles` (diff antes/después), `motivo`,
+  // `camposEditados`, `ip` y `userRole` → podían editarse sin invalidar el
+  // sello. Además incluye `seq` y `prevHash` para encadenar la bitácora:
+  // borrar o truncar entradas rompe la cadena y es detectable (ver
+  // verifyAuditChain). canonicalize normaliza ObjectId/Map/Date dentro de
+  // `detalles`.
   const payload = {
-    userId:       logData.userId?.toString() || null,
-    evento:       logData.evento,
-    resourceType: logData.resourceType || null,
-    resourceId:   logData.resourceId?.toString() || null,
-    patientId:    logData.patientId?.toString() || null,
-    timestamp:    logData.timestamp ? new Date(logData.timestamp).toISOString() : null,
+    userId:         logData.userId?.toString() || null,
+    userRole:       logData.userRole || null,
+    evento:         logData.evento,
+    resourceType:   logData.resourceType || null,
+    resourceId:     logData.resourceId?.toString() || null,
+    patientId:      logData.patientId?.toString() || null,
+    motivo:         logData.motivo ?? null,
+    camposEditados: logData.camposEditados ?? null,
+    detalles:       logData.detalles ?? null,
+    ip:             logData.ip ?? null,
+    seq:            logData.seq ?? null,
+    prevHash:       logData.prevHash ?? null,
+    timestamp:      logData.timestamp ? new Date(logData.timestamp).toISOString() : null,
   };
 
-  const canonical = canonicalize(sortKeys(payload));
+  const canonical = canonicalize(payload);
   return crypto.createHmac('sha256', secret).update(canonical).digest('hex');
 }
 

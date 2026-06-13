@@ -77,12 +77,18 @@ function validateEntries(entries) {
     return false;
   }
 
-  // Validar que cada entrada tenga la estructura esperada
+  // Validar que cada entrada tenga la estructura esperada. Una entrada
+  // identifica su objetivo por `tooth` O por `space` (daño inter-dental:
+  // diastema, prótesis fija…), y aplica un `damage`/`condition` o una `note`
+  // (entradas solo-nota del textBox). Antes exigía `tooth` y `damage`, lo que
+  // rechazaba las entradas de espacio y las de nota — alineado con
+  // normalizeEntry y el validador del controller para no perderlas si este
+  // helper (hoy sin uso vivo) vuelve a cablearse.
   return entries.every(entry => {
-    return entry 
-      && typeof entry === 'object'
-      && 'tooth' in entry
-      && ('damage' in entry || 'condition' in entry); // Aceptar tanto 'damage' como 'condition'
+    if (!entry || typeof entry !== 'object') return false;
+    const hasTarget = 'tooth' in entry || 'space' in entry;
+    const hasContent = 'damage' in entry || 'condition' in entry || 'note' in entry;
+    return hasTarget && hasContent;
   });
 }
 

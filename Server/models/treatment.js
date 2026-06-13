@@ -64,4 +64,10 @@ const treatmentSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Índices: las stats (getTreatmentStatus / getMostCommonTreatments /
+// getTreatmentDuration) filtran por deletedAt y por fecha de subdocumento, y
+// las lecturas por paciente. Sin esto eran COLLSCAN + $unwind en memoria.
+treatmentSchema.index({ paciente_id: 1 });
+treatmentSchema.index({ deletedAt: 1, 'tratamientos.fecha': 1 });
+
 module.exports = mongoose.model('Tratamiento', treatmentSchema);

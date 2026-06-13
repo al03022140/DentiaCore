@@ -339,6 +339,24 @@ const verifyIntegrity = async (req, res, next) => {
 };
 
 /**
+ * GET /api/audit/verify-chain
+ *
+ * Verifica la integridad de la bitácora de auditoría completa:
+ *  - cada entryHash recomputa (ninguna entrada fue editada), y
+ *  - la cadena prevHash/seq es continua (ninguna entrada fue borrada).
+ * Query: limit (opcional, verifica solo las últimas N entradas selladas).
+ */
+const verifyChain = async (req, res, next) => {
+  try {
+    const limit = Math.max(0, parseInt(req.query.limit, 10) || 0);
+    const report = await AuditLog.verifyChain({ limit });
+    return res.json(report);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * GET /api/audit/timeline/:patientId
  *
  * Devuelve todos los eventos de auditoría de un paciente,
@@ -396,4 +414,4 @@ const getTimeline = async (req, res, next) => {
   }
 };
 
-module.exports = { getLogs, getUsers, searchPatients, verifyIntegrity, getTimeline };
+module.exports = { getLogs, getUsers, searchPatients, verifyIntegrity, verifyChain, getTimeline };

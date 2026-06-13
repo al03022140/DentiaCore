@@ -28,6 +28,16 @@ const checkPrivilegeEscalation = (actorRole, targetCurrentRole, targetNewRole, i
     return 'No tiene permisos para modificar cuentas de superadmin';
   }
 
+  // Cannot modify users whose CURRENT role is equal or higher than yours
+  // (except editing your own account). Sin esto, un `doctor` (que tiene
+  // users.update) podía hacer PUT sobre el `administrador` y resetearle la
+  // contraseña → toma de control de una cuenta de mayor privilegio.
+  // El superadmin queda exento (puede gestionar a todos).
+  if (!isSelf && actorRole !== 'superadmin' &&
+      targetCurrentRole && getRoleLevel(targetCurrentRole) >= actorLevel) {
+    return 'No puede modificar usuarios con un rol igual o superior al suyo';
+  }
+
   // Cannot assign role higher than your own
   if (targetNewRole && getRoleLevel(targetNewRole) > actorLevel) {
     return 'No puede asignar un rol superior al suyo';
@@ -291,14 +301,17 @@ const disableUser = async (req, res) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-    // Prevent disabling superadmin accounts by non-superadmins
-    if (user.rol === 'superadmin' && req.user.role !== 'superadmin') {
-      return res.status(403).json({ message: 'No tiene permisos para desactivar cuentas de superadmin' });
-    }
-
     // Prevent self-disable
     if (req.user.id === user._id.toString()) {
       return res.status(403).json({ message: 'No puede desactivar su propia cuenta' });
+    }
+
+    // Misma regla anti-escalada que updateUser: no se puede desactivar a un
+    // usuario de rol igual o superior (cubre superadmin y el caso doctor →
+    // administrador). El superadmin puede desactivar a cualquiera.
+    const escalationErr = checkPrivilegeEscalation(req.user.role, user.rol, undefined, false);
+    if (escalationErr) {
+      return res.status(403).json({ message: escalationErr });
     }
 
     user.active = false;

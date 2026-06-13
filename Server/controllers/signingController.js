@@ -94,6 +94,16 @@ const signRecord = async (req, res, next) => {
       return res.status(400).json({ error: 'No se puede firmar un documento eliminado' });
     }
 
+    // Un registro ya firmado no se re-firma: hacerlo sobrescribiría
+    // silenciosamente al firmante original (firmadoPor/firmadoEn/contentHash),
+    // borrando la autoría legal de la primera firma (NOM-004 Art. 5.10). Para
+    // corregir un documento firmado se usa el flujo de addendum, no re-firma.
+    if (doc.firmadoEn) {
+      return res.status(409).json({
+        error: 'El documento ya está firmado. Use un addendum para correcciones.'
+      });
+    }
+
     // Calcular hash del contenido al momento de la firma
     const contentHash = computeContentHash(doc, resourceType);
 

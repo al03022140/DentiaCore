@@ -342,7 +342,7 @@ describe('BUG-5 · addPayment saga compensatoria', () => {
     expect(movements[0].type).toBe('INCOME');
   });
 
-  test('rollback: si charge.save falla, CashMovement se borra', async () => {
+  test('rollback: si el update atómico del cobro falla, CashMovement se borra', async () => {
     const patientId = new mongoose.Types.ObjectId();
     const charge = await PatientCharge.create({
       patientId,
@@ -353,10 +353,12 @@ describe('BUG-5 · addPayment saga compensatoria', () => {
       pagos: [{ monto: 300, fecha: new Date(), paymentMethod: 'CASH' }]
     });
 
-    // Mock para forzar fallo en charge.save() — simulamos un error de DB
-    // tras crear el CashMovement. La saga debe limpiar el movement.
-    const origSave = PatientCharge.prototype.save;
-    PatientCharge.prototype.save = function () {
+    // A-6 migró addPayment de charge.save() a findOneAndUpdate atómico. El test
+    // antiguo mockeaba `.prototype.save` (ya no se invoca), así que NO ejercía
+    // el rollback. Mockeamos findOneAndUpdate para simular fallo de DB tras
+    // crear el CashMovement; la saga debe borrar el movement y responder 409.
+    const origFOU = PatientCharge.findOneAndUpdate;
+    PatientCharge.findOneAndUpdate = function () {
       return Promise.reject(new Error('Simulated DB error'));
     };
 
@@ -368,12 +370,12 @@ describe('BUG-5 · addPayment saga compensatoria', () => {
         body: { monto: 100, paymentMethod: 'CASH', confirmacion: 'CONFIRMO' }
       }), res);
 
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(409);
       // No debe quedar movement huérfano
       const movements = await CashMovement.find({ linkedChargeId: charge._id });
       expect(movements).toHaveLength(0);
     } finally {
-      PatientCharge.prototype.save = origSave;
+      PatientCharge.findOneAndUpdate = origFOU;
     }
   });
 

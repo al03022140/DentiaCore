@@ -985,6 +985,9 @@ PatientSchema.index({ email: 1 });
 PatientSchema.index({ createdAt: -1 });
 PatientSchema.index({ updatedAt: -1 });
 PatientSchema.index({ fecha_nacimiento: 1 });
+// deletedAt entra en CASI todas las queries (listados, conteos de stats) como
+// predicado de soft-delete; combinado con createdAt cubre el patrón de stats.
+PatientSchema.index({ deletedAt: 1, createdAt: -1 });
 
 // Índice compuesto para búsquedas complejas
 PatientSchema.index({ 

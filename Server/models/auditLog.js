@@ -159,6 +159,19 @@ const auditLogSchema = new mongoose.Schema({
     default: null
   },
 
+  // ── Encadenamiento (tamper-evidence anti-borrado) ─────────────
+  // Secuencia monotónica + hash del eslabón anterior. Borrar o truncar
+  // entradas rompe la cadena y lo detecta verifyAuditChain. `seq` único
+  // (sparse: los logs legacy sin seq se ignoran hasta re-sellarlos).
+  seq: {
+    type: Number,
+    default: null
+  },
+  prevHash: {
+    type: String,
+    default: null
+  },
+
   // Actor secundario (delegación controlada)
   assistantId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -185,31 +198,98 @@ auditLogSchema.index({ userId: 1, timestamp: -1 });
 auditLogSchema.index({ evento: 1, timestamp: -1 });
 auditLogSchema.index({ patientId: 1, timestamp: -1 });
 auditLogSchema.index({ resourceType: 1, resourceId: 1, timestamp: -1 });
+// Secuencia de la cadena: único para serializar inserciones (un E11000 fuerza
+// reintento en `registrar`) y para recorrer la bitácora en orden.
+auditLogSchema.index({ seq: 1 }, { unique: true, sparse: true });
 
-// TTL index: retención mínima 5 años (NOM-004 Art. 5.4 — conservación de expediente)
-auditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 157680000 }); // 5 años ≈ 1825 días
+// NOTA: NO usamos un índice TTL. NOM-004 Art. 5.4 exige conservar el expediente
+// (y su auditoría) un MÍNIMO de 5 años — no borrarlo AL cumplir 5 años. Un TTL
+// purgaría la bitácora automáticamente y sin rastro (rompiendo además la
+// cadena). La depuración, si alguna vez aplica, debe ser una decisión
+// administrativa explícita y auditada, no un borrado silencioso del motor.
 
 /**
  * Registrar un evento de auditoría.
  * @param {object} data - Datos del evento
  * @returns {Promise<AuditLog>}
  */
-auditLogSchema.statics.registrar = function(data) {
+auditLogSchema.statics.registrar = async function(data) {
   const timestamp = data.timestamp || new Date();
-  const entryData = { ...data, timestamp };
+  // Reintentos: bajo escritura concurrente dos entradas podrían leer el mismo
+  // "último" eslabón; el índice único en `seq` hace fallar a la segunda
+  // (E11000) y reintentamos con el nuevo último. Serializa la cadena sin huecos.
+  const MAX_RETRIES = 5;
+  let lastErr = null;
 
-  // Compute HMAC for tamper detection
-  let entryHash = null;
-  try {
-    entryHash = computeEntryHash(entryData);
-  } catch (err) {
-    console.error('[AuditLog] Error computing entryHash:', err.message);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const last = await this.findOne({ seq: { $ne: null } })
+      .sort({ seq: -1 })
+      .select('seq entryHash')
+      .lean();
+    const seq = (last?.seq ?? 0) + 1;
+    const prevHash = last?.entryHash ?? null;
+    const entryData = { ...data, timestamp, seq, prevHash };
+
+    let entryHash = null;
+    try {
+      entryHash = computeEntryHash(entryData);
+    } catch (err) {
+      console.error('[AuditLog] Error computing entryHash:', err.message);
+    }
+
+    try {
+      return await this.create({ ...entryData, entryHash });
+    } catch (err) {
+      if (err && err.code === 11000 && attempt < MAX_RETRIES - 1) {
+        lastErr = err;
+        continue; // colisión de seq → releer el último y reintentar
+      }
+      throw err;
+    }
+  }
+  throw lastErr || new Error('No se pudo registrar el audit log tras reintentos');
+};
+
+/**
+ * Verifica la integridad de la cadena de auditoría:
+ *  - cada `entryHash` recomputa correctamente (no se editó ningún campo), y
+ *  - `prevHash` de cada eslabón coincide con el `entryHash` del anterior
+ *    (no se borraron ni reordenaron entradas).
+ * Recorre solo las entradas selladas (seq != null). Devuelve un reporte.
+ * @param {object} [opts]
+ * @param {number} [opts.limit] - máximo de entradas a verificar (más recientes)
+ * @returns {Promise<{ok:boolean, checked:number, breaks:Array}>}
+ */
+auditLogSchema.statics.verifyChain = async function(opts = {}) {
+  const { limit = 0 } = opts;
+  let query = this.find({ seq: { $ne: null } }).sort({ seq: 1 });
+  if (limit > 0) query = query.limit(limit);
+  const entries = await query.lean();
+
+  const breaks = [];
+  let prevHash = null;
+  let prevSeq = null;
+
+  for (const e of entries) {
+    // 1) ¿el entryHash recomputa? (detecta edición de cualquier campo sellado)
+    const recomputed = computeEntryHash(e);
+    if (recomputed !== e.entryHash) {
+      breaks.push({ seq: e.seq, _id: e._id, type: 'hash_mismatch' });
+    }
+    // 2) ¿encadena con el anterior? (detecta borrado/reordenamiento)
+    if (prevSeq !== null) {
+      if (e.seq !== prevSeq + 1) {
+        breaks.push({ seq: e.seq, _id: e._id, type: 'seq_gap', expected: prevSeq + 1 });
+      }
+      if (e.prevHash !== prevHash) {
+        breaks.push({ seq: e.seq, _id: e._id, type: 'chain_break' });
+      }
+    }
+    prevHash = e.entryHash;
+    prevSeq = e.seq;
   }
 
-  return this.create({
-    ...entryData,
-    entryHash
-  });
+  return { ok: breaks.length === 0, checked: entries.length, breaks };
 };
 
 /**

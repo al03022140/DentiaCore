@@ -56,10 +56,16 @@ const parseDurationToMs = (value) => {
 
 const buildCookieOptions = () => {
   const maxAge = parseDurationToMs(getRefreshTtl());
+  // En producción la cookie de sesión SIEMPRE va con Secure (igual que las
+  // cookies de Google OAuth, que ya derivan secure de NODE_ENV). Así, si se
+  // despliega con HTTPS y alguien olvida COOKIE_SECURE=true, el refresh token
+  // no viaja por HTTP en claro. COOKIE_SECURE permite forzarlo también en dev.
+  const secure = process.env.NODE_ENV === 'production'
+    || String(process.env.COOKIE_SECURE || 'false').toLowerCase() === 'true';
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: String(process.env.COOKIE_SECURE || 'false').toLowerCase() === 'true',
+    secure,
     maxAge: maxAge || undefined
   };
 };

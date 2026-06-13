@@ -104,7 +104,11 @@ async function startOnUnix() {
 
   const child = spawn(
     mongodPath,
-    ['--dbpath', DB_DIR, '--logpath', LOG_FILE, '--bind_ip', '127.0.0.1,0.0.0.0'],
+    // SOLO loopback: la BD contiene PHI y mongod arranca sin --auth. Con
+    // 0.0.0.0 cualquier dispositivo de la LAN (WiFi del consultorio) podía
+    // leer/escribir el expediente por el puerto 27017. El cliente y el server
+    // corren en la misma máquina, así que 127.0.0.1 es suficiente.
+    ['--dbpath', DB_DIR, '--logpath', LOG_FILE, '--bind_ip', '127.0.0.1'],
     {
       cwd: ROOT,
       detached: true,
