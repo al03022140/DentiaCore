@@ -208,13 +208,21 @@ const ConsultasPage = () => {
   const handleStartConsultation = async (apt) => {
     const patientId = apt.paciente_id?._id || apt.paciente_id;
     if (!patientId) return;
+    // Evitar doble submit: esta acción no marcaba busyId, así que el
+    // disabled={busyId === ...} de los botones nunca se activaba y un doble
+    // click disparaba dos transiciones EnCurso (historial/audit duplicado) y
+    // dos navigate. Si ya hay una transición en vuelo, ignorar el segundo click.
+    if (busyId) return;
     // Si está Pendiente o Confirmada, marcar EnCurso antes de navegar.
     if (apt.estado === 'Pendiente' || apt.estado === 'Confirmada') {
+      setBusyId(apt._id);
       try {
         await updateAppointmentStatus(apt._id, { estado: 'EnCurso' });
       } catch (err) {
         // No bloqueamos la navegación si falla — sólo aviso
         console.warn('No se pudo marcar EnCurso:', err);
+      } finally {
+        setBusyId(null);
       }
     }
     navigate(`/patient/${patientId}?appointmentId=${encodeURIComponent(apt._id)}`);

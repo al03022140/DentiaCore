@@ -102,6 +102,14 @@ const TraceabilitySection = () => {
 
       if (tab === 'usuario') {
         if (!selectedUserId) { setLogs([]); setTotal(0); setLoading(false); return; }
+        // Rango invertido (Desde > Hasta) devolvería 0 resultados sin explicar
+        // por qué; avisar explícitamente en vez de fingir "no hay registros".
+        // Comparación lexicográfica válida con fechas YYYY-MM-DD de ancho fijo.
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+          setError("El rango de fechas es inválido: 'Desde' es posterior a 'Hasta'.");
+          setLogs([]); setTotal(0); setLoading(false);
+          return;
+        }
         filters.userId = selectedUserId;
         if (dateFrom) filters.desde = dateFrom;
         if (dateTo) filters.hasta = dateTo;
@@ -173,6 +181,9 @@ const TraceabilitySection = () => {
 
   // ── Exportar PDF (window.print) ──
   const handleExportPDF = () => {
+    // No exportar mientras carga ni si no hay registros visibles: imprimiría
+    // una vista parcial o vacía.
+    if (loading || filteredLogs.length === 0) return;
     window.print();
   };
 
@@ -412,7 +423,11 @@ const TraceabilitySection = () => {
               <> · mostrando {filteredLogs.length}</>
             )}
           </span>
-          <button className="settings-btn-primary" onClick={handleExportPDF}>
+          <button
+            className="settings-btn-primary"
+            onClick={handleExportPDF}
+            disabled={loading || filteredLogs.length === 0}
+          >
             Exportar PDF
           </button>
         </div>

@@ -27,17 +27,13 @@ const resolveUploadTarget = (req) => {
     return req.uploadTargetId;
   }
 
-  if (req.body) {
-    const candidates = [req.body.patientId, req.body._id, req.body.paciente_id];
-    for (const candidate of candidates) {
-      const safe = safeObjectIdString(candidate);
-      if (safe) {
-        req.uploadTargetId = safe;
-        return req.uploadTargetId;
-      }
-    }
-  }
-
+  // SEGURIDAD: en el alta (POST /) NO hay :id, así que el destino se generaba
+  // antes a partir de req.body._id/patientId/paciente_id. Eso permitía que un
+  // cliente enviara el _id de OTRO paciente y la foto se escribiera en su
+  // carpeta (y luego el cleanup del controller borrara la carpeta de la
+  // víctima). El alta SIEMPRE genera el ObjectId en el servidor; el update usa
+  // exclusivamente req.params.id (rama de arriba). Nunca confiamos en un id de
+  // carpeta provisto por el cliente.
   if (!req.generatedPatientId) {
     req.generatedPatientId = new mongoose.Types.ObjectId().toString();
     if (!req.body) {

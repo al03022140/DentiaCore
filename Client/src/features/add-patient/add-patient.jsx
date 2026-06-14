@@ -7,6 +7,7 @@ import "./styles/add-patient.css";
 import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
 import { invalidatePatientsCache } from '../../shared/services/patient-service';
+import { useDraftPersistence } from '../../shared/hooks/useDraftPersistence';
 
 // Importar componentes de las secciones
 import Identification from './sections/identification';
@@ -94,6 +95,27 @@ const validateFormat = (data) => {
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
       if (age > 120) {
         errors.push({ label: 'La fecha de nacimiento implica una edad mayor a 120 años' });
+      }
+    }
+  }
+  // Fechas clínicas femeninas: ni el último parto ni la última menstruación
+  // pueden ser futuros (dato incoherente en el expediente NOM-024). El `max`
+  // del input es evadible por teclado/pegado, así que se valida aquí también.
+  const fem = data.informacion_femenina || {};
+  const parseLocalDate = (s) => {
+    const raw = String(s).slice(0, 10);
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
+  };
+  const femDateChecks = [
+    ['fecha_ultimo_parto', 'La fecha del último parto no puede ser futura'],
+    ['fecha_ultima_menstruacion', 'La fecha de última menstruación no puede ser futura'],
+  ];
+  for (const [field, label] of femDateChecks) {
+    if (fem[field]) {
+      const d = parseLocalDate(fem[field]);
+      if (!Number.isNaN(d.getTime()) && d > new Date()) {
+        errors.push({ label });
       }
     }
   }
@@ -575,7 +597,57 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   const [invalidFields, setInvalidFields] = useState(() => new Set());
   // Incrementar para forzar re-mount de la clase y reiniciar la animación shake
   const [shakeKey, setShakeKey] = useState(0);
-  
+
+  // ── Persistencia de borrador (SÓLO alta de paciente nuevo) ──────────────
+  // Este formulario es muy largo y se perdía por completo si el usuario
+  // recargaba, cerraba la pestaña o su sesión expiraba antes de guardar.
+  // Autosalvamos en localStorage (PHI-aware: retención 24h + limpieza en
+  // logout, via useDraftPersistence) y ofrecemos recuperarlo al volver. NO en
+  // edición: esos datos vienen del servidor. Se excluye photoURL del snapshot
+  // (base64 pesado → cuota de localStorage; la foto se re-sube si hace falta).
+  const isEditing = !!patientToEdit;
+  const initialFormSnapshotRef = useRef(null);
+  if (initialFormSnapshotRef.current === null) {
+    initialFormSnapshotRef.current = JSON.stringify(formData);
+  }
+  const draftRecoveryHandledRef = useRef(false);
+  const { loadDraft, clearDraft } = useDraftPersistence({
+    key: 'add-patient-new',
+    enabled: !isEditing,
+    isDirty: () => !isEditing && JSON.stringify(formData) !== initialFormSnapshotRef.current,
+    getSnapshot: () => {
+      const { photoURL: _omit, ...rest } = formData;
+      return rest;
+    },
+  });
+  const clearDraftRef = useRef(clearDraft);
+  useEffect(() => { clearDraftRef.current = clearDraft; }, [clearDraft]);
+
+  // Al montar en modo alta, ofrecer recuperar un borrador previo (una sola vez).
+  useEffect(() => {
+    if (isEditing || draftRecoveryHandledRef.current) return;
+    draftRecoveryHandledRef.current = true;
+    const saved = loadDraft();
+    if (!saved?.data) return;
+    Modal.confirm({
+      title: 'Borrador sin guardar encontrado',
+      content: 'Tienes datos de un paciente que no llegaste a guardar. ¿Quieres recuperarlos?',
+      okText: 'Recuperar',
+      cancelText: 'Descartar',
+      onOk: () => {
+        try {
+          const base = JSON.parse(initialFormSnapshotRef.current);
+          setFormData(deepMerge(base, saved.data));
+          setCurrentStep(0);
+          message.success('Borrador recuperado');
+        } catch {
+          message.error('No se pudo recuperar el borrador');
+        }
+      },
+      onCancel: () => clearDraftRef.current?.(),
+    });
+  }, [isEditing, loadDraft]);
+
   // useEffect para inicializar el formulario con datos del paciente cuando se está editando
   useEffect(() => {
     if (patientToEdit) {
@@ -1166,6 +1238,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       // directa (no por patient-service), así que sin esto la lista cacheada
       // (2 min) quedaría desactualizada tras crear o editar un paciente.
       invalidatePatientsCache();
+      // Alta exitosa: descartar el borrador autoguardado para no ofrecer
+      // recuperar un paciente que ya se creó.
+      if (!patientToEdit) clearDraftRef.current?.();
       message.success(patientToEdit ? "Paciente actualizado correctamente" : "Paciente guardado correctamente");
 
       // Solo navegar si no se está usando como modal

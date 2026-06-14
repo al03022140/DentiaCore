@@ -12,7 +12,7 @@ import arrowRight from '../../assets/images/icons/arrow-right.png';
 import addPatientIcon from '../../assets/images/icons/add_patient.svg';
 
 // Utilidades y API
-import { formatName, removeAccents, formatAgeYearsOnly } from '../../shared/utils/formatters';
+import { formatName, removeAccents, formatAgeYearsOnly, calculateAge } from '../../shared/utils/formatters';
 import { getAllPatients } from '../../shared/services/patient-service';
 
 // Formato compacto DD/MM/YY para que la fecha quepa en el chip de
@@ -263,17 +263,28 @@ const PatientList = () => {
     if (!normalized) return patients;
 
     return patients.filter((patient) => {
-      // Buscar por paciente_id (empieza con "#")
+      // Buscar por número de expediente (paciente_id) con prefijo "#".
+      // OJO: paciente_id se almacena SIN "#" (p. ej. "1234"), así que NO se
+      // debe anteponer "#" al comparar — antes el includes(`#${n}`) nunca
+      // casaba y la búsqueda por expediente devolvía siempre 0 resultados.
       if (normalized.startsWith('#')) {
         const searchDigits = normalized.slice(1).trim();
-        return patient.paciente_id?.trim().toLowerCase().includes(`#${searchDigits}`);
+        return searchDigits
+          ? patient.paciente_id?.toString().toLowerCase().includes(searchDigits)
+          : false;
       }
 
       // Buscar por _id de MongoDB
       if (patient._id?.toString().toLowerCase().includes(normalized)) return true;
 
-      // Buscar por edad (solo dígitos)
-      if (/^\d+$/.test(normalized) && patient.edad === parseInt(normalized, 10)) return true;
+      // Buscar por dígitos: número de expediente (sin "#") o edad.
+      // La edad se DERIVA de fecha_nacimiento (misma función que la card), no
+      // del campo persistido `edad` que el backend sólo recalcula al guardar y
+      // puede quedar obsoleto (paciente que ya cumplió años) o undefined.
+      if (/^\d+$/.test(normalized)) {
+        if (patient.paciente_id?.toString().toLowerCase().includes(normalized)) return true;
+        if (calculateAge(patient.fecha_nacimiento).years === parseInt(normalized, 10)) return true;
+      }
 
       // Buscar por nombre completo
       const nombreCompleto = removeAccents(
@@ -303,10 +314,19 @@ const PatientList = () => {
     const key = SORT_KEYS[sortType];
     if (!key) return filteredPatients;
     const isDate = sortType === 'ultimaVisita';
+    const isAge = sortType === 'edad';
+
+    // La edad se deriva de fecha_nacimiento (misma fuente que la card y la
+    // búsqueda), no del campo persistido `edad` que puede estar obsoleto.
+    // Pacientes sin fecha_nacimiento → null para que el orden los mande al final.
+    const getValue = (p) => {
+      if (isAge) return p.fecha_nacimiento ? calculateAge(p.fecha_nacimiento).years : null;
+      return p[key];
+    };
 
     const compareValues = (a, b) => {
-      const valueA = a[key];
-      const valueB = b[key];
+      const valueA = getValue(a);
+      const valueB = getValue(b);
 
       if (valueA == null && valueB == null) return 0;
       if (valueA == null) return isAscending ? 1 : -1;

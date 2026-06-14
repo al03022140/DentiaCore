@@ -8,6 +8,12 @@ const WomenSection = ({
     return null;
   }
 
+  // Tope para inputs de fecha: hoy (local). Un parto o una última
+  // menstruación NO pueden ser futuros. El `max` filtra el selector nativo;
+  // la validación dura adicional vive en validateFormat (cliente) y en el
+  // servidor (evadible por teclado/payload).
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <section className="form-section">
       <h2>Información Específica para Mujeres</h2>
@@ -144,6 +150,7 @@ const WomenSection = ({
                             <label>Fecha del último parto</label>
                             <input
                               type="date"
+                              max={today}
                               value={formData.informacion_femenina?.fecha_ultimo_parto || ""}
                               onChange={(e) => {
                                 setFormData(prev => ({
@@ -201,6 +208,7 @@ const WomenSection = ({
                           <label>Fecha de última menstruación</label>
                           <input
                             type="date"
+                            max={today}
                             value={formData.informacion_femenina?.fecha_ultima_menstruacion || ""}
                             onChange={(e) => {
                               setFormData(prev => ({

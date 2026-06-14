@@ -440,9 +440,29 @@ exports.cancelCharge = async (req, res) => {
       const chargeRef = `#${String(charge._id).slice(-6)}`;
       let reverseInterrupted = false;
       let skippedInsufficientFunds = 0;
+      let skippedOtherSession = 0;
       for (const pago of charge.pagos) {
         const monto = round2(pago.monto);
         const esEfectivo = pago.paymentMethod === 'CASH';
+
+        // El reverso debe afectar la MISMA caja donde entró el pago. Si el
+        // ingreso original pertenece a otra sesión (p.ej. una caja ya cerrada
+        // de otro día), crear el EXPENSE en la caja actual descuadra AMBOS
+        // cortes (el viejo conserva el INCOME, el nuevo recibe un EXPENSE sin
+        // INCOME correspondiente). Antes esto sólo se evitaba para CASH (vía
+        // chequeo de fondos) y NUNCA para DIGITAL. Ahora, para ambos métodos,
+        // si la sesión original no es la caja OPEN actual, NO se revierte
+        // automáticamente: se marca para ajuste manual. También cubre pagos sin
+        // cashMovementId (no se puede determinar su sesión de origen).
+        let originalSessionId = null;
+        if (pago.cashMovementId) {
+          const origMov = await CashMovement.findById(pago.cashMovementId).select('boxSessionId');
+          originalSessionId = origMov?.boxSessionId ? String(origMov.boxSessionId) : null;
+        }
+        if (!originalSessionId || originalSessionId !== String(activeSession._id)) {
+          skippedOtherSession++;
+          continue;
+        }
 
         // A-2: validar fondos ANTES de crear un EXPENSE en EFECTIVO. Si el
         // dinero ya no está en la caja actual (p.ej. el pago original fue en
@@ -515,11 +535,15 @@ exports.cancelCharge = async (req, res) => {
         });
       }
 
-      if (skippedInsufficientFunds > 0) {
+      const skippedTotal = skippedInsufficientFunds + skippedOtherSession;
+      if (skippedTotal > 0) {
+        const parts = [];
+        if (skippedInsufficientFunds > 0) parts.push(`${skippedInsufficientFunds} en efectivo por fondos insuficientes en la caja actual`);
+        if (skippedOtherSession > 0) parts.push(`${skippedOtherSession} de una caja distinta o ya cerrada`);
         return res.json({
           charge,
           reverseStatus: 'partial',
-          reverseMessage: `Cobro cancelado. ${skippedInsufficientFunds} pago(s) en efectivo NO se revirtieron por fondos insuficientes en la caja actual (el efectivo ya no está disponible). Regístrelo como ajuste manual.`,
+          reverseMessage: `Cobro cancelado. ${skippedTotal} pago(s) NO se revirtieron a caja (${parts.join('; ')}). Regístrelos como ajuste manual en la caja correspondiente.`,
           reversedMovementIds
         });
       }

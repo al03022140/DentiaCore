@@ -3,6 +3,7 @@ import {
   getStoredGoogleToken,
   getFreshGoogleToken,
   fetchGoogleSessionToken,
+  renewGoogleAccessToken,
 } from '../../../shared/services/googleTokenService';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5002';
@@ -66,7 +67,7 @@ const GoogleCalendarSection = () => {
   }, []);
 
   // ── Fetch calendar list ────────────────────────────────────────────────────
-  const fetchCalendars = useCallback(async (token) => {
+  const fetchCalendars = useCallback(async (token, isRetry = false) => {
     if (!token) return;
     setLoadingCalendars(true);
     try {
@@ -76,8 +77,29 @@ const GoogleCalendarSection = () => {
       if (res.ok) {
         const data = await res.json();
         setCalendars(data.calendars || []);
+        return;
       }
-    } catch { /* ignore */ }
+      // Token vencido/revocado: NO tragar el 401/403 (antes dejaba la UI como
+      // "conectado" pero sin calendarios y con un mensaje que culpaba al
+      // usuario por "permisos de escritura"). Intentar renovar una vez; si
+      // falla, degradar a estado de reconexión con un mensaje accionable.
+      if (res.status === 401 || res.status === 403) {
+        if (!isRetry) {
+          const fresh = await renewGoogleAccessToken();
+          const freshToken = typeof fresh === 'string' ? fresh : fresh?.token;
+          if (freshToken) {
+            setLoadingCalendars(false);
+            await fetchCalendars(freshToken, true);
+            return;
+          }
+        }
+        localStorage.removeItem('accessToken');
+        setCalendars([]);
+        setConnectedEmail(null);
+        setStatus('error');
+        setMsg({ type: 'error', text: 'Tu sesión de Google expiró. Vuelve a conectar tu cuenta.' });
+      }
+    } catch { /* error de red: no degradar el estado de conexión */ }
     finally { setLoadingCalendars(false); }
   }, []);
 

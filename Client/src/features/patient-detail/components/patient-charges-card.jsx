@@ -237,8 +237,12 @@ const PatientChargesCard = ({ patientId }) => {
       if (result?.reverseStatus === 'reversed') {
         const n = Array.isArray(result?.reversedMovementIds) ? result.reversedMovementIds.length : 0;
         message.success(`Cobro cancelado y ${n} pago(s) revertido(s) en caja`);
-      } else if (result?.reverseStatus === 'skipped') {
-        message.warning(result?.reverseMessage || 'Cobro cancelado, reversa pendiente');
+      } else if (result?.reverseStatus === 'partial' || result?.reverseStatus === 'skipped') {
+        // 'partial': algunos pagos sí se revirtieron y otros no (fondos
+        // insuficientes / pertenecen a otra caja o una ya cerrada).
+        // 'skipped': no había caja abierta. En ambos casos el operador debe
+        // ver el aviso de ajuste manual, no un éxito genérico.
+        message.warning(result?.reverseMessage || 'Cobro cancelado; algunos pagos quedaron pendientes de reverso manual.');
       } else {
         message.success('Cobro cancelado');
       }

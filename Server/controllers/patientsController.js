@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 const { isJpegOrPng } = require('../utils/imageSignature');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
-const { sanitizePatientForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
+const { sanitizePatientForBasicRead, sanitizeAppointmentForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
 const { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash } = require('../utils/saveSignatureImage');
 const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
 const auditLogger = require('../middlewares/auditLogger');
@@ -295,16 +295,27 @@ exports.getPatientById = async (req, res) => {
       hoy.setHours(0, 0, 0, 0);
       
       // Filtrar citas pasadas y futuras con manejo de fechas mejorado
-      const citasPasadas = citas.filter(cita => {
+      let citasPasadas = citas.filter(cita => {
         const fechaCita = new Date(cita.fecha_hora);
         return fechaCita < hoy;
       }).sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora)); // Ordenar descendente
-      
-      const citasFuturas = citas.filter(cita => {
+
+      let citasFuturas = citas.filter(cita => {
         const fechaCita = new Date(cita.fecha_hora);
         return fechaCita >= hoy;
       }).sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora)); // Ordenar ascendente
-      
+
+      // Si el usuario sólo tiene `patients.read.basic` (recepción), las citas
+      // se devuelven con campos de programación únicamente: NO debe ver
+      // motivo/observaciones/items ni la bitácora clínica de la cita. Antes el
+      // paciente se sanitizaba pero las citas se entregaban íntegras → fuga de
+      // PII clínica (NOM-004 Art. 5.7 / LFPDPPP). ultimaCita/proximaCita se
+      // derivan de los arreglos ya saneados.
+      if (req.filterClinicalData) {
+        citasPasadas = citasPasadas.map(sanitizeAppointmentForBasicRead);
+        citasFuturas = citasFuturas.map(sanitizeAppointmentForBasicRead);
+      }
+
       // Respuesta enriquecida con información adicional
       // Filtrar datos clínicos si el usuario solo tiene patients.read.basic
       const patientObj = req.filterClinicalData
@@ -358,13 +369,36 @@ const CREATE_ALLOWED_FIELDS = [
     'datosNoCompartir'
 ];
 
+// Valida que las fechas clínicas femeninas (último parto / última menstruación)
+// NO sean futuras. Sólo valida el valor entrante (no toca datos legacy ya
+// guardados). Devuelve un mensaje de error o null. Defensa en profundidad
+// NOM-024: el `max` del input y validateFormat del cliente son evadibles.
+const validateFemaleDates = (info) => {
+    if (!info || typeof info !== 'object') return null;
+    const checks = [
+        ['fecha_ultimo_parto', 'La fecha del último parto no puede ser futura'],
+        ['fecha_ultima_menstruacion', 'La fecha de última menstruación no puede ser futura'],
+    ];
+    const now = Date.now();
+    for (const [field, msg] of checks) {
+        const val = info[field];
+        if (val == null || val === '') continue;
+        const d = new Date(val);
+        if (!Number.isNaN(d.getTime()) && d.getTime() > now) return msg;
+    }
+    return null;
+};
+
 /** 🔹 Crear un paciente con subida de foto */
 exports.createPatient = async (req, res) => {
-    // Si multer subió la foto, ya creó la carpeta en uploads/pacientes/<req.body._id>.
-    // Si en cualquier punto fallamos antes de guardar, limpiamos esa carpeta para no
-    // dejar fotos huérfanas en disco.
-    let folderIdToCleanup = (req.file && req.body._id && mongoose.Types.ObjectId.isValid(req.body._id))
-        ? req.body._id
+    // Si multer subió la foto, ya creó la carpeta en uploads/pacientes/<id>,
+    // donde <id> es SIEMPRE el ObjectId generado por el servidor en la ruta
+    // (req.uploadTargetId). NUNCA usamos req.body._id aquí: era controlado por
+    // el cliente y permitía apuntar el cleanup a la carpeta de otro paciente.
+    // Si en cualquier punto fallamos antes de guardar, limpiamos esa carpeta
+    // para no dejar fotos huérfanas en disco.
+    let folderIdToCleanup = (req.file && req.uploadTargetId && mongoose.Types.ObjectId.isValid(req.uploadTargetId))
+        ? req.uploadTargetId
         : null;
     let savedSuccessfully = false;
 
@@ -454,6 +488,10 @@ exports.createPatient = async (req, res) => {
         }
         safePatientData.fecha_nacimiento = parsed.date;
 
+        // Fechas clínicas femeninas no pueden ser futuras (defensa servidor).
+        const femErr = validateFemaleDates(safePatientData.informacion_femenina);
+        if (femErr) return res.status(400).json({ message: femErr });
+
         // Normalizar documento.numero (trim + uppercase) ANTES de insertar para
         // que el índice único de Mongo detecte duplicados de facto sin importar
         // mayúsculas/espacios (siempre se almacena normalizado).
@@ -466,10 +504,18 @@ exports.createPatient = async (req, res) => {
 
         // Chequeo de duplicado a nivel de aplicación (legacy-safe). En una BD
         // legacy el índice único de documento.numero puede no existir
-        // (autoIndex off en prod), así que no podemos depender solo del E11000.
-        // Esta consulta —indexada cuando el índice existe— atrapa el caso común
-        // (alta secuencial en recepción) y da un 409 claro. La carrera entre dos
-        // altas concurrentes la sigue cubriendo el índice único + el retry.
+        // (autoIndex off en prod, o saltado por duplicados preexistentes), así
+        // que no podemos depender solo del E11000. Esta consulta —indexada
+        // cuando el índice existe— atrapa el caso común (alta secuencial en
+        // recepción) y da un 409 claro.
+        // OJO: este findOne + save NO es atómico. La carrera entre dos altas
+        // concurrentes con el mismo documento SÓLO queda cubierta si el índice
+        // único existe en la BD (entonces el segundo save da E11000 → 409). Si
+        // el índice fue saltado en una instalación legacy, dos requests
+        // simultáneas pueden crear ambos expedientes; garantizar la unicidad en
+        // ese escenario requiere construir el índice (ver ensureIndexes) o un
+        // upsert atómico, no este chequeo. savePatientWithRetry sólo reintenta
+        // colisiones de paciente_id, no de documento.numero.
         // Sin filtro deletedAt: el índice único reserva el número aunque el
         // paciente esté dado de baja, así que lo reflejamos igual.
         if (safePatientData.documento && safePatientData.documento.numero) {
@@ -488,12 +534,13 @@ exports.createPatient = async (req, res) => {
             }
         }
 
-        // _id del paciente: siempre lo decide el servidor. Si multer ya creó
-        // una carpeta usando un _id generado por sí mismo, lo reutilizamos para
-        // que la foto subida quede en la carpeta correcta.
+        // _id del paciente: SIEMPRE lo decide el servidor. Si multer ya creó
+        // una carpeta usando el _id que generó el propio servidor en la ruta
+        // (req.uploadTargetId), lo reutilizamos para que la foto subida quede en
+        // la carpeta correcta. Nunca se usa req.body._id (mass-assignment).
         let patientObjectId;
-        if (req.body._id && mongoose.Types.ObjectId.isValid(req.body._id)) {
-            patientObjectId = new mongoose.Types.ObjectId(req.body._id);
+        if (req.uploadTargetId && mongoose.Types.ObjectId.isValid(req.uploadTargetId)) {
+            patientObjectId = new mongoose.Types.ObjectId(req.uploadTargetId);
         } else {
             patientObjectId = new mongoose.Types.ObjectId();
         }
@@ -858,6 +905,12 @@ exports.updatePatient = async (req, res) => {
             safeUpdate.edad = calcularEdad(parsed.date);
         }
 
+        // Fechas clínicas femeninas no pueden ser futuras (defensa servidor).
+        if (safeUpdate.informacion_femenina !== undefined) {
+            const femErr = validateFemaleDates(safeUpdate.informacion_femenina);
+            if (femErr) return res.status(400).json({ message: femErr });
+        }
+
         // Normalizar documento.numero igual que en create
         if (safeUpdate.documento && safeUpdate.documento.numero != null) {
             const norm = String(safeUpdate.documento.numero).trim().toUpperCase();
@@ -1043,51 +1096,69 @@ exports.deletePatient = async (req, res) => {
             return res.status(409).json({ message: 'El paciente ya fue dado de baja previamente' });
         }
 
-        // Soft-delete del paciente
+        // Soft-delete del paciente + cascada a registros relacionados de forma
+        // ATÓMICA. Antes el paciente se marcaba deletedAt y luego un Promise.all
+        // cascadeaba a citas/odontograma/perio/cargos/adjuntos; si una
+        // updateMany fallaba a mitad, el paciente quedaba de baja con
+        // relacionados activos huérfanos (LFPDPPP derecho de cancelación
+        // incompleto) y un reintento daba 409 sin completar la cascada. Se
+        // envuelve en transacción; fallback standalone → secuencial (como antes).
+        // Cada modelo usa su propio mecanismo:
+        //   - Appointment, Odontograma, Periodontogram, PatientAttachment: `deletedAt`
+        //   - PatientCharge: `cancelado` con motivo
+        // CashMovement NO se cascadea: no tiene deletedAt y los movimientos
+        // cerrados forman parte del registro contable diario.
         const deletedAt = new Date();
         const deletedBy = req.user?.id || null;
         const cascadeReason = 'Paciente dado de baja';
-        patient.deletedAt = deletedAt;
-        patient.deletedBy = deletedBy;
-        patient.deleteReason = deleteReason.trim();
-        await patient.save({ validateModifiedOnly: true });
 
-        // Cascade soft-delete a registros clínicos, cargos y adjuntos.
-        // Antes sólo se cascadeaba a citas, dejando odontogramas/perio/
-        // charges/attachments huérfanos apuntando al paciente "borrado"
-        // (LFPDPPP derecho de cancelación). Cada modelo usa su propio
-        // mecanismo:
-        //   - Appointment, Odontograma, Periodontogram, PatientAttachment: `deletedAt`
-        //   - PatientCharge: `cancelado` con motivo
-        // CashMovement NO se cascadea: no tiene deletedAt y los
-        // movimientos cerrados forman parte del registro contable diario.
         const Odontograma = require('../models/odontograma.js');
         const PatientCharge = require('../models/patientCharge.js');
         const PatientAttachment = require('../models/patientAttachment.js');
 
         const softDeleteSet = { $set: { deletedAt, deletedBy, deleteReason: cascadeReason } };
-        await Promise.all([
-            Appointment.updateMany(
-                { paciente_id: patient._id, deletedAt: null },
-                softDeleteSet
-            ),
-            Odontograma.updateMany(
-                { patientId: patient._id, deletedAt: null },
-                softDeleteSet
-            ),
-            Periodontogram.updateMany(
-                { patient: patient._id, deletedAt: null },
-                softDeleteSet
-            ),
-            PatientCharge.updateMany(
-                { patientId: patient._id, cancelado: { $ne: true } },
-                { $set: { cancelado: true, canceladoEn: deletedAt, canceladoPor: deletedBy, canceladoMotivo: cascadeReason } }
-            ),
-            PatientAttachment.updateMany(
-                { patientId: patient._id, deletedAt: null },
-                softDeleteSet
-            )
-        ]);
+        const chargeCancelSet = { $set: { cancelado: true, canceladoEn: deletedAt, canceladoPor: deletedBy, canceladoMotivo: cascadeReason } };
+
+        const runCascade = async (session) => {
+            const opts = session ? { session } : {};
+            patient.deletedAt = deletedAt;
+            patient.deletedBy = deletedBy;
+            patient.deleteReason = deleteReason.trim();
+            await patient.save({ validateModifiedOnly: true, ...opts });
+            await Promise.all([
+                Appointment.updateMany({ paciente_id: patient._id, deletedAt: null }, softDeleteSet, opts),
+                Odontograma.updateMany({ patientId: patient._id, deletedAt: null }, softDeleteSet, opts),
+                Periodontogram.updateMany({ patient: patient._id, deletedAt: null }, softDeleteSet, opts),
+                PatientCharge.updateMany({ patientId: patient._id, cancelado: { $ne: true } }, chargeCancelSet, opts),
+                PatientAttachment.updateMany({ patientId: patient._id, deletedAt: null }, softDeleteSet, opts),
+            ]);
+        };
+
+        const isStandaloneTxError = (err) => {
+            const msg = String(err?.message || '');
+            return (
+                err?.codeName === 'IllegalOperation' ||
+                err?.code === 20 ||
+                msg.includes('Transaction numbers are only allowed on a replica set') ||
+                msg.includes('Transactions are not supported')
+            );
+        };
+
+        const session = await mongoose.startSession();
+        try {
+            try {
+                await session.withTransaction(async () => { await runCascade(session); });
+            } catch (txErr) {
+                if (isStandaloneTxError(txErr)) {
+                    console.warn('⚠️ MongoDB standalone — baja de paciente sin transacción');
+                    await runCascade(null);
+                } else {
+                    throw txErr;
+                }
+            }
+        } finally {
+            session.endSession();
+        }
 
         res.status(200).json({ message: 'Paciente dado de baja correctamente' });
     } catch (_error) {

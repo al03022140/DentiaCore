@@ -432,6 +432,27 @@ exports.updateAppointment = async (req, res) => {
         if (!existing) return res.status(404).json({ message: 'Cita no encontrada' });
 
         const { paciente_id, doctor_id, fecha_hora, estado, motivo, observaciones, comentarioProcedimiento, items, duracion, force } = req.body;
+
+        // Una cita en estado terminal (Pasada/NoShow/Cancelada) no se puede
+        // editar: reagendarla al futuro o cambiarle doctor/duración/items la
+        // "revive" saltándose TRANSITION_MATRIX (que sólo se consulta cuando el
+        // body trae `estado`) y corrompe el historial clínico/NOM-024. Sólo se
+        // permite si el ÚNICO cambio es una transición de estado válida — y como
+        // los estados cerrados no tienen ninguna en TRANSITION_MATRIX, esto
+        // bloquea de facto cualquier edición. Consistente con deleteAppointment.
+        if (ESTADOS_CERRADOS.includes(existing.estado)) {
+            const soloTransicionValida =
+                estado !== undefined && estado !== existing.estado &&
+                (TRANSITION_MATRIX[existing.estado] || []).includes(estado) &&
+                paciente_id === undefined && doctor_id === undefined &&
+                fecha_hora === undefined && duracion === undefined && items === undefined;
+            if (!soloTransicionValida) {
+                return res.status(409).json({
+                    message: 'No se puede editar una cita cerrada (Pasada, No-Show o Cancelada). Cree una nueva cita.'
+                });
+            }
+        }
+
         const allowedFields = {};
 
         if (paciente_id !== undefined) allowedFields.paciente_id = paciente_id;
@@ -600,98 +621,133 @@ exports.updateAppointment = async (req, res) => {
             };
         }
 
-        const updatedAppointment = await Appointment.findOneAndUpdate(
-            { _id: req.params.id, deletedAt: null },
-            update,
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedAppointment) {
-            return res.status(404).json({ message: 'Cita no encontrada' });
-        }
-
-        // ── Sincronizar PatientCharge DESPUÉS del save exitoso ─────
-        // Si alguna de estas operaciones falla, devolvemos 207-like (200 con
-        // warning) — la cita ya quedó consistente y el cobro queda en estado
-        // anterior; el operador puede reintentar editando de nuevo.
+        // ── Aplicar update + sincronizar PatientCharge de forma ATÓMICA ─────
+        // Antes la cita se guardaba y, si la sincronización del cobro fallaba,
+        // se respondía 200 con warning dejando el cobro inconsistente (p.ej.
+        // cita Cancelada pero cobro vivo con saldo pendiente → cobro indebido).
+        // Ahora ambos se envuelven en una transacción. Fallback standalone (sin
+        // replica set): se cae a la escritura secuencial degradada con warnings
+        // (mismo comportamiento que antes; sin atomicidad real pero sin 500).
+        let updatedAppointment = null;
         const chargeWarnings = [];
-        if (chargeOpAfterSave?.type === 'cancel') {
-            try {
-                await PatientCharge.findOneAndUpdate(
-                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
-                    {
-                        $set: {
-                            cancelado: true,
-                            canceladoEn: new Date(),
-                            canceladoPor: req.user?.id || null,
-                            canceladoMotivo: 'Items de la cita removidos'
-                        }
-                    }
-                );
-            } catch (chargeErr) {
-                console.error('[updateAppointment] Fallo al cancelar charge:', chargeErr);
-                chargeWarnings.push('Items actualizados pero el cobro asociado no se canceló — reintenta');
-            }
-        } else if (chargeOpAfterSave?.type === 'updateItems') {
-            try {
-                // El cobro de cita nace confirmado:false y nunca se promueve, por lo
-                // que esta rama siempre es alcanzable. El hook pre('save') que
-                // recalcula totalPagado/saldoPendiente NO corre en findOneAndUpdate,
-                // así que la invariante saldoPendiente = max(0, total - pagado) hay
-                // que mantenerla a mano (si no, editar items deja saldoPendiente
-                // obsoleto → se sobre-cobra o sub-cobra al paciente).
-                const linked = await PatientCharge.findOne(
-                    { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } }
-                ).select('totalPagado');
 
-                const totalPagado = round2(linked?.totalPagado || 0);
-
-                if (totalPagado > 0) {
-                    // El cobro ya recibió pagos: NO se reescriben los conceptos
-                    // facturados (alterar la base de un cobro pagado por una puerta
-                    // lateral corrompe la contabilidad). El ajuste debe hacerse desde
-                    // el expediente del paciente (cancelar + reemitir el cobro).
-                    chargeWarnings.push('La cita tiene un cobro con pagos registrados; sus conceptos NO se modificaron. Ajusta el cobro desde el expediente del paciente.');
-                } else {
-                    const newTotal = round2(chargeOpAfterSave.payload.total);
+        // Sincroniza el PatientCharge ligado a la cita. Con `throwOnError` (modo
+        // transacción) propaga el error para abortar la tx; sin él (modo
+        // degradado) acumula un warning y continúa.
+        const syncCharge = async (session, throwOnError) => {
+            const opts = session ? { session } : {};
+            if (chargeOpAfterSave?.type === 'cancel') {
+                try {
                     await PatientCharge.findOneAndUpdate(
                         { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
-                        {
-                            $set: {
-                                items: chargeOpAfterSave.payload.items,
-                                total: newTotal,
-                                // Sin pagos → saldoPendiente = total. Se fija explícito
-                                // porque el hook pre('save') no se ejecuta aquí.
-                                saldoPendiente: round2(Math.max(0, newTotal - totalPagado))
-                            }
-                        },
-                        { runValidators: true }
+                        { $set: { cancelado: true, canceladoEn: new Date(), canceladoPor: req.user?.id || null, canceladoMotivo: 'Items de la cita removidos' } },
+                        opts
                     );
+                } catch (chargeErr) {
+                    if (throwOnError) throw chargeErr;
+                    console.error('[updateAppointment] Fallo al cancelar charge:', chargeErr);
+                    chargeWarnings.push('Items actualizados pero el cobro asociado no se canceló — reintenta');
                 }
-            } catch (chargeErr) {
-                console.error('[updateAppointment] Fallo al actualizar charge items:', chargeErr);
-                chargeWarnings.push('Items de la cita actualizados pero el cobro asociado no — reintenta');
-            }
-        }
+            } else if (chargeOpAfterSave?.type === 'updateItems') {
+                try {
+                    // El hook pre('save') que recalcula totalPagado/saldoPendiente
+                    // NO corre en findOneAndUpdate, así que la invariante
+                    // saldoPendiente = max(0, total - pagado) se mantiene a mano.
+                    const linked = await PatientCharge.findOne(
+                        { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } }
+                    ).select('totalPagado').session(session || null);
 
-        // Cancelar cobro si pasó a Cancelada/NoShow (post-save)
-        if (allowedFields.estado === 'Cancelada' || allowedFields.estado === 'NoShow') {
-            try {
-                await PatientCharge.findOneAndUpdate(
-                    { appointmentId: updatedAppointment._id, confirmado: false, cancelado: { $ne: true } },
-                    {
-                        $set: {
-                            cancelado: true,
-                            canceladoEn: new Date(),
-                            canceladoPor: req.user?.id || null,
-                            canceladoMotivo: allowedFields.estado === 'NoShow' ? 'Paciente no se presentó' : 'Cita cancelada'
-                        }
+                    const totalPagado = round2(linked?.totalPagado || 0);
+
+                    if (totalPagado > 0) {
+                        // Cobro con pagos: NO se reescriben los conceptos facturados
+                        // (corromperia la contabilidad). Ajuste desde el expediente.
+                        chargeWarnings.push('La cita tiene un cobro con pagos registrados; sus conceptos NO se modificaron. Ajusta el cobro desde el expediente del paciente.');
+                    } else {
+                        const newTotal = round2(chargeOpAfterSave.payload.total);
+                        await PatientCharge.findOneAndUpdate(
+                            { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
+                            { $set: { items: chargeOpAfterSave.payload.items, total: newTotal, saldoPendiente: round2(Math.max(0, newTotal - totalPagado)) } },
+                            { runValidators: true, ...opts }
+                        );
                     }
-                );
-            } catch (chargeErr) {
-                console.error('[updateAppointment] Fallo al cancelar charge tras transición:', chargeErr);
-                chargeWarnings.push('Cita cancelada pero el cobro asociado quedó vivo — cancélelo manualmente');
+                } catch (chargeErr) {
+                    if (throwOnError) throw chargeErr;
+                    console.error('[updateAppointment] Fallo al actualizar charge items:', chargeErr);
+                    chargeWarnings.push('Items de la cita actualizados pero el cobro asociado no — reintenta');
+                }
             }
+
+            // Cancelar cobro si pasó a Cancelada/NoShow
+            if (allowedFields.estado === 'Cancelada' || allowedFields.estado === 'NoShow') {
+                try {
+                    await PatientCharge.findOneAndUpdate(
+                        { appointmentId: req.params.id, confirmado: false, cancelado: { $ne: true } },
+                        { $set: { cancelado: true, canceladoEn: new Date(), canceladoPor: req.user?.id || null, canceladoMotivo: allowedFields.estado === 'NoShow' ? 'Paciente no se presentó' : 'Cita cancelada' } },
+                        opts
+                    );
+                } catch (chargeErr) {
+                    if (throwOnError) throw chargeErr;
+                    console.error('[updateAppointment] Fallo al cancelar charge tras transición:', chargeErr);
+                    chargeWarnings.push('Cita cancelada pero el cobro asociado quedó vivo — cancélelo manualmente');
+                }
+            }
+        };
+
+        const applyUpdate = async (session) => {
+            const opts = session
+                ? { new: true, runValidators: true, session }
+                : { new: true, runValidators: true };
+            updatedAppointment = await Appointment.findOneAndUpdate(
+                { _id: req.params.id, deletedAt: null }, update, opts
+            );
+            if (!updatedAppointment) {
+                const notFound = new Error('APPOINTMENT_NOT_FOUND');
+                notFound.__notFound = true;
+                throw notFound;
+            }
+            await syncCharge(session, !!session);
+        };
+
+        const isStandaloneTxError = (err) => {
+            const msg = String(err?.message || '');
+            return (
+                err?.codeName === 'IllegalOperation' ||
+                err?.code === 20 ||
+                msg.includes('Transaction numbers are only allowed on a replica set') ||
+                msg.includes('Transactions are not supported')
+            );
+        };
+
+        const session = await mongoose.startSession();
+        try {
+            try {
+                await session.withTransaction(async () => {
+                    chargeWarnings.length = 0; // por si la tx reintenta internamente
+                    await applyUpdate(session);
+                });
+            } catch (txErr) {
+                if (txErr?.__notFound) {
+                    return res.status(404).json({ message: 'Cita no encontrada' });
+                }
+                if (isStandaloneTxError(txErr)) {
+                    // Sin replica set: camino secuencial degradado (charge falla →
+                    // warning, no revierte la cita) — igual que el comportamiento previo.
+                    chargeWarnings.length = 0;
+                    try {
+                        await applyUpdate(null);
+                    } catch (seqErr) {
+                        if (seqErr?.__notFound) {
+                            return res.status(404).json({ message: 'Cita no encontrada' });
+                        }
+                        throw seqErr;
+                    }
+                } else {
+                    throw txErr;
+                }
+            }
+        } finally {
+            session.endSession();
         }
 
         const populated = await Appointment.findById(updatedAppointment._id)

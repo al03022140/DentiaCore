@@ -49,6 +49,39 @@ const summarizeMovements = (movements, initialAmount = 0) => {
   };
 };
 
+// Determina, mediante un replay cronológico de los movimientos, si UN retiro
+// en efectivo concreto "sobra" (es el que deja la caja en negativo). Reemplaza
+// al borrado incondicional cuando cashOnHand<0, que ante dos retiros
+// concurrentes hacía que AMBOS se borraran (perdiendo uno que sí cabía). Aquí
+// cada petición revierte sólo su propio movimiento si es el rechazado en el
+// replay determinista por createdAt — preservando los retiros válidos.
+const isCashWithdrawalOverdrawn = (movements, initialAmount, movementId) => {
+  const sorted = [...movements].sort((a, b) => {
+    // Orden total y determinista aun para movimientos legacy sin createdAt/date
+    // (new Date(undefined) → NaN haría el sort inestable): se normaliza a 0 y se
+    // desempata siempre por _id.
+    const ta = new Date(a.createdAt || a.date || 0).getTime();
+    const tb = new Date(b.createdAt || b.date || 0).getTime();
+    const sa = Number.isFinite(ta) ? ta : 0;
+    const sb = Number.isFinite(tb) ? tb : 0;
+    if (sa !== sb) return sa - sb;
+    return String(a._id).localeCompare(String(b._id));
+  });
+  let balance = safeNum(initialAmount);
+  for (const m of sorted) {
+    if (m.paymentMethod !== 'CASH') continue; // sólo el efectivo afecta cashOnHand
+    const amt = safeNum(m.amount);
+    if (m.type === 'INCOME') {
+      balance += amt;
+    } else if (balance >= amt) {
+      balance -= amt; // el retiro cabe
+    } else if (String(m._id) === String(movementId)) {
+      return true; // este retiro es el que no cabe
+    }
+  }
+  return false;
+};
+
 // GET /cash/balance/monthly
 // A-9: el balance mensual incluye TODOS los movimientos reales del mes. Antes
 // se descartaban los de sesiones OPEN/CLOSING con más de 48 h (un olvido de
@@ -153,16 +186,33 @@ exports.forceResolveSession = async (req, res) => {
     const movements = await CashMovement.find({ boxSessionId: session._id });
     const summary = summarizeMovements(movements, session.initialAmount);
 
-    session.status = 'CLOSED';
-    session.endTime = new Date();
-    session.finalAmount = summary.cashOnHand;
-    session.closedBy = req.user.id;
-    await session.save();
+    // Guarda atómica (antes era read-check-save, no atómico): cerramos en UNA
+    // operación sólo si la sesión NO está ya CLOSED. El flip directo a CLOSED
+    // garantiza un único ganador — un segundo force-resolve (o un closeBox
+    // concurrente) ve `status: CLOSED`, el filtro $ne falla y recibe null, así
+    // que NO pisa closedBy/endTime/finalAmount del primer cierre. Sin esto, dos
+    // resoluciones concurrentes cerraban la misma sesión dos veces con corte y
+    // responsable no deterministas (trazabilidad NOM-024 corrupta).
+    const closed = await BoxSession.findOneAndUpdate(
+      { _id: session._id, status: { $ne: 'CLOSED' } },
+      {
+        $set: {
+          status: 'CLOSED',
+          endTime: new Date(),
+          finalAmount: summary.cashOnHand,
+          closedBy: req.user.id
+        }
+      },
+      { new: true }
+    );
+    if (!closed) {
+      return res.status(400).json({ message: 'La sesión ya está cerrada' });
+    }
 
     res.json({
-      session,
+      session: closed,
       summary: {
-        initialAmount: session.initialAmount,
+        initialAmount: closed.initialAmount,
         finalCashAmount: summary.cashOnHand,
         totalIncome: summary.totalIncome,
         totalExpense: summary.totalExpense,
@@ -306,17 +356,22 @@ exports.openBox = async (req, res) => {
       return res.status(400).json({ message: 'Monto inicial inválido' });
     }
 
-    // BUG-B3: bloquear apertura si hay sesiones CLOSING huérfanas (cierre que
-    // crasheó a la mitad). El índice único parcial sólo cubre OPEN; sin este
-    // guard se pueden acumular múltiples sesiones CLOSING.
-    const staleClosing = await BoxSession.findOne({
-      status: 'CLOSING',
-      updatedAt: { $lt: new Date(Date.now() - CLOSING_STALE_MS) }
+    // BUG-B3: bloquear apertura si hay CUALQUIER sesión CLOSING. El índice
+    // único parcial sólo cubre OPEN, así que una CLOSING (cierre normal en
+    // vuelo o uno que crasheó a la mitad) no impide abrir otra caja. Antes sólo
+    // se bloqueaba con CLOSING > 1h, dejando una ventana en la que se podía
+    // abrir una segunda caja coexistiendo con un cierre a medias: el dinero de
+    // la sesión CLOSING quedaba fuera del corte y la contabilidad se mezclaba.
+    // Un cierre exitoso mantiene CLOSING sólo milisegundos, así que un 409 a una
+    // apertura concurrente es aceptable (el usuario reintenta). El umbral
+    // CLOSING_STALE_MS sigue usándose para el banner de sesiones colgadas.
+    const closingSession = await BoxSession.findOne({
+      status: 'CLOSING'
     }).select('_id startTime updatedAt');
-    if (staleClosing) {
+    if (closingSession) {
       return res.status(409).json({
-        message: 'Hay una sesión de caja con cierre incompleto. Resuélvala desde "Sesiones colgadas" antes de abrir una nueva.',
-        staleSessionId: staleClosing._id
+        message: 'Hay una sesión de caja con cierre en curso o incompleto. Resuélvala antes de abrir una nueva.',
+        staleSessionId: closingSession._id
       });
     }
 
@@ -481,16 +536,16 @@ exports.addMovement = async (req, res) => {
       });
     }
 
-    // Saga compensatoria: post-insert recalcula cashOnHand incluyendo este
-    // movimiento. Si quedó negativo, otro EXPENSE concurrente metió el
-    // retiro antes — revertimos.
+    // Saga compensatoria: post-insert revierte SÓLO si este movimiento es el
+    // retiro que no cabe (replay cronológico). Antes se borraba siempre que el
+    // total quedara negativo, así que dos retiros concurrentes veían ambos el
+    // negativo y se borraban LOS DOS, perdiendo uno que sí cabía.
     if (type === 'EXPENSE' && paymentMethod === 'CASH') {
       const allMovements = await CashMovement.find({ boxSessionId: activeSession._id });
-      const { cashOnHand } = summarizeMovements(allMovements, activeSession.initialAmount);
-      if (cashOnHand < 0) {
+      if (isCashWithdrawalOverdrawn(allMovements, activeSession.initialAmount, movement._id)) {
         await CashMovement.deleteOne({ _id: movement._id });
         return res.status(409).json({
-          message: 'Otro retiro concurrente dejó la caja en negativo. Reintente.'
+          message: 'Fondos insuficientes: otro retiro concurrente consumió el efectivo disponible. Reintente.'
         });
       }
     }

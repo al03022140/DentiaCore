@@ -118,6 +118,32 @@ const sanitizePatientForBasicRead = (patient) => {
 };
 
 /**
+ * Campos de una CITA visibles para `patients.read.basic` (recepción): sólo
+ * agenda/programación, nada clínico. Quedan EXCLUIDOS `motivo`,
+ * `observaciones`, `comentarioProcedimiento`, `items`, `totalEstimado` y
+ * `estadoHistorial` (cada transición lleva su propio `motivo`), que son datos
+ * del expediente clínico. Simétrico a BASIC_PATIENT_FIELDS — NOM-004 Art. 5.7
+ * + LFPDPPP Art. 9.
+ */
+const BASIC_APPOINTMENT_FIELDS = [
+  '_id', 'paciente_id', 'doctor_id', 'fecha_hora', 'duracion',
+  'estado', 'createdAt', 'updatedAt',
+];
+
+/**
+ * Filtra campos clínicos de una cita, dejando sólo los de programación.
+ */
+const sanitizeAppointmentForBasicRead = (appointment) => {
+  if (!appointment) return appointment;
+  const obj = typeof appointment.toObject === 'function' ? appointment.toObject() : { ...appointment };
+  const filtered = {};
+  for (const key of BASIC_APPOINTMENT_FIELDS) {
+    if (obj[key] !== undefined) filtered[key] = obj[key];
+  }
+  return filtered;
+};
+
+/**
  * Middleware que requiere que el usuario sea un rol clínico
  * (doctor o asistente) para acceder a datos clínicos.
  * NOM-004 Art. 5.7 + LFPDPPP Art. 9
@@ -161,7 +187,9 @@ module.exports = authorize;
 module.exports.authorize = authorize;
 module.exports.filterPatientFields = filterPatientFields;
 module.exports.sanitizePatientForBasicRead = sanitizePatientForBasicRead;
+module.exports.sanitizeAppointmentForBasicRead = sanitizeAppointmentForBasicRead;
 module.exports.requireClinicalRole = requireClinicalRole;
 module.exports.requireSignerRole = requireSignerRole;
 module.exports.BASIC_PATIENT_FIELDS = BASIC_PATIENT_FIELDS;
 module.exports.BASIC_PATIENT_WRITE_FIELDS = BASIC_PATIENT_WRITE_FIELDS;
+module.exports.BASIC_APPOINTMENT_FIELDS = BASIC_APPOINTMENT_FIELDS;
