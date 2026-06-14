@@ -37,7 +37,13 @@ const REQUIRED_FIELDS = [
   { path: ["contacto", "entidad_federativa"], label: "Entidad federativa", step: 1 }
 ];
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// TLD de >=2 letras y sin caracteres raros/emojis en local-part o dominio.
+// Debe mantenerse alineado con el validador del modelo (Server/models/patient.js).
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const EMAIL_MAX_LEN = 254; // RFC 5321
+// Número de documento: alfanumérico + guion, mínimo 3 chars (rechaza emojis,
+// símbolos puros y entradas de 1-2 chars claramente inválidas).
+const DOC_NUMERO_REGEX = /^[A-Za-z0-9-]+$/;
 // Acepta el formato visible (espacios, guiones, paréntesis, +), pero
 // requiere que tenga AL MENOS 7 dígitos reales; "((((((" o "+++--" se rechazan.
 const PHONE_ALLOWED_CHARS = /^[\d\s\-+()]+$/;
@@ -66,8 +72,12 @@ const deepMerge = (base, source) => {
 
 const validateFormat = (data) => {
   const errors = [];
-  if (data.email && !EMAIL_REGEX.test(data.email)) {
+  if (data.email && (!EMAIL_REGEX.test(data.email) || data.email.length > EMAIL_MAX_LEN)) {
     errors.push({ label: 'El correo electrónico tiene un formato inválido' });
+  }
+  const docNumero = data.documento?.numero ? String(data.documento.numero).trim() : '';
+  if (docNumero && (docNumero.length < 3 || !DOC_NUMERO_REGEX.test(docNumero))) {
+    errors.push({ label: 'El número de documento debe tener al menos 3 caracteres y solo letras, números o guiones' });
   }
   const phone = data.contacto?.telefono;
   if (phone) {
@@ -919,15 +929,28 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   /** Manejo de carga de imagen */
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImageSrc(reader.result);
-        setIsCropping(true); // Activar modo de recorte automáticamente
-        // No actualizar formData.photoURL hasta que se confirme el recorte
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    // Validar tipo y tamaño ANTES de leer: un no-imagen rompe el recorte en
+    // silencio (createImage falla) y un archivo enorme se carga entero en
+    // memoria como base64. Alineado con el multer del backend (JPG/PNG, 5MB).
+    const ALLOWED = ['image/jpeg', 'image/png'];
+    if (!ALLOWED.includes(file.type)) {
+      message.error('El archivo debe ser una imagen JPG o PNG');
+      if (event.target) event.target.value = '';
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      message.error('La imagen no debe superar 5 MB');
+      if (event.target) event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageSrc(reader.result);
+      setIsCropping(true); // Activar modo de recorte automáticamente
+      // No actualizar formData.photoURL hasta que se confirme el recorte
+    };
+    reader.readAsDataURL(file);
   };
 
   /** Borra la imagen cargada */
@@ -971,6 +994,11 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       setIsCropping(false);
     } catch (error) {
       console.error("Error al recortar la imagen:", error);
+      // Sin feedback, un archivo corrupto/no-imagen que evada el accept dejaba
+      // el modal de recorte en un estado muerto. Avisar y resetear.
+      message.error('No se pudo procesar la imagen seleccionada');
+      setImageSrc(null);
+      setIsCropping(false);
     }
   }, [imageSrc, croppedAreaPixels, crop, zoom]);
   

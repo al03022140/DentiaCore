@@ -461,7 +461,7 @@ const PatientList = () => {
         <div className="patient-list">
           {currentPatients.length === 0 && (
             <p className="no-patients-msg">
-              {searchTerm ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados.'}
+              {deferredSearchTerm.trim() ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados.'}
             </p>
           )}
           {currentPatients.map((patient) => (

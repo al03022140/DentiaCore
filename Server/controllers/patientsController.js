@@ -131,30 +131,43 @@ exports.getAllPatients = async (req, res) => {
         // (Para clínicas muy grandes, lo ideal es migrar el front a paginación
         // server-side y usar ?page/?limit explícitos.)
         const MAX_LIMIT = 5000;
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        const requestedLimit = parseInt(req.query.limit);
-        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
-            ? Math.min(requestedLimit, MAX_LIMIT)
-            : MAX_LIMIT;
+
+        // Validación estricta de params EXPLÍCITOS: si el cliente envía
+        // limit/page presentes pero inválidos (negativo, 0, no numérico,
+        // sufijos), devolver 400 en vez de caer en silencio a MAX_LIMIT
+        // (descarga masiva de PII) o a page 1.
+        const parsePositiveIntParam = (raw, name) => {
+            if (raw === undefined) return { value: null };
+            const s = String(raw).trim();
+            if (!/^\d+$/.test(s)) return { error: `Parámetro '${name}' inválido (debe ser un entero positivo)` };
+            const n = parseInt(s, 10);
+            if (!Number.isFinite(n) || n < 1) return { error: `Parámetro '${name}' inválido (debe ser un entero positivo)` };
+            return { value: n };
+        };
+        const limitParam = parsePositiveIntParam(req.query.limit, 'limit');
+        if (limitParam.error) return res.status(400).json({ message: limitParam.error });
+        const pageParam = parsePositiveIntParam(req.query.page, 'page');
+        if (pageParam.error) return res.status(400).json({ message: pageParam.error });
+
+        const limit = limitParam.value ? Math.min(limitParam.value, MAX_LIMIT) : MAX_LIMIT;
+
+        // Conteo PRIMERO para acotar `page` al máximo real y evitar
+        // deep-pagination: un skip = (page-1)*limit gigantesco hace que Mongo
+        // recorra y descarte O(n) documentos por petición.
+        const total = await Patient.countDocuments({ deletedAt: null });
+        const maxPage = Math.max(1, Math.ceil(total / limit));
+        const page = Math.min(pageParam.value || 1, maxPage);
         const skip = (page - 1) * limit;
 
         // Construir la consulta base (excluir pacientes dados de baja).
         // .select() limita los campos al subset que necesita la lista.
         // .lean() devuelve POJOs en vez de docs Mongoose hidratados (más rápido).
-        let query = Patient.find({ deletedAt: null })
+        const patients = await Patient.find({ deletedAt: null })
             .select(PATIENT_LIST_FIELDS)
-            .lean();
-
-        // Aplicar paginación si se especifica un límite
-        if (limit > 0) {
-            query = query.skip(skip).limit(limit);
-        }
-
-        // Ejecutar la consulta en paralelo con el conteo total
-        const [patients, total] = await Promise.all([
-            query.exec(),
-            Patient.countDocuments({ deletedAt: null })
-        ]);
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec();
 
         if (!patients.length) {
             debugLog("⚠️ No se encontraron pacientes.");
@@ -491,6 +504,15 @@ exports.createPatient = async (req, res) => {
         // Fechas clínicas femeninas no pueden ser futuras (defensa servidor).
         const femErr = validateFemaleDates(safePatientData.informacion_femenina);
         if (femErr) return res.status(400).json({ message: femErr });
+
+        // documento debe ser un objeto {tipo, numero}. Si llega como string/
+        // array/number, las guardas `.numero` lo saltan en silencio (no corre el
+        // dup-check) y Mongoose lo castea a {} → ValidationError genérico de
+        // required. Rechazar con un 400 de formato claro.
+        if (safePatientData.documento !== undefined &&
+            (typeof safePatientData.documento !== 'object' || safePatientData.documento === null || Array.isArray(safePatientData.documento))) {
+            return res.status(400).json({ message: 'El campo documento debe ser un objeto con tipo y numero', field: 'documento' });
+        }
 
         // Normalizar documento.numero (trim + uppercase) ANTES de insertar para
         // que el índice único de Mongo detecte duplicados de facto sin importar
@@ -909,6 +931,14 @@ exports.updatePatient = async (req, res) => {
         if (safeUpdate.informacion_femenina !== undefined) {
             const femErr = validateFemaleDates(safeUpdate.informacion_femenina);
             if (femErr) return res.status(400).json({ message: femErr });
+        }
+
+        // documento debe ser un objeto {tipo, numero}. Un string/array aquí hace
+        // que castObject lo descarte a {} y el update "tenga éxito" (200) sin
+        // cambiar nada (no-op silencioso). Rechazar con un 400 de formato.
+        if (safeUpdate.documento !== undefined &&
+            (typeof safeUpdate.documento !== 'object' || safeUpdate.documento === null || Array.isArray(safeUpdate.documento))) {
+            return res.status(400).json({ message: 'El campo documento debe ser un objeto con tipo y numero', field: 'documento' });
         }
 
         // Normalizar documento.numero igual que en create

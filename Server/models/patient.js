@@ -24,7 +24,15 @@ const PatientSchema = new mongoose.Schema({
   // 📌 Identificación
   documento: {
       tipo: { type: String, enum: ["Licencia", "Pasaporte", "INE", "Otro"], required: true },
-      numero: { type: String, required: true, unique: true, trim: true, uppercase: true }
+      // minlength/match son la fuente de verdad del formato (alineado con el
+      // cliente). Sólo se validan al crear o cuando `documento` está en el $set
+      // de un update — editar otra sección de un paciente legacy NO los dispara.
+      numero: {
+          type: String, required: true, unique: true, trim: true, uppercase: true,
+          minlength: [3, 'El número de documento debe tener al menos 3 caracteres'],
+          maxlength: [30, 'El número de documento es demasiado largo'],
+          match: [/^[A-Z0-9-]+$/, 'El número de documento solo puede contener letras, números y guiones']
+      }
   },
 
   // 📌 Datos Personales
@@ -48,7 +56,7 @@ const PatientSchema = new mongoose.Schema({
     // validador SOLO corre cuando el email está en el $set — editar otra
     // sección de un paciente legacy con email no estándar NO lo dispara.
     validate: {
-      validator: (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      validator: (v) => !v || (v.length <= 254 && /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(v)),
       message: 'El email no tiene un formato válido'
     }
   },
