@@ -5,8 +5,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
+  /* SIN backdrop-filter a propósito: el desenfoque del fondo se re-componía en
+     cada trazo del canvas y hacía "parpadear" la firma mientras se firmaba —en
+     mouse, tableta y touch—. Un fondo sólido semitransparente da el mismo
+     aislamiento visual SIN recomposición por frame → sin parpadeo. */
+  background: rgba(0, 0, 0, 0.72);
   padding: 1rem;
 }
 
@@ -28,11 +31,9 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  /* La tarjeta forma su propio contexto de apilamiento para desacoplar su
-     composición de la del overlay con `backdrop-filter`. NO usamos `transform`
-     aquí a propósito: crearía un containing block que rompería el overlay
-     `position: fixed` del pad anidado (firma del doctor). El aislamiento real
-     del repintado lo hace la capa GPU del propio canvas (ver abajo). */
+  /* NO usamos `transform` aquí a propósito: crearía un containing block que
+     rompería el overlay `position: fixed` del pad anidado (firma del doctor).
+     `isolation: isolate` le da contexto de apilamiento propio sin ese efecto. */
   isolation: isolate;
 }
 
@@ -119,8 +120,9 @@
   display: block;
   background: #fff;
   cursor: crosshair;
-  /* Capa GPU propia: el trazo se repinta en su propia capa y no invalida la
-     tarjeta/overlay (evita el parpadeo bajo el backdrop-filter al firmar). */
+  /* Capa GPU propia para que el trazo se repinte suave en su propia capa. El
+     parpadeo de fondo ya se eliminó al quitar el backdrop-filter del overlay;
+     esto se mantiene solo por fluidez del dibujo. */
   transform: translateZ(0);
   backface-visibility: hidden;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
 import { getDoctors } from '../services/settingsService';
@@ -53,6 +53,7 @@ export default function DoctorSignStep({
   const [pin, setPin] = useState('');
   const [padOpen, setPadOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const pinInputRef = useRef(null);
 
   // SIEMPRE cargamos la lista de doctores: cualquier doctor puede firmar con
   // su PIN, independientemente de la cuenta clínica logueada.
@@ -136,6 +137,14 @@ export default function DoctorSignStep({
       });
     } catch (err) {
       setSubmitError(err?.response?.data?.error || err?.message || 'Error al firmar');
+    } finally {
+      // Limpiar el PIN tras CADA intento. Si fue incorrecto, el campo queda
+      // vacío y enfocado para reintentar sin borrarlo a mano; si fue correcto,
+      // el modal se cierra y limpiarlo es inocuo. Va en `finally` (no solo en
+      // `catch`) para cubrir también la firma de notas ya guardadas, cuyo
+      // handler muestra el error pero NO relanza la excepción.
+      setPin('');
+      setTimeout(() => pinInputRef.current?.focus(), 0);
     }
   };
 
@@ -245,6 +254,7 @@ export default function DoctorSignStep({
                 <label htmlFor="doctor-pin-input">PIN del doctor (4 dígitos)</label>
                 <input
                   id="doctor-pin-input"
+                  ref={pinInputRef}
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
