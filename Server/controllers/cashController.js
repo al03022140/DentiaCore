@@ -93,10 +93,14 @@ exports.getMonthlyBalance = async (req, res) => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Límite superior EXCLUSIVO en el inicio del mes siguiente. Antes se usaba
+    // fin-de-mes a 23:59:59 con milisegundos=0, lo que excluía los movimientos
+    // de los últimos ~999 ms del mes. (Los límites usan la TZ local del proceso;
+    // se asume el servidor en la TZ de la clínica.)
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const movements = await CashMovement.find({
-      date: { $gte: startOfMonth, $lte: endOfMonth }
+      date: { $gte: startOfMonth, $lt: startOfNextMonth }
     }).populate('boxSessionId', 'status startTime');
 
     const HOURS_48 = 48 * 60 * 60 * 1000;
@@ -530,7 +534,8 @@ exports.addMovement = async (req, res) => {
       status: 'OPEN'
     });
     if (!sessionStillOpen) {
-      await CashMovement.deleteOne({ _id: movement._id });
+      try { await CashMovement.deleteOne({ _id: movement._id }); }
+      catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
       return res.status(409).json({
         message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
       });
@@ -543,7 +548,8 @@ exports.addMovement = async (req, res) => {
     if (type === 'EXPENSE' && paymentMethod === 'CASH') {
       const allMovements = await CashMovement.find({ boxSessionId: activeSession._id });
       if (isCashWithdrawalOverdrawn(allMovements, activeSession.initialAmount, movement._id)) {
-        await CashMovement.deleteOne({ _id: movement._id });
+        try { await CashMovement.deleteOne({ _id: movement._id }); }
+        catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
         return res.status(409).json({
           message: 'Fondos insuficientes: otro retiro concurrente consumió el efectivo disponible. Reintente.'
         });

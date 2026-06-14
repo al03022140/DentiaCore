@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Popconfirm } from 'antd';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
 import { formatMoney } from '../../../shared/utils/money';
+import { setSectionDirty } from '../../../shared/utils/sectionDirtyGuard';
 import DEFAULT_DENTAL_SERVICES from './defaultDentalServices';
 
 // Tope superior del precio default — alineado con el schema del servidor
@@ -60,7 +61,11 @@ const CashSection = () => {
   ), [initial, categories, currency, serviceCatalog]);
 
   // Aviso de salir sin guardar — protege contra pérdida accidental de cambios.
+  // `beforeunload` cubre cerrar/recargar la pestaña; el guard de sección
+  // (sectionDirtyGuard) cubre la navegación SPA interna (botón "← Volver"),
+  // que `beforeunload` NO intercepta.
   useEffect(() => {
+    setSectionDirty(isDirty);
     if (!isDirty) return undefined;
     const handler = (e) => {
       e.preventDefault();
@@ -70,6 +75,10 @@ const CashSection = () => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
+
+  // Limpiar el guard al desmontar para no arrastrar el estado dirty a otra
+  // sección (p. ej. si el usuario navega y vuelve a entrar a otra config).
+  useEffect(() => () => setSectionDirty(false), []);
 
   // Resta el msg al modificar para no mostrar "guardado" tras nuevos cambios.
   useEffect(() => { if (msg) setMsg(null); }, [categories, currency, serviceCatalog]); // eslint-disable-line react-hooks/exhaustive-deps

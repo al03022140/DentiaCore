@@ -57,7 +57,7 @@ const NextPatient = () => {
           return;
         }
         const upcoming = appointments
-          .filter(apt => apt.estado !== 'Cancelada' && apt.estado !== 'Pasada' && new Date(apt.fecha_hora) > now)
+          .filter(apt => !['Cancelada', 'Pasada', 'NoShow'].includes(apt.estado) && new Date(apt.fecha_hora) > now)
           .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))[0];
         setNextPatient(upcoming || null);
       } catch (error) {

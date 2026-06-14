@@ -40,4 +40,25 @@ const uploadLogo = multer({
   }
 });
 
+// Sin este middleware, un logo demasiado grande o de tipo inválido cae al
+// handler global (500 'Error interno del servidor'). Lo traducimos a un 413/400
+// con mensaje accionable que el cliente ya sabe mostrar (err.response.data.message).
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ message: 'El logo supera el tamaño máximo permitido (1MB)' });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ message: 'Solo se permite subir un archivo a la vez' });
+    }
+    return res.status(400).json({ message: err.message || 'Error al subir el logo' });
+  }
+  if (err) {
+    return res.status(400).json({ message: err.message || 'Solo se aceptan imágenes PNG o JPG' });
+  }
+  next();
+};
+
+uploadLogo.handleMulterError = handleMulterError;
+
 module.exports = uploadLogo;

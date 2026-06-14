@@ -229,6 +229,11 @@ const ConsultasPage = () => {
   };
 
   const runStatusChange = async (apt, estado, opts = {}) => {
+    // Guard de doble submit: si ya hay una transición en vuelo, ignorar. Cierra
+    // el hueco de hacer click repetido en items del dropdown (que no consultan
+    // busyId). La protección real contra la carrera concurrente es server-side
+    // (updateAppointmentStatus es atómico sobre el estado de origen).
+    if (busyId) return;
     const { confirmTitle, requireReason, reasonPrompt } = opts;
     let motivo = null;
     if (requireReason) {

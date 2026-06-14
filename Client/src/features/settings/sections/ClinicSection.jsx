@@ -69,6 +69,19 @@ const ClinicSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setMsg(null);
+    // Validación temprana (feedback inmediato + evita subir archivos grandes a
+    // medias). El server es la fuente de verdad real (uploadLogo middleware).
+    const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (!ALLOWED.includes(file.type)) {
+      setMsg({ type: 'error', text: 'Solo se aceptan imágenes PNG o JPG' });
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      setMsg({ type: 'error', text: 'El logo no debe superar 1MB' });
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     try {
       await uploadLogo(file);
       setHasLogo(true);
@@ -135,7 +148,7 @@ const ClinicSection = () => {
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/svg+xml"
+            accept="image/png,image/jpeg"
             onChange={handleLogoUpload}
             style={{ display: 'none' }}
           />
@@ -144,7 +157,7 @@ const ClinicSection = () => {
           <button type="button" className="settings-btn-danger" onClick={handleLogoDelete}>Eliminar logo</button>
         )}
       </div>
-      <span className="hint" style={{ display: 'block', marginTop: 'var(--spacing-sm)' }}>PNG, JPG o SVG. Máximo 1MB. Se muestra en documentos impresos.</span>
+      <span className="hint" style={{ display: 'block', marginTop: 'var(--spacing-sm)' }}>PNG o JPG. Máximo 1MB. Se muestra en documentos impresos.</span>
     </div>
   );
 };

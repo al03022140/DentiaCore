@@ -160,16 +160,22 @@ const GoogleCalendarSection = () => {
   const handleSave = (e) => {
     e.preventDefault();
     setSaving(true);
-    localStorage.setItem('google_selected_calendar', selectedCalendar);
-    // Dispatch a storage event so calendar.jsx picks it up immediately
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'google_selected_calendar',
-      newValue: selectedCalendar,
-    }));
-    setTimeout(() => {
+    // Confirmar la escritura real: localStorage puede fallar (modo privado /
+    // quota). Antes un setTimeout cosmético mostraba "guardado" siempre, aunque
+    // el setItem hubiera fallado. Sólo se confirma éxito si realmente se escribió.
+    try {
+      localStorage.setItem('google_selected_calendar', selectedCalendar);
+      // Dispatch a storage event so calendar.jsx picks it up immediately
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'google_selected_calendar',
+        newValue: selectedCalendar,
+      }));
       setSaving(false);
       setMsg({ type: 'success', text: 'Calendario seleccionado guardado.' });
-    }, 200);
+    } catch {
+      setSaving(false);
+      setMsg({ type: 'error', text: 'No se pudo guardar la selección en este navegador.' });
+    }
   };
 
   // ── Handle OAuth callback if we're back from redirect ──────────────────────

@@ -163,6 +163,22 @@ const ProfessionalProfileSection = () => {
     if (!file) return;
     setFirmaMsg(null);
 
+    // Validación temprana ANTES del FileReader: evita generar un dataURL en
+    // memoria de archivos enormes y da feedback inmediato. El server valida
+    // igual (uploadFirma middleware → 413/400). La firma es legalmente
+    // relevante (NOM-004), así que el tipo importa.
+    const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (!ALLOWED.includes(file.type)) {
+      setFirmaMsg({ type: 'error', text: 'Solo se aceptan imágenes PNG o JPG' });
+      if (e.target) e.target.value = '';
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      setFirmaMsg({ type: 'error', text: 'La firma no debe superar 500 KB' });
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     // Preview inmediato con el archivo elegido — el usuario ve su firma
     // antes de que termine el roundtrip al servidor.
     const reader = new FileReader();

@@ -298,11 +298,11 @@ const CreateAppointmentModal = ({
   if (!visible) return null;
 
   return (
-    <div className="cam-overlay" onClick={onClose}>
+    <div className="cam-overlay" onClick={() => { if (!saving) onClose(); }}>
       <div className="cam-modal" onClick={e => e.stopPropagation()}>
         <div className="cam-header">
           <h2>{isEditing ? 'Editar Cita' : 'Nueva Cita'}</h2>
-          <button className="cam-close-btn" onClick={onClose}>&times;</button>
+          <button className="cam-close-btn" onClick={() => { if (!saving) onClose(); }}>&times;</button>
         </div>
 
         <div className="cam-body">
@@ -374,6 +374,12 @@ const CreateAppointmentModal = ({
               {doctors.map(d => (
                 <option key={d._id} value={d._id}>{d.nombre}</option>
               ))}
+              {/* En edición, si el doctor asignado ya no está en la lista
+                  (dado de baja), mostrarlo igual para no engañar a la UI con
+                  "Seleccionar doctor..."; queda disabled para forzar reasignar. */}
+              {selectedDoctor && !doctors.some(d => d._id === selectedDoctor) && (
+                <option value={selectedDoctor} disabled>Doctor asignado (inactivo) — reasigne</option>
+              )}
             </select>
           </div>
 
@@ -396,7 +402,10 @@ const CreateAppointmentModal = ({
                 value={duracion}
                 onChange={e => setDuracion(Number(e.target.value))}
               >
-                {DURATION_PRESETS.map(d => (
+                {/* Si la cita guardada tiene una duración fuera de los presets
+                    (p.ej. 25 min de un import), inyectarla para que el select
+                    refleje el valor real en vez de mostrar otro. */}
+                {(DURATION_PRESETS.includes(duracion) ? DURATION_PRESETS : [...DURATION_PRESETS, duracion].sort((a, b) => a - b)).map(d => (
                   <option key={d} value={d}>{d} min</option>
                 ))}
               </select>

@@ -167,7 +167,11 @@ async function transitionPastDue() {
 
         const bulk = Appointment.collection.initializeUnorderedBulkOp();
         for (const { id, from } of ids) {
-            bulk.find({ _id: id }).updateOne({
+            // Filtro condicional al estado de origen: si dos GET concurrentes
+            // disparan transitionPastDue sobre la misma cita, sólo el primero
+            // matchea (la deja en 'Pasada') y el segundo no encuentra documento
+            // → no se duplica la entrada de auto-transición en estadoHistorial.
+            bulk.find({ _id: id, estado: from }).updateOne({
                 $set: { estado: 'Pasada' },
                 $push: {
                     estadoHistorial: {
@@ -200,8 +204,16 @@ exports.getAllAppointments = async (req, res) => {
         const filter = { deletedAt: null };
         if (from || to) {
             filter.fecha_hora = {};
-            if (from) filter.fecha_hora.$gte = new Date(from);
-            if (to) filter.fecha_hora.$lte = new Date(to);
+            if (from) {
+                const f = new Date(from);
+                if (Number.isNaN(f.getTime())) return res.status(400).json({ message: "Parámetro 'from' no es una fecha válida" });
+                filter.fecha_hora.$gte = f;
+            }
+            if (to) {
+                const t = new Date(to);
+                if (Number.isNaN(t.getTime())) return res.status(400).json({ message: "Parámetro 'to' no es una fecha válida" });
+                filter.fecha_hora.$lte = t;
+            }
         }
         if (doctor_id && mongoose.Types.ObjectId.isValid(doctor_id)) {
             filter.doctor_id = doctor_id;
@@ -260,6 +272,9 @@ exports.getTodayAppointments = async (req, res) => {
 // GET /appointments/:id
 exports.getAppointmentById = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID de cita inválido' });
+        }
         const appointment = await Appointment.findById(req.params.id)
             .populate('paciente_id', PATIENT_FIELDS)
             .populate('doctor_id', DOCTOR_FIELDS)
@@ -428,6 +443,9 @@ exports.createAppointment = async (req, res) => {
 // PUT /appointments/:id
 exports.updateAppointment = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID de cita inválido' });
+        }
         const existing = await Appointment.findOne({ _id: req.params.id, deletedAt: null });
         if (!existing) return res.status(404).json({ message: 'Cita no encontrada' });
 
@@ -776,6 +794,9 @@ exports.updateAppointment = async (req, res) => {
 // PATCH /appointments/:id/status — transición de estado ligera con audit
 exports.updateAppointmentStatus = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID de cita inválido' });
+        }
         const { estado, motivo } = req.body || {};
         if (!ESTADOS_VALIDOS.includes(estado)) {
             return res.status(400).json({ message: `Estado inválido: ${estado}` });
@@ -788,10 +809,11 @@ exports.updateAppointmentStatus = async (req, res) => {
             return res.status(200).json({ message: 'Sin cambios', appointment: existing });
         }
 
-        const allowed = TRANSITION_MATRIX[existing.estado] || [];
+        const desde = existing.estado;
+        const allowed = TRANSITION_MATRIX[desde] || [];
         if (!allowed.includes(estado)) {
             return res.status(400).json({
-                message: `Transición no permitida: ${existing.estado} → ${estado}`
+                message: `Transición no permitida: ${desde} → ${estado}`
             });
         }
 
@@ -800,56 +822,50 @@ exports.updateAppointmentStatus = async (req, res) => {
             return res.status(400).json({ message: 'Debe indicar el motivo (mínimo 3 caracteres)' });
         }
 
-        const desde = existing.estado;
-        existing.estado = estado;
-        existing.modificadoPor = req.user?.id || null;
-        existing.modificadoEn = new Date();
-        existing.estadoHistorial.push({
+        // Entrada de bitácora de la transición.
+        const historyEntry = {
             desde,
             hacia: estado,
             cambiadoEn: new Date(),
             cambiadoPor: req.user?.id || null,
             motivo: motivo ? String(motivo).trim() : null
-        });
+        };
 
-        // Al terminar la consulta (→ Pasada), achicar la duración a los
-        // minutos reales transcurridos. Sólo encogemos, no extendemos: si la
-        // consulta tardó más de lo planeado mantenemos la duración original
-        // (la matriz de transición permite Pasada desde Pendiente/Confirmada/
-        // EnCurso — en todos los casos aplica el mismo razonamiento).
-        // El schema tiene `duracion.min = 5`, así que respetamos ese piso:
-        // si el doctor termina la cita en menos de 5 min, dejamos la duración
-        // original en lugar de fallar la validación de mongoose.
-        let duracionOriginal = null;
+        // Al terminar la consulta (→ Pasada), achicar la duración a los minutos
+        // reales transcurridos. Sólo encogemos, no extendemos; respetamos el
+        // piso `duracion.min = 5` del schema (si terminó en <5 min, no se toca).
+        const setFields = { estado, modificadoPor: req.user?.id || null, modificadoEn: new Date() };
         if (estado === 'Pasada' && existing.fecha_hora) {
-            const now = new Date();
-            const elapsedMs = now.getTime() - new Date(existing.fecha_hora).getTime();
+            const elapsedMs = Date.now() - new Date(existing.fecha_hora).getTime();
             if (elapsedMs > 0) {
                 const elapsedMin = Math.ceil(elapsedMs / 60_000);
                 if (elapsedMin >= 5 && (!existing.duracion || elapsedMin < existing.duracion)) {
-                    duracionOriginal = existing.duracion;
-                    existing.duracion = elapsedMin;
+                    const note = `Duración ajustada de ${existing.duracion} a ${elapsedMin} min (consulta terminada antes)`;
+                    historyEntry.motivo = historyEntry.motivo ? `${historyEntry.motivo} — ${note}` : note;
+                    setFields.duracion = elapsedMin;
                 }
             }
         }
 
-        // Si encogimos la duración, dejamos huella en el último item del
-        // historial para que el cambio quede auditado (NOM-024). La entrada
-        // del cambio de estado ya está pusheada arriba; le anexamos el detalle
-        // de la modificación de duración en `motivo`.
-        if (duracionOriginal !== null) {
-            const last = existing.estadoHistorial[existing.estadoHistorial.length - 1];
-            const dur = existing.duracion;
-            const note = `Duración ajustada de ${duracionOriginal} a ${dur} min (consulta terminada antes)`;
-            last.motivo = last.motivo ? `${last.motivo} — ${note}` : note;
+        // Transición ATÓMICA condicionada al estado de origen: si dos requests
+        // concurrentes intentan la misma transición (doble click), sólo UNA
+        // matchea `estado: desde`; la otra recibe null y se trata como "Sin
+        // cambios", evitando entradas duplicadas en estadoHistorial (NOM-024).
+        // Antes era findOne → existing.save(), no atómico: ambos $push aplicaban.
+        const updated = await Appointment.findOneAndUpdate(
+            { _id: req.params.id, deletedAt: null, estado: desde },
+            { $set: setFields, $push: { estadoHistorial: historyEntry } },
+            { new: true, runValidators: true }
+        );
+        if (!updated) {
+            const fresh = await Appointment.findOne({ _id: req.params.id, deletedAt: null });
+            return res.status(200).json({ message: 'Sin cambios', appointment: fresh });
         }
-
-        await existing.save();
 
         // Cancelar cobro asociado si cancelado/no-show
         if (estado === 'Cancelada' || estado === 'NoShow') {
             await PatientCharge.findOneAndUpdate(
-                { appointmentId: existing._id, confirmado: false, cancelado: { $ne: true } },
+                { appointmentId: updated._id, confirmado: false, cancelado: { $ne: true } },
                 {
                     $set: {
                         cancelado: true,
@@ -861,7 +877,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             );
         }
 
-        const populated = await Appointment.findById(existing._id)
+        const populated = await Appointment.findById(updated._id)
             .populate('paciente_id', PATIENT_FIELDS)
             .populate('doctor_id', DOCTOR_FIELDS);
 
@@ -1028,6 +1044,9 @@ exports.getAppointmentActivity = async (req, res) => {
 // DELETE /appointments/:id (soft)
 exports.deleteAppointment = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID de cita inválido' });
+        }
         const motivoRaw = req.body?.motivo;
         // Alineado con cliente: motivo obligatorio, mínimo 5 caracteres.
         if (typeof motivoRaw !== 'string' || motivoRaw.trim().length < MIN_DELETE_REASON_LEN) {

@@ -17,11 +17,13 @@ const ProfileSection = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwMsg, setPwMsg] = useState(null);
+  const [pwSaving, setPwSaving] = useState(false);
 
   // PIN
   const [pinCurrentPassword, setPinCurrentPassword] = useState('');
   const [pin, setPin] = useState('');
   const [pinMsg, setPinMsg] = useState(null);
+  const [pinSaving, setPinSaving] = useState(false);
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
@@ -40,11 +42,13 @@ const ProfileSection = () => {
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
+    if (pwSaving) return; // guard contra doble submit (doble click / Enter)
     setPwMsg(null);
     if (newPassword !== confirmPassword) {
       setPwMsg({ type: 'error', text: 'Las contraseñas no coinciden' });
       return;
     }
+    setPwSaving(true);
     try {
       await changeMyPassword(currentPassword, newPassword);
       setPwMsg({ type: 'success', text: 'Contraseña actualizada' });
@@ -53,12 +57,16 @@ const ProfileSection = () => {
       setConfirmPassword('');
     } catch (err) {
       setPwMsg({ type: 'error', text: err.response?.data?.message || 'Error al cambiar contraseña' });
+    } finally {
+      setPwSaving(false);
     }
   };
 
   const handlePinChange = async (e) => {
     e.preventDefault();
+    if (pinSaving) return; // guard contra doble submit
     setPinMsg(null);
+    setPinSaving(true);
     try {
       await changeMyPin(pinCurrentPassword, pin);
       setPinMsg({ type: 'success', text: 'PIN actualizado' });
@@ -66,6 +74,8 @@ const ProfileSection = () => {
       setPin('');
     } catch (err) {
       setPinMsg({ type: 'error', text: err.response?.data?.message || 'Error al cambiar PIN' });
+    } finally {
+      setPinSaving(false);
     }
   };
 
@@ -121,7 +131,9 @@ const ProfileSection = () => {
           <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required autoComplete="new-password" />
         </div>
         <div className="settings-actions">
-          <button type="submit" className="settings-btn-primary">Cambiar contraseña</button>
+          <button type="submit" className="settings-btn-primary" disabled={pwSaving}>
+            {pwSaving ? 'Guardando…' : 'Cambiar contraseña'}
+          </button>
         </div>
       </form>
 
@@ -149,7 +161,9 @@ const ProfileSection = () => {
           />
         </div>
         <div className="settings-actions">
-          <button type="submit" className="settings-btn-primary">Cambiar PIN</button>
+          <button type="submit" className="settings-btn-primary" disabled={pinSaving}>
+            {pinSaving ? 'Guardando…' : 'Cambiar PIN'}
+          </button>
         </div>
       </form>
     </div>

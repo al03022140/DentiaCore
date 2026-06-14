@@ -532,6 +532,16 @@ const Calendar = () => {
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
+    // Validar orden de horas antes de cualquier trabajo: un fin <= inicio crea
+    // un evento de duración negativa que Google rechaza con un 400 genérico.
+    // El `!(end > start)` también atrapa horas inválidas/vacías (NaN).
+    const startDt = new Date(`${eventForm.date}T${eventForm.startTime}:00`);
+    const endDt = new Date(`${eventForm.date}T${eventForm.endTime}:00`);
+    if (!(endDt > startDt)) {
+      setSyncStatus('error');
+      setSyncMessage('La hora de fin debe ser posterior a la de inicio.');
+      return;
+    }
     let token = getAccessToken();
     // If no valid token, try refreshing
     if (!token) {

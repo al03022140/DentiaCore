@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, InputNumber, Button, message } from 'antd';
 import { openBox } from '../../shared/services/cashService';
 
 const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // Reiniciar el monto cada vez que el modal se abre: el componente permanece
+  // montado dentro de CashPage, así que sin esto un intento previo (p.ej. $500
+  // tecleados y luego cancelado) se arrastraba a la siguiente apertura y podía
+  // abrir la caja con un fondo de cambio incorrecto.
+  useEffect(() => {
+    if (visible) setAmount(0);
+  }, [visible]);
 
   const handleOpen = async () => {
     setLoading(true);

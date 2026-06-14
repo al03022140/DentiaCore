@@ -16,6 +16,9 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   const [charges, setCharges] = useState([]);
   const [total, setTotal] = useState(0);
   const [orphanCount, setOrphanCount] = useState(0);
+  // Cobros con paciente pero excluidos por no caer en "hoy" según el reloj/TZ
+  // de ESTE equipo. Se informa para que el operador no asuma que no hay nada.
+  const [hiddenByDateCount, setHiddenByDateCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Pago rápido (Popconfirm, todo en efectivo) y pago detallado (Modal).
@@ -53,11 +56,13 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       });
       setCharges(visible);
       setOrphanCount(list.length - withPatient.length);
+      setHiddenByDateCount(withPatient.length - visible.length);
       setTotal(visible.length);
     } catch {
       setCharges([]);
       setTotal(0);
       setOrphanCount(0);
+      setHiddenByDateCount(0);
     } finally {
       setLoading(false);
     }
@@ -68,6 +73,7 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       setCharges([]);
       setTotal(0);
       setOrphanCount(0);
+      setHiddenByDateCount(0);
       setLoading(false);
       return;
     }
@@ -95,7 +101,10 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       }));
       fetchCharges();
     } catch (err) {
+      const status = err?.response?.status;
       message.error(err?.response?.data?.message || 'Error al registrar pago');
+      // El saldo del snapshot pudo quedar obsoleto: refrescar la lista.
+      if (status === 400 || status === 409) fetchCharges();
     } finally {
       setQuickPayingId(null);
     }
@@ -137,6 +146,12 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       message.warning('Ingresa un monto válido');
       return;
     }
+    // El input anuncia un "Máximo" pero el atributo HTML max no impide teclear
+    // de más; validar aquí evita un round-trip que el backend rechaza con 400.
+    if (monto > round2(payModalCharge.saldoPendiente)) {
+      message.warning('El monto supera el saldo pendiente del cobro');
+      return;
+    }
     setRegisteringPayment(true);
     try {
       await addPayment(payModalCharge._id, {
@@ -155,7 +170,11 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       }));
       fetchCharges();
     } catch (err) {
+      const status = err?.response?.status;
       message.error(err?.response?.data?.message || 'Error al registrar pago');
+      // El saldo pudo cambiar desde la ficha del paciente u otra pantalla:
+      // refrescar la lista para que el operador vea el saldo real.
+      if (status === 400 || status === 409) fetchCharges();
     } finally {
       setRegisteringPayment(false);
     }
@@ -175,6 +194,14 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
               title="Cobros sin paciente vinculado (paciente eliminado). No se muestran."
             >
               {' '}· {orphanCount} sin paciente
+            </span>
+          )}
+          {hiddenByDateCount > 0 && (
+            <span
+              className="pending-charges-panel__orphan-tag"
+              title="Cobros de otro día según el reloj de este equipo. No se muestran aquí; accede a ellos desde la ficha del paciente."
+            >
+              {' '}· {hiddenByDateCount} de otro día
             </span>
           )}
         </span>

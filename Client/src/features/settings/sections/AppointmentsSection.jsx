@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { getSettings, updateSettings } from '../../../shared/services/settingsService';
 
+// Los días se guardan como enteros 0-6 (convención JS getDay(): 0=domingo)
+// para coincidir con el modelo `workDays: [Number]` y el validador del server
+// (`isInt 0-6`). Antes el cliente enviaba nombres en español, que el validador
+// rechazaba con 400 → el formulario nunca podía guardarse.
 const DAYS = [
-  { key: 'lunes', label: 'Lunes' },
-  { key: 'martes', label: 'Martes' },
-  { key: 'miércoles', label: 'Miércoles' },
-  { key: 'jueves', label: 'Jueves' },
-  { key: 'viernes', label: 'Viernes' },
-  { key: 'sábado', label: 'Sábado' },
-  { key: 'domingo', label: 'Domingo' },
+  { key: 1, label: 'Lunes' },
+  { key: 2, label: 'Martes' },
+  { key: 3, label: 'Miércoles' },
+  { key: 4, label: 'Jueves' },
+  { key: 5, label: 'Viernes' },
+  { key: 6, label: 'Sábado' },
+  { key: 0, label: 'Domingo' },
 ];
 
 const AppointmentsSection = () => {
   const [duration, setDuration] = useState(30);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
-  const [workDays, setWorkDays] = useState(['lunes', 'martes', 'miércoles', 'jueves', 'viernes']);
+  const [workDays, setWorkDays] = useState([1, 2, 3, 4, 5]);
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,7 +32,9 @@ const AppointmentsSection = () => {
           setStartTime(s.businessHours.start || '09:00');
           setEndTime(s.businessHours.end || '18:00');
         }
-        if (s.workDays?.length) setWorkDays(s.workDays);
+        // Reflejar un [] persistido (distinguir "no configurado" de "vacío
+        // explícito"): si el server manda un array, usarlo tal cual.
+        if (Array.isArray(s.workDays)) setWorkDays(s.workDays);
       })
       .catch(() => setMsg({ type: 'error', text: 'Error al cargar configuración' }))
       .finally(() => setLoading(false));
@@ -40,8 +46,18 @@ const AppointmentsSection = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setMsg(null);
+    // Validar ANTES de marcar saving (evita el early-return con saving colgado).
+    // Comparación lexicográfica válida con HH:MM de ancho fijo.
+    if (startTime >= endTime) {
+      setMsg({ type: 'error', text: 'La hora de inicio debe ser anterior a la de fin' });
+      return;
+    }
+    if (workDays.length < 1) {
+      setMsg({ type: 'error', text: 'Selecciona al menos un día laboral' });
+      return;
+    }
+    setSaving(true);
     try {
       await updateSettings({
         defaultAppointmentDuration: Number(duration),
@@ -64,8 +80,11 @@ const AppointmentsSection = () => {
 
       <div className="settings-form-group">
         <label>Duración predeterminada (minutos)</label>
+        {/* Opciones alineadas con el enum del modelo/validador del server
+            (defaultAppointmentDuration). 90 no estaba permitido en el back
+            (causaba 400 al guardar), por eso se omite. */}
         <select value={duration} onChange={(e) => setDuration(e.target.value)}>
-          {[15, 20, 30, 45, 60, 90].map((d) => <option key={d} value={d}>{d} min</option>)}
+          {[15, 20, 30, 45, 60].map((d) => <option key={d} value={d}>{d} min</option>)}
         </select>
       </div>
 

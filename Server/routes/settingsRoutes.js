@@ -47,9 +47,13 @@ const settingsValidationRules = [
     if (typeof v !== 'object' || v === null) throw new Error('businessHours debe ser objeto {start,end}');
     if (v.start && !TIME_REGEX.test(v.start)) throw new Error('businessHours.start debe ser HH:MM');
     if (v.end && !TIME_REGEX.test(v.end)) throw new Error('businessHours.end debe ser HH:MM');
+    // Comparación lexicográfica válida con formato HH:MM de ancho fijo.
+    if (v.start && v.end && v.start >= v.end) {
+      throw new Error('businessHours.start debe ser anterior a businessHours.end');
+    }
     return true;
   }),
-  body('workDays').optional().isArray({ max: 7 }).withMessage('workDays debe ser un array de 0-6'),
+  body('workDays').optional().isArray({ min: 1, max: 7 }).withMessage('Selecciona al menos un día laboral (1-7)'),
   body('workDays.*').optional().isInt({ min: 0, max: 6 }),
   body('cashCategories').optional().isArray({ max: 50 }).withMessage('cashCategories debe ser un array (máx 50)'),
   body('cashCategories.*').optional().isString().trim().isLength({ min: 1, max: 60 }),
@@ -74,7 +78,13 @@ router.patch(
 );
 
 // ── Clinic Logo ──────────────────────────────────────────────
-router.post('/logo', authorize(['settings.update']), uploadLogo.single('logo'), settingsController.uploadLogo);
+router.post(
+  '/logo',
+  authorize(['settings.update']),
+  uploadLogo.single('logo'),
+  uploadLogo.handleMulterError,
+  settingsController.uploadLogo
+);
 router.delete('/logo', authorize(['settings.update']), settingsController.deleteLogo);
 router.get('/logo', settingsController.getLogo);
 
@@ -95,7 +105,7 @@ router.patch('/me/pin', sensitiveActionRateLimit, settingsController.changeMyPin
 // ni firma. Antes `requireClinicalRole` lo permitía (vía isAdminRole), por lo
 // que el admin podía subir firma; `requireSignerRole` lo bloquea.
 router.patch('/me/professional-profile', requireSignerRole, settingsController.updateProfessionalProfile);
-router.post('/me/firma', requireSignerRole, uploadFirma.single('firma'), settingsController.uploadFirma);
+router.post('/me/firma', requireSignerRole, uploadFirma.single('firma'), uploadFirma.handleMulterError, settingsController.uploadFirma);
 router.delete('/me/firma', requireSignerRole, settingsController.deleteFirma);
 
 // ── Get firma of a specific user ─────────────────────────────────
