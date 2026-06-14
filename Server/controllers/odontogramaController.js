@@ -7,6 +7,7 @@ const {
 const mongoose = require('mongoose');
 const fsExtra = require('fs-extra');
 const OdontogramaModel = require('../models/odontograma');
+const OdontogramaHistory = require('../models/odontogramaHistory');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 const { computeContentHash } = require('../utils/signing');
@@ -32,6 +33,43 @@ const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-
 // adyacencia (ver nota extensa en models/odontograma.js): el engine es el único
 // productor y emite un conjunto cerrado de IDs.
 const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
+
+// Genera un versionName por defecto inequívoco para una versión del odontograma
+// clínico. Mismo formato que el periodontograma (periodontogramController.js):
+// ISO compacto + sufijo random de 6 hex chars. El sufijo evita colisiones con
+// el índice único (patient, versionName) bajo doble-click o reintentos.
+const generateDefaultVersionName = () => {
+  const iso = new Date().toISOString().replace(/[:.-]/g, ''); // ej. 20260613T143012345Z
+  const suffix = Math.random().toString(16).slice(2, 8);
+  return `${iso}_${suffix}`;
+};
+
+// Construye la lista de versiones del odontograma clínico para la respuesta de
+// la API. Lee de la colección inmutable `odontograma_history` (orden cronológico
+// descendente); si está vacía para el paciente (datos legacy aún sin migrar por
+// 0004), cae al array `history[]` embebido del documento. Forma homogénea:
+// { id, versionName, fecha, datos }.
+const buildClinicalHistoryList = async (patientId, doc) => {
+  const versions = await OdontogramaHistory.find({ patient: patientId })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (versions.length > 0) {
+    return versions.map(v => ({
+      id: v._id,
+      versionName: v.versionName,
+      fecha: v.createdAt,
+      datos: (v.datos || []).map(normalizeEntry)
+    }));
+  }
+  return (doc?.history || [])
+    .filter(h => !h.deletedAt)
+    .map(h => ({
+      id: h._id,
+      versionName: h.versionName || null,
+      fecha: h.savedAt ? h.savedAt.toISOString() : null,
+      datos: (h.datos || []).map(normalizeEntry)
+    }));
+};
 
 // ——— Controladores ——————————————————————————————————————————————————————————————
 const verificarOdontogramaInicial = async (req, res, next) => {
@@ -489,14 +527,51 @@ const verificarOdontogramaClinico = async (req, res, next) => {
         error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
       });
     }
-    
+
+    // ── Listado de versiones (paridad con el periodontograma ?listVersions=true) ──
+    if (req.query.listVersions === 'true') {
+      const rows = await OdontogramaHistory.find({ patient: patientId })
+        .sort({ createdAt: -1 })
+        .select('versionName createdAt updatedAt')
+        .lean();
+      const seen = new Set();
+      const versions = [];
+      for (const r of rows) {
+        const name = (r.versionName || '').trim();
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        versions.push({ versionName: name, createdAt: r.createdAt, updatedAt: r.updatedAt });
+      }
+      return res.json({ success: true, versions });
+    }
+
+    // ── Datos de una versión específica (paridad con ?version=X) ──
+    if (req.query.version) {
+      const entry = await OdontogramaHistory.findOne({ patient: patientId, versionName: req.query.version })
+        .sort({ createdAt: -1 })
+        .lean();
+      if (!entry) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'VERSION_NOT_FOUND', message: 'Versión solicitada no encontrada' }
+        });
+      }
+      return res.json({
+        exists: true,
+        versionName: entry.versionName,
+        datos: (entry.datos || []).map(normalizeEntry),
+        source: 'history',
+        updatedAt: entry.updatedAt
+      });
+    }
+
     debugLog('🔍 [verificarOdontogramaClinico] Buscando en BD con patientId:', patientId, 'type:', TYPE_CLINIC);
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_CLINIC,
       deletedAt: null
     });
-    
+
     debugLog('📋 [verificarOdontogramaClinico] Documento encontrado:', {
       docExists: !!doc,
       currentExists: !!doc?.current,
@@ -505,21 +580,20 @@ const verificarOdontogramaClinico = async (req, res, next) => {
     });
 
     const datos = doc?.current?.datos?.map(normalizeEntry) || [];
-    const history = (doc?.history || []).filter(h => !h.deletedAt).map(h => ({
-      id: h._id,
-      fecha: h.savedAt.toISOString(),
-      datos: (h.datos || []).map(normalizeEntry)
-    }));
+    // El historial se sirve desde la colección de versiones (fallback al
+    // embebido legacy si el paciente aún no se migró).
+    const history = await buildClinicalHistoryList(patientId, doc);
 
     // updatedAt se devuelve para que el cliente lo pase como expectedUpdatedAt
     // al guardar; es la base del control de concurrencia 409.
     const responseData = {
       exists: !!doc && !!doc.current,
+      versionName: doc?.current?.versionName || null,
       datos,
       history,
       updatedAt: doc ? doc.updatedAt : null,
     };
-    
+
     debugLog('📤 [verificarOdontogramaClinico] Respuesta enviada:', {
       exists: responseData.exists,
       datosCount: responseData.datos.length,
@@ -547,29 +621,19 @@ const obtenerHistorialClinico = async (req, res, next) => {
     }
     
     debugLog('🔍 [obtenerHistorialClinico] Buscando historial con patientId:', patientId, 'type:', TYPE_CLINIC);
+    // Solo se necesita el embebido como fallback legacy; el historial real son
+    // las versiones de `odontograma_history` (las resuelve buildClinicalHistoryList).
     const doc = await OdontogramaModel.findOne({
       patientId: patientId,
       type: TYPE_CLINIC,
       deletedAt: null
     }).select('history');
 
-    debugLog('📋 [obtenerHistorialClinico] Documento encontrado:', {
-      docExists: !!doc,
-      historyExists: !!doc?.history,
-      historyLength: doc?.history?.length
-    });
-
-    const activeHistory = (doc?.history || []).filter(h => !h.deletedAt);
-    if (!doc || activeHistory.length === 0) {
+    const history = await buildClinicalHistoryList(patientId, doc);
+    if (history.length === 0) {
       debugLog('📭 [obtenerHistorialClinico] Sin historial, devolviendo vacío');
       return res.json({ exists: false, history: [] });
     }
-
-    const history = activeHistory.map(h => ({
-      id: h._id,
-      fecha: h.savedAt.toISOString(),
-      datos: (h.datos || []).map(normalizeEntry)
-    }));
 
     debugLog('📤 [obtenerHistorialClinico] Enviando historial con', history.length, 'entradas');
     res.json({
@@ -611,9 +675,17 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
         // Valida appointmentId vs paciente — descartado silenciosamente
         // si referencia una cita de otro paciente (anti cross-linking).
         const clinicAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
+
+        // Nombre de la versión: el cliente puede mandar uno; si no, se autogenera
+        // con el mismo esquema del periodontograma. Cada guardado con cambios crea
+        // una versión nueva e inmutable en `odontograma_history`.
+        const versionName = (typeof req.body?.versionName === 'string' && req.body.versionName.trim())
+          || generateDefaultVersionName();
+
         const snapshot = {
             datos: entries,
             imageUrl: '',
+            versionName,
             savedAt,
             appointmentId: clinicAppointmentId,
             savedBy: req.user?.id || null
@@ -689,57 +761,113 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       if (prev.length !== next.length) return false;
       return prev.every((v, i) => v === next[i]);
     };
-    const shouldPushHistory = !existingClinic || !isIdenticalToCurrent(existingClinic, entries);
+    const shouldCreateVersion = !existingClinic || !isIdenticalToCurrent(existingClinic, entries);
+
+    // Si NO se crea versión (guardado idéntico al actual), `current.versionName`
+    // debe conservar el nombre de la versión vigente — sobrescribirlo con un
+    // nombre nuevo no persistido dejaría a `current` apuntando a una versión que
+    // no existe en `odontograma_history`.
+    const effectiveVersionName = shouldCreateVersion
+      ? versionName
+      : (existingClinic?.current?.versionName || versionName);
+    snapshot.versionName = effectiveVersionName;
+
+    // Ya NO escribimos el array embebido `history[]`: se conserva intacto como
+    // fuente legacy de solo lectura (lo migra 0004). Las versiones nuevas viven
+    // en la colección inmutable `odontograma_history`.
     const updateOps = {
       $set: { current: snapshot, ...auditUpdate },
       $setOnInsert: { creadoPor: req.user?.id || null }
     };
-    if (shouldPushHistory) {
-      updateOps.$push = { history: snapshot };
+    // P3: `firmadoEn: null` cierra la carrera TOCTOU. Si otra request firmó el
+    // odontograma clínico entre la verificación previa y este upsert, el filtro
+    // ya no coincide, el upsert intenta INSERTAR y choca con el índice único
+    // parcial {patientId, type} → E11000, que traducimos a 403 inmutable.
+    const filter = { patientId: patientId, type: TYPE_CLINIC, deletedAt: null, firmadoEn: null };
+    const upsertOpts = { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true };
+
+    // Escritura atómica del doc principal + la versión, con fallback a Mongo
+    // standalone (mismo patrón que el periodontograma). El main se escribe
+    // PRIMERO para obtener su _id (lo necesita el campo `odontograma` de la
+    // versión); ante un fallo posterior el único residuo sería la versión
+    // huérfana, que es append-only y no corrompe `current`.
+    let doc;
+    const createVersion = async (session) => {
+      await OdontogramaHistory.create([{
+        patient: patientId,
+        odontograma: doc._id,
+        appointmentId: clinicAppointmentId,
+        versionName,
+        datos: entries,
+        createdBy: req.user?.id || null
+      }], session ? { session } : undefined);
+    };
+    const writeWithTransaction = async (session) => {
+      await session.withTransaction(async () => {
+        doc = await OdontogramaModel.findOneAndUpdate(filter, updateOps, { ...upsertOpts, session });
+        if (shouldCreateVersion) await createVersion(session);
+      });
+    };
+    const writeWithoutTransaction = async () => {
+      doc = await OdontogramaModel.findOneAndUpdate(filter, updateOps, upsertOpts);
+      if (shouldCreateVersion) await createVersion(null);
+    };
+    const isStandaloneTxError = (err) => {
+      const msg = String(err?.message || '');
+      return (
+        err?.codeName === 'IllegalOperation' ||
+        err?.code === 20 ||
+        msg.includes('Transaction numbers are only allowed on a replica set') ||
+        msg.includes('Transactions are not supported')
+      );
+    };
+
+    const session = await mongoose.startSession();
+    try {
+      try {
+        await writeWithTransaction(session);
+      } catch (txError) {
+        if (isStandaloneTxError(txError)) {
+          console.warn('⚠️ MongoDB standalone detectado — guardando odontograma clínico sin transacción');
+          await writeWithoutTransaction();
+        } else {
+          throw txError;
+        }
+      }
+    } catch (writeError) {
+      // Distinguir el origen del E11000:
+      //  - índice {patient, versionName} de odontograma_history → 409 conflicto de nombre
+      //  - índice parcial {patientId, type} del doc principal → el clínico fue
+      //    firmado en una request concurrente (TOCTOU) → 403 inmutable
+      if (writeError && writeError.code === 11000) {
+        const isVersionConflict = (writeError.keyPattern && writeError.keyPattern.versionName)
+          || /versionName/i.test(String(writeError.message));
+        if (isVersionConflict) {
+          return res.status(409).json({
+            success: false,
+            error: { code: 'VERSION_NAME_CONFLICT', message: `Ya existe una versión con el nombre '${versionName}'. Use un nombre diferente.` }
+          });
+        }
+        return res.status(403).json({
+          success: false,
+          error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico firmado. Use addendum para correcciones.' }
+        });
+      }
+      throw writeError;
+    } finally {
+      session.endSession();
     }
-    const doc = await OdontogramaModel.findOneAndUpdate(
-      // P3: `firmadoEn: null` cierra la carrera TOCTOU. Si otra request firmó el
-      // odontograma clínico entre la verificación previa y este upsert, el filtro
-      // ya no coincide, el upsert intenta INSERTAR y choca con el índice único
-      // → E11000, que el catch traduce a 403 inmutable.
-      { patientId: patientId, type: TYPE_CLINIC, deletedAt: null, firmadoEn: null },
-      updateOps,
-      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true } // P4
-    );
-    
-    // debugLog('💾 [saveClinicalHistoryEntries] Documento guardado en BD:', {
-    //   docId: doc._id,
-    //   currentDatos: doc.current?.datos,
-    //   historyLength: doc.history?.length
-    // });
 
     const responseData = {
       exists: true,
+      versionName: effectiveVersionName,
       datos: (doc.current.datos || []).map(normalizeEntry),
-      history: (doc.history || []).filter(h => !h.deletedAt).map(h => ({
-        id: h._id,
-        fecha: h.savedAt.toISOString(),
-        datos: (h.datos || []).map(normalizeEntry)
-      })),
+      history: await buildClinicalHistoryList(patientId, doc),
       updatedAt: doc.updatedAt
     };
-    
-    // debugLog('📤 [saveClinicalHistoryEntries] Respuesta enviada:', {
-    //   exists: responseData.exists,
-    //   datosCount: responseData.datos.length,
-    //   historyCount: responseData.history.length
-    // });
 
     res.status(201).json(responseData);
   } catch (error) {
-    // P3: choque con el índice único = el odontograma clínico fue firmado en una
-    // request concurrente tras la verificación → 403 inmutable (no 500 opaco).
-    if (error && error.code === 11000) {
-      return res.status(403).json({
-        success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma clínico firmado. Use addendum para correcciones.' }
-      });
-    }
     next(error);
   }
 };

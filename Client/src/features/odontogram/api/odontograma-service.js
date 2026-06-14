@@ -247,6 +247,8 @@ const odontogramaService = {
       const entries = buildBackendEntries(entryData);
       const body = { entries };
       if (options.appointmentId) body.appointmentId = options.appointmentId;
+      // Nombre de versión opcional: si no se manda, el servidor autogenera uno.
+      if (options.versionName) body.versionName = options.versionName;
       // Concurrencia optimista: el server compara con su updatedAt actual y
       // responde 409 ODONTOGRAMA_STALE si difieren.
       if (options.expectedUpdatedAt) body.expectedUpdatedAt = options.expectedUpdatedAt;
@@ -262,8 +264,65 @@ const odontogramaService = {
       );
       return {
         exists: data.exists ?? true,
+        versionName: data.versionName || null,
         datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
         history: Array.isArray(data.history) ? data.history : [],
+        updatedAt: data.updatedAt || null
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Lista los nombres de versión del odontograma clínico (más reciente primero).
+   * Paridad con PeriodontogramService.getDataVersions: filtra ObjectIds sueltos
+   * y deduplica preservando el orden del backend.
+   * @param {string} patientId - ID del paciente
+   * @returns {Promise<string[]>} Lista de versionName
+   */
+  async getClinicalDataVersions(patientId, options = {}) {
+    try {
+      const { data } = await API.get(
+        `/patients/${patientId}/odontograma-clinico?listVersions=true`,
+        { timeout: DEFAULT_TIMEOUT, signal: options.signal }
+      );
+      const raw = Array.isArray(data?.versions) ? data.versions : [];
+      const mapped = raw.map((entry) => {
+        if (typeof entry === 'string') return entry.trim();
+        if (entry && typeof entry === 'object' && entry.versionName) return String(entry.versionName).trim();
+        return null;
+      });
+      const filtered = mapped.filter((name) => {
+        if (typeof name !== 'string' || name.trim().length === 0) return false;
+        return !/^[a-f0-9]{24}$/i.test(name); // descartar ObjectIds sueltos
+      });
+      const seen = new Set();
+      const deduped = [];
+      for (const v of filtered) { if (!seen.has(v)) { seen.add(v); deduped.push(v); } }
+      return deduped;
+    } catch (error) {
+      if (error.response?.status === 404) return [];
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Obtiene los datos de una versión específica del odontograma clínico.
+   * @param {string} patientId - ID del paciente
+   * @param {string} versionName - Nombre de la versión a cargar
+   * @returns {Promise<{exists: boolean, versionName: string, datos: Array, updatedAt: string|null}>}
+   */
+  async getClinicalDataVersion(patientId, versionName, options = {}) {
+    try {
+      const { data } = await API.get(
+        `/patients/${patientId}/odontograma-clinico?version=${encodeURIComponent(versionName)}`,
+        { timeout: DEFAULT_TIMEOUT, signal: options.signal }
+      );
+      return {
+        exists: data.exists ?? true,
+        versionName: data.versionName ?? versionName,
+        datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
         updatedAt: data.updatedAt || null
       };
     } catch (error) {

@@ -516,6 +516,30 @@
   align-items: center;
 }
 
+/* Selector de versiones del odontograma clínico — mismo look que el del
+   periodontograma para paridad visual. */
+.odontograma-version-select {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: var(--card-border-width) solid var(--color-primary);
+  border-radius: var(--border-radius-md);
+  font: var(--pd-font-select);
+  color: var(--color-primary);
+  background-color: var(--color-bg-white);
+  transition: border-color var(--transition-medium), box-shadow var(--transition-medium);
+  min-width: 13.75rem;
+}
+
+.odontograma-version-select:focus {
+  outline: none;
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 0 0 3px var(--color-blue-500-25);
+}
+
+.odontograma-version-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Botón toggle "Ver registro" — outline azul profundo (mismo --color-primary
    que el botón "Guardar" del periodontograma). Mismo TAMAÑO que .capture-button
    / .odontogram-save-button (idéntico padding, border-width y font) pero con

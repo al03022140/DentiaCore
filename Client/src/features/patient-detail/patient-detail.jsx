@@ -38,6 +38,7 @@ import AddPatient from "../add-patient/add-patient.jsx";
 import API from '../../shared/services/axios-instance.js';
 import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
+import { sortVersionsDesc } from '../../shared/utils/version-name.js';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';
 import PatientInfoHeader from './components/patient-info-header.jsx';
 import PatientAppointmentsInfo from './components/patient-appointments-info.jsx';
@@ -181,6 +182,9 @@ const PatientDetail = () => {
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
+  // Versionado del odontograma clínico (paridad con el periodontograma).
+  const [clinicalVersionList, setClinicalVersionList] = useState([]);
+  const [clinicalSelectedVersion, setClinicalSelectedVersion] = useState(null);
   // updatedAt del documento odontograma — base del control de concurrencia
   // optimista (se reenvía como expectedUpdatedAt al guardar).
   const [initialOdontogramUpdatedAt, setInitialOdontogramUpdatedAt] = useState(null);
@@ -371,6 +375,14 @@ const PatientDetail = () => {
       setClinicalOdontogramData(result.datos || entryData || []);
       setClinicalOdontogramExists(result.exists ?? true);
       setClinicalOdontogramUpdatedAt(result.updatedAt || null);
+      // Refrescar la lista de versiones y seleccionar la recién creada.
+      try {
+        const versions = await odontogramaService.default.getClinicalDataVersions(patientId);
+        setClinicalVersionList(sortVersionsDesc(versions || []));
+        if (result.versionName) setClinicalSelectedVersion(result.versionName);
+      } catch (refreshErr) {
+        console.error('Error refrescando versiones del odontograma clínico:', refreshErr);
+      }
     } catch (err) {
       // handleApiError aplana el axios error a Error(message) con `code`/`status`
       // adjuntos: el code de negocio ya NO viaja en err.response.data.error.code.
@@ -402,6 +414,22 @@ const PatientDetail = () => {
       throw err;
     }
   }, [patientId, currentAppointmentId, clinicalOdontogramUpdatedAt]);
+
+  // Cargar una versión concreta en el canvas. El confirm de "cambios sin
+  // guardar" lo gestiona el hijo (que conoce el dirty del engine) antes de
+  // invocar este handler.
+  const handleSelectClinicalVersion = useCallback(async (versionName) => {
+    if (!versionName) return;
+    try {
+      const odontogramaService = await import('../odontogram/api/odontograma-service.js');
+      const result = await odontogramaService.default.getClinicalDataVersion(patientId, versionName);
+      setClinicalOdontogramData(result.datos || []);
+      setClinicalSelectedVersion(result.versionName || versionName);
+    } catch (err) {
+      console.error('Error al cargar versión del odontograma clínico:', err);
+      message.error('No se pudo cargar la versión seleccionada.');
+    }
+  }, [patientId]);
 
   const handleDeleteClinicalCanvasState = useCallback(async () => {
     try {
@@ -574,16 +602,25 @@ const PatientDetail = () => {
       try {
         const odontogramaService = await import('../odontogram/api/odontograma-service.js');
         if (cancelled) return;
-        const clinicalState = await odontogramaService.default.getClinicalOdontogramState(patientId);
+        const [clinicalState, versions] = await Promise.all([
+          odontogramaService.default.getClinicalOdontogramState(patientId),
+          odontogramaService.default.getClinicalDataVersions(patientId)
+        ]);
         if (cancelled) return;
         setClinicalOdontogramData(clinicalState.datos || []);
         setClinicalOdontogramExists(clinicalState.exists || false);
         setClinicalOdontogramUpdatedAt(clinicalState.updatedAt || null);
+        const ordered = sortVersionsDesc(versions || []);
+        setClinicalVersionList(ordered);
+        // La versión activa es la del `current`; si no viene, la más reciente.
+        setClinicalSelectedVersion(clinicalState.versionName || ordered[0] || null);
       } catch {
         if (cancelled) return;
         setClinicalOdontogramData([]);
         setClinicalOdontogramExists(false);
         setClinicalOdontogramUpdatedAt(null);
+        setClinicalVersionList([]);
+        setClinicalSelectedVersion(null);
       }
     })();
     return () => { cancelled = true; };
@@ -680,6 +717,9 @@ const PatientDetail = () => {
                 clinicalData={clinicalOdontogramData}
                 onDelete={handleDeleteClinicalCanvasState}
                 onDataSave={handleSaveClinicalCanvasData}
+                versionList={clinicalVersionList}
+                selectedVersion={clinicalSelectedVersion}
+                onSelectVersion={handleSelectClinicalVersion}
                 areScriptsReady={areScriptsReadyState}
                 canvasRef={canvas2Ref}
               />

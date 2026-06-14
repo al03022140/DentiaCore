@@ -4,6 +4,7 @@ import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogra
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
+import { formatVersionLabel } from '../../../shared/utils/version-name.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
 import PropTypes from 'prop-types';
@@ -52,11 +53,14 @@ const getDamageNameFromIdInternal = (damageId, engineInstance) => {
     return result;
 };
 
-const OdontogramClinicalSection = ({ 
-    patientId, 
+const OdontogramClinicalSection = ({
+    patientId,
     clinicalData = [], // Estado actual del CANVAS (snapshot)
     onDelete = () => {}, // Callback al padre para borrar canvas state
     onDataSave = () => {}, // Callback al padre para guardar canvas state
+    versionList = [], // Lista de versionName (más reciente primero)
+    selectedVersion = null, // versionName activo en el selector
+    onSelectVersion = () => {}, // Callback al padre para cargar una versión
 
     areScriptsReady = false, // Parámetro por defecto
     canvasRef
@@ -288,6 +292,21 @@ const OdontogramClinicalSection = ({
             savingRef.current = false;
         }
     }, [isEngineInitialized, onDataSave, loadClinicalHistory, getDamageNameFromId]);
+
+    // Cambio de versión desde el selector. El padre carga los datos en el canvas;
+    // aquí gestionamos el confirm de "cambios sin guardar" porque este componente
+    // es quien conoce el dirty del engine (isDirtyRef).
+    const handleVersionChange = useCallback((e) => {
+        const ver = e.target.value;
+        if (!ver || ver === selectedVersion) return;
+        if (isDirtyRef.current) {
+            const ok = window.confirm('Hay cambios sin guardar en el canvas. Cambiar de versión los descartará. ¿Continuar?');
+            if (!ok) return;
+            markClean();
+            draft.clearDraft();
+        }
+        onSelectVersion(ver);
+    }, [selectedVersion, onSelectVersion, markClean, draft]);
 
     // Columnas de la tabla - Estado Actual (usa datos directos sin prepareDataSource)
     const odontogramColumns = [
@@ -683,6 +702,20 @@ const OdontogramClinicalSection = ({
                   </p>
                 </div>
                 <div className="odontograma-controls">
+                  {versionList.length > 0 && (
+                    <select
+                      className="odontograma-version-select"
+                      value={selectedVersion || ''}
+                      onChange={handleVersionChange}
+                      disabled={isSaving}
+                      title="Versión del odontograma clínico"
+                      aria-label="Versión del odontograma clínico"
+                    >
+                      {versionList.map(v => (
+                        <option key={v} value={v}>{formatVersionLabel(v)}</option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
                     className="button-primary capture-button"
@@ -848,7 +881,10 @@ OdontogramClinicalSection.propTypes = {
   clinicalData: PropTypes.array,
   onDelete: PropTypes.func,
   onDataSave: PropTypes.func,
-  
+  versionList: PropTypes.array,
+  selectedVersion: PropTypes.string,
+  onSelectVersion: PropTypes.func,
+
   areScriptsReady: PropTypes.bool,
   canvasRef: PropTypes.oneOfType([
     PropTypes.func,

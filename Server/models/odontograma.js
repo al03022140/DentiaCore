@@ -181,6 +181,11 @@ const odontogramaSchema = new Schema({
     // imageUrl es opcional: el inicial guarda PNG del canvas, el clínico no tiene imagen.
     imageUrl: { type: String, default: '' },
     datos:    { type: [entrySchema], default: [] }, // Unificado a 'datos'
+    // Nombre de la versión activa (paridad con periodontogram.current.versionName).
+    // Apunta a la última versión guardada en la colección `odontograma_history`.
+    // Sin `required` a propósito: docs legacy y el upsert con runValidators no
+    // deben fallar por su ausencia; el default cubre los casos nuevos.
+    versionName: { type: String, default: 'Inicial' },
     savedAt:  { type: Date, default: () => new Date() },
     // Cita en la que se actualizó por última vez (opcional)
     appointmentId: { type: Types.ObjectId, ref: 'Appointment', default: null },
