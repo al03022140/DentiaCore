@@ -18,7 +18,7 @@ Falsos positivos descartados: 12 (4 secciones) + 7 (citas) = 19.
 ### Estado de fixes
 - ✅ Los **5 HIGH** (add-patient mass-assignment, fuga PII citas, caja forceResolve atómico, caja openBox bloqueo CLOSING, búsqueda #expediente) aplicados.
 - ✅ Los **12 MEDIUM** aplicados (2026-06-14). Verificado: suite servidor 152 passed; 3 fallos pre-existentes (nota OFICIAL, captura extemporánea, treatment-plan).
-- ⏳ 30 low pendientes.
+- ✅ **30 de 30 LOW** cerrados (2026-06-16; working tree limpio, `git diff HEAD` vacío). 29 aplicados y verificados (verificación estática: los controllers/rutas/modelos tocados pasan `node --check`). El ítem de Caja "items con `precioUnitario=0`" se resolvió como **decisión de producto: se permiten líneas en $0** (cortesías, garantías/retrabajo, ítems incluidos en paquete) — el comportamiento actual es correcto, sin cambio de código. El suite de servidor debe correrse localmente para re-confirmar (la descarga del binario de Mongo de `mongodb-memory-server` está bloqueada en entornos sin acceso a `fastdl.mongodb.org`); última corrida registrada: 152 passed / 3 fallos pre-existentes.
 
 ---
 

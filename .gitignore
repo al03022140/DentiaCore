@@ -65,3 +65,4 @@ DentiaCore.app/
 
 # Documentación interna / reportes de auditoría — se mantienen locales
 docs-locales/
+.cursor/
