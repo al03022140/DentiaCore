@@ -193,7 +193,11 @@ describe('Draft logic automatico', () => {
     expect(res.body.data.estadoRegistro).toBe('BORRADOR');
   });
 
-  test('Doctor crea nota de evolucion como OFICIAL', async () => {
+  // Tras el refactor de firma (NOM-024), una nota creada SIN firmas nace como
+  // BORRADOR aunque la cree un doctor; sólo pasa a OFICIAL al firmarla (lo cubre
+  // el test 'Firmar borrador con PIN correcto transiciona a OFICIAL'). El cliente
+  // refleja lo mismo: "Nota guardada como BORRADOR. Pídale al doctor que la firme."
+  test('Doctor crea nota de evolucion sin firmas -> BORRADOR', async () => {
     const { token: doctorToken } = await createUser({ rol: 'doctor' });
     const patient = await createPatient();
 
@@ -208,7 +212,7 @@ describe('Draft logic automatico', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.estadoRegistro).toBe('OFICIAL');
+    expect(res.body.data.estadoRegistro).toBe('BORRADOR');
   });
 
   test('Doctor crea plan de tratamiento como OFICIAL', async () => {
@@ -554,7 +558,12 @@ describe('Captura extemporanea (backdatedEntry)', () => {
           observaciones: 'Se registra tardiamente',
           fecha: pastDate.toISOString(),
         },
-        capturaExtemporaneaMotivo: 'Emergencia atendida fuera de horario, registro posterior obligado',
+        // El guard global `validarCapturaExtemporanea` (y el cliente) usan el
+        // objeto anidado `_capturaExtemporanea.motivo`, no un campo plano.
+        _capturaExtemporanea: {
+          motivo: 'emergencia_medica',
+          motivoDetalle: 'Emergencia atendida fuera de horario, registro posterior obligado',
+        },
       });
 
     expect(res.status).toBe(201);

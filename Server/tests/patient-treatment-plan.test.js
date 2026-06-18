@@ -73,7 +73,10 @@ describe('POST /api/patients/:id/treatment-plan', () => {
     const payload = {
       treatmentPlan: {
         texto: 'Aplicar tratamiento periodontal',
-        fecha: '2025-02-01T12:00:00.000Z',
+        // Fecha actual: una fecha fija en el pasado (>6h) dispara el guard de
+        // captura extemporánea y devuelve 400. Este test valida el guardado y el
+        // formato de la respuesta, no el backdating (eso se cubre aparte).
+        fecha: new Date().toISOString(),
         confirmar: 'confirmar'
       }
     };
