@@ -160,19 +160,33 @@ export function createStuSession(opts = {}) {
     async start() {
       if (!driver.checkConnected()) return;
       if (renderer) renderer.clear();
-      try {
-        await driver.setBackgroundColor(padBackground);
-        await driver.setPenColorAndWidth(inkColor, penWidth);
-        await driver.clearScreen();
-        await driver.setInking(true);
-        // Modo 1 = lápiz suave con timing extra (mejores trazos).
-        await driver.setWritingMode(1);
-      } catch (err) {
-        // Un timeout HID (driver) = tableta colgada: lo propagamos para que el
-        // panel muestre el error en vez de pasar a "listo" sin captura.
-        if (err?.code === 'WACOM_TIMEOUT') throw err;
-        /* algunos comandos de LCD son específicos por modelo: no es crítico */
-      }
+      // Cada comando del pad se ejecuta AISLADO. En algunos modelos (p.ej. el
+      // STU-500/500B) ciertos feature reports (fondo/color) pueden rechazar; si
+      // todo estuviera en un mismo try, un fallo temprano se llevaría por delante
+      // al clearScreen() y la firma anterior se quedaría pintada en el LCD al
+      // pasar de un firmante a otro (paciente → doctor). Aislando cada paso, un
+      // fallo no tumba a los demás. Un WACOM_TIMEOUT (tableta colgada) sí se
+      // propaga para que el panel muestre el error en vez de pasar a "listo".
+      const step = async (fn) => {
+        try {
+          await fn();
+        } catch (err) {
+          if (err?.code === 'WACOM_TIMEOUT') throw err;
+          /* comando de LCD específico de modelo: no es crítico, continuamos */
+        }
+      };
+      // clearScreen() PRIMERO: deja el pad limpio de inmediato aunque algún
+      // comando de estilo falle después → al abrir el panel del doctor el LCD
+      // se limpia solo, sin tener que escribir para reactivar el botón Limpiar.
+      await step(() => driver.clearScreen());
+      await step(() => driver.setBackgroundColor(padBackground));
+      await step(() => driver.setPenColorAndWidth(inkColor, penWidth));
+      // setBackgroundColor solo surte efecto al refrescar la pantalla: un segundo
+      // clearScreen aplica el fondo (y reafirma el borrado) sin romper nada.
+      await step(() => driver.clearScreen());
+      await step(() => driver.setInking(true));
+      // Modo 1 = lápiz suave con timing extra (mejores trazos).
+      await step(() => driver.setWritingMode(1));
     },
 
     /** Limpia la firma (lienzo + pantalla del pad). */

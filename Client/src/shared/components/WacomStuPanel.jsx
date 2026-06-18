@@ -300,11 +300,16 @@ export default function WacomStuPanel({
         </div>
       ) : (
         <div className="signature-pad-actions">
+          {/* El botón Limpiar queda disponible siempre que la tableta esté
+              conectada (status 'ready'), no solo cuando ya hay trazo. Es un
+              refuerzo: si el LCD conservara tinta de una firma anterior y el
+              lado de la app se cree vacío (empty=true), permite forzar el
+              borrado del pad sin tener que escribir antes para reactivarlo. */}
           <button
             type="button"
             className="signature-pad-btn signature-pad-btn-clear"
             onClick={handleClear}
-            disabled={loading || empty}
+            disabled={loading}
           >
             Limpiar
           </button>

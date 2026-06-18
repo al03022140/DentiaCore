@@ -281,8 +281,13 @@ export class WacomStuDriver {
     const data = event.data; // DataView (sin el byte de reportId)
     const status = data.getUint8(0);
     const packet = {
-      rdy: (status & (1 << 0)) !== 0, // lápiz en proximidad
-      sw: (status & (1 << 1)) !== 0, // lápiz en contacto con la superficie
+      // El STU-500/500B marca proximidad/contacto en los bits ALTOS (0x80/0x10),
+      // mientras que el STU-430/540 los marca en los BAJOS (0x01/0x02). Aceptamos
+      // ambas disposiciones a la vez: los bits son disjuntos, así no hay colisión
+      // y funciona en los dos sin tocar nada más. (Sin esto, en el STU-500 `sw`
+      // salía SIEMPRE false y el renderer nunca dibujaba el trazo.)
+      rdy: (status & 0x01) !== 0 || (status & 0x80) !== 0, // lápiz en proximidad
+      sw: (status & 0x02) !== 0 || (status & 0x10) !== 0, // lápiz en contacto con la superficie
       cx: Math.trunc(data.getUint16(2) / this.config.scaleFactor), // px de pantalla
       cy: Math.trunc(data.getUint16(4) / this.config.scaleFactor), // px de pantalla
       x: data.getUint16(2), // unidades de tableta

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
+import WacomStuPanel from '../../../shared/components/WacomStuPanel.jsx';
 import { useAuth } from '../../../app/auth/AuthContext';
 import {
   updateProfessionalProfile,
@@ -41,6 +42,10 @@ const ProfessionalProfileSection = () => {
   const [firmaMsg, setFirmaMsg] = useState(null);
   const [firmaSaving, setFirmaSaving] = useState(false);
   const [padEmpty, setPadEmpty] = useState(true);
+  // Fallback STU → canvas: si el doctor tiene la Wacom STU como dispositivo pero
+  // pulsa "Firmar en pantalla", dibujamos en el canvas en vez del pad. Se
+  // reinicia al cambiar de dispositivo o al volver al modo "Dibujar".
+  const [stuFallback, setStuFallback] = useState(false);
   // Cache-buster para forzar al <img> a recargar tras subir/reemplazar firma.
   const [firmaVersion, setFirmaVersion] = useState(() => Date.now());
   // Preview inmediato (dataURL) de la firma que acaba de hacer/subir el usuario,
@@ -93,6 +98,13 @@ const ProfessionalProfileSection = () => {
       setSignatureInput(user.preferences.signatureInput);
     }
   }, [user?.preferences?.signatureInput]);
+
+  // Al cambiar de dispositivo o volver al modo "Dibujar", reofrecer la Wacom STU
+  // (deshace un "Firmar en pantalla" previo) para que el doctor pueda capturar
+  // su firma directamente en el pad.
+  useEffect(() => {
+    setStuFallback(false);
+  }, [signatureInput, firmaMode]);
 
   // Persistir el dispositivo de firma. Optimista: actualizamos el estado
   // local primero, revertimos si el server rechaza.
@@ -269,6 +281,34 @@ const ProfessionalProfileSection = () => {
     }
   };
 
+  // ── Guardar firma capturada con la tableta Wacom STU ──
+  // WacomStuPanel entrega un PNG dataURL idéntico al del canvas; lo subimos por
+  // el MISMO camino que la firma dibujada (uploadFirma → multipart PNG), así el
+  // doctor con STU registra aquí su firma igual que firma notas/consentimientos.
+  // Re-lanzamos en error para que el panel también muestre el mensaje en sitio.
+  const saveStuFirma = async (pngDataUrl) => {
+    if (!pngDataUrl) return;
+    setFirmaMsg(null);
+    setLocalPreview(pngDataUrl); // preview inmediato
+    setFirmaSaving(true);
+    try {
+      const blob = await (await fetch(pngDataUrl)).blob();
+      const file = new File([blob], 'firma.png', { type: 'image/png' });
+      await uploadFirma(file);
+      await refreshProfile?.();
+      setHasFirma(true);
+      setFirmaVersion(Date.now());
+      setFirmaMsg({ type: 'success', text: 'Firma guardada correctamente' });
+    } catch (err) {
+      setLocalPreview(null);
+      const text = err?.response?.data?.message || err?.message || 'Error al guardar firma';
+      setFirmaMsg({ type: 'error', text });
+      throw new Error(text);
+    } finally {
+      setFirmaSaving(false);
+    }
+  };
+
   const handleDeleteFirma = async () => {
     if (!window.confirm('¿Eliminar la firma digital? Tendrás que volver a subirla o dibujarla para firmar con PIN.')) return;
     setFirmaMsg(null);
@@ -289,6 +329,12 @@ const ProfessionalProfileSection = () => {
   //  1. localPreview (dataURL) si acabamos de capturar/subir → INSTANTÁNEO
   //  2. serverPreview (object URL autenticado) si hay firma persistida
   const previewSrc = localPreview || serverPreview;
+
+  // En modo "Dibujar", si el dispositivo configurado es la Wacom STU (y no se
+  // hizo fallback a pantalla), capturamos con WacomStuPanel vía WebHID en vez
+  // del canvas — el pad STU no emite eventos de puntero, así que react-signature
+  // -canvas nunca recibiría el trazo.
+  const useStuPanel = signatureInput === 'stu' && !stuFallback;
 
   return (
     <div>
@@ -441,6 +487,18 @@ const ProfessionalProfileSection = () => {
             <input type="file" accept="image/png,image/jpeg" onChange={handleFileUpload} />
             <span className="hint">PNG o JPG, máximo 500 KB</span>
           </div>
+        ) : useStuPanel ? (
+          // Tableta de firmas Wacom STU: mismo panel WebHID que usa el paciente
+          // al firmar, ahora para que el doctor registre su propia firma.
+          <WacomStuPanel
+            onCapture={saveStuFirma}
+            onCancel={() => setFirmaMode('upload')}
+            onFallback={() => setStuFallback(true)}
+            signerName={user?.nombre || ''}
+            signerRole={user?.cedulaProfesional ? `Cédula ${user.cedulaProfesional}` : 'Doctor'}
+            loading={firmaSaving}
+            confirmLabel="Guardar firma"
+          />
         ) : (
           <>
             {/* Mismo recuadro que el pad del paciente: wrap + baseline + "×". */}
