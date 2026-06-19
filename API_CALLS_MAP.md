@@ -133,13 +133,13 @@
 
 ---
 
-## 12. USERS (`features/users/UsersPage.jsx`)
+## 12. USERS (`shared/services/settingsService.js` → `settings/sections/AccountsManagement.jsx`)
 
 | # | Method | Endpoint | File | Request Body | Response Fields Used | Notes |
 |---|--------|----------|------|-------------|---------------------|-------|
-| 42 | **GET** | `/users` | `features/users/UsersPage.jsx:28` | *(none)* | `response.data` → array of users (`_id`, `nombre`, `email`, `rol`, `active`) | Direct `API.get` |
-| 43 | **POST** | `/users` | `features/users/UsersPage.jsx:42` | `{ nombre, email, contraseña, rol }` | *(none, reloads list)* | Direct `API.post` |
-| 44 | **PATCH** | `/users/:id/disable` | `features/users/UsersPage.jsx:49` | *(none)* | *(none, reloads list)* | Direct `API.patch` |
+| 42 | **GET** | `/users` | `shared/services/settingsService.js:116` | *(none)* | `response.data` → array of users (`_id`, `nombre`, `email`, `rol`, `active`) | Direct `API.get` |
+| 43 | **POST** | `/users` | `shared/services/settingsService.js:133` | `{ nombre, email, contraseña, rol }` | *(none, reloads list)* | Direct `API.post` |
+| 44 | **PATCH** | `/users/:id/disable` | `shared/services/settingsService.js:145` | *(none)* | *(none, reloads list)* | Direct `API.patch` |
 
 ---
 
