@@ -10,14 +10,13 @@ import RealTimeGraphicsUpdater from './real-time-graphics-updater.js';
 import { PeriodontogramLinearGraphics } from './periodontogram-linear-graphics.js';
 import { UniversalToothValidator } from '../../../shared/validators/universal-tooth-validator.js';
 // Logger removido - usando console nativo
-import { 
+import {
   LINEAR_GRAPHICS_CONFIG,
   ADVANCED_POLYGON_CONFIG,
   ADVANCED_CLINICAL_INDICATORS,
   ADVANCED_PERFORMANCE_CONFIG,
   ADVANCED_HOVER_CONFIG,
   REAL_TIME_FEEDBACK_CONFIG,
-  EXTENDED_COLORS,
   QUALITY_METRICS_CONFIG,
   ADVANCED_LOGGING_CONFIG
 } from './config.js';
@@ -162,69 +161,36 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
    */
   handleLinearGraphicsInput(input) {
     if (this.linearGraphicsInstances.size === 0) return;
-    
-    const startTime = performance.now();
-    
+
     try {
       const toothNumber = this.extractToothNumber(input);
       const position = this.extractPosition(input);
       const field = this.extractField(input);
       const surface = this.extractSurface(input); // NUEVA: Detectar superficie específica
       const value = input.value === '' ? null : parseFloat(input.value);
-      
+
       if (!toothNumber || position === null || !field || !surface) {
-        this.logAdvanced('warn', 'Datos de input incompletos para gráficas lineales', {
-          toothNumber, position, field, surface
-        });
         return;
       }
-      
+
       logger.log(`🎯 [handleLinearGraphicsInput] Diente ${toothNumber} - Superficie: ${surface} - Campo: ${field} - Posición: ${position} - Valor: ${value}`);
-      
+
       // Si el valor es null o vacío, solo actualizar el cache pero no renderizar elementos visuales
       if (value === null || value === undefined || isNaN(value)) {
-      this.updateMeasurementCache(toothNumber, position, field, null, surface);
+        this.updateMeasurementCache(toothNumber, position, field, null, surface);
         // Limpiar cualquier elemento visual previo para esta posición específica
         this.clearVisualElementsForSpecificSurface(toothNumber, position, field, surface);
         return;
       }
-      
+
       // Actualizar cache de mediciones con información de superficie
       this.updateMeasurementCache(toothNumber, position, field, value, surface);
-      
-      // Validación avanzada en tiempo real
-      let validationResult = null;
-      if (this.extendedOptions.enableLinearValidation) {
-        validationResult = this.validateAdvancedLinearGraphicsInput(input, toothNumber, position, field, value);
-      }
-      
-      // Detectar indicadores clínicos avanzados
-      if (this.extendedOptions.enableClinicalIndicators) {
-        this.detectAndShowClinicalIndicators(toothNumber, position, field, value);
-      }
-      
-      // Feedback en tiempo real
-      if (this.extendedOptions.enableRealTimeFeedback && validationResult) {
-        this.showAdvancedRealTimeFeedback(input, validationResult, toothNumber, position);
-      }
-      
+
       // Obtener datos completos del diente para esa superficie específica
       const toothData = this.getCompleteToothMeasurements(toothNumber, surface);
-      
-      // CORREGIDO: Actualizar solo la superficie específica
+
+      // Actualizar solo la superficie específica
       this.updateSpecificSurfaceLinearGraphics(toothNumber, toothData, field, position, value, surface);
-      
-      // Métricas de rendimiento
-      if (this.extendedOptions.enableQualityMetrics) {
-        this.recordPerformanceMetrics('handleLinearGraphicsInput', startTime, {
-          toothNumber,
-          field,
-          surface,
-          hasValidation: !!validationResult,
-          instancesCount: this.linearGraphicsInstances.size
-        });
-      }
-      
     } catch (error) {
       console.error('Error procesando input de gráficas lineales:', error);
     }
@@ -612,225 +578,32 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
   }
   
   /**
-   * Validación avanzada de input de gráficas lineales
-   */
-  validateAdvancedLinearGraphicsInput(input, toothNumber, position, field, value) {
-    try {
-      // Usar UniversalToothValidator para validación consolidada
-      const validation = UniversalToothValidator.validateMeasurement(value, field.toUpperCase());
-      
-      // Crear estructura de respuesta compatible
-      const validationResult = {
-        isValid: validation !== null && !isNaN(validation),
-        value: validation,
-        error: validation === null || isNaN(validation) ? `Valor inválido para ${field}` : null,
-        clinicalIndicators: [],
-        qualityScore: validation !== null && !isNaN(validation) ? 100 : 0,
-        recommendations: []
-      };
-      
-      // Aplicar feedback visual avanzado
-      if (!validation.isValid) {
-        this.showAdvancedValidationError(input, validation, toothNumber, position);
-      } else {
-        this.clearAdvancedValidationError(input, toothNumber, position);
-        
-        // Mostrar indicadores clínicos si existen
-        if (validation.clinicalIndicators && validation.clinicalIndicators.length > 0) {
-          this.showClinicalIndicators(input, validation.clinicalIndicators, toothNumber, position);
-        }
-      }
-      
-      return validation;
-      
-    } catch (error) {
-      this.logAdvanced('error', 'Error en validación avanzada de gráficas lineales:', error);
-      return {
-        isValid: false,
-        error: 'Error interno de validación avanzada',
-        clinicalIndicators: [],
-        qualityScore: 0,
-        recommendations: []
-      };
-    }
-  }
-  
-  /**
-   * Detecta y muestra indicadores clínicos avanzados
-   */
-  detectAndShowClinicalIndicators(toothNumber, position, field, value) {
-    if (!ADVANCED_CLINICAL_INDICATORS.ENABLED || value === null) return;
-    
-    const indicators = [];
-    const toothData = this.getCompleteToothMeasurements(toothNumber);
-    
-    // Detectar bolsas patológicas
-    if (field === 'probingDepth' && value >= ADVANCED_CLINICAL_INDICATORS.PATHOLOGICAL_POCKETS.THRESHOLD) {
-      indicators.push({
-        type: 'pathological_pocket',
-        severity: value >= ADVANCED_CLINICAL_INDICATORS.PATHOLOGICAL_POCKETS.SEVERE_THRESHOLD ? 'severe' : 'moderate',
-        message: `Bolsa patológica detectada: ${value}mm`,
-        color: ADVANCED_CLINICAL_INDICATORS.PATHOLOGICAL_POCKETS.COLOR,
-        position
-      });
-    }
-    
-    // Detectar recesión severa
-    if (field === 'gingivalMargin' && value >= ADVANCED_CLINICAL_INDICATORS.SEVERE_RECESSION.THRESHOLD) {
-      indicators.push({
-        type: 'severe_recession',
-        severity: value >= ADVANCED_CLINICAL_INDICATORS.SEVERE_RECESSION.SEVERE_THRESHOLD ? 'severe' : 'moderate',
-        message: `Recesión severa detectada: ${value}mm`,
-        color: ADVANCED_CLINICAL_INDICATORS.SEVERE_RECESSION.COLOR,
-        position
-      });
-    }
-    
-    // Calcular pérdida de inserción si tenemos ambos valores
-    if (toothData.gingivalMargin[position] !== null && toothData.probingDepth[position] !== null) {
-      const attachmentLoss = toothData.gingivalMargin[position] + toothData.probingDepth[position];
-      if (attachmentLoss >= ADVANCED_CLINICAL_INDICATORS.ATTACHMENT_LOSS.THRESHOLD) {
-        indicators.push({
-          type: 'attachment_loss',
-          severity: attachmentLoss >= ADVANCED_CLINICAL_INDICATORS.ATTACHMENT_LOSS.SEVERE_THRESHOLD ? 'severe' : 'moderate',
-          message: `Pérdida de inserción: ${attachmentLoss}mm`,
-          color: ADVANCED_CLINICAL_INDICATORS.ATTACHMENT_LOSS.COLOR,
-          position
-        });
-      }
-    }
-    
-    // Cachear indicadores
-    if (indicators.length > 0) {
-      this.clinicalIndicatorsCache.set(`${toothNumber}-${position}`, {
-        indicators,
-        timestamp: Date.now()
-      });
-      
-      // Mostrar animaciones si están habilitadas
-      if (ADVANCED_CLINICAL_INDICATORS.ANIMATIONS.ENABLED) {
-        this.animateClinicalIndicators(toothNumber, position, indicators);
-      }
-    }
-  }
-  
-  /**
-   * Muestra feedback en tiempo real avanzado
-   */
-  showAdvancedRealTimeFeedback(input, validationResult, toothNumber, position) {
-    if (!REAL_TIME_FEEDBACK_CONFIG.ENABLED) return;
-    
-    const feedbackKey = `${toothNumber}-${position}`;
-    
-    // Limpiar feedback anterior
-    this.clearRealTimeFeedback(feedbackKey);
-    
-    // Mostrar indicadores de validación
-    if (REAL_TIME_FEEDBACK_CONFIG.VALIDATION_INDICATORS.ENABLED) {
-      this.showValidationIndicator(input, validationResult, toothNumber, position);
-    }
-    
-    // Mostrar progreso de calidad
-    if (REAL_TIME_FEEDBACK_CONFIG.PROGRESS_INDICATORS.ENABLED && validationResult.qualityScore !== undefined) {
-      this.showQualityProgress(input, validationResult.qualityScore, toothNumber, position);
-    }
-    
-    // Mostrar recomendaciones
-    if (validationResult.recommendations && validationResult.recommendations.length > 0) {
-      this.showRecommendations(input, validationResult.recommendations, toothNumber, position);
-    }
-  }
-  
-  /**
-   * Actualiza gráficas lineales con modo avanzado
-   */
-  /**
-   * NUEVA FUNCIÓN: Actualiza solo la superficie específica donde se está ingresando el dato
+   * Actualiza solo la superficie específica donde se está ingresando el dato
    */
   updateSpecificSurfaceLinearGraphics(toothNumber, toothData, field, position, value, surface) {
     const canvasKey = `${toothNumber}-${surface}`;
     const linearGraphics = this.linearGraphicsInstances.get(canvasKey);
-    
+
     logger.log(`🎯 [updateSpecificSurfaceLinearGraphics] Actualizando solo: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
-    
+
     if (!linearGraphics) {
       console.warn(`⚠️ No se encontró instancia de gráficas lineales para ${canvasKey}`);
       return;
     }
-    
+
     // Verificar si hay datos válidos para renderizar
     const hasValidData = toothData && (
       (toothData.gingivalMargin && toothData.gingivalMargin.some(val => val !== null && !isNaN(val))) ||
       (toothData.probingDepth && toothData.probingDepth.some(val => val !== null && !isNaN(val)))
     );
-    
+
     if (hasValidData) {
-      // Solo actualizar si hay datos válidos
-      if (this.extendedOptions.enablePolygonMode && ADVANCED_POLYGON_CONFIG.ENABLED) {
-        linearGraphics.updateToothLinearGraphicsAdvanced(toothNumber, toothData, {
-          polygonMode: true,
-          smoothing: ADVANCED_POLYGON_CONFIG.SMOOTHING,
-          interpolation: ADVANCED_POLYGON_CONFIG.INTERPOLATION
-        });
-      } else {
-        linearGraphics.updateToothLinearGraphics(toothNumber, toothData);
-      }
+      linearGraphics.updateToothLinearGraphics(toothNumber, toothData);
       logger.log(`✅ [updateSpecificSurfaceLinearGraphics] Actualizada superficie ${surface} del diente ${toothNumber}`);
     } else {
       // Si no hay datos válidos, limpiar elementos visuales
       linearGraphics.clearToothVisualElements(toothNumber);
       logger.log(`🧹 [updateSpecificSurfaceLinearGraphics] Limpiada superficie ${surface} del diente ${toothNumber}`);
-    }
-  }
-
-  /**
-   * FUNCIÓN ORIGINAL: Actualiza todas las superficies (mantener para compatibilidad)
-   */
-  updateAdvancedLinearGraphics(toothNumber, toothData, field, position, value) {
-    // Determinar superficies disponibles según el tipo de diente
-    const isUpperTooth = parseInt(toothNumber) >= 11 && parseInt(toothNumber) <= 28;
-    const surfaces = isUpperTooth ? ['vestibular', 'palatine'] : ['vestibular', 'lingual'];
-    
-    logger.log(`🦷 [DEBUG] Diente ${toothNumber} - Tipo: ${isUpperTooth ? 'Superior' : 'Inferior'} - Superficies: [${surfaces.join(', ')}]`);
-    
-    let instancesUpdated = 0;
-    
-    // Verificar si hay datos válidos para renderizar
-    const hasValidData = toothData && (
-      (toothData.gingivalMargin && toothData.gingivalMargin.some(val => val !== null && !isNaN(val))) ||
-      (toothData.probingDepth && toothData.probingDepth.some(val => val !== null && !isNaN(val)))
-    );
-    
-    surfaces.forEach(surface => {
-      const canvasKey = `${toothNumber}-${surface}`;
-      const linearGraphics = this.linearGraphicsInstances.get(canvasKey);
-      
-      logger.log(`🎨 [DEBUG] Buscando canvas: ${canvasKey} - Encontrado: ${!!linearGraphics}`);
-      
-      if (linearGraphics) {
-        if (hasValidData) {
-          // Solo actualizar si hay datos válidos
-          if (this.extendedOptions.enablePolygonMode && ADVANCED_POLYGON_CONFIG.ENABLED) {
-            linearGraphics.updateToothLinearGraphicsAdvanced(toothNumber, toothData, {
-              polygonMode: true,
-              smoothing: ADVANCED_POLYGON_CONFIG.SMOOTHING,
-              interpolation: ADVANCED_POLYGON_CONFIG.INTERPOLATION
-            });
-          } else {
-            linearGraphics.updateToothLinearGraphics(toothNumber, toothData);
-          }
-        } else {
-          // Si no hay datos válidos, limpiar elementos visuales
-          linearGraphics.clearToothVisualElements(toothNumber);
-        }
-        instancesUpdated++;
-      }
-    });
-    
-    logger.log(`📊 [DEBUG] Diente ${toothNumber} - Instancias actualizadas: ${instancesUpdated}/${surfaces.length}`);
-    
-    if (instancesUpdated === 0) {
-      this.logAdvanced('warn', `No se encontraron instancias de gráficas lineales para diente ${toothNumber}`);
     }
   }
   
@@ -960,61 +733,6 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
   }
   
   /**
-   * Registra métricas de rendimiento
-   */
-  recordPerformanceMetrics(operation, startTime, metadata = {}) {
-    if (!QUALITY_METRICS_CONFIG.ENABLED) return;
-    
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    
-    const metric = {
-      operation,
-      duration,
-      timestamp: Date.now(),
-      metadata
-    };
-    
-    // Añadir a historial
-    this.qualityMetricsHistory.push(metric);
-    
-    // Mantener solo las últimas métricas
-    if (this.qualityMetricsHistory.length > QUALITY_METRICS_CONFIG.PERFORMANCE.MAX_HISTORY) {
-      this.qualityMetricsHistory.shift();
-    }
-    
-    // Log si excede umbral
-    if (duration > QUALITY_METRICS_CONFIG.PERFORMANCE.SLOW_OPERATION_THRESHOLD) {
-      this.logAdvanced('warn', `Operación lenta detectada: ${operation} tomó ${duration.toFixed(2)}ms`, metadata);
-    }
-  }
-  
-  /**
-   * Logging avanzado
-   */
-  logAdvanced(level, message, data = null) {
-    if (!ADVANCED_LOGGING_CONFIG.ENABLED) return;
-    
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level: level.toUpperCase(),
-      component: 'ExtendedRealTimeGraphicsUpdater',
-      message,
-      data
-    };
-    
-    // Log según configuración
-    if (ADVANCED_LOGGING_CONFIG.CONSOLE.ENABLED) {
-      console[level](`[${logEntry.component}] ${message}`, data || '');
-    }
-    
-    // Log usando console nativo
-    if (console && console[level]) {
-      console[level](message, data);
-    }
-  }
-  
-  /**
    * Limpia elementos visuales para una posición específica
    */
   clearVisualElementsForPosition(toothNumber, position, field) {
@@ -1060,70 +778,9 @@ export class ExtendedRealTimeGraphicsUpdater extends RealTimeGraphicsUpdater {
     this.qualityMetricsHistory.length = 0;
     
     this.removeHoverEffectListeners();
-    
+
     // Llamar cleanup del padre
     super.cleanup();
-    
-    if (ADVANCED_LOGGING_CONFIG.enabled) this.logAdvanced('info', 'ExtendedRealTimeGraphicsUpdater limpiado correctamente');
-  }
-  
-  /**
-   * Obtiene métricas de performance extendidas
-   */
-  getExtendedPerformanceMetrics() {
-    const baseMetrics = this.getPerformanceMetrics ? this.getPerformanceMetrics() : {};
-    
-    // Calcular métricas de rendimiento
-    const avgDuration = this.qualityMetricsHistory.length > 0 
-      ? this.qualityMetricsHistory.reduce((sum, m) => sum + m.duration, 0) / this.qualityMetricsHistory.length
-      : 0;
-    
-    const slowOperations = this.qualityMetricsHistory.filter(
-      m => m.duration > QUALITY_METRICS_CONFIG.PERFORMANCE.SLOW_OPERATION_THRESHOLD
-    ).length;
-    
-    return {
-      ...baseMetrics,
-      linearGraphics: {
-        enabled: this.linearGraphicsEnabled,
-        cachedMeasurements: this.measurementCache.size,
-        validationErrors: this.validationErrors.size,
-        instances: this.linearGraphicsInstances.size,
-        lastUpdate: this.linearGraphics ? Date.now() : null
-      },
-      advanced: {
-        polygonMode: this.extendedOptions.enablePolygonMode,
-        clinicalIndicators: {
-          enabled: this.extendedOptions.enableClinicalIndicators,
-          cached: this.clinicalIndicatorsCache.size
-        },
-        hoverEffects: {
-          enabled: this.extendedOptions.enableHoverEffects,
-          active: this.hoverEffectsCache.size
-        },
-        realTimeFeedback: {
-          enabled: this.extendedOptions.enableRealTimeFeedback,
-          messages: this.feedbackMessages.size
-        },
-        performance: {
-          avgDuration: Math.round(avgDuration * 100) / 100,
-          slowOperations,
-          totalOperations: this.qualityMetricsHistory.length,
-          cacheHitRate: this.calculateCacheHitRate()
-        }
-      }
-    };
-  }
-  
-  /**
-   * Calcula la tasa de aciertos del cache
-   */
-  calculateCacheHitRate() {
-    const totalRequests = this.performanceCache.size + this.measurementCache.size;
-    if (totalRequests === 0) return 0;
-    
-    const hits = Array.from(this.performanceCache.values()).filter(entry => entry.hit).length;
-    return Math.round((hits / totalRequests) * 100);
   }
 }
 

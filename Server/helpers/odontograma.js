@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
 
 // Constantes
@@ -161,7 +161,7 @@ async function processAndSaveOdontograma(file, entries, patientId) {
   await ensureUploadsPath('pacientes', patientId, 'odontograma-inicial');
 
     // Generar nombre único y mover archivo
-    const uniqueName = `${uuidv4()}.png`;
+    const uniqueName = `${crypto.randomUUID()}.png`;
     const finalPath = path.join(targetDir, uniqueName);
     await fs.move(file.path, finalPath);
 

@@ -11,15 +11,8 @@ import ExtendedRealTimeGraphicsUpdater from '../utils/extended-real-time-graphic
 import { UniversalToothValidator } from '../../../shared/validators/universal-tooth-validator.js';
 import { PeriodontogramLinearGraphics } from '../utils/periodontogram-linear-graphics.js';
 import { logger } from '../../../shared/utils/logger';
-import { 
+import {
   LINEAR_GRAPHICS_CONFIG,
-  ADVANCED_POLYGON_CONFIG,
-  ADVANCED_CLINICAL_INDICATORS,
-  ADVANCED_PERFORMANCE_CONFIG,
-  ADVANCED_HOVER_CONFIG,
-  REAL_TIME_FEEDBACK_CONFIG,
-  EXTENDED_COLORS,
-  QUALITY_METRICS_CONFIG,
   ADVANCED_LOGGING_CONFIG
 } from '../utils/config.js';
 
@@ -200,24 +193,7 @@ export const usePeriodontogramLinearGraphics = ({
       
       updateLinearGraphics.timeoutId = setTimeout(() => {
         const normalizedData = normalizeZeroTriples(data);
-        // MEJORA IMPLEMENTADA: Renderizar polígonos continuos si están habilitados
-        if (ADVANCED_POLYGON_CONFIG.enabled) {
-          const allTeethData = Object.values(normalizedData || {});
-          
-          // Renderizar polígonos para margen gingival
-          if (allTeethData.some(tooth => tooth?.gingivalMargin)) {
-            realTimeUpdaterRef.current.renderContinuousPolygons(allTeethData, 'gingivalMargin');
-          }
-          
-          // Renderizar polígonos para profundidad de sondaje
-          if (allTeethData.some(tooth => tooth?.probingDepth)) {
-            realTimeUpdaterRef.current.renderContinuousPolygons(allTeethData, 'probingDepth');
-          }
-        } else {
-          // Actualización tradicional
-          realTimeUpdaterRef.current.updateAllLinearGraphics(normalizedData);
-        }
-        
+        realTimeUpdaterRef.current.updateAllLinearGraphics(normalizedData);
         lastDataRef.current = normalizedData;
       }, debounceDelay);
       
@@ -388,22 +364,6 @@ export const usePeriodontogramLinearGraphics = ({
   }, []);
   
   /**
-   * Obtiene métricas de performance
-   */
-  const getPerformanceMetrics = useCallback(() => {
-    if (!realTimeUpdaterRef.current) {
-      return null;
-    }
-    
-    try {
-      return realTimeUpdaterRef.current.getExtendedPerformanceMetrics();
-    } catch (error) {
-      console.error('Error obteniendo métricas:', error);
-      return null;
-    }
-  }, []);
-  
-  /**
    * Limpia recursos del sistema
    */
   const cleanup = useCallback(() => {
@@ -467,297 +427,19 @@ export const usePeriodontogramLinearGraphics = ({
     linearGraphicsEnabled: realTimeUpdaterRef.current?.linearGraphicsEnabled || false
   }), [containerRef, periodontogramData]);
   
-  // ============================================================================
-  // MEJORAS IMPLEMENTADAS - FASE 4: EFECTOS HOVER AVANZADOS
-  // ============================================================================
-  
-  // Función para manejar efectos hover avanzados
-  const handleAdvancedHover = useCallback((element, toothNumber, measurementType, value) => {
-    if (!ADVANCED_HOVER_CONFIG.enabled || !realTimeUpdaterRef.current) return;
-    
-    try {
-      // Mostrar tooltip avanzado
-      if (ADVANCED_HOVER_CONFIG.tooltip.enabled) {
-        showAdvancedTooltip(element, toothNumber, measurementType, value);
-      }
-      
-      // Aplicar highlight visual
-      if (ADVANCED_HOVER_CONFIG.highlight.enabled) {
-        applyHoverHighlight(element, toothNumber);
-      }
-      
-      // Marcar región como dirty para actualización optimizada
-      if (realTimeUpdaterRef.current.markDirtyRegion) {
-        realTimeUpdaterRef.current.markDirtyRegion(`${toothNumber}_${measurementType}`);
-      }
-      
-    } catch (error) {
-      console.error('Error en efectos hover avanzados:', error);
-    }
-  }, []);
-  
-  // Función para mostrar tooltip avanzado
-  const showAdvancedTooltip = useCallback((element, toothNumber, measurementType, value) => {
-    const config = ADVANCED_HOVER_CONFIG.tooltip;
-    
-    // Crear tooltip si no existe
-    let tooltip = document.getElementById('advanced-periodontogram-tooltip');
-    if (!tooltip) {
-      tooltip = document.createElement('div');
-      tooltip.id = 'advanced-periodontogram-tooltip';
-      tooltip.style.cssText = `
-        position: absolute;
-        background: ${config.background};
-        color: ${config.text_color};
-        padding: ${config.padding}px;
-        border-radius: ${config.border_radius}px;
-        font-size: ${config.font_size}px;
-        max-width: ${config.max_width}px;
-        z-index: 10000;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity ${config.fade_duration}ms ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      `;
-      document.body.appendChild(tooltip);
-    }
-    
-    // Contenido del tooltip
-    const measurementLabel = measurementType === 'gingivalMargin' ? 'Margen Gingival' : 'Profundidad de Sondaje';
-    const unit = ADVANCED_HOVER_CONFIG.measurement_preview.format.show_unit ? ' mm' : '';
-    const formattedValue = typeof value === 'number' ? value.toFixed(ADVANCED_HOVER_CONFIG.measurement_preview.format.decimal_places) : value;
-    
-    tooltip.innerHTML = `
-      <div><strong>Diente ${toothNumber}</strong></div>
-      <div>${measurementLabel}: ${formattedValue}${unit}</div>
-      ${getTooltipStatistics(toothNumber, measurementType, value)}
-    `;
-    
-    // Posicionar tooltip
-    const rect = element.getBoundingClientRect();
-    tooltip.style.left = `${rect.left + rect.width / 2}px`;
-    tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
-    
-    // Mostrar con delay
-    setTimeout(() => {
-      tooltip.style.opacity = '1';
-    }, config.delay);
-    
-    // Auto-hide después de un tiempo
-    setTimeout(() => {
-      if (tooltip) {
-        tooltip.style.opacity = '0';
-        setTimeout(() => {
-          if (tooltip && tooltip.parentNode) {
-            tooltip.parentNode.removeChild(tooltip);
-          }
-        }, config.fade_duration);
-      }
-    }, 3000);
-  }, []);
-  
-  // Función para obtener estadísticas del tooltip
-  const getTooltipStatistics = useCallback((toothNumber, measurementType, value) => {
-    if (!ADVANCED_HOVER_CONFIG.measurement_preview.show_statistics) return '';
-    
-    try {
-      // Obtener estadísticas clínicas
-      const indicators = ADVANCED_CLINICAL_INDICATORS;
-      let status = 'Normal';
-      let statusColor = EXTENDED_COLORS.CLINICAL_STATES.HEALTHY;
-      
-      if (measurementType === 'probingDepth' && value >= indicators.pathological_pockets.threshold) {
-        status = 'Bolsa Patológica';
-        statusColor = indicators.pathological_pockets.color;
-      } else if (measurementType === 'gingivalMargin' && value <= -indicators.severe_recession.threshold) {
-        status = 'Recesión Severa';
-        statusColor = indicators.severe_recession.color;
-      }
-      
-      return `<div style="color: ${statusColor}; margin-top: 4px;"><small>${status}</small></div>`;
-    } catch (error) {
-      return '';
-    }
-  }, []);
-  
-  // Función para aplicar highlight hover
-  const applyHoverHighlight = useCallback((element, toothNumber) => {
-    const config = ADVANCED_HOVER_CONFIG.highlight;
-    
-    // Aplicar estilos de highlight
-    element.style.transition = `all ${config.animation.duration}ms ease`;
-    element.style.backgroundColor = config.color;
-    element.style.opacity = config.opacity;
-    element.style.outline = `${config.stroke_width}px solid ${config.color}`;
-    
-    // Remover highlight al salir
-    const removeHighlight = () => {
-      element.style.backgroundColor = '';
-      element.style.opacity = '';
-      element.style.outline = '';
-      element.removeEventListener('mouseleave', removeHighlight);
-    };
-    
-    element.addEventListener('mouseleave', removeHighlight);
-  }, []);
-  
-  // ============================================================================
-  // MEJORAS IMPLEMENTADAS - FASE 5: FEEDBACK VISUAL EN TIEMPO REAL
-  // ============================================================================
-  
-  // Función para mostrar feedback de validación en tiempo real
-  const showRealTimeFeedback = useCallback((element, validationResult, value) => {
-    if (!REAL_TIME_FEEDBACK_CONFIG.enabled) return;
-    
-    try {
-      const config = REAL_TIME_FEEDBACK_CONFIG.validation_indicators;
-      
-      // Determinar color según resultado de validación
-      let borderColor = config.colors.valid;
-      let feedbackText = '';
-      
-      if (validationResult.hasErrors) {
-        borderColor = config.colors.error;
-        feedbackText = validationResult.errors.join(', ');
-      } else if (validationResult.hasWarnings) {
-        borderColor = config.colors.warning;
-        feedbackText = validationResult.warnings.join(', ');
-      }
-      
-      // Aplicar estilos de feedback
-      element.style.borderColor = borderColor;
-      element.style.borderWidth = '2px';
-      element.style.transition = 'border-color 300ms ease';
-      
-      // Mostrar mensaje de feedback si hay errores o advertencias
-      if (feedbackText && (config.show_errors || config.show_warnings)) {
-        showFeedbackMessage(element, feedbackText, borderColor);
-      }
-      
-    } catch (error) {
-      console.error('Error en feedback visual en tiempo real:', error);
-    }
-  }, []);
-  
-  // Función para mostrar mensaje de feedback
-  const showFeedbackMessage = useCallback((element, message, color) => {
-    // Crear elemento de mensaje
-    let feedbackMsg = element.parentNode.querySelector('.real-time-feedback');
-    if (!feedbackMsg) {
-      feedbackMsg = document.createElement('div');
-      feedbackMsg.className = 'real-time-feedback';
-      feedbackMsg.style.cssText = `
-        position: absolute;
-        background: ${color};
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        z-index: 1000;
-        margin-top: 2px;
-        opacity: 0;
-        transition: opacity 300ms ease;
-      `;
-      element.parentNode.appendChild(feedbackMsg);
-    }
-    
-    feedbackMsg.textContent = message;
-    feedbackMsg.style.backgroundColor = color;
-    feedbackMsg.style.opacity = '1';
-    
-    // Auto-hide después de 3 segundos
-    setTimeout(() => {
-      if (feedbackMsg) {
-        feedbackMsg.style.opacity = '0';
-        setTimeout(() => {
-          if (feedbackMsg && feedbackMsg.parentNode) {
-            feedbackMsg.parentNode.removeChild(feedbackMsg);
-          }
-        }, 300);
-      }
-    }, 3000);
-  }, []);
-  
-  // Función para limpiar las gráficas lineales
-  const clearLinearGraphics = useCallback(() => {
-    if (!realTimeUpdaterRef.current) return;
-    
-    try {
-      logger.log('Limpiando gráficas lineales');
-      
-      // Limpiar todas las instancias de gráficas lineales
-      if (realTimeUpdaterRef.current.linearGraphicsInstances) {
-        realTimeUpdaterRef.current.linearGraphicsInstances.forEach((instance) => {
-          if (instance.clear) {
-            instance.clear();
-          }
-        });
-      }
-      
-      // Limpiar cachés avanzados
-      if (realTimeUpdaterRef.current.clearCaches) {
-        realTimeUpdaterRef.current.clearCaches();
-      }
-      
-      logger.log('Gráficas lineales limpiadas correctamente');
-    } catch (error) {
-      console.error('Error al limpiar gráficas lineales:', error);
-    }
-  }, []);
-  
-  // Función para calcular puntuación de calidad
-  const calculateQualityScore = useCallback((stats, qualityMetrics) => {
-    try {
-      let score = 0;
-      let maxScore = 0;
-      
-      // Rendimiento (40% del score)
-      maxScore += 40;
-      if (stats.lastRenderTime <= qualityMetrics.performance.max_render_time) {
-        score += 40;
-      } else {
-        score += Math.max(0, 40 * (1 - (stats.lastRenderTime - qualityMetrics.performance.max_render_time) / qualityMetrics.performance.max_render_time));
-      }
-      
-      // Eficiencia de caché (30% del score)
-      maxScore += 30;
-      score += 30 * Math.min(1, stats.cacheHitRatio / qualityMetrics.performance.cache_hit_ratio_target);
-      
-      // Estabilidad (30% del score)
-      maxScore += 30;
-      score += 30; // Placeholder - implementar métricas de estabilidad
-      
-      return Math.round((score / maxScore) * 100);
-    } catch (error) {
-      return 0;
-    }
-  }, []);
-
   return {
     // Estado
     systemStatus,
-    
+
     // Métodos principales
-    initializeLinearGraphics,
-    updateLinearGraphics,
     updateToothLinearGraphics,
-    clearLinearGraphics,
-    
+
     // Validación
     validateMeasurement,
-    
+
     // Efectos visuales
     addHoverEffect,
-    removeHoverEffect,
-    handleAdvancedHover,
-    showRealTimeFeedback,
-    
-    // Utilidades
-    getPerformanceMetrics,
-    cleanup,
-    
-    // Referencias (para casos avanzados)
-    realTimeUpdaterRef: realTimeUpdaterRef.current
+    removeHoverEffect
   };
 };
 

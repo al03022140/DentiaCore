@@ -34,9 +34,6 @@ export const setActiveCurrency = (code) => {
   }
 };
 
-/** Lee la moneda activa (útil para tests / debug). */
-export const getActiveCurrency = () => activeCurrency;
-
 /**
  * Formatea un monto en la moneda activa. Acepta number, string numérico o
  * null/undefined (devuelve "0"). Para totales sin decimales (montos enteros)
@@ -60,20 +57,6 @@ export const formatMoney = (amount, opts = {}) => {
     style: 'currency',
     currency,
     minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: 2
-  }).format(safe);
-};
-
-/**
- * Variante "plana" sin símbolo de moneda — útil dentro de un placeholder o
- * cuando el símbolo ya está fuera del componente. Mantiene el locale activo.
- */
-export const formatAmount = (amount) => {
-  const n = typeof amount === 'number' ? amount : Number(amount);
-  const safe = Number.isFinite(n) ? n : 0;
-  const locale = CURRENCY_LOCALES[activeCurrency] || 'es-MX';
-  return new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 0,
     maximumFractionDigits: 2
   }).format(safe);
 };

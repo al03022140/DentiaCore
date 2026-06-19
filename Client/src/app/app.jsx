@@ -19,10 +19,8 @@ import ConsultasPage from '../features/consultas/ConsultasPage';
 import StatisticsPage from '../features/statistics/StatisticsPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
-import PermissionGate from './auth/PermissionGate';
 import DraftsCenter from '../features/consultas/DraftsCenter';
 import SettingsPage from '../features/settings/SettingsPage';
-import UsersPage from '../features/users/UsersPage';
 import { SidebarProvider } from '../shared/contexts/SidebarContext';
 
 const antdTheme = {
@@ -137,7 +135,6 @@ const App = () => {
             <Route path="/consultas" element={<ConsultasPage />} />
             <Route path="/caja" element={<CashPage />} />
             <Route path="/estadisticas" element={<StatisticsPage />} />
-            <Route path="/usuarios" element={<UsersPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
             <Route path="/configuracion/:section" element={<SettingsPage />} />
           </Route>

@@ -8,7 +8,8 @@ const express = require('express');
 const router = express.Router();
 const examController = require('../controllers/examController');
 const { authorize, requireClinicalRole } = require('../middlewares/authorize');
-const backdatedEntry = require('../middlewares/backdatedEntry');
+// La captura extemporánea se valida en el middleware GLOBAL (config/routes.js),
+// que ya cubre estas rutas; antes había aquí un backdatedEntry() redundante.
 const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 // Lectura — cualquier rol clínico o admin
@@ -21,7 +22,6 @@ router.post('/',
   writeLimiter,
   requireClinicalRole,
   authorize(['exams.create']),
-  backdatedEntry(),
   examController.createExam
 );
 
@@ -29,7 +29,6 @@ router.put('/:id',
   writeLimiter,
   requireClinicalRole,
   authorize(['exams.update']),
-  backdatedEntry(),
   examController.updateExam
 );
 

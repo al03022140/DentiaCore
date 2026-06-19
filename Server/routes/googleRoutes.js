@@ -1,13 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { google } = require('googleapis');
 
-// Configuración del cliente OAuth2
-const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-);
+// OAuth2 de Google + Calendar v3 vía REST con fetch (sin la dependencia
+// googleapis ~50MB). Solo construimos la URL de consentimiento, intercambiamos/
+// renovamos tokens y llamamos a Calendar. Helpers al final del archivo.
 
 const SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -110,13 +106,7 @@ router.get('/auth/url', oauthLimiter, (req, res) => {
             ? JSON.stringify({ url: chosenClientUrl, path: returnPath })
             : chosenClientUrl;
 
-        const url = oauth2Client.generateAuthUrl({
-            access_type: 'offline', // Solicita refresh_token
-            scope: SCOPES,
-            include_granted_scopes: true,
-            prompt: 'consent', // Siempre solicitar consentimiento para obtener refresh_token
-            state: encodeURIComponent(statePayload)
-        });
+        const url = buildAuthUrl(encodeURIComponent(statePayload));
         res.json({ url });
     } catch (_error) {
         res.status(500).json({ error: 'Error generando URL de autenticación' });
@@ -146,13 +136,15 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
             return res.redirect(`${clientUrl}`);
         }
 
-        // Use a per-request client for token exchange to avoid stale singleton state
-        const exchangeClient = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-        );
-        const { tokens } = await exchangeClient.getToken(code);
+        const tokens = await postToken({
+            code,
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+            grant_type: 'authorization_code',
+        });
+        // REST devuelve expires_in (s); googleapis daba expiry_date (ms epoch).
+        tokens.expiry_date = tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : null;
         rememberProcessedCode(code);
         
         // Redirigir al frontend con tokens en cookies httpOnly en lugar de URL params
@@ -207,15 +199,8 @@ router.get('/calendar/list', oauthLimiter, async (req, res, next) => {
         if (!accessToken) {
             return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
         }
-        const perRequestClient = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-        );
-        perRequestClient.setCredentials({ access_token: accessToken });
-        const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
-        const response = await calendar.calendarList.list({ minAccessRole: 'writer' });
-        const calendars = (response.data.items || []).map(c => ({
+        const data = await gcal(accessToken, '/users/me/calendarList?minAccessRole=writer');
+        const calendars = (data.items || []).map(c => ({
             id: c.id,
             summary: c.summary,
             primary: c.primary || false,
@@ -237,29 +222,15 @@ router.get('/calendar/events', oauthLimiter, async (req, res, next) => {
         if (!accessToken) {
             return res.status(401).json({ error: 'Se requiere access token en header Authorization' });
         }
-        // Crear cliente OAuth2 por solicitud para evitar condiciones de carrera
-        const perRequestClient = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-        );
-        perRequestClient.setCredentials({ access_token: accessToken });
-        const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
-
         // Accept optional query params for date range and calendar selection
         const calendarId = req.query.calendarId || 'primary';
-        const listParams = {
-            calendarId,
-            singleEvents: true,
-            orderBy: 'startTime',
-        };
-        if (req.query.timeMin) listParams.timeMin = req.query.timeMin;
-        else listParams.timeMin = new Date().toISOString();
-        if (req.query.timeMax) listParams.timeMax = req.query.timeMax;
-        if (req.query.maxResults) listParams.maxResults = Math.min(Number(req.query.maxResults) || 250, 2500);
+        const qs = new URLSearchParams({ singleEvents: 'true', orderBy: 'startTime' });
+        qs.set('timeMin', req.query.timeMin || new Date().toISOString());
+        if (req.query.timeMax) qs.set('timeMax', req.query.timeMax);
+        if (req.query.maxResults) qs.set('maxResults', String(Math.min(Number(req.query.maxResults) || 250, 2500)));
 
-        const response = await calendar.events.list(listParams);
-        res.json({ items: response.data.items || [] });
+        const data = await gcal(accessToken, `/calendars/${encodeURIComponent(calendarId)}/events?${qs}`);
+        res.json({ items: data.items || [] });
     } catch (error) {
         next(error);
     }
@@ -278,19 +249,12 @@ router.post('/calendar/events', oauthLimiter, async (req, res, next) => {
         if (!summary || !start || !end) {
             return res.status(400).json({ error: 'Se requiere summary, start y end' });
         }
-        const perRequestClient = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-        );
-        perRequestClient.setCredentials({ access_token: accessToken });
-        const calendar = google.calendar({ version: 'v3', auth: perRequestClient });
         const targetCalendarId = bodyCalendarId || 'primary';
-        const response = await calendar.events.insert({
-            calendarId: targetCalendarId,
-            requestBody: { summary, description, location, start, end },
+        const data = await gcal(accessToken, `/calendars/${encodeURIComponent(targetCalendarId)}/events`, {
+            method: 'POST',
+            body: JSON.stringify({ summary, description, location, start, end }),
         });
-        res.status(201).json(response.data);
+        res.status(201).json(data);
     } catch (error) {
         next(error);
     }
@@ -309,20 +273,16 @@ router.post('/refresh-token', oauthLimiter, authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Se requiere refresh_token' });
         }
 
-        // Crear cliente OAuth2 por solicitud para evitar condiciones de carrera
-        const perRequestClient = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URI
-        );
-        perRequestClient.setCredentials({ refresh_token: refreshToken });
+        const credentials = await postToken({
+            refresh_token: refreshToken,
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            grant_type: 'refresh_token',
+        });
 
-        // Obtener nuevos tokens
-        const { credentials } = await perRequestClient.getAccessToken();
-
-        // Calcular tiempo de expiración en segundos
-        const expiresInSec = credentials.expiry_date
-            ? Math.max(0, Math.floor((credentials.expiry_date - Date.now()) / 1000))
+        // REST devuelve expires_in (segundos).
+        const expiresInSec = credentials.expires_in
+            ? Math.max(0, Math.floor(credentials.expires_in))
             : 3600; // Default 1 hora
 
         // Si Google rotó el refresh token, actualizamos la cookie httpOnly.
@@ -416,3 +376,44 @@ module.exports = router;
          return '';
      } catch { return ''; }
  }
+
+// ── Google OAuth2 / Calendar v3 vía REST (reemplazo de googleapis) ───────────
+function buildAuthUrl(state) {
+    const params = new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        response_type: 'code',
+        scope: SCOPES.join(' '),
+        access_type: 'offline',          // solicita refresh_token
+        include_granted_scopes: 'true',
+        prompt: 'consent',
+        state,
+    });
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+}
+
+async function postToken(params) {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(params),
+    });
+    const data = await res.json();
+    // data.error reproduce los strings que googleapis lanzaba (invalid_grant, etc.)
+    if (!res.ok) throw new Error(data.error || `token_request_failed_${res.status}`);
+    return data;
+}
+
+async function gcal(accessToken, path, init = {}) {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3${path}`, {
+        ...init,
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+            ...init.headers,
+        },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || `calendar_error_${res.status}`);
+    return data;
+}

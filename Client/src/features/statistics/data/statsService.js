@@ -110,17 +110,6 @@ const fetchNoShows = async (granularity, visualization) => {
   };
 };
 
-const fetchProductivity = async (granularity, visualization) => {
-  const params = buildParams(granularity);
-  const { data } = await API.get('/stats/productivity', { params });
-
-  return {
-    chartType: CHART_TYPE_MAP[visualization] || 'line',
-    labels: data.labels,
-    datasets: styleDatasets(data.datasets, visualization)
-  };
-};
-
 const fetchNetEarnings = async (granularity, visualization) => {
   const params = buildParams(granularity);
   const { data } = await API.get('/stats/net-earnings', { params });

@@ -9,66 +9,6 @@
 // Patient no tiene CURP ni RFC). La validación REAL de email/teléfono vive
 // ahora a nivel de schema en models/patient.js, con las reglas del front.
 
-// Listas de valores válidos
-const VALID_VALUES = {
-    GENEROS: ['masculino', 'femenino', 'otro', 'prefiero_no_decir'],
-    
-    TIPOS_DOCUMENTO: ['ine', 'pasaporte', 'curp', 'cedula_profesional', 'otro'],
-    
-    ESTADOS_MEXICO: [
-        'aguascalientes', 'baja_california', 'baja_california_sur', 'campeche',
-        'chiapas', 'chihuahua', 'coahuila', 'colima', 'ciudad_de_mexico',
-        'durango', 'guanajuato', 'guerrero', 'hidalgo', 'jalisco', 'mexico',
-        'michoacan', 'morelos', 'nayarit', 'nuevo_leon', 'oaxaca', 'puebla',
-        'queretaro', 'quintana_roo', 'san_luis_potosi', 'sinaloa', 'sonora',
-        'tabasco', 'tamaulipas', 'tlaxcala', 'veracruz', 'yucatan', 'zacatecas'
-    ],
-    
-    NIVELES_ANSIEDAD: ['ninguna', 'leve', 'moderada', 'severa'],
-    
-    CONSUMO_ALCOHOL: ['nunca', 'ocasional', 'moderado', 'frecuente'],
-    
-    FRECUENCIA_CEPILLADO: ['nunca', '1_vez_dia', '2_veces_dia', '3_o_mas_veces_dia'],
-    
-    CONSUMO_AZUCAR: ['bajo', 'moderado', 'alto'],
-    
-    CONDICIONES_DIENTE: [
-        'sano', 'caries', 'obturado', 'corona', 'endodoncia', 'extraccion_indicada',
-        'ausente', 'implante', 'protesis', 'fracturado'
-    ],
-    
-    SUPERFICIES_DIENTE: [
-        'oclusal', 'mesial', 'distal', 'vestibular', 'lingual', 'palatino',
-        'cervical', 'incisal', 'completa'
-    ],
-    
-    TIPOS_DANO: [
-        'caries', 'fractura', 'desgaste', 'mancha', 'calculo', 'gingivitis',
-        'periodontitis', 'movilidad', 'sensibilidad', 'otro'
-    ]
-};
-
-// Mensajes de error personalizados
-const ERROR_MESSAGES = {
-    REQUIRED: 'Este campo es obligatorio',
-    INVALID_EMAIL: 'Formato de email inválido',
-    INVALID_PHONE: 'Formato de teléfono mexicano inválido (10 dígitos)',
-    INVALID_CURP: 'Formato de CURP inválido',
-    INVALID_RFC: 'Formato de RFC inválido',
-    INVALID_POSTAL_CODE: 'Código postal debe tener 5 dígitos',
-    INVALID_NAME: 'Solo se permiten letras y espacios',
-    INVALID_DATE: 'Fecha inválida',
-    FUTURE_DATE: 'La fecha no puede ser futura',
-    INVALID_AGE: 'Edad debe estar entre 0 y 120 años',
-    INVALID_TOOTH_NUMBER: 'Número de diente inválido',
-    INVALID_ENUM: (field, values) => `${field} debe ser uno de: ${values.join(', ')}`,
-    MIN_LENGTH: (field, min) => `${field} debe tener al menos ${min} caracteres`,
-    MAX_LENGTH: (field, max) => `${field} no puede exceder ${max} caracteres`,
-    DUPLICATE_TOOTH: 'Ya existe un registro para este diente',
-    MAX_SNAPSHOTS: 'Máximo 10 instantáneas permitidas',
-    INVALID_URL: 'URL de imagen inválida'
-};
-
 // Configuraciones de límites
 const LIMITS = {
     MAX_SNAPSHOTS: 10,
@@ -142,54 +82,7 @@ const SANITIZERS = {
     }
 };
 
-// Configuración de índices para optimización
-// NOTA: Estos índices deben coincidir con los paths reales del schema Patient
-const INDEXES = {
-    // Índices simples
-    SIMPLE: [
-        { field: 'paciente_id', options: { unique: true } },
-        { field: 'documento.numero', options: { sparse: true } },
-        { field: 'email', options: { sparse: true } },
-        { field: 'contacto.telefono', options: { sparse: true } },
-        { field: 'createdAt', options: {} },
-        { field: 'updatedAt', options: {} }
-    ],
-    
-    // Índices compuestos
-    COMPOUND: [
-        {
-            fields: {
-                'primer_nombre': 1,
-                'apellido_paterno': 1
-            },
-            options: { name: 'nombre_completo_idx' }
-        },
-        {
-            fields: {
-                'fecha_nacimiento': 1,
-                'sexo': 1
-            },
-            options: { name: 'demografia_idx' }
-        }
-    ],
-    
-    // Índices de texto
-    TEXT: [
-        {
-            fields: {
-                'primer_nombre': 'text',
-                'apellido_paterno': 'text',
-                'apellido_materno': 'text'
-            },
-            options: { name: 'busqueda_nombres_idx' }
-        }
-    ]
-};
-
 module.exports = {
-    VALID_VALUES,
-    ERROR_MESSAGES,
     LIMITS,
-    SANITIZERS,
-    INDEXES
+    SANITIZERS
 };

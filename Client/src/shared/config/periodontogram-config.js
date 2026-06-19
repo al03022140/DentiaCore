@@ -210,22 +210,6 @@ export const MEASUREMENT_FACE_CONFIG = {
 };
 
 /**
- * Configuración de arrays de medición - NORMALIZACIÓN SEGÚN ESPECIFICACIÓN MÉDICA
- * ESTRUCTURA NORMALIZADA: 3 elementos por cara, 4 caras por diente
- * Orden: [mesial, central, distal] para cada cara
- */
-export const MEASUREMENT_ARRAY_CONFIG = {
-  length: 3,
-  structure: [
-    { index: 0, position: 'mesial', description: 'Medición mesial' },
-    { index: 1, position: 'central', description: 'Medición central' },
-    { index: 2, position: 'distal', description: 'Medición distal' }
-  ],
-  faces: ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'],
-  description: 'Configuración normalizada de 3 mediciones por cara, 4 caras según especificación médica'
-};
-
-/**
  * Mapeo de caras para compatibilidad - NORMALIZACIÓN SEGÚN ESPECIFICACIÓN MÉDICA
  */
 export const FACE_MAPPING = {
@@ -278,28 +262,6 @@ export const UI_COLORS = {
     grade1: '#ffc107',    // Amarillo para movilidad grado 1
     grade2: '#fd7e14',    // Naranja para movilidad grado 2
     grade3: '#dc3545'     // Rojo para movilidad grado 3
-  }
-};
-
-/**
- * Configuraciones de tamaños y espaciado
- */
-export const UI_DIMENSIONS = {
-  toothSize: {
-    width: 40,
-    height: 60,
-    unit: 'px'
-  },
-  measurementInput: {
-    width: 50,
-    height: 30,
-    unit: 'px'
-  },
-  spacing: {
-    small: 4,
-    medium: 8,
-    large: 16,
-    unit: 'px'
   }
 };
 
@@ -409,70 +371,9 @@ export const DEV_CONFIG = {
   description: 'Configuraciones específicas para desarrollo'
 };
 
-/**
- * Datos de prueba para testing
- */
-export const TEST_DATA = {
-  sampleToothData: {
-    numeroDiente: 11,
-    arcada: 'superior',
-    ausente: 0,
-    implante: false,
-    movilidad: 1,
-    pronostico: 'Bueno',
-    furca: {
-      vestibular: 0,
-      lingualPalatino: 0,
-      doble: { furca1: 0, furca2: 0 }
-    },
-    vestibular: {
-      profundidad: [2, 4, 3],
-      margen: [0, -1, 0],
-      sangrado: [0, 1, 0],
-      supuracion: [false, false, false],
-      placa: [true, true, false]
-    },
-    lingualPalatino: {
-      profundidad: [2, 3, 5],
-      margen: [0, 0, -2],
-      sangrado: [0, 0, 1],
-      supuracion: [false, false, false],
-      placa: [false, true, false]
-    },
-    anchuraEncia: 0,
-    notes: 'Diente de prueba para testing - estructura normalizada'
-  },
-  description: 'Datos de prueba para testing y desarrollo - Normalización Opción 1 Mejorada'
-};
-
 // ============================================================================
 // UTILIDADES DE CONFIGURACIÓN
 // ============================================================================
-
-/**
- * Obtiene una configuración específica con fallback
- * @param {string} path - Ruta de la configuración (ej: 'SAVE_CONFIG.debouncing.delay')
- * @param {*} defaultValue - Valor por defecto si no se encuentra
- * @returns {*} Valor de configuración
- */
-export function getConfig(path, defaultValue = null) {
-  try {
-    const parts = path.split('.');
-    let current = globalThis;
-    
-    for (const part of parts) {
-      if (current[part] === undefined) {
-        return defaultValue;
-      }
-      current = current[part];
-    }
-    
-    return current;
-  } catch (error) {
-    console.warn(`Error obteniendo configuración ${path}:`, error);
-    return defaultValue;
-  }
-}
 
 /**
  * Valida si un número de diente es válido usando la configuración centralizada
@@ -491,29 +392,6 @@ export function isValidToothNumber(toothNumber) {
 export function getToothQuadrant(toothNumber) {
   const quadrantNumber = Math.floor(toothNumber / 10);
   return TOOTH_QUADRANTS[quadrantNumber] || null;
-}
-
-/**
- * Obtiene el tipo de diente (permanente o temporal)
- * @param {number} toothNumber - Número del diente
- * @returns {string} 'permanent' o 'temporary'
- */
-export function getToothType(toothNumber) {
-  if (PERMANENT_TEETH.includes(toothNumber)) {
-    return 'permanent';
-  } else if (TEMPORARY_TEETH.includes(toothNumber)) {
-    return 'temporary';
-  }
-  return 'unknown';
-}
-
-/**
- * Obtiene límites de medición para un campo específico
- * @param {string} fieldName - Nombre del campo
- * @returns {Object|null} Límites de medición
- */
-export function getMeasurementLimits(fieldName) {
-  return MEASUREMENT_LIMITS[fieldName] || null;
 }
 
 /**
@@ -546,33 +424,27 @@ const PERIODONTOGRAM_CONFIG = {
   
   // Estructura de datos
   MEASUREMENT_FACE_CONFIG,
-  MEASUREMENT_ARRAY_CONFIG,
   FACE_MAPPING,
-  
+
   // UI
   UI_COLORS,
-  UI_DIMENSIONS,
-  
+
   // Guardado
   SAVE_CONFIG,
   CACHE_CONFIG,
-  
+
   // Transformación
   TRANSFORMATION_CONFIG,
-  
+
   // Logging
   LOGGING_CONFIG,
-  
+
   // Desarrollo
   DEV_CONFIG,
-  TEST_DATA,
-  
+
   // Utilidades
-  getConfig,
   isValidToothNumber,
   getToothQuadrant,
-  getToothType,
-  getMeasurementLimits,
   getIndicatorColor
 };
 

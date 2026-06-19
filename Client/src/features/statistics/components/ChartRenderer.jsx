@@ -1,5 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
+
+// Lee los tokens del tema activo para que ejes y leyendas sean legibles
+// tanto en claro como en oscuro (antes los colores estaban hardcodeados
+// para fondo claro y se perdían sobre la tarjeta oscura).
+const readThemeColors = () => {
+  const cs = getComputedStyle(document.documentElement);
+  const pick = (name, fallback) => {
+    const value = cs.getPropertyValue(name).trim();
+    return value || fallback;
+  };
+  return {
+    text: pick('--color-text-secondary', '#555'),
+    grid: pick('--color-border-light', 'rgba(0,0,0,0.06)'),
+  };
+};
 
 // Las opciones replican las del widget del home (patient-stats) para
 // mantener un estilo visual consistente entre Home y Estadísticas:
@@ -8,6 +23,7 @@ import Chart from 'chart.js/auto';
 const buildOptions = (chartType, datasets) => {
   const showLegend = datasets.length > 1 || !!datasets[0]?.label;
   const isPie = chartType === 'pie' || chartType === 'doughnut';
+  const theme = readThemeColors();
 
   return {
     responsive: true,
@@ -17,7 +33,13 @@ const buildOptions = (chartType, datasets) => {
       legend: {
         display: showLegend,
         position: 'top',
-        labels: { boxWidth: 12, font: { size: 11 } },
+        labels: {
+          boxWidth: 8,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          color: theme.text,
+          font: { size: 11 },
+        },
       },
       tooltip: { mode: isPie ? 'nearest' : 'index', intersect: false },
     },
@@ -26,14 +48,14 @@ const buildOptions = (chartType, datasets) => {
         type: 'category',
         grid: { display: false },
         title: { display: false },
-        ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 8 },
+        ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 8, color: theme.text },
       },
       y: {
         beginAtZero: true,
         grace: '15%',
         title: { display: false },
-        ticks: { maxTicksLimit: 6, precision: 0 },
-        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: { maxTicksLimit: 6, precision: 0, color: theme.text },
+        grid: { color: theme.grid },
       },
     },
   };
@@ -42,6 +64,18 @@ const buildOptions = (chartType, datasets) => {
 const ChartRenderer = ({ chartType, labels, datasets }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
+  // Se incrementa al cambiar el tema (data-theme) para reconstruir el chart
+  // con los colores correctos sin necesidad de recargar.
+  const [themeVersion, setThemeVersion] = useState(0);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setThemeVersion(v => v + 1));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -66,7 +100,7 @@ const ChartRenderer = ({ chartType, labels, datasets }) => {
         chartRef.current = null;
       }
     };
-  }, [chartType, datasets, labels]);
+  }, [chartType, datasets, labels, themeVersion]);
 
   return (
     <div className="chart-renderer">

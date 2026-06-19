@@ -62,7 +62,7 @@ Construir una aplicación fiable y mantenible que permita a profesionales dental
 - `Client/` : Código del cliente (interfaz web), configuración de Vite, pruebas y assets públicos.
 - `Server/` : Código del servidor (API, controladores, modelos), configuración y scripts para ejecución en producción/desarrollo.
 - `DB/` : Archivos de base de datos (WiredTiger) y datos locales.
-- `scripts/` o `Server/scripts/` : Utilidades para gestionar la base de datos (ej. `start-mongo.ps1`, `mongo-utils.ps1`).
+- `scripts/` o `Server/scripts/` : Utilidades para gestionar la base de datos (ej. `start-mongo.ps1`, `backup-db.js`, `restore-db.js`).
 - Archivos en raíz: instaladores y launcher (`launcher.py`, `install.ps1`, `install.sh`, `EJECUTAR_INSTALADOR.bat`).
 
 **Responsabilidad de cada carpeta o módulo**

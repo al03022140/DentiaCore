@@ -372,53 +372,6 @@ export const normalizeEntriesForEngine = (entries) => {
   return out;
 };
 
-/**
- * Verifica si un array contiene un elemento (por diente, tipo y superficie)
- * @param {Array} array - Array a verificar
- * @param {Object} element - Elemento a buscar
- * @param {Array} props - Propiedades a comparar
- * @returns {boolean} - true si el elemento existe, false en caso contrario
- */
-export const includesEntry = (array, element, props = ['diente','tipo','superficie']) => {
-  if (!Array.isArray(array) || typeof element !== 'object' || element == null) {
-    return false;
-  }
-  return array.some(item =>
-    props.every(prop => item?.[prop] === element?.[prop])
-  );
-};
-
-// Alias para compatibilidad con tu componente
-export const arrayContainsElement = includesEntry;
-
-/**
- * Combina dos arrays sin duplicados, comparando ciertas props
- * @param {Array} a1 - Primer array
- * @param {Array} a2 - Segundo array
- * @param {Array} props - Propiedades a comparar
- * @returns {Array} - Array combinado sin duplicados
- */
-export const mergeEntries = (a1, a2, props = ['diente','tipo','superficie']) => {
-  const arr1 = Array.isArray(a1) ? a1 : [];
-  const arr2 = Array.isArray(a2) ? a2 : [];
-  return [
-    ...arr1,
-    ...arr2.filter(el => !includesEntry(arr1, el, props))
-  ];
-};
-
-/**
- * Parchea el Engine para evitar polling infinito de checkInitialOdontogramStatus
- * Útil para tests o desarrollo local.
- */
-export function disableInitialCheckPolling() {
-  if (window.Engine && !window.Engine.prototype._patchedCheck) {
-    window.Engine.prototype._patchedCheck = true;
-    window.Engine.prototype._originalCheckInitialOdontogramStatus = window.Engine.prototype.checkInitialOdontogramStatus;
-    window.Engine.prototype.checkInitialOdontogramStatus = () => Promise.resolve({ hasSaved: false });
-  }
-}
-
 export function patchEnginePrototype() {
   if (window.Engine) {
     if (!window.Engine.prototype._originalCheckInitialOdontogramStatus) {
@@ -443,11 +396,8 @@ const utils = {
   getDamageNameByCode,
   DAMAGE_NAMES,
   prepareDataSource,
-  includesEntry,
-  mergeEntries,
   damageToCode,
   normalizeEntriesForEngine,
-  disableInitialCheckPolling,
   patchEnginePrototype
 };
 

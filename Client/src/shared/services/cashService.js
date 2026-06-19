@@ -1,15 +1,5 @@
 import API from './axios-instance';
 
-export const getMonthlyBalance = async () => {
-  try {
-    const response = await API.get('/cash/balance/monthly');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching monthly balance:', error);
-    throw error;
-  }
-};
-
 export const getSessionBalance = async () => {
   const response = await API.get('/cash/session/balance');
   return response.data;

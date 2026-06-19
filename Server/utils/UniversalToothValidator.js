@@ -21,6 +21,7 @@
 
 const crypto = require('crypto');
 const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
+const { computePeriodontalStatistics } = require('../../Client/src/shared/stats/periodontal-stats-core.cjs');
 // Caras canónicas reutilizables en validación/estadísticas
 const CANON_FACES = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
 
@@ -426,104 +427,6 @@ class UniversalToothValidator {
   }
   
   /**
-   * Sanitiza un valor según su esquema (sin validación estricta)
-   * @param {any} value - Valor a sanitizar
-   * @param {Object} schema - Esquema de sanitización
-   * @returns {any} - Valor sanitizado
-   */
-  static sanitizeValue(value, schema) {
-    const result = this.validateValue(value, schema);
-    return result.sanitizedValue;
-  }
-  
-  /**
-   * Valida y sanitiza datos completos de un diente
-   * @param {Object} toothData - Datos del diente
-   * @returns {Object} - Datos validados y sanitizados
-   */
-  static validateCompleteToothData(toothData) {
-    if (!toothData || typeof toothData !== 'object') {
-      return this.getDefaultToothData();
-    }
-    
-    const validatedData = {};
-    const allErrors = [];
-    const allWarnings = [];
-    
-    // Validar cada campo según el esquema
-    Object.keys(UNIFIED_TOOTH_SCHEMA).forEach(fieldName => {
-      const schema = UNIFIED_TOOTH_SCHEMA[fieldName];
-      const fieldValue = toothData[fieldName];
-      
-      // Si el campo no existe, usar valor por defecto
-      const valueToValidate = fieldValue !== undefined ? fieldValue : schema.default;
-      
-      const result = this.validateValue(valueToValidate, schema, fieldName);
-      validatedData[fieldName] = result.sanitizedValue;
-      
-      allErrors.push(...result.errors);
-      allWarnings.push(...result.warnings);
-    });
-    
-    // Advertencias y errores procesados
-    
-    return validatedData;
-  }
-  
-  /**
-   * Obtiene datos por defecto para un diente
-   * SINCRONIZADO CON CLIENTE
-   * UTILIZA CONFIGURACIÓN CENTRALIZADA
-   * @param {number} toothNumber - Número del diente (opcional)
-   * @returns {Object} - Datos por defecto
-   */
-  static getDefaultToothData(toothNumber = 11) {
-    return PERIODONTOGRAM_CONFIG.getDefaultToothData(toothNumber);
-  }
-  
-
-  
-  /**
-   * Valida los datos completos del periodontograma (método de compatibilidad)
-   * @param {Object} data - Datos completos { teeth, statistics }
-   * @returns {Object} - Resultado de validación
-   */
-  static validatePeriodontogramData(data) {
-    try {
-      if (!data || typeof data !== 'object') {
-        return {
-          isValid: false,
-          errors: ['Los datos deben ser un objeto válido']
-        };
-      }
-
-      const { teeth, statistics } = data;
-      
-      if (!teeth || typeof teeth !== 'object') {
-        return {
-          isValid: false,
-          errors: ['Campo "teeth" requerido y debe ser objeto']
-        };
-      }
-
-      if (!statistics || typeof statistics !== 'object') {
-        return {
-          isValid: false,
-          errors: ['Campo "statistics" requerido y debe ser objeto']
-        };
-      }
-
-      // Usar la validación de estructura existente
-      return this.validatePeriodontogramStructure({ teeth, statistics });
-    } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Error en validación: ${error.message}`]
-      };
-    }
-  }
-
-  /**
    * Valida la estructura completa del periodontograma
    * @param {Object} periodontogramData - Datos del periodontograma
    * @returns {Object} - Resultado de validación
@@ -788,334 +691,30 @@ class UniversalToothValidator {
       return cached;
     }
     
-    const teeth = periodontogramData.teeth;
-    const faceKeysEs = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
-    const measurementKeysEs = ['sangrado', 'placa', 'supuracion', 'margenGingival', 'profundidadSondaje'];
-    const toFiniteNumber = (value, fallback = 0) => {
-      if (value === true) return 1;
-      if (value === false) return 0;
-      const num = Number(value);
-      return Number.isFinite(num) ? num : fallback;
-    };
-    const forEachTriple = (candidate, handler) => {
-      if (!Array.isArray(candidate)) return;
-      const limit = Math.min(3, candidate.length);
-      for (let i = 0; i < limit; i++) {
-        handler(candidate[i], i);
-      }
-    };
-    let presentTeeth = 0;
-    let bleedingCount = 0;
-    let plaqueCount = 0;
-    let totalDepth = 0;
-    let depthCount = 0;
-    let totalAttachmentLevel = 0;
-    let attachmentLevelCount = 0;
-    
-    // Iterar sobre los 32 dientes permanentes estándar
-    PERIODONTOGRAM_CONFIG.PERMANENT_TEETH.forEach(toothNumber => {
-  const toothData = teeth[toothNumber];
-      
-  // Verificar si el diente está presente
-  const isAbsentFlag = toothData && ((toothData.present === false) || (toothData.absent === true) || (toothData.ausente === true));
-  const isPresent = toothData && !isAbsentFlag;
-      
-      if (isPresent) {
-        presentTeeth++;
-        
-        // Procesar datos de sangrado y placa por caras (estructura legacy por caras)
-        const processToothFaces = (tooth) => {
-          const faces = ['vestibular', 'palatino'];
-          
-          faces.forEach(face => {
-            const faceData = tooth[face];
-            if (faceData) {
-              // Sangrado: contar cada casilla del array (3 elementos por cara)
-              if (Array.isArray(faceData.sangrado)) {
-                faceData.sangrado.forEach(value => {
-                  if (typeof value === 'number' && value > 0) bleedingCount++;
-                  else if (value === true || value === 1) bleedingCount++;
-                });
-              } else if (faceData.sangrado > 0) {
-                bleedingCount++;
-              }
-              
-              // Placa: contar cada casilla del array (3 elementos por cara)
-              if (Array.isArray(faceData.placa)) {
-                faceData.placa.forEach(value => {
-                  if (typeof value === 'number' && value > 0) plaqueCount++;
-                  else if (value === true || value === 1) plaqueCount++;
-                });
-              } else if (faceData.placa > 0) {
-                plaqueCount++;
-              }
-              
-              // Profundidad de sondaje: procesar array de 3 elementos
-              if (Array.isArray(faceData.profundidadSondaje)) {
-                faceData.profundidadSondaje.forEach((depth, index) => {
-                  const numDepth = parseFloat(depth);
-                  if (!isNaN(numDepth) && numDepth !== 999) {
-                    // Nivel de inserción clínica (NIC) = PS - MG (margen positivo reduce, margen negativo aumenta)
-                    const marginArray = faceData.margenGingival || faceData.margen;
-                    const margin = Array.isArray(marginArray) ? parseFloat(marginArray[index]) || 0 : parseFloat(faceData.margenGingival) || 0;
-                    const attachmentLevel = numDepth - margin;
-                    totalAttachmentLevel += attachmentLevel;
-                    attachmentLevelCount++;
-                    // Acumular profundidad para media global
-                    totalDepth += numDepth;
-                    depthCount++;
-                  }
-                });
-              } else {
-                // Compatibilidad con valores únicos
-                const depth = parseFloat(faceData.profundidadSondaje);
-                if (!isNaN(depth) && depth > 0) {
-                  totalDepth += depth;
-                  depthCount++;
-                  
-                  // Nivel de inserción clínica (NIC) = PS - MG (margen positivo reduce, margen negativo aumenta)
-                  const margin = parseFloat(faceData.margenGingival) || 0;
-                  const attachmentLevel = depth - margin;
-                  totalAttachmentLevel += attachmentLevel;
-                  attachmentLevelCount++;
-                }
-              }
-            }
-          });
-          
-          // Compatibilidad con estructura legacy adicional
-          if (tooth.lingual) {
-            const faceData = tooth.lingual;
-            if (faceData.sangrado > 0) bleedingCount++;
-            if (faceData.placa > 0) plaqueCount++;
-            
-            const depth = parseFloat(faceData.profundidadSondaje);
-            if (!isNaN(depth) && depth > 0) {
-              totalDepth += depth;
-              depthCount++;
-              
-              const margin = parseFloat(faceData.margenGingival) || 0;
-              const attachmentLevel = depth - margin;
-              totalAttachmentLevel += attachmentLevel;
-              attachmentLevelCount++;
-            }
-          }
-        };
+    // Acumuladores desde el núcleo compartido (misma matemática que el cliente).
+    const acc = computePeriodontalStatistics(periodontogramData);
+    const totalCasillasPosibles = acc.teethWithClinicalData * 6;
 
-        // Detectar estructura canónica (bloques con caras canónicas de tripletas)
-        const hasCanonical = (() => {
-          const keys = ['bleeding', 'plaque', 'suppuration', 'probingDepth', 'gingivalMargin'];
-          return keys.some(k => {
-            const block = toothData && toothData[k];
-            return block && typeof block === 'object' && CANON_FACES.some(f => Array.isArray(block[f]));
-          });
-        })();
-
-        const hasSpanishCanonicalFaces = faceKeysEs.some(faceKey => {
-          const face = toothData && toothData[faceKey];
-          if (!face || typeof face !== 'object') return false;
-          return measurementKeysEs.some(mKey => Array.isArray(face[mKey]));
-        });
-
-        if (hasCanonical) {
-          // Procesar formato canónico: 5 bloques x caras x tripletas.
-          // P2: el denominador de %SS/%placa es presentTeeth*6 (= 2 caras × 3
-          // sitios). Contar las 4 caras inflaba el numerador hasta ~200%. Igual
-          // que la rama español, se procesan solo las 2 caras de la arcada del
-          // diente (las otras 2 deberían venir vacías, pero no había defensa).
-          const measurementBlocks = ['bleeding', 'plaque', 'suppuration', 'probingDepth', 'gingivalMargin'];
-          const faceHasData = (f) => measurementBlocks.some(k => {
-            const block = toothData && toothData[k];
-            return block && Array.isArray(block[f]);
-          });
-          const inferredArcadeEn = (() => {
-            if (toothData && typeof toothData.arcada === 'string') return toothData.arcada.toLowerCase();
-            const n = Number(toothNumber);
-            if (Number.isFinite(n)) return (n >= 11 && n <= 28) ? 'superior' : 'inferior';
-            return null;
-          })();
-          let facesToProcessEn = CANON_FACES.filter(faceHasData);
-          if (facesToProcessEn.length > 2) {
-            const preferred = inferredArcadeEn === 'superior'
-              ? ['vestibularSuperior', 'palatinoSuperior']
-              : ['vestibularInferior', 'lingualInferior'];
-            const filtered = preferred.filter(f => facesToProcessEn.includes(f));
-            facesToProcessEn = filtered.length > 0 ? filtered : facesToProcessEn.slice(0, 2);
-          }
-          for (const face of facesToProcessEn) {
-            // Conteos de sangrado
-            const bleedArr = toothData.bleeding && toothData.bleeding[face];
-            if (Array.isArray(bleedArr)) {
-              bleedArr.forEach(v => {
-                if (typeof v === 'number' && v > 0) bleedingCount++; else if (v === true || v === 1) bleedingCount++;
-              });
-            }
-            // Conteos de placa
-            const plaqueArr = toothData.plaque && toothData.plaque[face];
-            if (Array.isArray(plaqueArr)) {
-              plaqueArr.forEach(v => {
-                if (typeof v === 'number' && v > 0) plaqueCount++; else if (v === true || v === 1) plaqueCount++;
-              });
-            }
-            // Profundidad y NIC
-            const depthArr = toothData.probingDepth && toothData.probingDepth[face];
-            const marginArr = toothData.gingivalMargin && toothData.gingivalMargin[face];
-            if (Array.isArray(depthArr)) {
-              for (let i = 0; i < depthArr.length; i++) {
-                const depth = parseFloat(depthArr[i]);
-                // Excluir solo valores centinela (999) - incluir 0 como medición válida
-                if (!isNaN(depth) && depth !== 999) {
-                  const rawMargin = Array.isArray(marginArr) ? parseFloat(marginArr[i]) : (typeof marginArr === 'number' ? marginArr : 0);
-                  const margin = isNaN(rawMargin) ? 0 : rawMargin;
-                  totalDepth += depth; depthCount++;
-                  totalAttachmentLevel += (depth - margin); attachmentLevelCount++;
-                }
-              }
-            }
-          }
-        } else if (hasSpanishCanonicalFaces) {
-          // Procesar formato canónico con claves en español dentro de cada cara
-          const inferredArcade = (() => {
-            if (typeof toothData === 'object' && typeof toothData.arcada === 'string') {
-              return toothData.arcada.toLowerCase();
-            }
-            const n = Number(toothNumber);
-            if (Number.isFinite(n)) {
-              return (n >= 11 && n <= 28) ? 'superior' : 'inferior';
-            }
-            return null;
-          })();
-
-          let facesToProcess = faceKeysEs.filter(faceKey => {
-            const face = toothData && toothData[faceKey];
-            if (!face || typeof face !== 'object') return false;
-            return measurementKeysEs.some(mKey => Array.isArray(face[mKey]));
-          });
-
-          if (facesToProcess.length > 2) {
-            const preferred = inferredArcade === 'superior'
-              ? ['vestibularSuperior', 'palatinoSuperior']
-              : ['vestibularInferior', 'lingualInferior'];
-            const filtered = preferred.filter(face => facesToProcess.includes(face));
-            if (filtered.length > 0) {
-              facesToProcess = filtered;
-            } else {
-              facesToProcess = facesToProcess.slice(0, 2);
-            }
-          }
-
-          facesToProcess.forEach(faceKey => {
-            const face = toothData[faceKey];
-            if (!face || typeof face !== 'object') {
-              return;
-            }
-
-            // Sangrado
-            forEachTriple(face.sangrado ?? face.bleeding, (value) => {
-              const bleedValue = toFiniteNumber(value);
-              if (bleedValue > 0) {
-                bleedingCount++;
-              }
-            });
-
-            // Placa
-            forEachTriple(face.placa ?? face.plaque, (value) => {
-              const plaqueValue = toFiniteNumber(value);
-              if (plaqueValue > 0) {
-                plaqueCount++;
-              }
-            });
-
-            // Profundidad y NIC
-            const depthArray = face.profundidadSondaje ?? face.probingDepth;
-            const marginArray = face.margenGingival ?? face.gingivalMargin;
-            forEachTriple(depthArray, (depthValue, index) => {
-              const depth = toFiniteNumber(depthValue, 0);
-              if (!Number.isFinite(depth) || depth === 999) {
-                return;
-              }
-              const margin = Array.isArray(marginArray)
-                ? toFiniteNumber(marginArray[index], 0)
-                : toFiniteNumber(marginArray, 0);
-              totalDepth += depth;
-              depthCount++;
-              totalAttachmentLevel += (depth - margin);
-              attachmentLevelCount++;
-            });
-          });
-        } else {
-          // Flujo legacy existente
-          processToothFaces(toothData);
-          
-          // Compatibilidad con estructura legacy (arrays simples de 6 elementos)
-          const legacyProbingDepth = toothData.probingDepth;
-          const legacyGingivalMargin = toothData.gingivalMargin;
-          
-          if (legacyProbingDepth && legacyGingivalMargin && 
-              Array.isArray(legacyProbingDepth) && Array.isArray(legacyGingivalMargin)) {
-            
-            // Procesar hasta 6 sitios (3 vestibular + 3 palatino/lingual)
-            for (let i = 0; i < Math.min(6, legacyProbingDepth.length, legacyGingivalMargin.length); i++) {
-              const depth = parseFloat(legacyProbingDepth[i]);
-              const margin = parseFloat(legacyGingivalMargin[i]);
-              
-              if (!isNaN(depth) && !isNaN(margin) && depth !== 999 && margin !== 999) {
-                // Acumular profundidad
-                totalDepth += depth;
-                depthCount++;
-                
-                // Calcular nivel de inserción clínica (NIC = PS - MG)
-                const attachmentLevel = depth - margin;
-                totalAttachmentLevel += attachmentLevel;
-                attachmentLevelCount++;
-              }
-            }
-          }
-        }
-      }
-    });
-    
-    // Calcular estadísticas según fórmulas específicas por el usuario
-    const absentTeeth = 32 - presentTeeth;
-    
-    // 🦷 Fórmulas de estadísticas periodontales (usando base de 192 sitios)
-    // Base: 32 dientes * 6 casillas (3 vestibular + 3 palatino/lingual) = 192 sitios. Si hay ausentes: presentTeeth * 6
-    const totalCasillasPosibles = presentTeeth * 6;
-    
     const statistics = {
-      totalTeeth: 32, // Siempre 32 dientes permanentes
-      presentTeeth,
-      absentTeeth,
-      
-      // Conteos de sitios
-      bleedingCount,
-      plaqueCount,
-      
-      // 3. % de sangrado: (numeroDeCasillasConSangrado / totalCasillasPosibles) * 100
-      bleedingPercentage: totalCasillasPosibles > 0 ? Math.round((bleedingCount / totalCasillasPosibles) * 100) : 0,
-      
-      // 4. % de placa: (numeroDeCasillasConPlaca / totalCasillasPosibles) * 100
-      plaquePercentage: totalCasillasPosibles > 0 ? Math.round((plaqueCount / totalCasillasPosibles) * 100) : 0,
-      
-      // 1. Media de profundidad de sondaje: sumaDeTodasLasProfundidades / numeroDeCasillasConValor
-      averageProbingDepth: depthCount > 0 ? Math.round((totalDepth / depthCount) * 100) / 100 : 0,
-      
-      // 2. Media de nivel de inserción clínica: nivelInsercion = profundidadSondaje - margenGingival
-      averageAttachmentLevel: attachmentLevelCount > 0 ? Math.round((totalAttachmentLevel / attachmentLevelCount) * 100) / 100 : 0,
-      
+      totalTeeth: 32,
+      presentTeeth: acc.presentTeeth,
+      absentTeeth: 32 - acc.presentTeeth,
+      bleedingCount: acc.bleedingCount,
+      plaqueCount: acc.plaqueCount,
+      bleedingPercentage: totalCasillasPosibles > 0 ? Math.round((acc.bleedingCount / totalCasillasPosibles) * 100) : 0,
+      plaquePercentage: totalCasillasPosibles > 0 ? Math.round((acc.plaqueCount / totalCasillasPosibles) * 100) : 0,
+      averageProbingDepth: acc.depthCount > 0 ? Math.round((acc.totalDepth / acc.depthCount) * 100) / 100 : 0,
+      averageAttachmentLevel: acc.attachmentLevelCount > 0 ? Math.round((acc.totalAttachmentLevel / acc.attachmentLevelCount) * 100) / 100 : 0,
       lastCalculated: new Date().toISOString()
     };
-    
-    // Guardar en caché
+
     statisticsCache.set(cacheKey, statistics, dataHash);
 
-    // Log de depuración solo fuera de producción (antes era incondicional y
-    // ruidoso en cada cálculo de estadísticas en prod).
     if (process.env.NODE_ENV !== 'production') {
       console.log('[VALIDATION] Estadísticas calculadas exitosamente según especificaciones SEPA', {
         presentTeeth: statistics.presentTeeth,
         totalCasillasPosibles,
-        bleedingCount,
+        bleedingCount: acc.bleedingCount,
         bleedingPercentage: statistics.bleedingPercentage
       });
     }
@@ -1185,17 +784,6 @@ class UniversalToothValidator {
   }
   
   /**
-   * Valida una medición individual según su tipo
-   * UTILIZA CONFIGURACIÓN CENTRALIZADA
-   * @param {any} value - Valor a validar
-   * @param {string} measurementType - Tipo de medición
-   * @returns {number} - Valor validado
-   */
-  static validateMeasurement(value, measurementType) {
-    return PERIODONTOGRAM_CONFIG.validateMeasurement(value, measurementType);
-  }
-  
-  /**
    * Invalida caché de estadísticas
    * @param {string} key - Clave específica a invalidar (opcional)
    */
@@ -1231,14 +819,6 @@ class UniversalToothValidator {
       standard: 'UNIFIED_CALCULATION',
       calculatedAt: new Date().toISOString()
     };
-  }
-  
-  /**
-   * Alias para getDefaultStatistics para mantener compatibilidad con código existente
-   * @returns {Object} - Objeto con estadísticas inicializadas a cero
-   */
-  static getEmptyStatistics() {
-    return this.getDefaultStatistics();
   }
   
   /**
@@ -1381,91 +961,6 @@ class UniversalToothValidator {
     if (normalizedData.arcada !== expectedArcada) {
       errors.push(`La arcada ${normalizedData.arcada} no es consistente con el número de diente ${toothNumber}`);
     }
-  }
-  
-  /**
-   * Transforma datos del frontend al formato backend normalizado Opción 1
-   * @param {Object} frontendData - Datos del frontend
-   * @param {number} toothNumber - Número del diente
-   * @returns {Object} - Datos transformados para backend
-   */
-  static transformToBackend(frontendData, toothNumber) {
-    try {
-      const arcada = this.determineArcada(toothNumber);
-      const needsDouble = PERIODONTOGRAM_CONFIG.needsDoubleFurca(toothNumber);
-
-      // Procesar furca según reglas: número -> lingualPalatino; [n1,n2] -> doble (solo molares con doble)
-      const furcaInput = frontendData?.furca;
-      let furcaOut = { vestibular: 0, lingualPalatino: 0, doble: { furca1: 0, furca2: 0 } };
-      if (Array.isArray(furcaInput)) {
-        if (needsDouble && furcaInput.length >= 2) {
-          furcaOut.doble.furca1 = Number(furcaInput[0]) || 0;
-          furcaOut.doble.furca2 = Number(furcaInput[1]) || 0;
-        }
-        // Si no aplica doble furca, se ignora el array (queda en 0)
-      } else if (typeof furcaInput === 'number' || typeof furcaInput === 'string') {
-        const v = Number(furcaInput) || 0;
-        furcaOut.lingualPalatino = v; // Palatino en superiores, lingual en inferiores (campo neutral)
-      }
-
-      const backendData = {
-        numero: toothNumber,
-        arcada,
-
-        // Estados del diente: usar present (API nueva) y persistir absent = !present
-        absent: typeof frontendData.present === 'boolean' ? !frontendData.present : Boolean(frontendData.absent),
-        implante: Boolean(frontendData.implante),
-
-        pronostico: String(frontendData.pronostico || 'bueno'),
-        movilidad: Number(frontendData.movilidad) || 0,
-
-        // Valor único de anchura de encía a nivel de diente
-        anchuraEncia: Number.isFinite(Number(frontendData.anchuraEncia))
-          ? Math.min(
-              UNIFIED_TOOTH_SCHEMA.anchuraEncia.max,
-              Math.max(UNIFIED_TOOTH_SCHEMA.anchuraEncia.min, Number(frontendData.anchuraEncia))
-            )
-          : UNIFIED_TOOTH_SCHEMA.anchuraEncia.default,
-
-        // Objeto furca normalizado
-        furca: furcaOut,
-
-        // Caras del diente (sin anchuraEncia por cara)
-        vestibular: this.transformFaceData(frontendData.vestibular),
-        lingualPalatino: this.transformFaceData(frontendData.lingualPalatino || frontendData.palatino || frontendData.lingual)
-      };
-
-      return backendData;
-
-    } catch (error) {
-      console.error('Error transformando datos a backend:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Transforma datos de una cara del diente
-   * @param {Object} faceData - Datos de la cara
-   * @returns {Object} - Datos de cara transformados
-   */
-  static transformFaceData(faceData) {
-    if (!faceData) {
-      return {
-        profundidadSondaje: this.ensureArray3(null, 0),
-        margenGingival: this.ensureArray3(null, 0),
-        sangrado: this.ensureArray3(null, 0),
-        supuracion: this.ensureArray3(null, 0),
-        placa: this.ensureArray3(null, 0)
-      };
-    }
-    
-    return {
-      profundidadSondaje: this.ensureArray3(faceData.profundidadSondaje || faceData.profundidad, 0),
-      margenGingival: this.ensureArray3(faceData.margenGingival || faceData.margen, 0),
-      sangrado: this.ensureArray3(faceData.sangrado, 0),
-      supuracion: this.ensureArray3(faceData.supuracion, 0),
-      placa: this.ensureArray3(faceData.placa, 0)
-    };
   }
   
   /**
@@ -1618,6 +1113,5 @@ class UniversalToothValidator {
 
 module.exports = {
   UniversalToothValidator,
-  UNIFIED_TOOTH_SCHEMA,
-  StatisticsCache
+  UNIFIED_TOOTH_SCHEMA
 };
