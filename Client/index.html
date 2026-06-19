@@ -23,8 +23,13 @@
         URL.createObjectURL) y googleusercontent (avatar de Google).
       - style-src conserva 'unsafe-inline' (lo requieren los estilos inline de
         React y los <style> inyectados por antd).
-      ⚠️ Verificar en navegador antes de desplegar: login, editor de odontograma
-         y vista de firmas. Si algo se rompe, revertir esta etiqueta.
+      ⚠️ Verificar en navegador antes de desplegar: login, editor de odontograma,
+         vista/captura de firmas y alta/edición de paciente con foto. Si algo se
+         rompe, revertir esta etiqueta.
+      ⚠️ OJO con connect-src: NO incluye `data:`, así que un fetch() sobre una URL
+         `data:` se bloquea con "Failed to fetch". Para convertir un dataURL a
+         Blob/File usa shared/utils/dataUrl.js (decodifica base64 sin red), NO
+         fetch(dataUrl). (img-src sí permite data:, por eso los <img> sí cargan.)
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
