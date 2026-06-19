@@ -90,11 +90,19 @@ export function createStuSession(opts = {}) {
     if (connectionCb) connectionCb(kind);
   });
 
+  let previewRaf = 0;
   function emitPreview() {
     if (!previewCb || !renderer) return;
-    // Para el preview usamos el lienzo completo (no recortado) para que el
-    // trazo aparezca en su posición real mientras se firma.
-    previewCb(renderer.toFullDataUrl());
+    // Coalesce a un frame: el lápiz llega a ~100-200 Hz y generar un PNG
+    // (toDataURL) + setState por cada punto encola el encode/decode y se ve
+    // lento. Un solo toDataURL por frame (~60 fps) basta y elimina el retraso.
+    if (previewRaf) return;
+    previewRaf = requestAnimationFrame(() => {
+      previewRaf = 0;
+      // Para el preview usamos el lienzo completo (no recortado) para que el
+      // trazo aparezca en su posición real mientras se firma.
+      if (previewCb && renderer) previewCb(renderer.toFullDataUrl());
+    });
   }
 
   // Crea el renderer dimensionado a las capacidades reales del dispositivo y
