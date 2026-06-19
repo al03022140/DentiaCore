@@ -15,6 +15,23 @@ import folderUploadIcon from '../../../assets/images/icons/folder-upload.svg';
 // (wrap, baseline, "×", proporciones) sea idéntico aquí.
 import '../../../shared/components/styles/signature-pad-modal.css';
 
+// Convierte un dataURL (el PNG que entrega WacomStuPanel) en Blob SIN usar
+// fetch(). Un fetch() a una URL `data:` se trata como petición de red y depende
+// del CSP `connect-src`/entorno: si no permite `data:` el navegador lo bloquea
+// con "Failed to fetch". Decodificar el base64 a mano no toca la red, así que
+// es inmune al CSP y funciona igual en dev (vite) y en el build servido por Express.
+const dataUrlToBlob = (dataUrl) => {
+  const comma = dataUrl.indexOf(',');
+  if (comma === -1) throw new Error('dataURL inválido');
+  const header = dataUrl.slice(0, comma);
+  const body = dataUrl.slice(comma + 1);
+  const mime = header.match(/data:([^;]+)/)?.[1] || 'image/png';
+  const binary = /;base64/i.test(header) ? atob(body) : decodeURIComponent(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+};
+
 const ProfessionalProfileSection = () => {
   // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
   // hacía que el user del front no se actualizara tras subir firma.
@@ -292,7 +309,7 @@ const ProfessionalProfileSection = () => {
     setLocalPreview(pngDataUrl); // preview inmediato
     setFirmaSaving(true);
     try {
-      const blob = await (await fetch(pngDataUrl)).blob();
+      const blob = dataUrlToBlob(pngDataUrl);
       const file = new File([blob], 'firma.png', { type: 'image/png' });
       await uploadFirma(file);
       await refreshProfile?.();
