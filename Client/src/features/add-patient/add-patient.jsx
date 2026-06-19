@@ -6,6 +6,7 @@ import defaultAvatar from "../../assets/images/icons/Profile Default.svg";
 import "./styles/add-patient.css";
 import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
+import { dataUrlToBlob } from '../../shared/utils/dataUrl';
 import { invalidatePatientsCache } from '../../shared/services/patient-service';
 import { useDraftPersistence } from '../../shared/hooks/useDraftPersistence';
 
@@ -1214,17 +1215,19 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       throw new PatientValidationError("Errores de formato", formatErrors);
     }
 
-    // Si hay una foto en base64, convertirla a archivo
+    // Si hay una foto en base64, convertirla a archivo.
+    // ⚠️ NO usar fetch(dataUrl) aquí: el <meta> CSP de index.html no permite
+    // `data:` en connect-src, así que fetch() sobre el dataURL se bloquea con
+    // "Failed to fetch" y rompe el alta/edición con foto. dataUrlToBlob decodifica
+    // el base64 a mano (sin red), inmune al CSP.
     if (patientData.photoURL && patientData.photoURL.startsWith('data:image/')) {
       try {
-        // Convertir base64 a blob
-        const response = await fetch(patientData.photoURL);
-        const blob = await response.blob();
-        
+        const blob = dataUrlToBlob(patientData.photoURL);
+
         // Crear archivo desde el blob
         const file = new File([blob], 'patient-photo.jpg', { type: 'image/jpeg' });
         formDataToSend.append('foto', file);
-        
+
         // Remover photoURL del objeto de datos ya que se enviará como archivo
         delete patientData.photoURL;
       } catch (error) {
