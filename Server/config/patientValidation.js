@@ -51,35 +51,6 @@ const SANITIZERS = {
             .replace(/'/g, '&#x27;')
             .trim();
     },
-    
-    /**
-     * Limpia y formatea teléfono
-     */
-    cleanPhone: (phone) => {
-        if (!phone) return phone;
-        return phone.replace(/[^\d+]/g, '');
-    },
-    
-    /**
-     * Normaliza nombre (primera letra mayúscula)
-     */
-    normalizeName: (name) => {
-        if (!name) return name;
-        return name
-            .toLowerCase()
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ')
-            .trim();
-    },
-    
-    /**
-     * Normaliza email a minúsculas
-     */
-    normalizeEmail: (email) => {
-        if (!email) return email;
-        return email.toLowerCase().trim();
-    }
 };
 
 module.exports = {

@@ -1,4 +1,3 @@
-import { logger } from '../utils/logger';
 /**
  * 🔧 CONFIGURACIÓN CENTRALIZADA DEL PERIODONTOGRAMA
  * 
@@ -270,29 +269,6 @@ export const UI_COLORS = {
 // ============================================================================
 
 /**
- * Configuraciones de debouncing y guardado automático
- */
-export const SAVE_CONFIG = {
-  debouncing: {
-    delay: 1000,          // Delay en ms para debouncing
-    maxDelay: 5000,       // Máximo delay antes de forzar guardado
-    description: 'Configuración de debouncing para guardado automático'
-  },
-  retries: {
-    maxAttempts: 3,       // Máximo número de reintentos
-    backoffDelay: 2000,   // Delay entre reintentos
-    exponentialBackoff: true,
-    description: 'Configuración de reintentos para guardado'
-  },
-  validation: {
-    validateBeforeSave: true,
-    strictMode: false,    // Si es true, falla en cualquier error de validación
-    logWarnings: true,
-    description: 'Configuración de validación antes del guardado'
-  }
-};
-
-/**
  * Configuraciones de caché
  */
 export const CACHE_CONFIG = {
@@ -305,33 +281,6 @@ export const CACHE_CONFIG = {
     ttl: 600000,          // 10 minutos en ms
     maxSize: 50,
     description: 'Configuración de caché para validaciones'
-  }
-};
-
-// ============================================================================
-// CONFIGURACIONES DE TRANSFORMACIÓN DE DATOS
-// ============================================================================
-
-/**
- * Configuraciones para transformaciones entre frontend y backend
- */
-export const TRANSFORMATION_CONFIG = {
-  dataFormat: {
-    frontend: 'fourFace',     // Formato de 4 caras (superior: vestibular/palatino, inferior: vestibular/lingual)
-    backend: 'threeElement',  // Formato de 3 elementos por cara (mesial, central, distal)
-    description: 'Formatos de datos para transformaciones'
-  },
-  migration: {
-    enableLegacySupport: true,
-    autoMigrate: true,
-    logMigrations: true,
-    description: 'Configuración de migración de datos legacy'
-  },
-  validation: {
-    strictTransformation: false,
-    preserveUnknownFields: true,
-    logTransformations: true,
-    description: 'Configuración de validación durante transformaciones'
   }
 };
 
@@ -354,21 +303,6 @@ export const LOGGING_CONFIG = {
   enableFileOutput: false,
   maxLogEntries: 1000,
   description: 'Configuración de sistema de logging'
-};
-
-// ============================================================================
-// CONFIGURACIONES DE DESARROLLO Y TESTING
-// ============================================================================
-
-/**
- * Configuraciones específicas para desarrollo
- */
-export const DEV_CONFIG = {
-  enableDebugMode: process.env.NODE_ENV === 'development',
-  enablePerformanceMonitoring: true,
-  enableDetailedLogging: process.env.NODE_ENV === 'development',
-  mockDataEnabled: false,
-  description: 'Configuraciones específicas para desarrollo'
 };
 
 // ============================================================================
@@ -430,17 +364,10 @@ const PERIODONTOGRAM_CONFIG = {
   UI_COLORS,
 
   // Guardado
-  SAVE_CONFIG,
   CACHE_CONFIG,
-
-  // Transformación
-  TRANSFORMATION_CONFIG,
 
   // Logging
   LOGGING_CONFIG,
-
-  // Desarrollo
-  DEV_CONFIG,
 
   // Utilidades
   isValidToothNumber,
@@ -449,19 +376,3 @@ const PERIODONTOGRAM_CONFIG = {
 };
 
 export default PERIODONTOGRAM_CONFIG;
-
-// ============================================================================
-// VALIDACIÓN DE CONFIGURACIÓN
-// ============================================================================
-
-// Validar que todas las configuraciones estén correctamente definidas
-if (typeof window !== 'undefined' && DEV_CONFIG.enableDebugMode) {
-  logger.log('🔧 Configuración del periodontograma cargada:', {
-    permanentTeeth: PERMANENT_TEETH.length,
-    temporaryTeeth: TEMPORARY_TEETH.length,
-    totalValidTeeth: ALL_VALID_TEETH.length,
-    quadrants: Object.keys(TOOTH_QUADRANTS).length,
-    measurementLimits: Object.keys(MEASUREMENT_LIMITS).length,
-    version: '4.0.0'
-  });
-}

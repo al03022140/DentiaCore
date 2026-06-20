@@ -53,8 +53,6 @@ const getJwtSecret = () => {
  * Validate password complexity.
  * Requires: ≥8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special character.
  */
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/\\`~])[A-Za-z\d!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/\\`~]{8,}$/;
-
 const validatePasswordStrength = (password) => {
   if (!password || typeof password !== 'string') {
     return { valid: false, message: 'La contraseña es requerida' };
@@ -81,6 +79,5 @@ module.exports = {
   hashToken,
   generateSecureToken,
   getJwtSecret,
-  validatePasswordStrength,
-  PASSWORD_REGEX
+  validatePasswordStrength
 };

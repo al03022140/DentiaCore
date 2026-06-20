@@ -130,4 +130,4 @@ async function verifySignatureImageHash(absPath, expectedHash) {
   return { ok: actual === expectedHash, expected: expectedHash, actual };
 }
 
-module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash, MAX_BYTES };
+module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash };

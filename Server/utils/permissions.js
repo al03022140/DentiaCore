@@ -190,8 +190,7 @@ const getPermissionsForRole = (role) => {
 };
 
 const mergePermissions = (basePermissions = [], extraPermissions = []) => {
-  const merged = new Set([...(basePermissions || []), ...(extraPermissions || [])]);
-  return Array.from(merged);
+  return [...new Set([...(basePermissions || []), ...(extraPermissions || [])])];
 };
 
 /**

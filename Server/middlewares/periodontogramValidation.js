@@ -54,16 +54,6 @@ class PeriodontogramValidationMiddleware {
   }
 
   /**
-   * VALIDADOR validateFullPeriodontogramUpdate ELIMINADO
-   * No se validan datos de dientes individuales - solo imágenes y estadísticas
-   */
-
-  /**
-   * VALIDADOR validateToothUpdate ELIMINADO
-   * No se validan datos de dientes individuales - solo imágenes y estadísticas
-   */
-
-  /**
    * Middleware para verificar errores de validación
    */
   static checkValidationErrors() {
@@ -85,16 +75,6 @@ class PeriodontogramValidationMiddleware {
       next();
     };
   }
-
-  /**
-   * MIDDLEWARES sanitizeToothData y validateAndSanitizeTooth ELIMINADOS
-   * No se procesan datos de dientes individuales - solo imágenes y estadísticas
-   */
-
-  /**
-   * MIDDLEWARE validateAndSanitizePeriodontogram ELIMINADO
-   * No se validan datos de dientes individuales - solo imágenes y estadísticas
-   */
 }
 
 module.exports = PeriodontogramValidationMiddleware;
