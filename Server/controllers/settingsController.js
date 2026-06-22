@@ -260,7 +260,9 @@ exports.uploadFirma = async (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó imagen de firma' });
 
     const userId = req.user._id || req.user.id;
-    const user = await Usuario.findById(userId);
+    // Sólo necesitamos el filename anterior para limpiarlo del disco; no hace
+    // falta cargar (ni revalidar) el documento completo.
+    const user = await Usuario.findById(userId).select('firmaDigitalUrl');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
     // Eliminar firma anterior si existe
@@ -269,10 +271,31 @@ exports.uploadFirma = async (req, res) => {
       await fsExtra.remove(oldPath).catch(() => {});
     }
 
-    user.firmaDigitalUrl = req.file.filename;
-    await user.save();
-    res.json({ message: 'Firma subida correctamente', firmaDigitalUrl: user.firmaDigitalUrl });
+    // Persistencia ATÓMICA de un único campo que controla el servidor (el
+    // filename lo genera multer). Se usa findByIdAndUpdate con
+    // runValidators:false a propósito: `user.save()` revalida TODO el documento
+    // y dispara el hook pre('save'), de modo que CUALQUIER campo legado/inválido
+    // ajeno a la firma (p.ej. un enum viejo en preferences, o un email que ya no
+    // cumple el regex) abortaba la subida con un 500 aunque la firma fuera
+    // correcta. Aquí no hay nada del usuario que validar.
+    const updated = await Usuario.findByIdAndUpdate(
+      userId,
+      { $set: { firmaDigitalUrl: req.file.filename } },
+      { new: true, runValidators: false }
+    );
+    if (!updated) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    res.json({ message: 'Firma subida correctamente', firmaDigitalUrl: updated.firmaDigitalUrl });
   } catch (error) {
+    // Si quedara una validación previa (p.ej. exigir cédula antes de firmar),
+    // devolvemos un 400 legible en vez del 500 genérico. El cliente muestra
+    // `data.message` (ProfessionalProfileSection.jsx:305).
+    if (error && error.name === 'ValidationError') {
+      const detalle = Object.values(error.errors || {}).map((e) => e.message).join(' ');
+      return res.status(400).json({
+        message: detalle || 'No se pudo guardar la firma: revisa tu perfil profesional (cédula, etc.).'
+      });
+    }
     res.status(500).json({ message: 'Error al subir firma', error: error.message });
   }
 };
@@ -280,17 +303,36 @@ exports.uploadFirma = async (req, res) => {
 exports.deleteFirma = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
-    const user = await Usuario.findById(userId);
+    // Sólo necesitamos el filename para borrarlo del disco; no cargamos ni
+    // revalidamos el documento completo.
+    const user = await Usuario.findById(userId).select('firmaDigitalUrl');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
     if (user.firmaDigitalUrl) {
       const filePath = resolveUploadsPath('firmas', path.basename(user.firmaDigitalUrl));
       await fsExtra.remove(filePath).catch(() => {});
-      user.firmaDigitalUrl = null;
-      await user.save();
+      // Limpieza ATÓMICA del único campo, igual que en uploadFirma: evitamos
+      // `user.save()` (revalida TODO el documento y dispara el pre('save')) para
+      // que un campo legado/inválido ajeno a la firma no aborte el borrado.
+      // `null` es el valor "sin firma" del esquema (firmaDigitalUrl default:null,
+      // users.js:110) y lo que esperan los chequeos `!!firmaDigitalUrl` del
+      // cliente (hasFirma, ProfessionalProfileSection.jsx:41/68).
+      await Usuario.findByIdAndUpdate(
+        userId,
+        { $set: { firmaDigitalUrl: null } },
+        { new: true, runValidators: false }
+      );
     }
     res.json({ message: 'Firma eliminada' });
   } catch (error) {
+    // Mismo trato que uploadFirma: 400 legible ante ValidationError, 500 sólo
+    // para errores inesperados.
+    if (error && error.name === 'ValidationError') {
+      const detalle = Object.values(error.errors || {}).map((e) => e.message).join(' ');
+      return res.status(400).json({
+        message: detalle || 'No se pudo eliminar la firma: revisa tu perfil profesional.'
+      });
+    }
     res.status(500).json({ message: 'Error al eliminar firma', error: error.message });
   }
 };
