@@ -119,7 +119,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
                 name="situacion_laboral"
                 value="empleado"
                 checked={formData.situacion_laboral?.empleado || false}
-                onChange={(e) => handleSituacionLaboralChange(e.target.value, true)}
+                onChange={(e) => handleSituacionLaboralChange(e.target.value)}
               />
               Empleado
             </label>
@@ -129,7 +129,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
                 name="situacion_laboral"
                 value="pensionado"
                 checked={formData.situacion_laboral?.pensionado || false}
-                onChange={(e) => handleSituacionLaboralChange(e.target.value, true)}
+                onChange={(e) => handleSituacionLaboralChange(e.target.value)}
               />
               Pensionado
             </label>
@@ -139,7 +139,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
                 name="situacion_laboral"
                 value="desempleado"
                 checked={formData.situacion_laboral?.desempleado || false}
-                onChange={(e) => handleSituacionLaboralChange(e.target.value, true)}
+                onChange={(e) => handleSituacionLaboralChange(e.target.value)}
               />
               Desempleado
             </label>
@@ -149,7 +149,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
                 name="situacion_laboral"
                 value="jubilado"
                 checked={formData.situacion_laboral?.jubilado || false}
-                onChange={(e) => handleSituacionLaboralChange(e.target.value, true)}
+                onChange={(e) => handleSituacionLaboralChange(e.target.value)}
               />
               Jubilado
             </label>

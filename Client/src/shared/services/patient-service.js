@@ -16,10 +16,9 @@ export const invalidatePatientsCache = () => {
   patientsCache = { data: null, ts: 0 };
 };
 
-export const getAllPatients = async (options = {}) => {
-  const { skipCache = false } = options;
+export const getAllPatients = async () => {
   const now = Date.now();
-  if (!skipCache && patientsCache.data !== null && now - patientsCache.ts < PATIENTS_CACHE_TTL_MS) {
+  if (patientsCache.data !== null && now - patientsCache.ts < PATIENTS_CACHE_TTL_MS) {
     return patientsCache.data;
   }
   try {

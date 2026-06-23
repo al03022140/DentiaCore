@@ -1284,11 +1284,6 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
         }
       }
     } catch (err) {
-      if (err instanceof PatientValidationError) {
-        console.warn("Validación de paciente incompleta:", err.details);
-        throw err;
-      }
-
       console.error("Error procesando paciente:", err);
 
       // Concurrencia optimista del backend: PATIENT_STALE significa que el
@@ -1509,8 +1504,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     const keys = new Set(missingFields.map(f => f.path.join('.')));
     setInvalidFields(keys);
     setShakeKey(k => k + 1);
-    // Limpiar resaltado después de 3 s para no dejar todo en rojo indefinidamente
-    setTimeout(() => setInvalidFields(new Set()), 3000);
+    // Limpiar resaltado después de 3 s para no dejar todo en rojo indefinidamente.
+    // Guarda isMountedRef: el flujo modal puede desmontar antes de los 3 s.
+    setTimeout(() => { if (isMountedRef.current) setInvalidFields(new Set()); }, 3000);
   };
 
   // Intenta avanzar/saltar a `newStep`. Si se va hacia adelante valida todos
@@ -1602,6 +1598,9 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
                         setImageSrc(formData.photoURL);
                         setCrop(formData.photoCrop || { x: 0, y: 0 });
                         setZoom(formData.photoZoom || 1);
+                        // Reset del recorte anterior: si se Guarda antes de que
+                        // onCropComplete dispare, no reusar coordenadas de otra imagen.
+                        setCroppedAreaPixels(null);
                         setIsCropping(true);
                       } else if (!formData.photoURL && !imageSrc) {
                         fileInputRef.current && fileInputRef.current.click();

@@ -174,7 +174,7 @@ const Habits = ({
                         <label>
                           <input
                             type="checkbox"
-                            checked={formData.habitos_higiene.consumo_azucar.tipo.includes("Gaseosas")}
+                            checked={(formData.habitos_higiene.consumo_azucar.tipo || []).includes("Gaseosas")}
                             onChange={() => handleToggleAzucar("Gaseosas")}
                           />
                           Gaseosas
@@ -182,7 +182,7 @@ const Habits = ({
                         <label>
                           <input
                             type="checkbox"
-                            checked={formData.habitos_higiene.consumo_azucar.tipo.includes("Dulces")}
+                            checked={(formData.habitos_higiene.consumo_azucar.tipo || []).includes("Dulces")}
                             onChange={() => handleToggleAzucar("Dulces")}
                           />
                           Dulces

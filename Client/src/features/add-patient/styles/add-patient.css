@@ -23,9 +23,10 @@
   box-shadow: 0 0 0 2px rgba(229,62,62,0.25);
 }
 
-/* Limpiar el rojo en cuanto el usuario escribe algo */
-.add-patient-wrapper input.field-invalid:not(:placeholder-shown),
-.add-patient-wrapper select.field-invalid:not([value=""]) {
+/* Limpiar el rojo en cuanto el usuario escribe algo. Solo inputs: en <select>
+   React controla el value por propiedad (no atributo), así que [value=""] no
+   refleja la selección; el rojo del select lo retira el JS al revalidar. */
+.add-patient-wrapper input.field-invalid:not(:placeholder-shown) {
   border-color: var(--color-border-medium) !important;
   background-color: unset !important;
 }
@@ -369,45 +370,10 @@
   box-sizing: border-box;
 }
 
-/* Botones para recorte y subida de imagen */
-.add-patient-wrapper .upload-button,
+/* Botón Guardar del recorte de imagen */
 .add-patient-wrapper .crop-button {
   display: block;
   margin: 10px auto;
-}
-
-/* Plantilla de alineación (Cropper) */
-.add-patient-wrapper .overlay-template {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80%;
-  height: 80%;
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* =========================
-   Muestra/Oculta campos de cepillo
-========================= */
-.add-patient-wrapper .cepillo-dental-fields {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; 
-  opacity: 0;
-  max-height: none;
-  visibility: hidden;
-  overflow: visible;
-}
-
-/* Mostrar cuando 'show' está activo */
-.add-patient-wrapper .cepillo-dental-fields.show {
-  visibility: visible;
-  opacity: 1;
 }
 
 /* Ajuste del título principal */
@@ -457,29 +423,6 @@
   white-space: nowrap;
   z-index: 1001;
   pointer-events: none;
-}
-
-/* Controles de imagen dentro de la foto */
-.add-patient-wrapper .image-controls {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: flex;
-  gap: 8px;
-}
-
-.add-patient-wrapper .image-controls .crop-button {
-  --btn-padding: 6px 10px;
-  --btn-font: var(--text-label);
-}
-
-.add-patient-wrapper .image-controls .crop-button:hover {
-  transform: scale(1.05);
-}
-
-.add-patient-wrapper .upload-button {
-  margin-top: 10px;
-  --btn-padding: 6px 12px;
 }
 
 .add-patient-wrapper .right-section {

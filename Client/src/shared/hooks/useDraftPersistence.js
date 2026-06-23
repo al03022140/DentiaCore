@@ -149,7 +149,7 @@ export const useDraftPersistence = ({
     };
   }, [enabled, saveNow]);
 
-  return { saveNow, loadDraft, clearDraft };
+  return { loadDraft, clearDraft };
 };
 
 export default useDraftPersistence;
