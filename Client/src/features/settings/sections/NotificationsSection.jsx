@@ -2,6 +2,21 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../app/auth/AuthContext';
 import { updateMyPreferences } from '../../../shared/services/settingsService';
 
+// Fuera del componente: si vive dentro del render, React lo trata como un tipo
+// nuevo en cada render y remonta los <input> en cada cambio de estado.
+const Toggle = ({ label, desc, checked, onChange }) => (
+  <div className="settings-toggle">
+    <div>
+      <div className="settings-toggle-label">{label}</div>
+      {desc && <div className="settings-toggle-desc">{desc}</div>}
+    </div>
+    <label className="settings-switch">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="slider" />
+    </label>
+  </div>
+);
+
 const NotificationsSection = () => {
   // ⚠️ AuthContext expone `refreshProfile`, no `refreshUser` — el bug previo
   // hacía que el user del front no se actualizara tras guardar.
@@ -29,19 +44,6 @@ const NotificationsSection = () => {
       setSaving(false);
     }
   };
-
-  const Toggle = ({ label, desc, checked, onChange }) => (
-    <div className="settings-toggle">
-      <div>
-        <div className="settings-toggle-label">{label}</div>
-        {desc && <div className="settings-toggle-desc">{desc}</div>}
-      </div>
-      <label className="settings-switch">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span className="slider" />
-      </label>
-    </div>
-  );
 
   return (
     <div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   getStoredGoogleToken,
   getFreshGoogleToken,
@@ -44,13 +44,9 @@ const GoogleCalendarSection = () => {
   const [status, setStatus] = useState('idle'); // idle | loading | connected | error
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
-  const authAttemptedRef = useRef(false);
-
-  // ── Get a valid token (renueva vía cookie httpOnly si hace falta) ──────────
-  const getValidToken = useCallback(async () => getFreshGoogleToken(), []);
 
   // ── Fetch user info ────────────────────────────────────────────────────────
-  const fetchUserInfo = useCallback(async (token) => {
+  const fetchUserInfo = async (token) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/api/google/auth/userinfo`, {
@@ -64,10 +60,10 @@ const GoogleCalendarSection = () => {
         }
       }
     } catch { /* non-critical */ }
-  }, []);
+  };
 
   // ── Fetch calendar list ────────────────────────────────────────────────────
-  const fetchCalendars = useCallback(async (token, isRetry = false) => {
+  const fetchCalendars = async (token, isRetry = false) => {
     if (!token) return;
     setLoadingCalendars(true);
     try {
@@ -88,7 +84,6 @@ const GoogleCalendarSection = () => {
           const fresh = await renewGoogleAccessToken();
           const freshToken = typeof fresh === 'string' ? fresh : fresh?.token;
           if (freshToken) {
-            setLoadingCalendars(false);
             await fetchCalendars(freshToken, true);
             return;
           }
@@ -101,10 +96,10 @@ const GoogleCalendarSection = () => {
       }
     } catch { /* error de red: no degradar el estado de conexión */ }
     finally { setLoadingCalendars(false); }
-  }, []);
+  };
 
   // ── Connect: redirect to Google OAuth ──────────────────────────────────────
-  const handleConnect = useCallback(async () => {
+  const handleConnect = async () => {
     if (isAuthFetchInProgress() || isAuthInProgress()) return;
     try {
       setStatus('loading');
@@ -135,7 +130,7 @@ const GoogleCalendarSection = () => {
       setMsg({ type: 'error', text: 'Error de conexión al iniciar autenticación.' });
       setAuthFetchInProgress(false);
     }
-  }, []);
+  };
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const handleDisconnect = useCallback(() => {
@@ -145,7 +140,6 @@ const GoogleCalendarSection = () => {
     localStorage.removeItem('google_selected_calendar');
     setAuthFetchInProgress(false);
     clearAuthInProgress();
-    authAttemptedRef.current = false;
     setConnectedEmail(null);
     setCalendars([]);
     setSelectedCalendar('primary');
@@ -199,7 +193,6 @@ const GoogleCalendarSection = () => {
       };
       setMsg({ type: 'error', text: errorMessages[errorFromUrl] || messageFromUrl || 'Error en la autenticación.' });
       window.history.replaceState({}, document.title, window.location.pathname);
-      authAttemptedRef.current = true;
       return;
     }
 
@@ -207,7 +200,6 @@ const GoogleCalendarSection = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
       clearAuthInProgress();
       setAuthFetchInProgress(false);
-      authAttemptedRef.current = true;
       (async () => {
         try {
           // A-4: el endpoint exige la sesión de la app (JWT en Authorization),
@@ -236,7 +228,7 @@ const GoogleCalendarSection = () => {
     setAuthFetchInProgress(false);
 
     (async () => {
-      const token = await getValidToken();
+      const token = await getFreshGoogleToken();
       if (token) {
         setStatus('connected');
         fetchUserInfo(token);

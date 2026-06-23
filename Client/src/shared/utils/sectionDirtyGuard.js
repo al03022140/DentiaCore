@@ -16,8 +16,6 @@ export const setSectionDirty = (value) => {
   dirty = !!value;
 };
 
-export const isSectionDirty = () => dirty;
-
 // Devuelve true si es seguro salir (no hay cambios, o el usuario confirmó
 // descartarlos). Cuando el usuario acepta salir, limpia el flag para no volver
 // a preguntar en navegaciones encadenadas.

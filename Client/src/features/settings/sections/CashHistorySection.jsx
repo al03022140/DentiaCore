@@ -37,14 +37,16 @@ const STATUS_META = {
 // Calcula totales por método y por tipo a partir de los movimientos de una sesión.
 const computeTotals = (movements) => {
   const init = { incomeCash: 0, incomeDigital: 0, expenseCash: 0, expenseDigital: 0 };
+  // Redondeo a centavos en cada acumulado: evita el drift de float (0.1+0.2…).
+  const cents = (a, b) => Math.round((a + b) * 100) / 100;
   return movements.reduce((acc, m) => {
     const amt = Number(m.amount) || 0;
     if (m.type === 'INCOME') {
-      if (m.paymentMethod === 'CASH') acc.incomeCash += amt;
-      else acc.incomeDigital += amt;
+      if (m.paymentMethod === 'CASH') acc.incomeCash = cents(acc.incomeCash, amt);
+      else acc.incomeDigital = cents(acc.incomeDigital, amt);
     } else {
-      if (m.paymentMethod === 'CASH') acc.expenseCash += amt;
-      else acc.expenseDigital += amt;
+      if (m.paymentMethod === 'CASH') acc.expenseCash = cents(acc.expenseCash, amt);
+      else acc.expenseDigital = cents(acc.expenseDigital, amt);
     }
     return acc;
   }, init);

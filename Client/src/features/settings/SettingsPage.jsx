@@ -107,7 +107,7 @@ const SettingsPage = () => {
       );
     }
     return (
-      <SettingsSection title={sectionMeta?.name || section} onBack={() => navigate('/configuracion')}>
+      <SettingsSection title={sectionMeta.name} onBack={() => navigate('/configuracion')}>
         <SectionComponent />
       </SettingsSection>
     );
