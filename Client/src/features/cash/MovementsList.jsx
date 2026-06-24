@@ -12,11 +12,9 @@ import {
 import { getLastMovements, updateMovement } from '../../shared/services/cashService';
 import { getAllPatients } from '../../shared/services/patient-service';
 
-import { formatMoney } from '../../shared/utils/money';
+import { formatMoneyCompact as formatMXN } from '../../shared/utils/money';
 
 const { Text } = Typography;
-
-const formatMXN = (amount) => formatMoney(amount, { showDecimals: false });
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';

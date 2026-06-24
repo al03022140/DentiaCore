@@ -2,19 +2,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Input, Select, Popconfirm, message } from 'antd';
 import { getAllChargesWithMeta, addPayment, getChargesByPatient } from '../../shared/services/patientChargeService';
-import { formatMoney } from '../../shared/utils/money';
+import { formatMoney, round2 } from '../../shared/utils/money';
 import userNot from '../../assets/images/icons/Profile Default.svg';
 import { calculateAgeYears } from '../../shared/utils/formatters';
 
 const CONFIRM_PHRASE = 'CONFIRMO';
-const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
-
-const calculateAge = (fechaNacimiento) => calculateAgeYears(fechaNacimiento);
 
 const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   const navigate = useNavigate();
   const [charges, setCharges] = useState([]);
-  const [total, setTotal] = useState(0);
   const [orphanCount, setOrphanCount] = useState(0);
   // Cobros con paciente pero excluidos por no caer en "hoy" según el reloj/TZ
   // de ESTE equipo. Se informa para que el operador no asuma que no hay nada.
@@ -57,10 +53,8 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       setCharges(visible);
       setOrphanCount(list.length - withPatient.length);
       setHiddenByDateCount(withPatient.length - visible.length);
-      setTotal(visible.length);
     } catch {
       setCharges([]);
-      setTotal(0);
       setOrphanCount(0);
       setHiddenByDateCount(0);
     } finally {
@@ -185,9 +179,7 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
       <div className="cash-card__header">
         <h2 className="cash-card__title">Cobros de Citas</h2>
         <span className="pending-charges-panel__count">
-          {total > charges.length
-            ? `${charges.length} de ${total} pendientes`
-            : `${charges.length} pendiente${charges.length !== 1 ? 's' : ''}`}
+          {`${charges.length} pendiente${charges.length !== 1 ? 's' : ''}`}
           {orphanCount > 0 && (
             <span
               className="pending-charges-panel__orphan-tag"
@@ -223,7 +215,7 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
                   .join(' ')
                   .trim() || 'Paciente sin nombre'
               : 'Paciente desconocido';
-            const age = patient ? calculateAge(patient.fecha_nacimiento) : null;
+            const age = patient ? calculateAgeYears(patient.fecha_nacimiento) : null;
             const photo = patient?.photoURL || patient?.foto;
             const photoUrl = photo
               ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${encodeURIComponent(photo)}`

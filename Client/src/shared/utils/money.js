@@ -60,3 +60,9 @@ export const formatMoney = (amount, opts = {}) => {
     maximumFractionDigits: 2
   }).format(safe);
 };
+
+/** Formato compacto: omite los .00 (totales y listados de caja). */
+export const formatMoneyCompact = (amount) => formatMoney(amount, { showDecimals: false });
+
+/** Redondeo a centavos (2 decimales). Acepta number/string; NaN → 0. */
+export const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;

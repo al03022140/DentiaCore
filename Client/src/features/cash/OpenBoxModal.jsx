@@ -62,7 +62,7 @@ const OpenBoxModal = ({ visible, onOpenSuccess, onCancel }) => {
           value={amount}
           onChange={setAmount}
           formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={value => value.replace(/\$\s?|(,*)/g, '')}
+          parser={value => value.replace(/,/g, '')}
         />
       </div>
     </Modal>
