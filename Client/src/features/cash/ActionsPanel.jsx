@@ -103,7 +103,7 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
         <div className="cash-card__extra">
           {isBoxOpen
             ? <Button type="link" danger onClick={handleCloseBox}>Cerrar Caja</Button>
-            : <Button type="link" onClick={onRequestOpenBox}>Abrir Caja</Button>}
+            : <Button type="link" className="cash-open-glow" onClick={onRequestOpenBox}>Abrir Caja</Button>}
         </div>
       </div>
 

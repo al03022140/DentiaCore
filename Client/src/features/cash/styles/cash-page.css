@@ -390,6 +390,35 @@
   transition: background var(--figma-transition-fast);
 }
 
+/* "Abrir Caja": glow que respira para invitar a abrir la caja. El botón solo
+   se muestra cuando la caja está cerrada, así que el latido se apaga solo al
+   abrirla (pasa a ser "Cerrar Caja"). color-mix sobre --color-primary lo hace
+   theme-aware (azul marca en claro, azul brillante en oscuro). */
+@keyframes cash-open-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+    background: var(--cash-brand-tint);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background: var(--cash-brand-tint-strong);
+  }
+}
+
+.cash-card__extra .ant-btn-link.cash-open-glow {
+  border-radius: var(--figma-radius-sm);
+  animation: cash-open-breathe 2.4s ease-in-out infinite;
+}
+
+/* Accesibilidad: si el usuario prefiere menos movimiento, glow fijo sin latido. */
+@media (prefers-reduced-motion: reduce) {
+  .cash-card__extra .ant-btn-link.cash-open-glow {
+    animation: none;
+    background: var(--cash-brand-tint);
+    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  }
+}
+
 .cash-card .ant-card-extra .ant-btn-link:not(.ant-btn-dangerous) {
   color: var(--color-primary);
 }
