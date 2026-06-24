@@ -1,6 +1,10 @@
 import PERIODONTOGRAM_CONFIG from '../config/periodontogram-config.js';
 import { logger } from '../utils/logger';
-import { computePeriodontalStatistics } from '../stats/periodontal-stats-core.cjs';
+// El core es CommonJS (lo require() el server); en el cliente se consume con
+// default import: Vite (plugin dev-cjs-to-esm) y rollup exponen module.exports
+// como default export. Un named import falla en Vite dev.
+import periodontalStatsCore from '../stats/periodontal-stats-core.cjs';
+const { computePeriodontalStatistics } = periodontalStatsCore;
 
 // ============================================================================
 // IMPORTAR CONFIGURACIÓN CENTRALIZADA
