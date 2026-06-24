@@ -65,7 +65,6 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   useEffect(() => {
     if (!isBoxOpen) {
       setCharges([]);
-      setTotal(0);
       setOrphanCount(0);
       setHiddenByDateCount(0);
       setLoading(false);
