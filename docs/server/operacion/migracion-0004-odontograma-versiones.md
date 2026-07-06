@@ -87,7 +87,7 @@ No hay `down()`. Si algo sale mal, restaura el backup que el runner tomó antes 
 npm run restore:db
 ```
 
-Ver `docs/operacion/backups-y-restauracion.md` para el detalle de restauración.
+Ver `docs/server/operacion/backups-y-restauracion.md` para el detalle de restauración.
 
 ---
 

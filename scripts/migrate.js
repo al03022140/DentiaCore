@@ -7,7 +7,7 @@
  * UNA sola vez cada una (idempotente a nivel de runner: registra las aplicadas
  * en la colección `migrations`). Antes de aplicar cualquier pendiente, toma un
  * BACKUP automático (backup-first). El rollback es restaurar ese backup
- * (ver docs/operacion/backups-y-restauracion.md) — no hay `down()`.
+ * (ver docs/server/operacion/backups-y-restauracion.md) — no hay `down()`.
  *
  * Cada migración exporta:
  *   module.exports = {
@@ -141,7 +141,7 @@ async function main() {
   } catch (err) {
     console.error(`❌ Falló la migración: ${err.message}`);
     console.error('   Nada quedó a medias en el registro; corrige y vuelve a correr (las up son idempotentes).');
-    console.error('   Si los datos quedaron inconsistentes, restaura el backup previo (docs/operacion/backups-y-restauracion.md).');
+    console.error('   Si los datos quedaron inconsistentes, restaura el backup previo (docs/server/operacion/backups-y-restauracion.md).');
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();

@@ -5,7 +5,7 @@
  *            NOM-013-SSA1-2015, LFPDPPP (2025).
  *
  * Cada rol respeta el principio de mínimo privilegio (LFPDPPP Art. 6).
- * Ver roles.MD en la raíz del proyecto para la documentación completa.
+ * Ver roles.MD (ahora en docs/server/) para la documentación completa.
  */
 
 const ROLE_PERMISSIONS = {

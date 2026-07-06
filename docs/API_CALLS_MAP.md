@@ -99,8 +99,8 @@
 |---|--------|----------|------|-------------|---------------------|-------|
 | 23 | **POST** | `/patients/:patientId/odontograma-clinico` | `features/odontogram/api/odontograma-service.js:196` | `{ entries: [{ tooth, damage, surface, note }] }` | `data.exists`, `data.datos`, `data.history` | `saveClinicalOdontogramState()` |
 | 24 | **GET** | `/patients/:patientId/odontograma-clinico` | `features/odontogram/api/odontograma-service.js:217` | *(none)* | `data.exists`, `data.datos`, `data.history` | `getClinicalOdontogramState()` |
-| 25 | **GET** | `/patients/:patientId/odontograma-clinico/history` | `features/odontogram/api/odontograma-service.js:234` | *(none)* | `data.history` → array | `getClinicalOdontogramHistory()` |
-| 26 | **DELETE** | `/patients/:patientId/odontograma-clinico/history/:entryId` | `features/odontogram/api/odontograma-service.js:249` | *(none)* | `data.message` | `deleteClinicalOdontogramEntry()` |
+| 25 | **GET** | `/patients/:patientId/odontograma-clinico/history` | — | *(none)* | `data.history` → array | **Cliente: removido** (`getClinicalOdontogramHistory()`). Ruta server vigente: `obtenerHistorialClinico`. |
+| 26 | **DELETE** | `/patients/:patientId/odontograma-clinico/history/:entryId` | — | *(none)* | `data.message` | **Cliente: removido** (`deleteClinicalOdontogramEntry()`). Ruta server vigente: `deleteClinicalHistoryEntry`. |
 | 27 | **DELETE** | `/patients/:patientId/odontograma-clinico` | `features/odontogram/api/odontograma-service.js:261` | *(none)* | `data.message` | `deleteClinicalOdontogramState()` |
 
 ---
@@ -194,11 +194,11 @@
 - `POST   /patients/:id/odontograma-inicial/history`
 - *(image)* `/patients/:id/odontograma-inicial/image`
 
-### Odontogram Clinical (5 endpoints)
+### Odontogram Clinical (3 llamados por el cliente; 5 rutas en el server)
 - `POST   /patients/:id/odontograma-clinico`
 - `GET    /patients/:id/odontograma-clinico`
-- `GET    /patients/:id/odontograma-clinico/history`
-- `DELETE /patients/:id/odontograma-clinico/history/:entryId`
+- `GET    /patients/:id/odontograma-clinico/history` — _cliente removido; ruta server vigente_
+- `DELETE /patients/:id/odontograma-clinico/history/:entryId` — _cliente removido; ruta server vigente_
 - `DELETE /patients/:id/odontograma-clinico`
 
 ### Periodontogram (6 endpoints)
