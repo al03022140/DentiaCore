@@ -1005,12 +1005,24 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   
 
   /** Maneja cambios en campos simples */
+  // Retira el rojo de un campo en cuanto deja de estar vacío.
+  const clearInvalid = (key, value) => {
+    if (isEmptyValue(value)) return;
+    setInvalidFields((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     // email se normaliza a lowercase para alinearse con el schema mongoose
     // que tiene `lowercase: true` — antes el usuario veía 'User@x.com' en
     // el form y al recargar aparecía 'user@x.com', confuso.
     const normalized = name === 'email' ? value.toLowerCase() : value;
+    clearInvalid(name, normalized);
     setFormData((prev) => {
       const next = { ...prev, [name]: normalized };
       // Al cambiar el sexo a algo distinto de Femenino, limpiar los datos
@@ -1040,6 +1052,7 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
   /** Maneja cambios en campos anidados */
   const handleNestedChange = (parentKey, field, value) => {
+    clearInvalid(`${parentKey}.${field}`, value);
     setFormData((prev) => ({
       ...prev,
       [parentKey]: {
@@ -1500,13 +1513,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   }, {});
 
   // Marca los campos faltantes como inválidos y dispara la animación shake.
+  // El rojo se mantiene hasta que el usuario llena cada campo (clearInvalid lo
+  // retira al escribir) para que vea de un vistazo qué falta.
   const markInvalidFields = (missingFields) => {
     const keys = new Set(missingFields.map(f => f.path.join('.')));
     setInvalidFields(keys);
     setShakeKey(k => k + 1);
-    // Limpiar resaltado después de 3 s para no dejar todo en rojo indefinidamente.
-    // Guarda isMountedRef: el flujo modal puede desmontar antes de los 3 s.
-    setTimeout(() => { if (isMountedRef.current) setInvalidFields(new Set()); }, 3000);
   };
 
   // Intenta avanzar/saltar a `newStep`. Si se va hacia adelante valida todos

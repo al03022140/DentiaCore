@@ -1,4 +1,5 @@
 import plusIcon from '../../../assets/images/icons/plus.svg';
+import TrashIcon from './TrashIcon';
 import { useNestedFormState } from '../../../shared/hooks/useNestedFormState';
 
 // Opciones de frecuencia compartidas por Tabaquismo y Alcoholismo.
@@ -331,8 +332,9 @@ const Medic = ({
                                type="button"
                                onClick={() => handleRemoveItem('cirugias_previas', index)}
                                className="trash-button"
+                               aria-label="Eliminar cirugía"
                              >
-                               🗑️
+                               <TrashIcon />
                              </button>
                           </div>
                         ))}
@@ -520,7 +522,7 @@ const Medic = ({
                           value={med.frecuencia || ""}
                           onChange={(e) => handleArrayChange("medicacion", index, "frecuencia", e.target.value, "encuesta_medica")}
                         />
-                        <button className="trash-button" type="button" onClick={() => handleRemoveItem("medicacion", index)}>🗑️</button>
+                        <button className="trash-button" type="button" aria-label="Eliminar medicación" onClick={() => handleRemoveItem("medicacion", index)}><TrashIcon /></button>
                       </div>
                     ))}
                     <button
@@ -551,7 +553,7 @@ const Medic = ({
                           value={alergia.reaccion || ""}
                           onChange={(e) => handleArrayChange("alergias", index, "reaccion", e.target.value,"encuesta_medica")}
                         />
-                        <button className="trash-button" type="button" onClick={() => handleRemoveItem("alergias", index)}>🗑️</button>
+                        <button className="trash-button" type="button" aria-label="Eliminar alergia" onClick={() => handleRemoveItem("alergias", index)}><TrashIcon /></button>
                       </div>
                     ))}
                     <button

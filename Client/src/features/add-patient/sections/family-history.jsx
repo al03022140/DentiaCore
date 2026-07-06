@@ -1,4 +1,5 @@
 import plusIcon from '../../../assets/images/icons/plus.svg';
+import TrashIcon from './TrashIcon';
 
 const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
   return (
@@ -57,6 +58,7 @@ const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
           <button
             type="button"
             className="trash-button"
+            aria-label="Eliminar antecedente"
             onClick={() =>
               setFormData((prev) => ({
                 ...prev,
@@ -64,7 +66,7 @@ const FamilyHistory = ({ formData, handleArrayChange, setFormData }) => {
               }))
             }
           >
-            🗑️
+            <TrashIcon />
           </button>
         </div>
       ))}
