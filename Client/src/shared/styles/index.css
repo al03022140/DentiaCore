@@ -394,3 +394,12 @@ img.profile-default-avatar {
 [data-theme="dark"] img.profile-default-avatar {
   filter: brightness(0) invert(1);
 }
+
+/* Diálogos de AntD (Modal.confirm / .error / .info, p.ej. la validación de
+   "Completa los campos obligatorios"): el fondo oscuro lo pone .ant-modal-content
+   en modo oscuro, pero AntD fija el texto del confirm en negro vía CSS-in-JS y
+   queda ilegible. Forzamos el color de texto del tema. */
+[data-theme="dark"] .ant-modal-confirm-title,
+[data-theme="dark"] .ant-modal-confirm-content {
+  color: var(--color-text-primary) !important;
+}
