@@ -85,6 +85,16 @@ module.exports = {
     //    recomputar entryHash con el formato nuevo. Esto deja una cadena
     //    verificable por AuditLog.verifyChain.
     const AuditLog = mongoose.model('AuditLog');
+
+    // `seq` tiene índice único-sparse. Si alguna entrada ya trae un seq (p.ej.
+    // la app en vivo se lo pone a las entradas nuevas desde que existe el
+    // encadenamiento), renumerar en el mismo recorrido puede chocar a mitad
+    // de camino contra un valor que otro documento todavía no ha soltado
+    // (confirmado: E11000 dup key seq_1 en una BD real con 10/789 ya
+    // numeradas). Se limpia todo primero — sparse, así que sin el campo no
+    // compiten por unicidad — y se renumera desde cero en un solo recorrido.
+    await AuditLog.collection.updateMany({}, { $unset: { seq: '' } });
+
     const entries = AuditLog.find({}).sort({ timestamp: 1, _id: 1 }).cursor();
 
     let seq = 0;
