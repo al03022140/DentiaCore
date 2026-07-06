@@ -356,44 +356,6 @@ const odontogramaService = {
   },
 
   /**
-   * Obtiene el historial del odontograma clínico
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<Array>} Array de entradas del historial
-   */
-  async getClinicalOdontogramHistory(patientId) {
-    try {
-      const { data } = await API.get(
-        `/patients/${patientId}/odontograma-clinico/history`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return Array.isArray(data.history) ? data.history : [];
-    } catch (error) {
-      if (error.response?.status === 404) {
-        return [];
-      }
-      throw handleApiError(error);
-    }
-  },
-
-  /**
-   * Elimina una entrada del historial del odontograma clínico
-   * @param {string} patientId - ID del paciente
-   * @param {string} entryId - ID de la entrada a eliminar
-   * @returns {Promise<{message: string}>}
-   */
-  async deleteClinicalOdontogramEntry(patientId, entryId) {
-    try {
-      const { data } = await API.delete(
-        `/patients/${patientId}/odontograma-clinico/history/${entryId}`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
-
-  /**
    * Elimina completamente el estado del odontograma clínico
    * @param {string} patientId - ID del paciente
    * @returns {Promise<{message: string}>}

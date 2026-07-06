@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Table, Modal, message, Tabs } from 'antd';
-import { prepareDataSource, normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
+import { Table, Modal, message } from 'antd';
+import { normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
@@ -74,8 +74,6 @@ const OdontogramClinicalSection = ({
     const [isSaving, setIsSaving] = useState(false);
     const [engineError, setEngineError] = useState(null);
     const [isEngineInitialized, setIsEngineInitialized] = useState(false);
-    const [clinicalHistory, setClinicalHistory] = useState([]);
-    const [loadingHistory, setLoadingHistory] = useState(false);
     const [currentCanvasData, setCurrentCanvasData] = useState([]);
     const [isFullscreen, setIsFullscreen] = useState(false);
     // Tabla colapsable: por defecto oculta para que el canvas use todo el ancho.
@@ -148,54 +146,6 @@ const OdontogramClinicalSection = ({
     }, []); // Dependencia de engineManagerRef.current.instance es implícita, pero useCallback lo memoizará sin ella.
            // Si se quiere re-memoizar cuando el engine cambia, se añadiría engineManagerRef.current.instance a las deps,
            // pero eso es más complejo con refs. Por ahora, se asume que el engine no cambia tan seguido como para necesitarlo.
-
-    // Función para cargar el historial clínico — la versión "callable" se
-    // expone por si algún handler de Save/Delete quiere recargar. El efecto
-    // que la dispara al montar usa su propia closure con `cancelled` para
-    // no setState tras unmount.
-    const loadClinicalHistory = useCallback(async () => {
-        if (!patientId) return;
-        setLoadingHistory(true);
-        try {
-            const odontogramaService = await import('../api/odontograma-service.js');
-            const history = await odontogramaService.default.getClinicalOdontogramHistory(patientId);
-            const sortedHistory = Array.isArray(history) ?
-                history.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)) : [];
-            setClinicalHistory(sortedHistory);
-        } catch (error) {
-            console.error('Error al cargar historial clínico:', error);
-            setClinicalHistory([]);
-        } finally {
-            setLoadingHistory(false);
-        }
-    }, [patientId]);
-
-    // Carga inicial: guard con `cancelled` para evitar setState tras unmount
-    // y para minimizar el impacto del doble-mount de StrictMode (la segunda
-    // resolución no toca el state si el primer cleanup ya corrió).
-    useEffect(() => {
-        if (!patientId) return;
-        let cancelled = false;
-        (async () => {
-            setLoadingHistory(true);
-            try {
-                const odontogramaService = await import('../api/odontograma-service.js');
-                if (cancelled) return;
-                const history = await odontogramaService.default.getClinicalOdontogramHistory(patientId);
-                if (cancelled) return;
-                const sortedHistory = Array.isArray(history) ?
-                    history.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)) : [];
-                setClinicalHistory(sortedHistory);
-            } catch (error) {
-                if (cancelled) return;
-                console.error('Error al cargar historial clínico:', error);
-                setClinicalHistory([]);
-            } finally {
-                if (!cancelled) setLoadingHistory(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [patientId]);
 
     // --- Funciones ---
 
@@ -273,7 +223,6 @@ const OdontogramClinicalSection = ({
                 markClean();
                 draft.clearDraft();
                 message.success('Odontograma clínico guardado exitosamente');
-                await loadClinicalHistory();
             } else {
                 console.error('La prop onDataSave no está definida o no es una función');
                 message.error('Error interno: no se puede guardar el odontograma');
@@ -291,7 +240,7 @@ const OdontogramClinicalSection = ({
             setIsSaving(false);
             savingRef.current = false;
         }
-    }, [isEngineInitialized, onDataSave, loadClinicalHistory, getDamageNameFromId]);
+    }, [isEngineInitialized, onDataSave, getDamageNameFromId]);
 
     // Cambio de versión desde el selector. El padre carga los datos en el canvas;
     // aquí gestionamos el confirm de "cambios sin guardar" porque este componente
@@ -313,13 +262,6 @@ const OdontogramClinicalSection = ({
         { title: 'Diente', dataIndex: 'tooth', key: 'tooth', width: 40 },
         { title: 'Daño', dataIndex: 'damage', key: 'damage', width: 100, ellipsis: true },
         { title: 'Fecha', dataIndex: 'fecha', key: 'fecha', width: 60, ellipsis: true },
-    ];
-
-    // Columnas para la tabla del historial (usa prepareDataSource)
-    const historyColumns = [
-        { title: 'Diente', dataIndex: 'diente', key: 'diente', width: 40 },
-        { title: 'Daño', dataIndex: 'tipo', key: 'tipo', width: 100, ellipsis: true },
-        { title: 'Fecha', dataIndex: 'fecha', key: 'fecha', width: 60 },
     ];
 
     // Función para obtener el nombre de la superficie usando códigos de letra del engine
@@ -657,30 +599,6 @@ const OdontogramClinicalSection = ({
         });
     }, [currentCanvasData, clinicalData]);
 
-    // NUEVO: Preparar datos del historial para la tabla
-    const historyTableData = useMemo(() => {
-        if (!Array.isArray(clinicalHistory) || clinicalHistory.length === 0) {
-            return [];
-        }
-        
-        return clinicalHistory.flatMap((historyEntry, historyIndex) => {
-            if (!historyEntry.datos || !Array.isArray(historyEntry.datos)) {
-                return [];
-            }
-            
-            return historyEntry.datos.map((item, itemIndex) => {
-                const baseDamage = getDamageNameFromId(item.damage);
-                const combinedDamage = combineDamageWithSurface(baseDamage, item.surface);
-                
-                return {
-                    key: `history-${historyIndex}-${itemIndex}-${item.tooth || 'unknown'}`,
-                    tooth: item.tooth || 'N/A',
-                    damage: combinedDamage,
-                    fecha: historyEntry.fecha ? new Date(historyEntry.fecha).toLocaleDateString('es-ES') : 'N/A'
-                };
-            });
-        });
-    }, [clinicalHistory, getDamageNameFromId]);
     return (
         <section className="patient-detail_odontograma">
             <div className="odontograma-section">
@@ -702,20 +620,23 @@ const OdontogramClinicalSection = ({
                   </p>
                 </div>
                 <div className="odontograma-controls">
-                  {versionList.length > 0 && (
-                    <select
-                      className="odontograma-version-select"
-                      value={selectedVersion || ''}
-                      onChange={handleVersionChange}
-                      disabled={isSaving}
-                      title="Versión del odontograma clínico"
-                      aria-label="Versión del odontograma clínico"
-                    >
-                      {versionList.map(v => (
-                        <option key={v} value={v}>{formatVersionLabel(v)}</option>
-                      ))}
-                    </select>
-                  )}
+                  {/* Selector SIEMPRE visible (paridad con el periodontograma):
+                      antes se ocultaba con versionList.length>0, así que un
+                      paciente sin versiones (legacy sin migrar / sin guardados)
+                      no veía el selector. El placeholder cubre la lista vacía. */}
+                  <select
+                    className="odontograma-version-select"
+                    value={selectedVersion || ''}
+                    onChange={handleVersionChange}
+                    disabled={isSaving}
+                    title="Versión del odontograma clínico"
+                    aria-label="Versión del odontograma clínico"
+                  >
+                    <option value="">Seleccionar versión...</option>
+                    {versionList.map(v => (
+                      <option key={v} value={v}>{formatVersionLabel(v)}</option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     className="button-primary capture-button"
@@ -823,50 +744,17 @@ const OdontogramClinicalSection = ({
                     )}
                   </div>
                   <div className="odontograma-table-container">
-                   <Tabs
-                     defaultActiveKey="current"
-                     items={[
-                       {
-                         key: 'current',
-                         label: 'Estado Actual',
-                         children: (
-                           <Table 
-                             columns={odontogramColumns} 
-                             dataSource={tableData}
-                             rowKey={r => r.key}
-                             size="small" 
-                             pagination={false}
-                             bordered
-                             scroll={{ y: 500 }}
-                             tableLayout="fixed"
-                             className="odontograma-table"
-                             locale={{ emptyText: 'No hay daños dibujados en el canvas actualmente. Dibuje daños en el odontograma para verlos aquí.' }}
-                           />
-                         )
-                       },
-                       {
-                         key: 'history',
-                         label: `Historial (${historyTableData.length})`,
-                         children: loadingHistory ? (
-                           <div style={{ textAlign: 'center', padding: '20px' }}>
-                             <span>Cargando historial...</span>
-                           </div>
-                         ) : (
-                           <Table 
-                             columns={historyColumns}
-                             dataSource={prepareDataSource(historyTableData, 'clinico-history')}
-                             rowKey={r => r.key}
-                             size="small"
-                             pagination={{ pageSize: 20, showSizeChanger: false }}
-                             bordered
-                             scroll={{ y: 500 }}
-                             tableLayout="fixed"
-                             className="odontograma-table"
-                             locale={{ emptyText: 'No hay entradas en el historial clínico.' }}
-                           />
-                         )
-                       }
-                     ]}
+                   <Table
+                     columns={odontogramColumns}
+                     dataSource={tableData}
+                     rowKey={r => r.key}
+                     size="small"
+                     pagination={false}
+                     bordered
+                     scroll={{ y: 500 }}
+                     tableLayout="fixed"
+                     className="odontograma-table"
+                     locale={{ emptyText: 'No hay daños dibujados en el canvas actualmente. Dibuje daños en el odontograma para verlos aquí.' }}
                    />
                   </div>
                 </div>
