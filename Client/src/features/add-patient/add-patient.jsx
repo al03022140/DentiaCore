@@ -1514,7 +1514,11 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
 
   // Marca los campos faltantes como inválidos y dispara la animación shake.
   // El rojo se mantiene hasta que el usuario llena cada campo (clearInvalid lo
-  // retira al escribir) para que vea de un vistazo qué falta.
+  // retira al escribir) para que vea de un vistazo qué falta. Ya NO hay un
+  // timeout de respaldo que limpie todo a los 3s: si en el futuro se agrega un
+  // REQUIRED_FIELDS cuyo input no pase por handleChange/handleNestedChange
+  // (las únicas dos vías que llaman clearInvalid), ese campo se quedaría en
+  // rojo para siempre.
   const markInvalidFields = (missingFields) => {
     const keys = new Set(missingFields.map(f => f.path.join('.')));
     setInvalidFields(keys);

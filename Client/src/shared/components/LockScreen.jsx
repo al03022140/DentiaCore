@@ -258,11 +258,19 @@ export const LockScreenProvider = ({ children }) => {
   useEffect(() => {
     if (!isLocked) { sessionCheckedRef.current = false; return undefined; }
 
+    // Si el usuario desbloquea con PIN correcto mientras este chequeo sigue
+    // en vuelo (red lenta), el efecto se limpia (isLocked pasa a false) pero
+    // la promesa ya en curso no se cancela sola — sin este guard, una
+    // respuesta 401 tardía dispararía logout() justo después de un
+    // desbloqueo exitoso.
+    let cancelled = false;
+
     const checkSession = () => {
       if (sessionCheckedRef.current) return;
       if (document.visibilityState !== 'visible') return;
       sessionCheckedRef.current = true;
       triggerTokenRefresh().catch((err) => {
+        if (cancelled) return;
         if (err?.response?.status === 401) {
           // Sesión muerta: a login sin pedir PIN.
           sessionStorage.removeItem('dentiacore_locked');
@@ -278,6 +286,7 @@ export const LockScreenProvider = ({ children }) => {
     document.addEventListener('visibilitychange', checkSession);
     window.addEventListener('focus', checkSession);
     return () => {
+      cancelled = true;
       document.removeEventListener('visibilitychange', checkSession);
       window.removeEventListener('focus', checkSession);
     };
