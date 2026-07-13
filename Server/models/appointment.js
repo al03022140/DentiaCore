@@ -41,19 +41,24 @@ const appointmentSchema = new mongoose.Schema({
         default: "Pendiente",
         index: true
     },
+    // maxlength (DB-MOD-01 / FE-01): motivo es un campo corto; sin tope, un
+    // texto enorme infla el documento y degrada los listados de agenda.
     motivo: {
         type: String,
         required: true,
-        trim: true
+        trim: true,
+        maxlength: 500
     },
     observaciones: {
         type: String,
-        trim: true
+        trim: true,
+        maxlength: 2000
     },
     // ── Procedimiento y cobro ──────────────────────────────────
     comentarioProcedimiento: {
         type: String,
-        trim: true
+        trim: true,
+        maxlength: 2000
     },
     items: [{
         nombre: { type: String, required: true, trim: true },
