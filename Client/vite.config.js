@@ -61,12 +61,6 @@ export default defineConfig({
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
-          });
         }
       },
       '/uploads': {
@@ -77,17 +71,6 @@ export default defineConfig({
           proxy.on('error', (err, _req, _res) => {
             console.error('Error en proxy de uploads:', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('📤 Enviando archivo estático:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('📥 Respuesta de archivo estático:', proxyRes.statusCode, req.url);
-          });
-        },
-        // Configuración específica para archivos estáticos
-        headers: {
-          'Cache-Control': 'public, max-age=31536000', // Cache por 1 año
-          'Accept-Ranges': 'bytes'
         }
       }
     }

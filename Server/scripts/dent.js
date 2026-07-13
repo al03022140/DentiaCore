@@ -90,7 +90,9 @@ app.use(cors({
             process.env.CLIENT_URL    // URL del cliente desde .env
         ].filter(Boolean); // Eliminar valores undefined/null
         
-        // Permitir peticiones sin origen (como Postman, curl, etc.)
+        // Permitir peticiones sin origen (Postman, curl, mismo origen). Con
+        // credentials:true las cookies de sesión siguen exigiendo auth, así que
+        // esto no abre la API: solo evita bloquear clientes que no envían Origin.
         if (!origin) return callback(null, true);
         
         // Verificar si el origen está en la lista permitida

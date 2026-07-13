@@ -3,7 +3,11 @@
  * 
  * Archivo único que centraliza TODAS las configuraciones, constantes y parámetros
  * del sistema de periodontograma para eliminar duplicaciones y garantizar consistencia.
- * 
+ *
+ * ⚠️ DUPLICADO PARCIAL de Server/config/periodontogram-config.js. NO están
+ * auto-sincronizados (este usa claves español camelCase, el server inglés
+ * UPPER_SNAKE). Cambios en límites/dientes/pronóstico deben hacerse en AMBOS.
+ *
  * CONSOLIDACIÓN CRÍTICA:
  * ✅ Números de dientes unificados
  * ✅ Configuraciones de validación centralizadas
@@ -289,7 +293,9 @@ export const CACHE_CONFIG = {
 // ============================================================================
 
 /**
- * Configuraciones de logging y debugging
+ * Configuraciones de logging y debugging.
+ * ponytail: config inerte — nadie la importa. El logger real es
+ * ADVANCED_LOGGING_CONFIG en features/periodontogram/utils/config.js (enabled:false).
  */
 export const LOGGING_CONFIG = {
   levels: {
