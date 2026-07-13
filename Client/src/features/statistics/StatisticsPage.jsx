@@ -18,7 +18,7 @@ const METRICS = [
     description: 'Cierres por turno y discrepancias detectadas.',
     category: 'Operaciones',
     temporalities: ['diaria', 'semanal', 'mensual'],
-    visualizations: ['barra', 'heatmap']
+    visualizations: ['barra']
   },
   {
     id: 'patient-type-trend',
@@ -88,8 +88,7 @@ const TEMPORALITY_LABELS = {
 const VISUALIZATION_LABELS = {
   linea: 'Linea',
   barra: 'Barra',
-  pastel: 'Pastel',
-  heatmap: 'Heatmap'
+  pastel: 'Pastel'
 };
 
 const SLOT_COUNT = 4;

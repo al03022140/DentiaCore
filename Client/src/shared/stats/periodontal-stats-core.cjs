@@ -69,9 +69,15 @@ function normalizeToCanonicalBlocks(toothData, toothNumber) {
   };
 
   const arcada = inferArcada(toothData, toothNumber);
+  // El diente superior tiene cara palatina; el inferior, lingual. Un bloque
+  // legacy mal etiquetado (lingual en un superior, palatino en un inferior) se
+  // mapea a la cara NO-vestibular de la propia arcada. Antes iba a la cara de la
+  // OTRA arcada y luego `facesForTooth` la filtraba → esas mediciones no se
+  // contaban para ninguna cara. Orden de iteración: el nombre anatómicamente
+  // correcto se asigna primero y gana si vienen ambos. M3.
   const legacyFaceMap = arcada === 'superior'
-    ? { vestibular: 'vestibularSuperior', palatino: 'palatinoSuperior', lingual: 'lingualInferior' }
-    : { vestibular: 'vestibularInferior', lingual: 'lingualInferior', palatino: 'palatinoSuperior' };
+    ? { vestibular: 'vestibularSuperior', palatino: 'palatinoSuperior', lingual: 'palatinoSuperior' }
+    : { vestibular: 'vestibularInferior', lingual: 'lingualInferior', palatino: 'lingualInferior' };
 
   // Forma canónica: bloque-por-medición keyed por cara canónica.
   for (const [canon, aliases] of Object.entries(blockAliases)) {

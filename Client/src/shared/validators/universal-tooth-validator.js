@@ -266,6 +266,8 @@ export const UniversalToothValidator = {
         totalTeeth,
         presentTeeth: acc.presentTeeth,
         absentTeeth: Math.max(0, totalTeeth - acc.presentTeeth),
+        bleedingCount: acc.bleedingCount, // M4: mismo conjunto de campos que el servidor
+        plaqueCount: acc.plaqueCount,
         bleedingPercentage: totalCasillasPosibles > 0 ? Math.round((acc.bleedingCount / totalCasillasPosibles) * 100) : 0,
         plaquePercentage: totalCasillasPosibles > 0 ? Math.round((acc.plaqueCount / totalCasillasPosibles) * 100) : 0,
         averageProbingDepth: acc.depthCount > 0 ? Math.round((acc.totalDepth / acc.depthCount) * 100) / 100 : 0,

@@ -183,4 +183,51 @@ module.exports = [
       maxProbingDepth: 4,
     },
   },
+  {
+    // M3: `palatino` mal etiquetado en un diente INFERIOR (46) → debe contarse
+    // en lingualInferior (cara propia), no perderse. Antes iba a palatinoSuperior
+    // y facesForTooth lo filtraba (todo quedaba en 0).
+    name: 'legacy palatino en diente inferior se cuenta como lingual',
+    input: {
+      teeth: {
+        46: {
+          palatino: { sangrado: [1, 1, 1], profundidadSondaje: [5, 5, 5], margenGingival: [1, 1, 1] },
+        },
+      },
+    },
+    expected: {
+      presentTeeth: 32,
+      teethWithClinicalData: 1,
+      bleedingCount: 3,
+      plaqueCount: 0,
+      totalDepth: 15,
+      depthCount: 3,
+      totalAttachmentLevel: 12, // (5−1)×3
+      attachmentLevelCount: 3,
+      maxProbingDepth: 5,
+    },
+  },
+  {
+    // M3: `lingual` mal etiquetado en un diente SUPERIOR (16) → debe contarse en
+    // palatinoSuperior (cara propia), no perderse.
+    name: 'legacy lingual en diente superior se cuenta como palatino',
+    input: {
+      teeth: {
+        16: {
+          lingual: { sangrado: [1, 0, 1], profundidadSondaje: [4, 4, 4], margenGingival: [2, 2, 2] },
+        },
+      },
+    },
+    expected: {
+      presentTeeth: 32,
+      teethWithClinicalData: 1,
+      bleedingCount: 2,
+      plaqueCount: 0,
+      totalDepth: 12,
+      depthCount: 3,
+      totalAttachmentLevel: 6, // (4−2)×3
+      attachmentLevelCount: 3,
+      maxProbingDepth: 4,
+    },
+  },
 ];

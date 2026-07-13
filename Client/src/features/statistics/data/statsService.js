@@ -10,8 +10,7 @@ const GRANULARITY_API_MAP = {
 const CHART_TYPE_MAP = {
   linea: 'line',
   barra: 'bar',
-  pastel: 'pie',
-  heatmap: 'bar'
+  pastel: 'pie'
 };
 
 // Paleta alineada con `Client/src/features/main-page/components/patient-stats.jsx`

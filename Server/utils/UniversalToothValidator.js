@@ -705,6 +705,7 @@ class UniversalToothValidator {
       plaquePercentage: totalCasillasPosibles > 0 ? Math.round((acc.plaqueCount / totalCasillasPosibles) * 100) : 0,
       averageProbingDepth: acc.depthCount > 0 ? Math.round((acc.totalDepth / acc.depthCount) * 100) / 100 : 0,
       averageAttachmentLevel: acc.attachmentLevelCount > 0 ? Math.round((acc.totalAttachmentLevel / acc.attachmentLevelCount) * 100) / 100 : 0,
+      maxProbingDepth: acc.maxProbingDepth, // M4: mismo conjunto de campos que el cliente
       lastCalculated: new Date().toISOString()
     };
 
