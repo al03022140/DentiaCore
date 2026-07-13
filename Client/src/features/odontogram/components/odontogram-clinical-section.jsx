@@ -608,7 +608,7 @@ const OdontogramClinicalSection = ({
                     Odontograma Clínico
                     {hasUnsavedChanges && (
                       <span
-                        style={{ marginLeft: 12, fontSize: 13, color: '#d97706', fontWeight: 500 }}
+                        style={{ marginLeft: 12, fontSize: 13, color: 'var(--color-warning)', fontWeight: 500 }}
                         title="Hay cambios en el canvas que no han sido persistidos"
                       >
                         ● No guardado

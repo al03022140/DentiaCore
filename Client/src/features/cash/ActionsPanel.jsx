@@ -216,14 +216,14 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="Monto Inicial">{formatMXN(closeSummary.initialAmount)}</Descriptions.Item>
             <Descriptions.Item label="Efectivo Final">{formatMXN(closeSummary.finalCashAmount)}</Descriptions.Item>
-            <Descriptions.Item label="Total Ingresos"><span style={{ color: '#4caf50', fontWeight: 600 }}>{formatMXN(closeSummary.totalIncome)}</span></Descriptions.Item>
-            <Descriptions.Item label="Total Egresos"><span style={{ color: '#e53e3e', fontWeight: 600 }}>{formatMXN(closeSummary.totalExpense)}</span></Descriptions.Item>
+            <Descriptions.Item label="Total Ingresos"><span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{formatMXN(closeSummary.totalIncome)}</span></Descriptions.Item>
+            <Descriptions.Item label="Total Egresos"><span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{formatMXN(closeSummary.totalExpense)}</span></Descriptions.Item>
             <Descriptions.Item label="Ing. Efectivo">{formatMXN(closeSummary.cashIncome)}</Descriptions.Item>
             <Descriptions.Item label="Ing. Digital">{formatMXN(closeSummary.digitalIncome)}</Descriptions.Item>
             <Descriptions.Item label="Egr. Efectivo">{formatMXN(closeSummary.cashExpense)}</Descriptions.Item>
             <Descriptions.Item label="Egr. Digital">{formatMXN(closeSummary.digitalExpense)}</Descriptions.Item>
             <Descriptions.Item label="Movimientos">{closeSummary.movementCount}</Descriptions.Item>
-            <Descriptions.Item label="Balance Neto"><span style={{ color: closeSummary.net >= 0 ? '#4caf50' : '#e53e3e', fontWeight: 600 }}>{formatMXN(closeSummary.net)}</span></Descriptions.Item>
+            <Descriptions.Item label="Balance Neto"><span style={{ color: closeSummary.net >= 0 ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600 }}>{formatMXN(closeSummary.net)}</span></Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

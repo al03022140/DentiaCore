@@ -512,7 +512,7 @@ const OdontogramInitialSection = ({
             disabled={saving}
           />
           {confirmationText && !isConfirmationValid && (
-            <p style={{ color: '#ff4d4f', marginTop: '8px', fontSize: '14px' }}>
+            <p style={{ color: 'var(--color-danger)', marginTop: '8px', fontSize: '14px' }}>
               Debes escribir exactamente "Confirmar".
             </p>
           )}

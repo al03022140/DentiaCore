@@ -447,7 +447,7 @@ function UserFormModal({ target, onClose, onSave, assignableRoles, currentUserId
           {requiresCedula && (
             <div className="settings-form-group">
               <label htmlFor="user-cedula">
-                Cédula profesional {requiresCedula && <span style={{ color: '#dc2626' }}>*</span>}
+                Cédula profesional {requiresCedula && <span style={{ color: 'var(--color-danger)' }}>*</span>}
               </label>
               <input
                 id="user-cedula"

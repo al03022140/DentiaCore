@@ -163,11 +163,13 @@ API.interceptors.response.use(
           clearAccessToken();
           // Preservar la ruta actual para volver tras el login. Sin esto,
           // el usuario que estaba en /patient/123 acaba siempre en /.
+          // FE-03: marcar `sessionExpired=1` para que LoginPage explique por qué
+          // se cerró la sesión, en vez de un redirect silencioso e inexplicado.
           const currentPath = window.location.pathname + window.location.search;
           if (currentPath && !currentPath.startsWith('/login')) {
-            window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+            window.location.href = `/login?sessionExpired=1&from=${encodeURIComponent(currentPath)}`;
           } else {
-            window.location.href = '/login';
+            window.location.href = '/login?sessionExpired=1';
           }
           return Promise.reject(refreshError);
         })

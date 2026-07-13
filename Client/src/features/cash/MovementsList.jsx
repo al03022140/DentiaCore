@@ -164,7 +164,9 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
           <HistoryOutlined /> Historial de ediciones
         </div>
         {edits.map((e, idx) => (
-          <div key={idx} className="movement-edit-history__entry">
+          // FE-05: key estable derivada de editedAt+editedBy (no el índice), que
+          // reordenaba nodos al crecer el historial. idx sólo como desempate.
+          <div key={`${e.editedAt || ''}-${e.editedBy?._id || e.editedBy || ''}-${idx}`} className="movement-edit-history__entry">
             <div className="movement-edit-history__head">
               <span>{formatDateTime(e.editedAt)}</span>
               <span>{e.editedBy?.nombre || 'Usuario desconocido'}</span>
@@ -192,6 +194,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
           loading={loading}
           itemLayout="horizontal"
           dataSource={movements}
+          rowKey={(item) => item._id}
           renderItem={(item) => {
             const hasEdits = Array.isArray(item.edits) && item.edits.length > 0;
             const isLinked = !!item.linkedChargeId;

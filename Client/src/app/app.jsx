@@ -21,6 +21,7 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
 import DraftsCenter from '../features/consultas/DraftsCenter';
 import SettingsPage from '../features/settings/SettingsPage';
+import NotFound from '../shared/components/NotFound';
 import { SidebarProvider } from '../shared/contexts/SidebarContext';
 
 const antdTheme = {
@@ -137,6 +138,8 @@ const App = () => {
             <Route path="/estadisticas" element={<StatisticsPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
             <Route path="/configuracion/:section" element={<SettingsPage />} />
+            {/* FE-01: catch-all dentro del layout — muestra 404 con sidebar/header. */}
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
       </Routes>

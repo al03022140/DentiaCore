@@ -14,6 +14,9 @@ const LoginPage = () => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  // FE-03: si el interceptor de axios expulsó por sesión expirada, lo indica
+  // con ?sessionExpired=1 para explicar el motivo en vez de un redirect mudo.
+  const sessionExpired = new URLSearchParams(location.search).get('sessionExpired') === '1';
 
   const handleCapsLock = (event) => {
     if (typeof event.getModifierState === 'function') {
@@ -52,6 +55,12 @@ const LoginPage = () => {
         <div className="login-card">
           <h1>Inicio de sesión</h1>
           <p className="login-card__subtitle">Accede con tu correo y contraseña.</p>
+
+          {sessionExpired && (
+            <div className="login-error" role="status">
+              <span>Tu sesión expiró por inactividad. Vuelve a iniciar sesión para continuar.</span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="login-form" autoComplete="on">
             <label htmlFor="email">Correo</label>
