@@ -34,6 +34,10 @@ const ROLE_PERMISSIONS = {
     'periodontogram.read',
     'consultas.read',
     'exams.read',
+    // BE-02: exams.delete (archivar examen) es acción administrativa análoga a
+    // patients.delete; sin esto la ruta DELETE /exams/:id era inalcanzable para
+    // todo rol real (solo el bypass de superadmin), funcionalidad rota en prod.
+    'exams.delete',
     // Citas — CRUD completo
     'appointments.read',
     'appointments.create',
@@ -73,7 +77,7 @@ const ROLE_PERMISSIONS = {
     'odontogram.read', 'odontogram.create', 'odontogram.update',
     'periodontogram.read', 'periodontogram.create', 'periodontogram.update',
     'consultas.read', 'consultas.create', 'consultas.update',
-    'exams.read', 'exams.create', 'exams.update',
+    'exams.read', 'exams.create', 'exams.update', 'exams.delete', // BE-02: ver administrador
     // Citas — CRUD completo (delete de admin)
     'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
     // Caja (de admin)

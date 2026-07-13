@@ -11,6 +11,7 @@
  * Ver roles.MD §5.
  */
 const AuditLog = require('../models/auditLog');
+const logger = require('../utils/logger');
 
 // ── Mapa de método HTTP → evento de auditoría ──────────────────
 const METHOD_EVENT_MAP = {
@@ -215,6 +216,20 @@ auditLogger.registrarManual = function(req, evento, datos = {}) {
     evento,
     ip:       req.ip || req.connection?.remoteAddress,
     ...datos,
+  }).catch((err) => {
+    // BE-01 (Crítica): NO silenciar el fallo de auditoría NOM-024. Antes los
+    // ~15 call sites hacían `.catch(() => {})` y un fallo transitorio de Mongo
+    // (o E11000 de `seq`) dejaba el evento legal sin registrar y sin traza. Al
+    // loguear aquí, TODOS los llamadores quedan cubiertos de una sola vez;
+    // re-lanzamos para que los que `await` + propagan (signingController) sigan
+    // viendo el error, y el `.catch(()=>{})` de los fire-and-forget ya no oculta
+    // un fallo — solo evita el unhandledRejection de un error ya registrado.
+    logger.error('Fallo al registrar evento de auditoría NOM-024', {
+      evento,
+      userId: req.user?.id || null,
+      error: err?.message || String(err),
+    });
+    throw err;
   });
 };
 

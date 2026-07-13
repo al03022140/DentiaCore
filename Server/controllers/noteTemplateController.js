@@ -1,4 +1,5 @@
 const NoteTemplate = require('../models/noteTemplate');
+const { devError } = require('../utils/httpError');
 
 // ── List my templates ────────────────────────────────────────
 exports.getMyTemplates = async (req, res) => {
@@ -9,7 +10,7 @@ exports.getMyTemplates = async (req, res) => {
       .select('nombre tipoProcedimiento descripcion');
     res.json(templates);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener plantillas', error: error.message });
+    res.status(500).json({ message: 'Error al obtener plantillas', error: devError(error) });
   }
 };
 
@@ -36,7 +37,7 @@ exports.createTemplate = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ message: 'Ya existe una plantilla con ese nombre' });
     }
-    res.status(500).json({ message: 'Error al crear plantilla', error: error.message });
+    res.status(500).json({ message: 'Error al crear plantilla', error: devError(error) });
   }
 };
 
@@ -62,7 +63,7 @@ exports.updateTemplate = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ message: 'Ya existe una plantilla con ese nombre' });
     }
-    res.status(500).json({ message: 'Error al actualizar plantilla', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar plantilla', error: devError(error) });
   }
 };
 
@@ -82,6 +83,6 @@ exports.deleteTemplate = async (req, res) => {
     if (!template) return res.status(404).json({ message: 'Plantilla no encontrada' });
     res.json({ message: 'Plantilla eliminada' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar plantilla', error: error.message });
+    res.status(500).json({ message: 'Error al eliminar plantilla', error: devError(error) });
   }
 };

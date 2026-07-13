@@ -3,6 +3,7 @@ const CashMovement = require('../models/cashMovement');
 const BoxSession = require('../models/boxSession');
 const PatientCharge = require('../models/patientCharge');
 const Patient = require('../models/patient');
+const logger = require('../utils/logger');
 
 const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 const safeNum = (n) => (Number.isFinite(n) ? n : 0);
@@ -535,7 +536,7 @@ exports.addMovement = async (req, res) => {
     });
     if (!sessionStillOpen) {
       try { await CashMovement.deleteOne({ _id: movement._id }); }
-      catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+      catch (rbErr) { logger.error('CRITICAL: rollback CashMovement falló (movimiento huérfano en caja)', { movementId: movement._id, error: rbErr?.message || String(rbErr) }); }
       return res.status(409).json({
         message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
       });
@@ -549,7 +550,7 @@ exports.addMovement = async (req, res) => {
       const allMovements = await CashMovement.find({ boxSessionId: activeSession._id });
       if (isCashWithdrawalOverdrawn(allMovements, activeSession.initialAmount, movement._id)) {
         try { await CashMovement.deleteOne({ _id: movement._id }); }
-        catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+        catch (rbErr) { logger.error('CRITICAL: rollback CashMovement falló (movimiento huérfano en caja)', { movementId: movement._id, error: rbErr?.message || String(rbErr) }); }
         return res.status(409).json({
           message: 'Fondos insuficientes: otro retiro concurrente consumió el efectivo disponible. Reintente.'
         });

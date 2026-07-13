@@ -12,6 +12,7 @@ const Patient = require('../models/patient');
 const Usuario = require('../models/users');
 const mongoose = require('mongoose');
 const { computeIntegrityHash, computeEntryHash } = require('../utils/integrity');
+const { RESOURCE_MODEL_MAP } = require('../utils/resourceModelMap');
 
 // ── Etiquetas legibles por evento ───────────────────────────────
 const EVENTO_LABELS = {
@@ -142,19 +143,27 @@ const getLogs = async (req, res, next) => {
 
     const filter = {};
 
-    // Filtro por usuario
-    if (userId) {
-      filter.userId = userId;
+    // BE-01: coercer a String + validar ObjectId antes de armar el filtro Mongo.
+    // El sanitizador global ya quita operadores `$`, pero esto además rechaza
+    // valores mal formados con un 400 claro en vez de un filtro silencioso vacío.
+    if (userId !== undefined) {
+      if (!mongoose.Types.ObjectId.isValid(String(userId))) {
+        return res.status(400).json({ message: 'userId inválido' });
+      }
+      filter.userId = String(userId);
     }
 
     // Filtro por paciente
-    if (patientId) {
-      filter.patientId = patientId;
+    if (patientId !== undefined) {
+      if (!mongoose.Types.ObjectId.isValid(String(patientId))) {
+        return res.status(400).json({ message: 'patientId inválido' });
+      }
+      filter.patientId = String(patientId);
     }
 
     // Filtro por evento
-    if (evento) {
-      filter.evento = evento;
+    if (evento !== undefined) {
+      filter.evento = String(evento);
     }
 
     // Filtro por fecha (día específico o rango)
@@ -278,17 +287,6 @@ const searchPatients = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
-
-// ── Mapa resourceType → modelo Mongoose ─────────────────────────
-const RESOURCE_MODEL_MAP = {
-  patient:         'Patient',
-  examen:          'Examen',
-  receta:          'Receta',
-  tratamiento:     'Tratamiento',
-  periodontograma: 'Periodontogram',
-  odontograma:     'Odontograma',
-  cita:            'Appointment',
 };
 
 /**
