@@ -141,7 +141,10 @@ function adaptTeethFromClientPayload(teeth) {
   const getArcada = (num) => {
     const n = parseInt(num, 10);
     const first = Math.floor(n / 10);
-    return (first === 1 || first === 2) ? 'superior' : 'inferior';
+    // Igual que inferArcada (abajo): superior = cuadrantes 1-2 (permanentes) y
+    // 5-6 (temporales). Antes 5x/6x caían en 'inferior' y el cross-check FDI
+    // del modelo rechazaba el diente con ValidationError.
+    return [1, 2, 5, 6].includes(first) ? 'superior' : 'inferior';
   };
 
   const out = {};

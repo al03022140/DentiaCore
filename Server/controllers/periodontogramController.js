@@ -154,7 +154,7 @@ exports.getPeriodontogram = [
       const optimizedPeriodontogram = await Periodontogram.findById(periodontogram._id)
         // Nota: el esquema no tiene campo 'history' (el historial vive en la colección
         // PeriodontogramHistory), por lo que un .select('-history') era un no-op engañoso.
-        .populate('patient', 'primer_nombre primer_apellido email')
+        .populate('patient', 'primer_nombre apellido_paterno email')
         .lean()
         .maxTimeMS(15000) // Timeout de 15 segundos para esta consulta específica
         .exec();
@@ -184,9 +184,8 @@ exports.getPeriodontogram = [
           message: 'La consulta tardó demasiado tiempo. Por favor, intente nuevamente.'
         });
       }
-      
 
-      
+      console.error('❌ getPeriodontogram:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor al obtener el periodontograma'
@@ -278,9 +277,9 @@ exports.createInitialPeriodontogram = async (req, res) => {
           createdAt: newPeriodontogram.createdAt
         }
       });
-      
-    } catch (_error) {
-      
+
+    } catch (error) {
+      console.error('❌ createInitialPeriodontogram:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor al crear el periodontograma'
@@ -467,10 +466,9 @@ exports.getPeriodontogramHistory = [
           }
         }
       });
-      
-    } catch (_error) {
 
-      
+    } catch (error) {
+      console.error('❌ getPeriodontogramHistory:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -479,108 +477,13 @@ exports.getPeriodontogramHistory = [
   }
 ];
 
-/**
- * Eliminar periodontograma (soft delete)
- */
-exports.deletePeriodontogram = [
-  validatePatientIdAsId,
-  checkValidationErrors,
-  async (req, res) => {
-    try {
-      // Rechazar claves legacy si vienen en query/body
-      const legacyInQuery = collectForbiddenKeys(req.query || {});
-      if (legacyInQuery.length > 0) {
-        return res.status(400).json({ success: false, message: `Parámetros de consulta no permitidos: ${legacyInQuery.join(', ')}` });
-      }
-      const legacyInBody = collectForbiddenKeys(req.body || {});
-      if (legacyInBody.length > 0) {
-        return res.status(400).json({ success: false, message: `Formato canónico requerido. Se detectaron claves legacy no permitidas: ${legacyInBody.join(', ')}` });
-      }
-      const { id } = req.params;
-      const userId = req.user?.id;
-      
-
-      
-      const periodontogram = await Periodontogram.findOne({ patient: id });
-      if (!periodontogram) {
-        return res.status(404).json({
-          success: false,
-          message: 'Periodontograma no encontrado'
-        });
-      }
-
-      // NOM-024: sólo los registros realmente firmados son inmutables.
-      if (periodontogram.firmadoEn) {
-        return res.status(403).json({
-          success: false,
-          message: 'No se puede eliminar un periodontograma firmado'
-        });
-      }
-
-      // Borrador: solo el creador o un admin pueden eliminar
-      if (!isAdminRole(req.user?.role)) {
-        if (periodontogram.creadoPor && periodontogram.creadoPor.toString() !== userId) {
-          return res.status(403).json({
-            success: false,
-            message: 'Solo el creador o un administrador pueden eliminar este borrador'
-          });
-        }
-      }
-      
-      // Soft delete - cambiar estado a archived
-      periodontogram.status = 'archived';
-      await periodontogram.save();
-
-      // Generar un nombre único con milisegundos y verificar colisión por paciente
-      const pad = (n) => String(n).padStart(2, '0');
-      const buildName = (d, suffix = '') => {
-        return `Archivado_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}${suffix}`;
-      };
-      let attempt = 0;
-      let archiveVersionName;
-      while (true) {
-        const now = new Date();
-        // incluir ms solo para variar si hay colisión (como sufijo)
-        const suffix = attempt === 0 ? '' : `-${now.getMilliseconds()}`;
-        const cand = buildName(now, suffix);
-        const exists = await PeriodontogramHistory.exists({ patient: id, versionName: cand });
-        if (!exists) { archiveVersionName = cand; break; }
-        attempt += 1;
-        if (attempt > 5) { // fallback
-          archiveVersionName = `${cand}-${Math.random().toString(36).slice(2, 6)}`;
-          break;
-        }
-      }
-      const archiveStats = statisticsToPlain(periodontogram.current.statistics);
-      const archiveTeeth = mapTeethToPlain(periodontogram.current.teeth);
-      const validUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
-
-      await PeriodontogramHistory.create({
-        patient: periodontogram.patient,
-        periodontogram: periodontogram._id,
-        versionName: archiveVersionName,
-        teeth: archiveTeeth,
-        statistics: archiveStats,
-        createdBy: validUserId
-      });
-      
-
-      
-      res.status(200).json({
-        success: true,
-        message: 'Periodontograma archivado exitosamente'
-      });
-      
-    } catch (_error) {
-
-      
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor'
-      });
-    }
-  }
-];
+// NOTA: se eliminó deletePeriodontogram (DELETE /). No tenía consumidor (ni
+// cliente, ni tests) y su semántica estaba rota: marcaba status:'archived'
+// pero NINGUNA lectura/guardado/listado de borradores/firma filtraba ese
+// estado — el doc "eliminado" seguía sirviéndose, editándose y firmándose
+// igual. Si algún día se quiere "reiniciar periodontograma", implementarlo
+// con el filtrado completo (reads, saves, drafts, signing) y permitir
+// re-crear. Las versiones siguen preservadas en PeriodontogramHistory.
 
 // Configuración de multer eliminada - solo manejo de datos JSON
 
@@ -717,7 +620,16 @@ exports.savePeriodontogramData = [
       }
 
       const normalizedTeeth = normalizeFurcaInTeeth(validatedData.teeth || {});
-      const versionNameFromPayload = typeof payload.versionName === 'string' ? payload.versionName.trim() : payload.versionName;
+      // versionName: string ≤200 (se persiste en CADA entrada del historial,
+      // que es inmutable — sin tope, un nombre de 1MB quedaría para siempre).
+      const rawVersionName = payload.versionName ?? payload.version ?? null;
+      if (rawVersionName != null && (typeof rawVersionName !== 'string' || rawVersionName.trim().length > 200)) {
+        return res.status(400).json({
+          success: false,
+          message: 'versionName inválido (debe ser un string de máximo 200 caracteres)'
+        });
+      }
+      const versionNameFromPayload = typeof rawVersionName === 'string' ? rawVersionName.trim() : null;
       const versionName = versionNameFromPayload || validatedData.version || generateDefaultVersionName();
       const createdAt = validatedData.fechaCreacion ? new Date(validatedData.fechaCreacion) : new Date();
       const updatedAt = validatedData.fechaModificacion ? new Date(validatedData.fechaModificacion) : new Date();
@@ -726,7 +638,13 @@ exports.savePeriodontogramData = [
       periodontogram.current.teeth = new Map(Object.entries(normalizedTeeth));
       periodontogram.markModified('current.teeth');
       periodontogram.current.versionName = versionName;
-      periodontogram.current.needsStatisticsRecalc = true;
+      // Stats calculadas AQUÍ, de los MISMOS teeth que se guardan — no en el
+      // pre-save via needsStatisticsRecalc: el snapshot del History se toma
+      // antes del save y heredaba las stats de la versión ANTERIOR (la primera
+      // versión quedaba con estadísticas en ceros).
+      periodontogram.current.statistics = Periodontogram.computeStatistics(normalizedTeeth);
+      periodontogram.markModified('current.statistics');
+      periodontogram.current.needsStatisticsRecalc = false;
       periodontogram.current.createdAt = periodontogram.current.createdAt || createdAt;
 
       if (periodontogram.initial?.metadata) {
@@ -915,6 +833,12 @@ exports.getPeriodontogramData = [
           teeth: normalizedTeeth,
           statistics: baseStatistics,
           arcadas,
+          // updatedAt del DOCUMENTO principal (no de la versión servida): es el
+          // token que el cliente debe reenviar como expectedUpdatedAt al
+          // guardar para el control de concurrencia optimista (409 STALE) —
+          // incluso cuando carga una versión del historial, el guardado
+          // siempre escribe sobre el documento current.
+          documentUpdatedAt: periodontogram.updatedAt,
           metadata: {
             createdAt,
             updatedAt

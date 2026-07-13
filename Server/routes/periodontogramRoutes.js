@@ -74,9 +74,8 @@ router.get('/statistics/:version', readRateLimit, authorize(['periodontogram.rea
 
 router.get('/history', readRateLimit, authorize(['periodontogram.read']), periodontogramController.getPeriodontogramHistory);
 
-// requireClinicalRole se agrega para alinear con POST/PUT — el resto de
-// endpoints exigen rol clínico, no había razón para que DELETE fuera laxo.
-router.delete('/', writeRateLimit, requireClinicalRole, authorize(['periodontogram.delete']), periodontogramController.deletePeriodontogram);
+// DELETE / se eliminó — ver nota en periodontogramController (semántica de
+// 'archived' rota y sin consumidores).
 
 // Middleware de manejo de errores específico para periodontograma
 router.use((error, req, res, _next) => {

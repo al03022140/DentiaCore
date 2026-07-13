@@ -599,6 +599,12 @@ PeriodontogramSchema.statics.createInitial = function(patientId, userId) {
   return this.create(buildEmptyPeriodontogramPayload(patientId, userId));
 };
 
+// Cálculo de estadísticas desde teeth (Map o plano). Expuesto como static para
+// que el controller pueda sellar en el History las stats de los MISMOS teeth
+// que está guardando (antes el historial heredaba las stats de la versión
+// anterior) y para la migración 0006 que recomputa las entradas legacy.
+PeriodontogramSchema.statics.computeStatistics = computeCurrentStatistics;
+
 // Igual que createInitial pero NO persiste: devuelve un doc en memoria con la
 // misma forma. Para que los GET (lectura) puedan responder un periodontograma
 // vacío sin escribir en BD — antes los GET auto-creaban un BORRADOR que

@@ -58,6 +58,11 @@ const handleApiError = (error) => {
       case 404:
         message = 'Periodontograma no encontrado';
         break;
+      case 409:
+        // Conflictos con mensaje accionable del server: PERIODONTOGRAMA_STALE
+        // (otro usuario guardó primero) o nombre de versión duplicado.
+        message = data?.message || 'Conflicto: el periodontograma fue modificado por otro usuario. Recarga antes de guardar.';
+        break;
       case 500:
         message = 'Error interno del servidor. Por favor, intente más tarde';
         break;
@@ -137,72 +142,12 @@ const PeriodontogramService = {
     }
   },
 
-  /**
-   * Crea un nuevo periodontograma para un paciente
-   * @param {string} patientId - ID del paciente
-   * @param {Object} initialData - Datos iniciales del periodontograma
-   * @returns {Promise<PeriodontogramResponse>}
-   */
-  async createPeriodontogram(patientId, initialData = {}) {
-    try {
-      logger.log('🚀 Creando periodontograma para paciente:', patientId);
-
-      const response = await API.post(`/patients/${patientId}/periodontogram`, {
-        initialData
-      }, {
-        timeout: 30000 // 30s: evita abortos por Mongo local lento (es idempotente: 409 → get)
-      });
-
-      logger.log('✅ Periodontograma creado exitosamente');
-      return response.data;
-    } catch (error) {
-      if (error.response?.status === 409) {
-        logger.info('ℹ️ Periodontograma ya existe. Obteniendo el registro actual.');
-        return await PeriodontogramService.getPeriodontogram(patientId);
-      }
-      console.error('❌ Error creando periodontograma:', error);
-      handleApiError(error);
-    }
-  },
-
-  /**
-   * Actualiza los datos del periodontograma
-   * @deprecated Use saveData para usar el endpoint unificado /periodontogram/data
-   * @param {string} patientId - ID del paciente
-   * @param {Object} data - Datos del periodontograma a actualizar
-   * @returns {Promise<PeriodontogramResponse>}
-   */
-  async updatePeriodontogram(patientId, data) {
-    try {
-      console.warn('⚠️ updatePeriodontogram está deprecado. Redirigiendo a saveData para usar el endpoint unificado /periodontogram/data');
-      // Delegar al flujo unificado que valida con el esquema y no rechaza claves canónicas
-      return await PeriodontogramService.saveData(patientId, data);
-    } catch (error) {
-      console.error('❌ Error actualizando periodontograma (delegado a saveData):', error);
-      handleApiError(error);
-    }
-  },
-
-  // Funciones de imágenes eliminadas tras migración a JSON puro
-
-  /**
-   * Verifica si existe un periodontograma para el paciente intentando obtener los datos
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<boolean>}
-   */
-  async exists(patientId) {
-    try {
-      logger.log('🔍 Verificando existencia de periodontograma para paciente:', patientId);
-
-      const data = await PeriodontogramService.getData(patientId);
-      logger.log('✅ Periodontograma existe');
-      return !!data;
-    } catch (error) {
-      logger.log('📝 Periodontograma no existe o error al obtener datos');
-      // Si hay error 404 o cualquier otro error, asumimos que no existe
-      return false;
-    }
-  },
+  // NOTA (auditoría periodontograma): se eliminaron createPeriodontogram,
+  // updatePeriodontogram (deprecado), exists() y deletePeriodontogram — sin
+  // consumidores. El alta la hace el propio PUT /data (auto-crea); exists()
+  // además siempre devolvía true (GET /data responde éxito con un
+  // periodontograma vacío en memoria); el DELETE del server se retiró por
+  // semántica rota ('archived' no se filtraba en ningún lado).
 
   /**
    * Obtiene las estadísticas del periodontograma
@@ -373,19 +318,6 @@ const PeriodontogramService = {
       if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
         console.error('❌ Error obteniendo lista de versiones JSON:', error);
       }
-      handleApiError(error);
-    }
-  },
-
-  async deletePeriodontogram(patientId) {
-    try {
-      logger.log('🗑️ Eliminando periodontograma para paciente:', patientId);
-      await API.delete(`/patients/${patientId}/periodontogram`, {
-        timeout: DEFAULT_TIMEOUT
-      });
-      logger.log('✅ Periodontograma eliminado correctamente');
-    } catch (error) {
-      console.error('❌ Error eliminando periodontograma:', error);
       handleApiError(error);
     }
   }
