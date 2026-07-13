@@ -26,6 +26,10 @@ const OdontogramInitialSection = ({
   onSaveSuccess,
   initialSnapshotStatus = 'loading',
   areScriptsReady = false,
+  // updatedAt del doc (si existe un BORRADOR previo): viaja como
+  // expectedUpdatedAt para que el server corte con 409 un re-guardado stale.
+  // El padre ya lo tenía en estado pero nunca llegaba hasta aquí.
+  updatedAt = null,
 }) => {
   // Modo derivado: si ya existe → view (canvas read-only). Si no → edit.
   const mode = exists ? 'view' : 'edit';
@@ -285,7 +289,8 @@ const OdontogramInitialSection = ({
       // hallazgos sin contaminar el odontograma con un daño-fantasma ('Sano')
       // que el engine no reconoce al recargar.
       const { default: odontogramaService } = await import('../api/odontograma-service.js');
-      const response = await odontogramaService.saveInitialOdontogram(patientId, entries);
+      const saveOptions = updatedAt ? { expectedUpdatedAt: updatedAt } : {};
+      const response = await odontogramaService.saveInitialOdontogram(patientId, entries, saveOptions);
 
       if (!response || response.exists !== true) {
         throw new Error('Respuesta inesperada del servidor.');
@@ -319,7 +324,7 @@ const OdontogramInitialSection = ({
     } finally {
       setSaving(false);
     }
-  }, [saving, mode, patientId, onSaveSuccess]);
+  }, [saving, mode, patientId, onSaveSuccess, updatedAt]);
 
   const handleOpenConfirm = useCallback(() => {
     if (savedOnceRef.current || saving) return;
@@ -533,6 +538,7 @@ OdontogramInitialSection.propTypes = {
   onSaveSuccess: PropTypes.func,
   initialSnapshotStatus: PropTypes.oneOf(['loading', 'saved', 'none', 'error']),
   areScriptsReady: PropTypes.bool,
+  updatedAt: PropTypes.string,
 };
 
 export default OdontogramInitialSection;

@@ -23,16 +23,6 @@ document.writeln("<script type='text/javascript' src='js/odontogramaGenerator.js
 document.writeln("<script type='text/javascript' src='js/collisionHandler.js'></script>");
 */
 
-/** Misma clave que Client/src/shared/services/auth-token.js (dentia_access_token) */
-function dentiaGetAccessToken() {
-    "use strict";
-    try {
-        return localStorage.getItem('dentia_access_token');
-    } catch (e) {
-        return null;
-    }
-}
-
 function Engine(config) {
     "use strict";
     // canvas which is used by the engine
@@ -1439,32 +1429,12 @@ Engine.prototype.getOdontogramaData = function() {
  */
 Engine.prototype.checkInitialOdontogramStatus = function() {
     "use strict";
-    var self = this;
-    if (!this.patientId) {
-        this.hasSavedInitialOdontogram = false;
-        return;
-    }
-    var token = dentiaGetAccessToken();
-    var headers = { Accept: 'application/json' };
-    if (token) {
-        headers.Authorization = 'Bearer ' + token;
-    }
-    fetch('/api/patients/' + this.patientId + '/has-initial-odontogram', {
-        credentials: 'include',
-        headers: headers
-    })
-        .then(function (response) {
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
-            }
-            return response.json();
-        })
-        .then(function (data) {
-            self.hasSavedInitialOdontogram = !!data.hasSaved;
-        })
-        .catch(function (error) {
-            console.error('Error checking initial odontogram:', error);
-        });
+    // Ya no consulta al servidor. Este flag sólo protegía el botón "Guardar"
+    // interno del engine (oculto por las secciones React); el estado real del
+    // odontograma inicial lo gestionan las secciones React + el 409 del
+    // servidor. El fetch a /has-initial-odontogram se eliminó junto con el
+    // endpoint (disparaba una petición por montaje sin efecto visible).
+    this.hasSavedInitialOdontogram = false;
 };
 
 Engine.prototype.saveOdontogramaInicial = function () {

@@ -36,7 +36,10 @@ const OdontogramaHistorySchema = new mongoose.Schema({
   versionName: {
     type: String,
     required: true,
-    default: 'Inicial'
+    default: 'Inicial',
+    // Backstop de la cota del controller (400 antes de llegar aquí). Sólo
+    // aplica al create — la colección es append-only, legacy no se re-valida.
+    maxlength: 200
   },
   // Snapshot completo de entradas: [{ tooth, space, damage, surface, note, fecha }]
   datos: {

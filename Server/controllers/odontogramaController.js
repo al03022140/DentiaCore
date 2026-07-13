@@ -34,6 +34,16 @@ const FDI_TOOTH_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-
 // productor y emite un conjunto cerrado de IDs.
 const FDI_SPACE_REGEX = /^(1[1-8]|2[1-8]|3[1-8]|4[1-8]|5[1-5]|6[1-5]|7[1-5]|8[1-5]){2}$/;
 
+// Cotas de tamaño (paridad con el hardening de otros módulos: notas 2000,
+// versionName 200 como el periodontograma). El engine emite códigos numéricos
+// cortos para damage y superficies tipo 'M'/'18_M'; los máximos son holgados
+// para datos legítimos pero cierran el payload sin límite.
+const MAX_ENTRIES = 1000;
+const MAX_NOTE_LENGTH = 2000;
+const MAX_DAMAGE_LENGTH = 100;
+const MAX_SURFACE_LENGTH = 20;
+const MAX_VERSION_NAME_LENGTH = 200;
+
 // Genera un versionName por defecto inequívoco para una versión del odontograma
 // clínico. Mismo formato que el periodontograma (periodontogramController.js):
 // ISO compacto + sufijo random de 6 hex chars. El sufijo evita colisiones con
@@ -141,23 +151,11 @@ const verificarOdontogramaInicial = async (req, res, next) => {
   }
 };
 
-/** Comprobación ligera para el motor (canvas): solo indica si ya existe snapshot inicial */
-const hasInitialOdontogram = async (req, res, next) => {
-  try {
-    const patientId = req.patient?.id || req.patient?._id;
-    if (!patientId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
-      });
-    }
-    const doc = await OdontogramaModel.findOne({ patientId, type: TYPE_INITIAL, deletedAt: null }).lean();
-    const hasSaved = !!(doc && doc.current);
-    res.json({ hasSaved });
-  } catch (error) {
-    next(error);
-  }
-};
+// NOTA: se eliminó `hasInitialOdontogram` (GET /has-initial-odontogram). Su
+// único consumidor era el fetch interno del engine (checkInitialOdontogramStatus),
+// que alimentaba el guard del botón "Guardar" del engine — botón que las
+// secciones React ocultan. El estado real lo gestiona el GET del odontograma
+// inicial + el 409 del servidor.
 
 const guardarOdontogramaInicial = async (req, res, next) => {
   try {
@@ -420,93 +418,11 @@ const obtenerSnapshotPorId = async (req, res, next) => {
   }
 };
 
-const agregarHistorialInicial = async (req, res, next) => {
-  try {
-    const patientId = req.patient?.id || req.patient?._id;
-    if (!patientId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
-      });
-    }
-
-    const odontograma = await OdontogramaModel.findOne({ patientId: patientId, type: TYPE_INITIAL, deletedAt: null });
-    if (!odontograma || !odontograma.current) {
-      return res.status(404).json({
-        exists: false,
-        message: 'Odontograma inicial no encontrado para agregar al historial.'
-      });
-    }
-
-    // NOM-024: Los registros OFICIAL son inmutables — solo se permiten addenda
-    if (odontograma.estado === 'OFICIAL') {
-      return res.status(403).json({
-        success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede modificar un odontograma en estado OFICIAL. Use addendum para correcciones.' }
-      });
-    }
-
-    // BORRADOR: solo el creador o un admin pueden modificar
-    if (odontograma.estado === 'BORRADOR' && !isAdminRole(req.user?.role)) {
-      if (odontograma.creadoPor && odontograma.creadoPor.toString() !== req.user?.id) {
-        return res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden modificar este borrador' }
-        });
-      }
-    }
-
-    const savedAt = new Date();
-    const entries = req.validatedEntries.map(normalizeEntry).map(e => ({
-      tooth: e.tooth,
-      space: e.space || '',
-      damage: e.damage,
-      surface: e.surface,
-      note: e.note,
-      fecha: savedAt
-    }));
-    const snapshotAppointmentId = await resolvePatientAppointmentId(req.body?.appointmentId, patientId);
-    const snapshot = {
-      imageUrl: odontograma.current.imageUrl,
-      datos: entries,
-      savedAt,
-      appointmentId: snapshotAppointmentId,
-      savedBy: req.user?.id || null
-    };
-
-    const updated = await OdontogramaModel.findOneAndUpdate(
-      // P3: guard atómico contra una firma concurrente. Sin upsert: si el doc
-      // pasó a OFICIAL, el filtro no coincide, `updated` es null y respondemos
-      // 409 en vez de pisar un registro ya inmutable.
-      { patientId: patientId, type: TYPE_INITIAL, deletedAt: null, estado: { $ne: 'OFICIAL' } },
-      {
-        $push: { history: snapshot },
-        $set: { modificadoPor: req.user?.id || null, modificadoEn: new Date() }
-      },
-      { new: true, runValidators: true } // P4: validar al actualizar
-    );
-    if (!updated) {
-      return res.status(409).json({
-        success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'El odontograma inicial fue firmado por otra operación. Recarga antes de continuar.' }
-      });
-    }
-
-    res.status(201).json({
-      exists: true,
-      imageUrl: updated.current?.imageUrl || null,
-      datos: (updated.current?.datos || []).map(normalizeEntry),
-      history: updated.history.map(v => ({
-        id: v._id,
-        imageUrl: v.imageUrl,
-        fecha: v.savedAt.toISOString(),
-        datos: (v.datos || []).map(normalizeEntry)
-      }))
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// NOTA: se eliminó `agregarHistorialInicial` (POST /odontograma-inicial/history).
+// No tenía consumidor (el cliente sólo re-guarda vía POST /odontograma-inicial,
+// que ya hace $push al history) y contradecía el diseño de captura única: era
+// una segunda vía de escritura al historial inicial. Los GET de historial se
+// conservan (lectura del registro clínico).
 
 // NOTA: el odontograma inicial es de captura única e inmutable por paciente.
 // No existe función de delete/archivado — la regla de negocio es "una sola vez,
@@ -685,6 +601,16 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
         const versionName = (typeof req.body?.versionName === 'string' && req.body.versionName.trim())
           || generateDefaultVersionName();
 
+        // Paridad con el periodontograma (P10): cota al nombre de versión. El
+        // maxlength del schema de history es el backstop (create-only, no
+        // afecta legacy).
+        if (versionName.length > MAX_VERSION_NAME_LENGTH) {
+          return res.status(400).json({
+            success: false,
+            error: { code: 'VERSION_NAME_TOO_LONG', message: `versionName no puede exceder ${MAX_VERSION_NAME_LENGTH} caracteres.` }
+          });
+        }
+
         const snapshot = {
             datos: entries,
             imageUrl: '',
@@ -765,6 +691,23 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
       return prev.every((v, i) => v === next[i]);
     };
     const shouldCreateVersion = !existingClinic || !isIdenticalToCurrent(existingClinic, entries);
+
+    // Pre-check del nombre ANTES de escribir el doc principal. En Mongo
+    // standalone (el despliegue real de la clínica) la transacción degrada a
+    // escrituras separadas: sin este check, un versionName duplicado
+    // actualizaba `current` con los datos del guardado RECHAZADO y dejaba
+    // current.versionName apuntando a una versión vieja con otros datos.
+    // El manejo de E11000 de abajo queda para la ventana de carrera residual
+    // (en réplica set la transacción ya lo cubre con rollback).
+    if (shouldCreateVersion) {
+      const nameTaken = await OdontogramaHistory.exists({ patient: patientId, versionName });
+      if (nameTaken) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'VERSION_NAME_CONFLICT', message: `Ya existe una versión con el nombre '${versionName}'. Use un nombre diferente.` }
+        });
+      }
+    }
 
     // Si NO se crea versión (guardado idéntico al actual), `current.versionName`
     // debe conservar el nombre de la versión vigente — sobrescribirlo con un
@@ -875,121 +818,19 @@ const saveClinicalHistoryEntries = async (req, res, next) => {
   }
 };
 
-const deleteClinicalHistoryEntry = async (req, res, next) => {
-  try {
-    const { entryId } = req.params;
-    
-    const patientId = req.patient?.id || req.patient?._id;
-    if (!patientId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
-      });
-    }
-    
-    // P5: entryId no-ObjectId → 404 en vez de CastError → 500.
-    if (!mongoose.Types.ObjectId.isValid(entryId)) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'ENTRY_NOT_FOUND', message: 'Entrada del historial no encontrada' }
-      });
-    }
-
-    const result = await OdontogramaModel.updateOne(
-      {
-        patientId: patientId,
-        type: TYPE_CLINIC,
-        deletedAt: null,
-        'history._id': entryId,
-        'history.deletedAt': null
-      },
-      { $set: { 
-        'history.$.deletedAt': new Date(),
-        'history.$.deletedBy': req.user?.id || null,
-        'history.$.deleteReason': req.body?.motivo || 'Eliminado por usuario'
-      } }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'DOCUMENT_NOT_FOUND', message: 'Documento de odontograma clínico no encontrado' }
-      });
-    }
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'ENTRY_NOT_FOUND', message: 'Entrada del historial no encontrada' }
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Entrada del historial eliminada correctamente'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const deleteClinicalOdontogramState = async (req, res, next) => {
-  try {
-    const patientId = req.patient?.id || req.patient?._id;
-    if (!patientId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_PATIENT_ID', message: 'ID de paciente no válido' }
-      });
-    }
-    
-    // Soft-delete (NOM-004 Art. 5.4)
-    const doc = await OdontogramaModel.findOne({
-      patientId: patientId,
-      type: TYPE_CLINIC
-    });
-
-    if (!doc) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'DOCUMENT_NOT_FOUND', message: 'Estado del odontograma clínico no encontrado' }
-      });
-    }
-
-    // NOM-024: los registros realmente firmados no se pueden eliminar.
-    // Antes el guard usaba `estado === 'OFICIAL'` pero ese campo se
-    // auto-marcaba en cada save sin firma real (ver saveClinicalHistoryEntries).
-    if (doc.firmadoEn) {
-      return res.status(403).json({
-        success: false,
-        error: { code: 'IMMUTABLE_RECORD', message: 'No se puede eliminar un odontograma clínico firmado' }
-      });
-    }
-
-    // BORRADOR: solo el creador o un admin pueden eliminar
-    if (!isAdminRole(req.user?.role)) {
-      if (doc.creadoPor && doc.creadoPor.toString() !== req.user?.id) {
-        return res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Solo el creador o un administrador pueden eliminar este borrador clínico' }
-        });
-      }
-    }
-
-    doc.estado = 'ARCHIVADO';
-    doc.deletedAt = new Date();
-    doc.deletedBy = req.user?.id || null;
-    doc.deleteReason = req.body?.motivo || 'Eliminado por usuario';
-    await doc.save();
-
-    res.json({
-      success: true,
-      message: 'Estado del odontograma clínico archivado correctamente'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// NOTA: se eliminaron `deleteClinicalHistoryEntry` (DELETE /history/:entryId)
+// y `deleteClinicalOdontogramState` (DELETE /odontograma-clinico) — misma
+// decisión que el DELETE del periodontograma (P2): cero consumidores en la UI.
+// Además ambos habían quedado incoherentes tras la migración 0004:
+//  - el delete de entrada soft-deleteaba el array embebido `history[]`, pero la
+//    UI lee las versiones de la colección `odontograma_history` (inmutable) —
+//    borrar ahí no tenía ningún efecto visible;
+//  - el delete del doc archivaba el principal pero dejaba TODAS sus versiones
+//    en `odontograma_history` (consultadas por paciente), que seguirían
+//    apareciendo en el selector del sucesor y bloqueando nombres por el índice
+//    único {patient, versionName}.
+// Si algún día se quiere "reiniciar odontograma clínico", implementarlo
+// completo (incluyendo qué hacer con las versiones del archivado).
 
 // ——— Middlewares y Error Handler ——————————————————————————————————————————————————————
 const validarEntradasOdontograma = (req, res, next) => {
@@ -1035,7 +876,39 @@ const validarEntradasOdontograma = (req, res, next) => {
     });
   }
 
-  // Mapear usando la función normalizada del helper
+  if (entries.length > MAX_ENTRIES) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'TOO_MANY_ENTRIES', message: `entries no puede exceder ${MAX_ENTRIES} elementos.` }
+    });
+  }
+
+  // Cada entrada debe ser un objeto plano con campos escalares. Antes un
+  // `null` en el array reventaba normalizeEntry (TypeError → 500) y un campo
+  // objeto llegaba hasta Mongoose (CastError → 500). Validamos aquí para
+  // responder 400 con contexto.
+  const isScalar = (v) => v === undefined || v === null || typeof v === 'string' || typeof v === 'number';
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || typeof e !== 'object' || Array.isArray(e)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ENTRY', message: `Entry #${i} debe ser un objeto`, invalidEntry: e ?? null }
+      });
+    }
+    for (const field of ['tooth', 'diente', 'space', 'espacio', 'damage', 'condition', 'tipo', 'surface', 'superficie', 'note', 'nota']) {
+      if (!isScalar(e[field])) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ENTRY', message: `Entry #${i}: el campo '${field}' debe ser texto o número` }
+        });
+      }
+    }
+  }
+
+  // Mapear usando la función normalizada del helper. Se coercen los campos a
+  // String (el engine puede emitir números) para que aguas abajo el tipo sea
+  // siempre uniforme.
   const mappedEntries = entries.map((e) => {
     // debugLog(`[DEBUG] Procesando entry #${index}:`, e);
     const normalized = normalizeEntry(e);
@@ -1046,6 +919,11 @@ const validarEntradasOdontograma = (req, res, next) => {
       // Normalizar 'condition' como alias de 'damage'
       damage: e.condition !== undefined ? e.condition : normalized.damage
     };
+    mapped.tooth = String(mapped.tooth ?? '').trim();
+    mapped.damage = String(mapped.damage ?? '').trim();
+    mapped.surface = String(mapped.surface ?? '0').trim() || '0';
+    mapped.note = String(mapped.note ?? '');
+    if (mapped.space !== undefined) mapped.space = String(mapped.space).trim();
     // debugLog(`[DEBUG] Entry #${index} mapeada:`, mapped);
     return mapped;
   });
@@ -1134,6 +1012,18 @@ const validarEntradasOdontograma = (req, res, next) => {
         }
       });
     }
+    // Cotas de longitud: 400 claro aquí en vez de ValidationError de Mongoose
+    // (500) al persistir. Los maxlength del schema quedan como backstop.
+    const tooLong =
+      (item.note.length > MAX_NOTE_LENGTH && `'note' excede ${MAX_NOTE_LENGTH} caracteres`) ||
+      (item.damage.length > MAX_DAMAGE_LENGTH && `'damage' excede ${MAX_DAMAGE_LENGTH} caracteres`) ||
+      (item.surface.length > MAX_SURFACE_LENGTH && `'surface' excede ${MAX_SURFACE_LENGTH} caracteres`);
+    if (tooLong) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'ENTRY_FIELD_TOO_LONG', message: `Entry #${i}: ${tooLong}.` }
+      });
+    }
   }
   next();
 };
@@ -1154,6 +1044,15 @@ const manejarError = (err, req, res, next) => {
   }
 
   if (err instanceof ValidationError) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: err.message }
+    });
+  }
+  // ValidationError/CastError de MONGOOSE (no la clase custom de arriba):
+  // datos que esquivaron la validación del middleware y fallaron al persistir
+  // con runValidators. Son entrada inválida → 400, no un 500 opaco.
+  if (err && (err.name === 'ValidationError' || err.name === 'CastError')) {
     return res.status(400).json({
       success: false,
       error: { code: 'VALIDATION_ERROR', message: err.message }
@@ -1214,16 +1113,12 @@ module.exports = {
   TYPE_INITIAL,
   TYPE_CLINIC,
   verificarOdontogramaInicial,
-  hasInitialOdontogram,
   validarEntradasOdontograma,
   guardarOdontogramaInicial,
   obtenerHistorialInicial,
   obtenerSnapshotPorId,
-  agregarHistorialInicial,
   verificarOdontogramaClinico,
   obtenerHistorialClinico,
   saveClinicalHistoryEntries,
-  deleteClinicalHistoryEntry,
-  deleteClinicalOdontogramState,
   manejarError
 };

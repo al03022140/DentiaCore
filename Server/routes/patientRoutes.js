@@ -369,8 +369,17 @@ router
   const imageUrl = odontograma.current.imageUrl;
       // Remover el prefijo '/uploads' de la URL para obtener la ruta relativa
       const relativePath = imageUrl.replace(/^\/uploads\//, '');
-      const imagePath = path.join(uploadsBase, relativePath);
-      
+      const imagePath = path.resolve(uploadsBase, relativePath);
+
+      // Contención: imageUrl viene de BD (histórico generado por el server),
+      // pero un valor legacy corrupto con '..' no debe escapar de uploads.
+      if (!imagePath.startsWith(path.resolve(uploadsBase) + path.sep)) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'IMAGE_NOT_FOUND', message: 'Imagen del odontograma inicial no encontrada' }
+        });
+      }
+
       // Verificar que el archivo existe
       const exists = await fs.pathExists(imagePath);
       if (!exists) {

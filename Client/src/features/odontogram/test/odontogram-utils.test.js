@@ -1,4 +1,4 @@
-import { prepareDataSource, damageToCode, normalizeEntriesForEngine } from '../utils/odontogram-utils';
+import { prepareDataSource, damageToCode, normalizeEntriesForEngine, sameEntryContent, resetEngineData, formatToothNumber } from '../utils/odontogram-utils';
 
 describe('Odontogram Utilities', () => {
     describe('prepareDataSource', () => {
@@ -309,6 +309,85 @@ describe('Odontogram Utilities', () => {
             expect(normalizeEntriesForEngine('not an array')).toEqual([]);
             expect(normalizeEntriesForEngine([])).toEqual([]);
             expect(normalizeEntriesForEngine([null, undefined, 'x'])).toEqual([]);
+        });
+    });
+
+    describe('formatToothNumber', () => {
+        test('formatea IDs de espacio de 4 dígitos con guión', () => {
+            expect(formatToothNumber('1817')).toBe('18-17');
+            expect(formatToothNumber('1121')).toBe('11-21'); // cruce de línea media
+        });
+
+        test('deja intactos los dientes normales y valores no-espacio', () => {
+            expect(formatToothNumber('11')).toBe('11');
+            expect(formatToothNumber('85')).toBe('85');
+            expect(formatToothNumber('9999')).toBe('9999'); // dígitos inválidos → tal cual
+        });
+    });
+
+    describe('sameEntryContent (base del sync canvas ↔ servidor)', () => {
+        test('mismo contenido en formas distintas (engine vs servidor) → true', () => {
+            const engineShape = [
+                { tooth: '11', damage: '1', diagnostic: '', surface: '0', note: '', fecha: '12/07/2026' },
+                { space: '1817', damage: '8', diagnostic: '', surface: '0', note: '', fecha: '12/07/2026' },
+            ];
+            const serverShape = [
+                { space: '1817', damage: '8', surface: '0', note: '', engineTeeth: [], fecha: '2026-07-12T10:00:00.000Z' },
+                { tooth: '11', damage: '1', surface: '0', note: '', engineTeeth: ['11'], fecha: '2026-07-12T10:00:00.000Z' },
+            ];
+            expect(sameEntryContent(engineShape, serverShape)).toBe(true);
+        });
+
+        test('difiere el contenido clínico → false', () => {
+            const a = [{ tooth: '11', damage: '1', surface: '0', note: '' }];
+            const b = [{ tooth: '11', damage: '5', surface: '0', note: '' }];
+            expect(sameEntryContent(a, b)).toBe(false);
+            expect(sameEntryContent(a, [])).toBe(false);
+        });
+
+        test('la fecha NO cuenta como diferencia', () => {
+            const a = [{ tooth: '11', damage: '1', surface: '0', note: '', fecha: '01/01/2026' }];
+            const b = [{ tooth: '11', damage: '1', surface: '0', note: '', fecha: '2026-06-30T23:59:59Z' }];
+            expect(sameEntryContent(a, b)).toBe(true);
+        });
+
+        test('entradas de espacio ausentes en un lado → false (regresión del bug de spaces)', () => {
+            const withSpace = [
+                { tooth: '11', damage: '1', surface: '0', note: '' },
+                { space: '1817', damage: '8', surface: '0', note: '' },
+            ];
+            const withoutSpace = [{ tooth: '11', damage: '1', surface: '0', note: '' }];
+            expect(sameEntryContent(withSpace, withoutSpace)).toBe(false);
+        });
+    });
+
+    describe('resetEngineData (previene fusión de versiones en el canvas)', () => {
+        const fakeEngine = () => ({
+            odontAdult: [
+                { id: 11, damages: [{ id: 1 }], textBox: { text: 'nota' }, checkBoxes: [{ state: 1 }, { state: 0 }] },
+                null, // hueco defensivo
+            ],
+            odontChild: [
+                { id: 51, damages: [{ id: 4 }], textBox: { text: '' }, checkBoxes: [] },
+            ],
+            odontSpacesAdult: [{ id: 1817, damages: [{ id: 8 }] }],
+            odontSpacesChild: [{ id: 5161, damages: [] }],
+        });
+
+        test('limpia daños, notas y superficies de AMBAS denticiones y espacios', () => {
+            const engine = fakeEngine();
+            resetEngineData(engine);
+            expect(engine.odontAdult[0].damages).toHaveLength(0);
+            expect(engine.odontAdult[0].textBox.text).toBe('');
+            expect(engine.odontAdult[0].checkBoxes.every(cb => cb.state === 0)).toBe(true);
+            expect(engine.odontChild[0].damages).toHaveLength(0);
+            expect(engine.odontSpacesAdult[0].damages).toHaveLength(0);
+        });
+
+        test('tolera engine null o arrays faltantes', () => {
+            expect(() => resetEngineData(null)).not.toThrow();
+            expect(() => resetEngineData({})).not.toThrow();
+            expect(() => resetEngineData({ odontAdult: [{}] })).not.toThrow();
         });
     });
 });

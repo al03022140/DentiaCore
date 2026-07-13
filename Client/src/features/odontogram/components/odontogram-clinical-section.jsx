@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Table, Modal, message } from 'antd';
-import { normalizeEntriesForEngine } from '../utils/odontogram-utils.js';
+import { normalizeEntriesForEngine, sameEntryContent, resetEngineData, formatToothNumber } from '../utils/odontogram-utils.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
 import { getCurrentDateFormatted } from '../../../shared/utils/date-utils.js';
-import { formatVersionLabel } from '../../../shared/utils/version-name.js';
+// Mismo módulo que usa el periodontograma: parsea el sello UTC (…Z) con
+// Date.UTC. El viejo shared/utils/version-name.js (borrado) parseaba el ISO
+// compacto como hora LOCAL → todas las etiquetas corridas por el offset.
+import { formatVersionLabel } from '../../../shared/utils/periodontogram-version-time.js';
 // Eliminados: import { DeleteOutlined, SaveOutlined, RiseOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 // import '../../Styles/PatientDetail.css'; // Asumiendo estilos compartidos
 import PropTypes from 'prop-types';
@@ -56,7 +59,6 @@ const getDamageNameFromIdInternal = (damageId, engineInstance) => {
 const OdontogramClinicalSection = ({
     patientId,
     clinicalData = [], // Estado actual del CANVAS (snapshot)
-    onDelete = () => {}, // Callback al padre para borrar canvas state
     onDataSave = () => {}, // Callback al padre para guardar canvas state
     versionList = [], // Lista de versionName (más reciente primero)
     selectedVersion = null, // versionName activo en el selector
@@ -170,8 +172,17 @@ const OdontogramClinicalSection = ({
         try {
             const engineData = engineManagerRef.current.instance.getData() || [];
             if (!engineData.length) {
-                message.info('No hay datos para guardar.');
-                return;
+                // Canvas vacío. Si el registro guardado también está vacío no
+                // hay nada que persistir; pero si HABÍA daños, el estado vacío
+                // es un cambio clínico legítimo (p.ej. se quitó la ortodoncia)
+                // — antes este return hacía imposible pasar de N daños a 0.
+                const hadData = Array.isArray(clinicalData) && clinicalData.length > 0;
+                if (!hadData) {
+                    message.info('No hay datos para guardar.');
+                    return;
+                }
+                const ok = window.confirm('El canvas está vacío: se guardará una versión SIN hallazgos (los daños anteriores quedan en el historial de versiones). ¿Continuar?');
+                if (!ok) return;
             }
             
             // --- INICIO CORRECCIÓN TIPO VALUE FIX ---
@@ -240,7 +251,7 @@ const OdontogramClinicalSection = ({
             setIsSaving(false);
             savingRef.current = false;
         }
-    }, [isEngineInitialized, onDataSave, getDamageNameFromId]);
+    }, [isEngineInitialized, onDataSave, getDamageNameFromId, clinicalData]);
 
     // Cambio de versión desde el selector. El padre carga los datos en el canvas;
     // aquí gestionamos el confirm de "cambios sin guardar" porque este componente
@@ -289,52 +300,29 @@ const OdontogramClinicalSection = ({
         return damage;
     }, []);
 
-    // Normaliza los datos para el engine y la tabla. No depende de clinicalData, así evitamos reinstanciar el engine.
+    // Normaliza los datos para el engine y la tabla delegando en el
+    // normalizador COMPARTIDO (el mismo del odontograma inicial). El
+    // normalizador local anterior tenía dos bugs que el compartido ya
+    // resuelve: (a) descartaba las entradas de espacio inter-dental
+    // (`space:` sin tooth — diastema, prótesis fija, orto fijo…), así que
+    // esos daños guardados jamás volvían al canvas ni a la tabla al
+    // recargar; (b) en entradas sólo-nota producía damage:"undefined"
+    // (String('' || undefined)), que el engine trataba como daño no numérico
+    // en vez de repoblar el textBox de la nota.
     const normalizeForEngine = useCallback(entries => {
-        // logger.log('[OdontoClinical] normalizeForEngine - entries recibidas:', entries);
-        const result = (Array.isArray(entries) ? entries : []).flatMap((e, i) => {
-            // logger.log(`[OdontoClinical] normalizeForEngine - procesando entrada ${i}:`, e);
-            
-            // Detectar si los datos vienen del engine (formato simple) o del servidor (formato complejo)
-            const isEngineData = e.tooth && !e.engineTeeth;
-            
-            if (isEngineData) {
-                // Datos que vienen directamente del engine - formato simple
-                return [{
-                    key: `${patientId}-${e.tooth}-${e.damage}-${e.surface || '0'}-${e.fecha || ''}-${i}`,
-                    tooth: String(e.tooth),
-                    damage: String(e.damage || ''),
-                    surface: String(e.surface || '0'),
-                    note: String(e.note || ''),
-                    fecha: e.fecha || ''
-                }];
-            } else {
-                // Datos que vienen del servidor - formato complejo con engineTeeth
-                let engineTeeth = e.engineTeeth;
-                if (!engineTeeth || !Array.isArray(engineTeeth) || engineTeeth.length === 0) {
-                    if (e.tooth) {
-                        engineTeeth = [e.tooth];
-                        // logger.log(`[OdontoClinical] normalizeForEngine - creando engineTeeth desde tooth: [${e.tooth}]`);
-                    } else {
-                        console.warn(`[OdontoClinical] normalizeForEngine - entrada ${i} no tiene engineTeeth ni tooth válido, saltando...`);
-                        return [];
-                    }
-                }
-                
-                // logger.log(`[OdontoClinical] normalizeForEngine - engineTeeth final:`, engineTeeth);
-                
-                return engineTeeth.map(toothNum => ({
-                    key: `${patientId}-${toothNum}-${e.damage || e.tipo}-${e.surface || e.superficie || '0'}-${e.fecha || ''}-${i}`,
-                    tooth: String(toothNum),
-                    damage: String(e.damage || e.tipo),
-                    surface: String(e.surface || e.superficie || '0'),
-                    note: String(e.note || e.nota || ''),
-                    fecha: e.fecha || ''
-                }));
+        // Compat: entradas legacy con engineTeeth múltiple y sin tooth se
+        // expanden a una entrada por diente antes de normalizar.
+        const expanded = (Array.isArray(entries) ? entries : []).flatMap(e => {
+            if (e && typeof e === 'object' && !e.tooth && !e.space && Array.isArray(e.engineTeeth) && e.engineTeeth.length > 0) {
+                return e.engineTeeth.map(toothNum => ({ ...e, tooth: toothNum }));
             }
+            return [e];
         });
-        // logger.log('[OdontoClinical] normalizeForEngine - resultado final:', result);
-        return result;
+        return normalizeEntriesForEngine(expanded).map((e, i) => ({
+            key: `${patientId}-${e.space || e.tooth}-${e.damage}-${e.surface}-${e.fecha || ''}-${i}`,
+            ...e,
+            fecha: e.fecha || ''
+        }));
     }, [patientId]);
 
     // Efecto de inicialización del engine: sólo depende de areScriptsReady, patientId y canvasRef
@@ -427,6 +415,9 @@ const OdontogramClinicalSection = ({
                             try {
                                 const entries = normalizeEntriesForEngine(data);
                                 if (entries.length > 0 && engineManagerRef.current?.instance) {
+                                    // El draft es un snapshot COMPLETO del canvas:
+                                    // reemplaza (reset + load), no fusiona.
+                                    resetEngineData(engineManagerRef.current.instance);
                                     engineManagerRef.current.instance.loadOdontogramaData(entries);
                                     engineManagerRef.current.instance.update?.();
                                     markDirty();
@@ -468,29 +459,35 @@ const OdontogramClinicalSection = ({
         };
     }, [areScriptsReady, patientId, canvasRef]);
 
-    // Efecto para sincronizar el engine con clinicalData
+    // Efecto para sincronizar el engine con clinicalData.
+    //  - Comparación por CONTENIDO clínico (sameEntryContent): el compare
+    //    anterior era JSON.stringify de dos formas distintas (getData() crudo
+    //    vs normalizado con keys) → SIEMPRE difería y recargaba en cada render.
+    //  - reset ANTES de cargar: loadOdontogramaData es ADITIVO (no quita
+    //    daños); sin reset, cambiar de versión FUSIONABA la versión elegida
+    //    con lo que ya estaba dibujado (y un guardado posterior persistía esa
+    //    mezcla como versión nueva).
     useEffect(() => {
         const { instance: engine, initialized: engineInitialized } = engineManagerRef.current;
         if (!engineInitialized || !engine || isSaving) {
             return;
         }
-        
-        const engineData = normalizeForEngine(clinicalData);
-        const currentEngineData = engine.getData();
-        
-        if (JSON.stringify(currentEngineData) !== JSON.stringify(engineData)) {
-            engine.processing = true;
-            try {
-                engine.loadOdontogramaData(engineData);
-                engine.update();
-                // Sincronizar la tabla con el nuevo estado del engine (reemplaza
-                // al antiguo setInterval que polleaba cada 1s).
-                requestAnimationFrame(() => syncCanvasFromEngineRef.current());
-            } catch (error) {
-                console.error('[OdontoClinical] Error al actualizar engine:', error);
-            } finally {
-                 engine.processing = false;
-            }
+
+        if (sameEntryContent(engine.getData() || [], clinicalData)) {
+            return; // mismo contenido — no tocar el canvas (preserva edición en curso)
+        }
+        engine.processing = true;
+        try {
+            resetEngineData(engine);
+            engine.loadOdontogramaData(normalizeForEngine(clinicalData));
+            engine.update();
+            // Sincronizar la tabla con el nuevo estado del engine (reemplaza
+            // al antiguo setInterval que polleaba cada 1s).
+            requestAnimationFrame(() => syncCanvasFromEngineRef.current());
+        } catch (error) {
+            console.error('[OdontoClinical] Error al actualizar engine:', error);
+        } finally {
+             engine.processing = false;
         }
     }, [clinicalData, isEngineInitialized, normalizeForEngine]);
 
@@ -529,21 +526,24 @@ const OdontogramClinicalSection = ({
         Promise.resolve().then(() => syncCanvasFromEngineRef.current());
      }, [isEngineInitialized]);
 
-    // Listener para el evento unificado 'odontogramSave'
+    // Listener para el evento unificado 'odontogramSave' (lo emite el botón
+    // "Guardar" interno del engine — hoy oculto, se conserva como red de
+    // seguridad). Comparte el guard savingRef con triggerSave para que ambos
+    // caminos sean mutuamente excluyentes. Se eliminó el "fallback" de 5s que
+    // reseteaba isSaving: en guardados legítimamente lentos (>5s; el timeout
+    // real de axios es 30s) re-habilitaba el botón a mitad del request.
     useEffect(() => {
-        // Fallback para evitar que isSaving quede atascado si el usuario cancela el prompt
-        let fallbackTimeout = null;
         const handleSaveClinicalData = async (event) => {
-            clearTimeout(fallbackTimeout);
             const { tipo, patientId: evtId, entries } = event.detail;
             if (tipo !== 'clinico' || evtId !== patientId) return;
+            if (savingRef.current) return; // ya hay un guardado en curso
+            savingRef.current = true;
             setIsSaving(true);
             try {
                 // Usar las entradas normalizadas del evento
                 const engineData = entries || engineManagerRef.current.instance?.getUnifiedOdontogramData() || [];
                 if (!engineData.length) {
                   message.info('No hay datos para guardar.');
-                  setIsSaving(false);
                   return;
                 }
                 // IMPORTANTE: await — onDataSave es async y lanza en caso de
@@ -559,18 +559,14 @@ const OdontogramClinicalSection = ({
                 }
             } finally {
                 setIsSaving(false);
+                savingRef.current = false;
             }
         };
         document.addEventListener('odontogramSave', handleSaveClinicalData);
-        // Fallback: si en 5s no llega el evento, resetea isSaving
-        fallbackTimeout = setTimeout(() => {
-            if (isSaving) setIsSaving(false);
-        }, 5000);
         return () => {
-            clearTimeout(fallbackTimeout);
             document.removeEventListener('odontogramSave', handleSaveClinicalData);
         };
-    }, [onDataSave, patientId, isSaving]);
+    }, [onDataSave, patientId, markClean, draft]);
 
     // --- JSX --- 
     // logger.log('[OdontoClinical] Antes de RETURN. Estado Canvas (canvasData):', canvasData);
@@ -585,12 +581,18 @@ const OdontogramClinicalSection = ({
         }
         
         return dataToUse.map((row, index) => {
-            const baseDamage = getDamageNameFromIdInternal(row.damage || row.tipo);
+            // Entrada sólo-nota: mostrar la nota en vez de "Sin especificar".
+            const rawDamage = row.damage || row.tipo;
+            const baseDamage = rawDamage
+                ? getDamageNameFromIdInternal(rawDamage)
+                : (row.note ? `Nota: ${row.note}` : 'Sin especificar');
             const combinedDamage = combineDamageWithSurface(baseDamage, row.surface);
-            
+            // Daños inter-dentales: el objetivo viene en `space` ("1817" → "18-17").
+            const target = row.tooth || (row.space ? formatToothNumber(row.space) : '');
+
             return {
-                key: `current-${index}-${row.tooth}`,
-                tooth: row.tooth,
+                key: `current-${index}-${target}`,
+                tooth: target,
                 damage: combinedDamage,
                 surface: row.surface,
                 note: row.note || '',
@@ -767,7 +769,6 @@ const OdontogramClinicalSection = ({
 OdontogramClinicalSection.propTypes = {
   patientId: PropTypes.string.isRequired,
   clinicalData: PropTypes.array,
-  onDelete: PropTypes.func,
   onDataSave: PropTypes.func,
   versionList: PropTypes.array,
   selectedVersion: PropTypes.string,

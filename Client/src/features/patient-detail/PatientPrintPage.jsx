@@ -5,7 +5,6 @@ import './styles/patient-detail.css';
 import './styles/patient-print.css';
 import userNot from '../../assets/images/icons/Profile Default.svg';
 import API from '../../shared/services/axios-instance.js';
-import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
 import { useAuth } from '../../app/auth/AuthContext';
 import { getSettings } from '../../shared/services/settingsService';
 import { getPatientById } from '../../shared/services/patient-service.js';
@@ -120,14 +119,16 @@ const PatientPrintPage = () => {
   const [error, setError] = useState(null);
   const [initialData, setInitialData] = useState([]);
   const [initialExists, setInitialExists] = useState(false);
-  const [odontogramHistory, setOdontogramHistory] = useState([]);
   // Ref (NO estado): igual que en patient-detail.jsx, si fuera estado la
   // identidad de checkInitialOdontogram cambiaría y el efecto de setup se
   // re-dispararía duplicando todas las cargas.
   const fetchedInitialRef = useRef(false);
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
-  const [, setClinicalOdontogramExists] = useState(false);
+  // Token de concurrencia optimista (mismo contrato que patient-detail):
+  // sin él, un guardado desde esta vista pisaba en silencio los cambios de
+  // otro usuario porque el server no tenía contra qué comparar.
+  const [clinicalOdontogramUpdatedAt, setClinicalOdontogramUpdatedAt] = useState(null);
   const [clinicName, setClinicName] = useState('');
 
   const formatImageUrl = useCallback((url) => {
@@ -161,17 +162,9 @@ const PatientPrintPage = () => {
     }
   }, [patientId]);
 
-  const normalizeHistory = useCallback((rawHistory = []) => {
-    return rawHistory.map((item) => ({
-      ...item,
-      fecha: item.fecha || item.createdAt || formatDateToDDMMYYYY(new Date()),
-    }));
-  }, []);
-
   const resetOdontogramState = useCallback(() => {
     setInitialExists(false);
     setInitialData([]);
-    setOdontogramHistory([]);
   }, []);
 
   const fetchPatientData = useCallback(async () => {
@@ -247,7 +240,6 @@ const PatientPrintPage = () => {
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
         setInitialExists(true);
-        setOdontogramHistory(normalizeHistory(data.history));
         setInitialOdontogramLoadStatus('saved');
       } else {
         resetOdontogramState();
@@ -260,7 +252,7 @@ const PatientPrintPage = () => {
       setInitialOdontogramLoadStatus('error');
       fetchedInitialRef.current = false; // permitir reintento
     }
-  }, [patientId, normalizeHistory, resetOdontogramState]);
+  }, [patientId, resetOdontogramState]);
 
   const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
     setInitialData(datos || []);
@@ -277,28 +269,18 @@ const PatientPrintPage = () => {
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      const result = await odontogramaService.default.saveClinicalOdontogramState(patientId, entryData);
+      const options = {};
+      if (clinicalOdontogramUpdatedAt) options.expectedUpdatedAt = clinicalOdontogramUpdatedAt;
+      const result = await odontogramaService.default.saveClinicalOdontogramState(patientId, entryData, options);
       setClinicalOdontogramData(result.datos || entryData || []);
-      setClinicalOdontogramExists(result.exists ?? true);
+      setClinicalOdontogramUpdatedAt(result.updatedAt || null);
     } catch (err) {
       console.error('Error al guardar odontograma clínico:', err);
-      message.error('Error al guardar el odontograma clínico');
+      // Propagar: el hijo muestra el toast de error y NO el de éxito
+      // (mismo contrato que patient-detail).
+      throw err;
     }
-  }, [patientId]);
-
-  const handleDeleteClinicalCanvasState = useCallback(async () => {
-    try {
-      const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      await odontogramaService.default.deleteClinicalOdontogramState(patientId);
-      setClinicalOdontogramData([]);
-      setClinicalOdontogramExists(false);
-      message.success('Estado del odontograma clínico eliminado exitosamente');
-      await fetchPatientData();
-    } catch (err) {
-      console.error('Error al eliminar estado del odontograma clínico:', err);
-      message.error('Error al eliminar el estado del odontograma clínico');
-    }
-  }, [patientId, fetchPatientData]);
+  }, [patientId, clinicalOdontogramUpdatedAt]);
 
   useEffect(() => {
     resetOdontogramState();
@@ -311,10 +293,10 @@ const PatientPrintPage = () => {
       const odontogramaService = await import('../odontogram/api/odontograma-service.js');
       const clinicalState = await odontogramaService.default.getClinicalOdontogramState(patientId);
       setClinicalOdontogramData(clinicalState.datos || []);
-      setClinicalOdontogramExists(clinicalState.exists || false);
+      setClinicalOdontogramUpdatedAt(clinicalState.updatedAt || null);
     } catch {
       setClinicalOdontogramData([]);
-      setClinicalOdontogramExists(false);
+      setClinicalOdontogramUpdatedAt(null);
     }
   }, [patientId]);
 
@@ -483,7 +465,6 @@ const PatientPrintPage = () => {
                 <OdontogramClinicalSection
                   patientId={patientId}
                   clinicalData={clinicalOdontogramData}
-                  onDelete={handleDeleteClinicalCanvasState}
                   onDataSave={handleSaveClinicalCanvasData}
                   areScriptsReady={areScriptsReadyState}
                   canvasRef={canvas2Ref}
