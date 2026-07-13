@@ -8,6 +8,7 @@ const RESOURCE_LABELS = {
   odontograma: 'Odontograma',
   periodontograma: 'Periodontograma',
   examen: 'Examen',
+  nota_evolucion: 'Nota de evolución',
 };
 
 const DISMISS_KEY = 'dentiacore_drafts_dismissed';

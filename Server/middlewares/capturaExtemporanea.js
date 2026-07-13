@@ -39,8 +39,8 @@ function extractFechaNota(body) {
 
 // Motivo desde el objeto anidado (path global/cliente) o desde un campo plano
 // (path exámenes). Devuelve el texto recortado o ''.
-function extractMotivo(body) {
-  const fromObj = body?._capturaExtemporanea?.motivo;
+function extractMotivo(body, clientCE) {
+  const fromObj = clientCE?.motivo;
   const raw = (typeof fromObj === 'string' && fromObj)
     || body?.capturaExtemporaneaMotivo
     || body?.motivoExtemporanea
@@ -60,20 +60,29 @@ function validarCapturaExtemporanea(req, res, next) {
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
   if (!req.body || typeof req.body !== 'object') return next();
 
+  // `_capturaExtemporanea` la escribe SOLO este middleware. Antes únicamente se
+  // limpiaba en la rama "dentro de tolerancia": un body sin fecha (o con fecha
+  // no parseable) pasaba de largo y una marca inyectada por el cliente llegaba
+  // intacta a los controllers (notas/planes/exámenes/odonto/perio la persisten
+  // tal cual) → metadato de extemporaneidad FALSO en el registro clínico. Se
+  // captura primero lo que el cliente haya mandado (motivo/motivoDetalle son
+  // entradas legítimas) y se elimina siempre; sólo se re-inyecta el objeto
+  // enriquecido cuando la captura es realmente extemporánea.
+  const clientCE = (req.body._capturaExtemporanea && typeof req.body._capturaExtemporanea === 'object')
+    ? req.body._capturaExtemporanea
+    : null;
+  delete req.body._capturaExtemporanea;
+
   const fechaNota = extractFechaNota(req.body);
   if (!fechaNota) return next(); // Sin fecha → no aplica
 
   const fechaServidor = new Date();
   const diffMs = Math.abs(fechaServidor.getTime() - fechaNota.getTime());
 
-  if (diffMs <= TOLERANCE_MS) {
-    // Dentro de tolerancia: limpiar la bandera si llegó por error.
-    if (req.body._capturaExtemporanea) delete req.body._capturaExtemporanea;
-    return next();
-  }
+  if (diffMs <= TOLERANCE_MS) return next(); // Dentro de tolerancia
 
   // Extemporánea: exigir motivo válido.
-  const motivo = extractMotivo(req.body);
+  const motivo = extractMotivo(req.body, clientCE);
   if (!motivoEsValido(motivo)) {
     return res.status(400).json({
       error: 'Captura extemporánea detectada',
@@ -92,7 +101,7 @@ function validarCapturaExtemporanea(req, res, next) {
   req.body._capturaExtemporanea = {
     esExtemporanea: true,
     motivo,
-    motivoDetalle: req.body?._capturaExtemporanea?.motivoDetalle || null,
+    motivoDetalle: clientCE?.motivoDetalle || null,
     fechaNota,
     fechaCaptura: fechaServidor,
     diferenciaMs: diffMs,

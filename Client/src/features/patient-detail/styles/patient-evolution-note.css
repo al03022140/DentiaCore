@@ -557,3 +557,82 @@
   border-color: var(--color-border-medium);
 }
 
+
+/* ── Estado del registro en la card (auditoría notas de evolución) ── */
+/* Chip BORRADOR: antes una nota sin firmar era indistinguible de una oficial
+   salvo por la miniatura de firma. Solo borde/texto (sin fondo) para que
+   funcione igual en claro y oscuro. */
+.evolution-note-card__draft-badge {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-warning);
+  border-radius: 999px;
+  color: var(--color-warning);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Aviso de rechazo del doctor (Centro de Firmas): el motivo se persiste para
+   que el creador lo vea aquí y corrija. */
+.evolution-note-card__rejected {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-danger);
+  border-left-width: 4px;
+  border-radius: 4px;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* ── Acciones por card: editar borrador / verificar integridad / ver más ── */
+.evolution-note-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+/* Mismo look de enlace que __toggle, para que las tres acciones lean igual. */
+.evolution-note-card__action-btn {
+  margin-top: var(--spacing-md);
+  background: transparent;
+  border: none;
+  padding: var(--spacing-xs) 0;
+  color: var(--color-primary);
+  font: var(--pd-font-label-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.evolution-note-card__action-btn:hover:not(:disabled) {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.evolution-note-card__action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Edición inline de un BORRADOR */
+.evolution-note-card__edit {
+  display: grid;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.evolution-note-card__edit label {
+  font: var(--pd-font-label-md);
+  color: var(--color-text-primary);
+}
+
+.evolution-note-card__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}

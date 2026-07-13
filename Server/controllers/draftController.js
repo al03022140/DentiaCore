@@ -12,6 +12,7 @@
  *   body: { draftIds: [...], pin: '****' }
  *   Requiere PIN válido. Transiciona cada DRAFT → OFICIAL.
  */
+const crypto = require('crypto');
 const OdontogramaModel = require('../models/odontograma');
 const { devError } = require('../utils/httpError');
 const Periodontogram = require('../models/periodontogram');
@@ -83,8 +84,13 @@ async function attachDoctorSignatureToNote(note, signer, patientId) {
   note.doctorFirmaMethod = 'pin';
   if (!signer || !signer.firmaDigitalUrl) return;
   try {
+    // Sufijo único por intento — mismo motivo que en persistNoteSignatures
+    // (patientsController): dos intentos de firma concurrentes sobre la misma
+    // nota no deben compartir ruta de archivo, o el perdedor pisa/borra el
+    // snapshot que la nota OFICIAL del ganador ya referencia.
+    const attempt = crypto.randomBytes(4).toString('hex');
     const snap = await copyFirmaToSnapshot(signer.firmaDigitalUrl, [
-      'pacientes', String(patientId), 'firmas-notas', `${note._id.toString()}_doctor`,
+      'pacientes', String(patientId), 'firmas-notas', `${note._id.toString()}_doctor_${attempt}`,
     ]);
     note.doctorFirmaUrl = snap.publicUrl;
     note.doctorFirmaImageHash = snap.contentHash;
@@ -630,6 +636,12 @@ const rejectDraft = async (req, res) => {
     }
 
     const motivoTrim = motivo.trim();
+    // Cota espejo del maxlength de rechazoMotivo en el schema (500): el $set
+    // posicional de persistNoteRejected no corre validators, y en top-level el
+    // doc.save() convertía el exceso en un 500 de ValidationError.
+    if (motivoTrim.length > 500) {
+      return res.status(400).json({ message: 'El motivo excede el máximo de 500 caracteres.' });
+    }
     const now = new Date();
 
     // ── Notas de evolución (subdoc) ────────────────────────────

@@ -70,7 +70,10 @@ describe('addEvolutionNote — creación OFICIAL con firma pad (resolveSigningDo
     expect(res.body.data.pacienteFirmaUrl).toBeTruthy();
     expect(res.body.data.doctorFirmaUrl).toBeTruthy();
     expect(res.body.data.contentHash).toBeTruthy();
-    expect(res.body.data.firmadoPor).toBe(doctor._id.toString());
+    // firmadoPor viaja enriquecido ({_id, nombre, cedulaProfesional}) para que
+    // la UI muestre el nombre del firmante real sin recargar el expediente.
+    expect(res.body.data.firmadoPor._id).toBe(doctor._id.toString());
+    expect(res.body.data.firmadoPor.nombre).toBeTruthy();
   });
 
   test('asistente no puede auto-firmar como OFICIAL (403)', async () => {

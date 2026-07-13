@@ -496,6 +496,13 @@ router
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.signExistingEvolutionNote);
 
+// Verificar integridad de una nota (hash de contenido + imágenes de firma vs
+// lo sellado al firmar). Lectura clínica; no muta nada.
+router
+  .route('/:id/evolution-note/:noteId/verify')
+  .all(validateId, checkPatient)
+  .get(requireClinicalRole, authorize(['patients.read']), patientCtrl.verifyEvolutionNoteIntegrity);
+
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router
   .route('/:id/finalize-history')
