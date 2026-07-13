@@ -13,7 +13,7 @@
  * mismo valor.
  */
 const mongoose = require('mongoose');
-const { computeContentHash } = require('../utils/signing');
+const { computeIntegrityHash } = require('../utils/integrity');
 
 require('../models/odontograma');
 
@@ -35,7 +35,7 @@ module.exports = {
 
     let sellados = 0;
     for await (const doc of cursor) {
-      const hash = computeContentHash(doc, 'odontograma');
+      const hash = computeIntegrityHash(doc, 'odontograma');
       await Odontograma.collection.updateOne(
         { _id: doc._id },
         { $set: { contentHash: hash, integrityHash: hash } }

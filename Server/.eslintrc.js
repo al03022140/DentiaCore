@@ -130,7 +130,6 @@ module.exports = {
           '__dirname',
           '__filename',
           // Helpers internos y campos de documento privados del dominio
-          '_computeEvolutionNoteHash',
           '_evolutionNoteCounter',
           '_capturaExtemporanea'
         ],

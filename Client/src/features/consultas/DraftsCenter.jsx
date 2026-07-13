@@ -48,22 +48,8 @@ const DraftsCenter = () => {
 
   useEffect(() => {
     if (!canSign) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await API.get('/drafts');
-        if (cancelled) return;
-        setDrafts(res.data?.drafts || []);
-      } catch {
-        if (cancelled) return;
-        setError('Error al cargar borradores');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [canSign]);
+    fetchDrafts();
+  }, [canSign, fetchDrafts]);
 
   // Cuando se cargan los drafts, decidir si mostrar la notificación
   useEffect(() => {
@@ -88,17 +74,10 @@ const DraftsCenter = () => {
     // Con firmas: no se guarda, reaparecerá al recargar/navegar
   };
 
-  const openSignSingle = (draft) => {
+  // draft=null → firmar todas (batch); draft específico → firmar una sola.
+  const openSign = (draft = null) => {
     setSelectedDraft(draft);
-    setBatchMode(false);
-    setPin('');
-    setError('');
-    setShowPinModal(true);
-  };
-
-  const openSignAll = () => {
-    setSelectedDraft(null);
-    setBatchMode(true);
+    setBatchMode(!draft);
     setPin('');
     setError('');
     setShowPinModal(true);
@@ -178,7 +157,7 @@ const DraftsCenter = () => {
           </div>
           <div className="drafts-notification-actions">
             {drafts.length > 1 && !expanded && (
-              <button className="drafts-btn-batch-mini" onClick={(e) => { e.stopPropagation(); openSignAll(); }} disabled={signing}>
+              <button className="drafts-btn-batch-mini" onClick={(e) => { e.stopPropagation(); openSign(); }} disabled={signing}>
                 Firmar Todas
               </button>
             )}
@@ -194,7 +173,7 @@ const DraftsCenter = () => {
         {expanded && drafts.length > 0 && (
           <div className="drafts-notification-body">
             {drafts.length > 1 && (
-              <button className="drafts-btn-batch" onClick={openSignAll} disabled={signing}>
+              <button className="drafts-btn-batch" onClick={() => openSign()} disabled={signing}>
                 Firmar Todas ({drafts.length})
               </button>
             )}
@@ -211,7 +190,7 @@ const DraftsCenter = () => {
                     {draft.createdAt ? new Date(draft.createdAt).toLocaleString('es-MX') : '—'}
                   </div>
                   <div className="draft-card-actions">
-                    <button className="drafts-btn-sign" onClick={() => openSignSingle(draft)} disabled={signing}>
+                    <button className="drafts-btn-sign" onClick={() => openSign(draft)} disabled={signing}>
                       Firmar
                     </button>
                     <button className="drafts-btn-reject" onClick={() => handleReject(draft)} disabled={signing}>

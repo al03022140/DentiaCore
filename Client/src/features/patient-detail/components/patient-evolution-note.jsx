@@ -89,20 +89,12 @@ const PatientEvolutionNote = ({
   // Nombre del profesional para la etiqueta bajo la línea de firma del doctor.
   const doctorDisplayName = user?.nombre || 'Profesional tratante';
 
-  // Flujo de firma:
-  //   null     → estado inicial (form editable)
-  //   'patient' → modal de pad para que firme el paciente
-  //   'doctor'  → DoctorSignStep para que firme el doctor (con selector si asistente)
+  // Flujo de firma unificado (nota nueva y nota ya guardada):
+  //   signStep   null → sin modal abierto | 'patient' → pad del paciente | 'doctor' → DoctorSignStep
+  //   signTarget null → nota nueva (submitNote) | { noteId, index } → nota existente (BORRADOR → OFICIAL)
   const [signStep, setSignStep] = useState(null);
+  const [signTarget, setSignTarget] = useState(null);
   const [patientSigDataUrl, setPatientSigDataUrl] = useState(null);
-
-  // Flujo de firma para notas ya guardadas (BORRADOR → OFICIAL)
-  //   null     → sin modal abierto
-  //   'patient' → pad del paciente
-  //   'doctor'  → firma del doctor (PIN o pad)
-  const [existingSignStep, setExistingSignStep] = useState(null);
-  const [existingSignTarget, setExistingSignTarget] = useState(null); // { noteId, index }
-  const [existingPatientSig, setExistingPatientSig] = useState(null);
 
   useEffect(() => {
     if (Array.isArray(initialEvolutionNotes)) {
@@ -122,6 +114,7 @@ const PatientEvolutionNote = ({
 
   const resetSignFlow = () => {
     setSignStep(null);
+    setSignTarget(null);
     setPatientSigDataUrl(null);
   };
 
@@ -187,8 +180,12 @@ const PatientEvolutionNote = ({
     }
   };
 
-  const handleSignAndSave = () => {
-    setError(null);
+  // Inicia el flujo de firma. target=null → nota nueva (limpia el error del
+  // form, igual que antes handleSignAndSave); target={noteId,index} → nota
+  // existente (antes handleSignExistingNote no limpiaba error; se preserva).
+  const handleStartDoctorSign = (target = null) => {
+    if (!target) setError(null);
+    setSignTarget(target);
     setSignStep('patient');
   };
 
@@ -208,46 +205,29 @@ const PatientEvolutionNote = ({
     setSignStep('doctor');
   };
 
+  // Nota nueva (signTarget=null) → submitNote (el error se propaga, igual
+  // que antes). Nota existente → POST .../sign; ante fallo deja el modal
+  // abierto para reintentar (no relanza), igual que antes
+  // handleExistingDoctorSigned.
   const handleDoctorSigned = async (doctorSignature) => {
-    await submitNote({
-      patientSignature: patientSigDataUrl,
-      doctorSignature,
-    });
-  };
+    if (!signTarget) {
+      await submitNote({
+        patientSignature: patientSigDataUrl,
+        doctorSignature,
+      });
+      return;
+    }
 
-  const handleCancelSign = () => {
-    if (loading) return;
-    resetSignFlow();
-  };
-
-  const resetExistingSignFlow = () => {
-    setExistingSignStep(null);
-    setExistingSignTarget(null);
-    setExistingPatientSig(null);
-  };
-
-  const handleSignExistingNote = (noteId, index) => {
-    setExistingSignTarget({ noteId, index });
-    setExistingSignStep('patient');
-  };
-
-  const handleExistingPatientSigned = (pngDataUrl) => {
-    setExistingPatientSig(pngDataUrl);
-    setExistingSignStep('doctor');
-  };
-
-  const handleExistingDoctorSigned = async (doctorSignature) => {
-    if (!existingSignTarget) return;
     setLoading(true);
     try {
-      const { noteId } = existingSignTarget;
+      const { noteId } = signTarget;
       // Timeout 30s como en la creación (sube firmas + valida PIN + escribe en
       // Mongo). Esta vía SÍ es segura ante reintentos: el server exige que la
       // nota siga en BORRADOR, así que un reintento tras firmar devuelve 409 sin
       // duplicar nada.
       const response = await API.post(
         `/patients/${patientId}/evolution-note/${noteId}/sign`,
-        { patientSignature: existingPatientSig, doctorSignature },
+        { patientSignature: patientSigDataUrl, doctorSignature },
         { timeout: 30000 }
       );
       const payload = response?.data;
@@ -260,7 +240,7 @@ const PatientEvolutionNote = ({
           (n._id && updated._id && n._id === updated._id) || n._id === noteId ? updated : n
         )));
         message.success('Nota firmada y marcada como OFICIAL.');
-        resetExistingSignFlow();
+        resetSignFlow();
       } else {
         // No confirmado: dejamos el modal abierto para reintentar.
         const msg = payload?.error || payload?.message || 'No se pudo confirmar la firma. Intente nuevamente.';
@@ -272,6 +252,11 @@ const PatientEvolutionNote = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelSign = () => {
+    if (loading) return;
+    resetSignFlow();
   };
 
   // Imprime SOLO las notas seleccionadas dentro de un IFRAME aislado.
@@ -472,7 +457,7 @@ const PatientEvolutionNote = ({
             <button
               type="button"
               className="save-button"
-              onClick={handleSignAndSave}
+              onClick={() => handleStartDoctorSign()}
               disabled={!isFormValid || loading}
             >
               {loading
@@ -510,7 +495,7 @@ const PatientEvolutionNote = ({
         <div className="patient-evolution-note__cards">
           {Array.isArray(notes) && notes.length > 0 ? (
             notes.map((n, idx) => {
-              const noteKey = n._id || `note-${idx}`;
+              const noteKey = noteKeyOf(n, idx);
               const isExpanded = expandedNotes.has(noteKey);
               // Número canónico del backend. No usamos idx+1 como fallback:
               // tras filtrar notas soft-deleted hay huecos legítimos y idx+1
@@ -583,7 +568,7 @@ const PatientEvolutionNote = ({
                             firmaDesactualizada={n.firmaDesactualizada}
                             contentHash={n.contentHash}
                             canSign={canSignOfficial}
-                            onSignClick={() => handleSignExistingNote(n._id, idx)}
+                            onSignClick={() => handleStartDoctorSign({ noteId: n._id, index: idx })}
                           />
                         )}
                       </div>
@@ -720,7 +705,7 @@ const PatientEvolutionNote = ({
       </div>
       )}
 
-      {/* PASO 1 — Firma del paciente */}
+      {/* PASO 1 — Firma del paciente (nueva nota o nota ya guardada, según signTarget) */}
       <SignaturePadModal
         isOpen={signStep === 'patient'}
         onClose={handleCancelSign}
@@ -734,38 +719,11 @@ const PatientEvolutionNote = ({
         loading={loading}
       />
 
-      {/* PASO 2 — Firma del doctor (self o cross-user vía selector) */}
+      {/* PASO 2 — Firma del doctor (self o cross-user vía selector), nueva nota o nota ya guardada */}
       <DoctorSignStep
         isOpen={signStep === 'doctor'}
         onClose={handleCancelSign}
         onConfirm={handleDoctorSigned}
-        title="Firma del doctor"
-        subtitle={canSignOfficial
-          ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
-          : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
-        consentText={doctorConsentText}
-        loading={loading}
-      />
-
-      {/* PASO 1 — Firma del paciente (nota ya guardada) */}
-      <SignaturePadModal
-        isOpen={existingSignStep === 'patient'}
-        onClose={() => { if (!loading) resetExistingSignFlow(); }}
-        onConfirm={handleExistingPatientSigned}
-        title="Firma del paciente"
-        subtitle="Consentimiento de la nota de evolución"
-        signerName={patientFullName}
-        signerRole="Paciente"
-        consentText={patientConsentText}
-        confirmLabel="Confirmar firma del paciente"
-        loading={loading}
-      />
-
-      {/* PASO 2 — Firma del doctor (nota ya guardada) */}
-      <DoctorSignStep
-        isOpen={existingSignStep === 'doctor'}
-        onClose={() => { if (!loading) resetExistingSignFlow(); }}
-        onConfirm={handleExistingDoctorSigned}
         title="Firma del doctor"
         subtitle={canSignOfficial
           ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
