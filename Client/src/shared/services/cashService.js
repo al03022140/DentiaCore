@@ -25,11 +25,15 @@ export const addMovement = async (movementData) => {
   return response.data;
 };
 
-export const getLastMovements = async ({ onlyActiveSession = false, boxSessionId, limit } = {}) => {
+// Con withTotal=true el backend responde { items, total, limit, skip }
+// (paginación); sin él, el array plano de siempre.
+export const getLastMovements = async ({ onlyActiveSession = false, boxSessionId, limit, skip, withTotal = false } = {}) => {
   const params = new URLSearchParams();
   if (onlyActiveSession) params.set('onlyActiveSession', 'true');
   if (boxSessionId) params.set('boxSessionId', boxSessionId);
   if (limit) params.set('limit', String(limit));
+  if (skip) params.set('skip', String(skip));
+  if (withTotal) params.set('withTotal', 'true');
   const qs = params.toString();
   const response = await API.get(`/cash/movements${qs ? `?${qs}` : ''}`);
   return response.data;

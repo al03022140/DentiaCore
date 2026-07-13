@@ -424,6 +424,17 @@ exports.cancelCharge = async (req, res) => {
       return res.status(400).json({ message: 'El cobro ya está cancelado' });
     }
 
+    // Populate ÚNICO aquí: todos los returns de abajo (completo, parcial,
+    // omitido) devuelven la misma forma de `charge`. Antes los caminos
+    // parciales devolvían el doc sin populate y el frontend recibía payloads
+    // distintos según el resultado del reverso.
+    await charge.populate([
+      { path: 'appointmentId', select: 'fecha_hora motivo estado' },
+      { path: 'pagos.registradoPor', select: 'nombre' },
+      { path: 'creadoPor', select: 'nombre' },
+      { path: 'canceladoPor', select: 'nombre' }
+    ]);
+
     // Reverso opcional de los pagos a la caja OPEN actual.
     const reversedMovementIds = [];
     if (wantsReverse && Array.isArray(charge.pagos) && charge.pagos.length > 0) {
@@ -550,14 +561,8 @@ exports.cancelCharge = async (req, res) => {
       }
     }
 
-    const populated = await PatientCharge.findById(charge._id)
-      .populate('appointmentId', 'fecha_hora motivo estado')
-      .populate('pagos.registradoPor', 'nombre')
-      .populate('creadoPor', 'nombre')
-      .populate('canceladoPor', 'nombre');
-
     res.json({
-      charge: populated,
+      charge,
       reverseStatus: wantsReverse ? (reversedMovementIds.length > 0 ? 'reversed' : 'not_needed') : 'kept',
       reversedMovementIds
     });

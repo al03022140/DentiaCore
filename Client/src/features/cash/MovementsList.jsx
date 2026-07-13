@@ -42,9 +42,13 @@ const describeChanges = (changes) => {
   ));
 };
 
+const PAGE_SIZE = 30;
+
 const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) => {
   const [movements, setMovements] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState(null); // movement object o null
   const [saving, setSaving] = useState(false);
   // Guard síncrono contra doble submit (el estado `saving` se lee stale).
@@ -74,21 +78,50 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
       setLoading(true);
       // Solo movimientos de la sesión abierta: al cerrar/abrir una caja
       // empezamos con cero, sin arrastrar los de la sesión anterior.
-      const data = await getLastMovements({ onlyActiveSession: true });
-      setMovements(Array.isArray(data) ? data : []);
+      const data = await getLastMovements({ onlyActiveSession: true, withTotal: true, limit: PAGE_SIZE });
+      setMovements(Array.isArray(data?.items) ? data.items : []);
+      setTotal(Number(data?.total) || 0);
     } catch (error) {
       console.error('Error fetching movements:', error);
       setMovements([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Página siguiente: anexa al listado. Un movimiento nuevo registrado entre
+  // páginas corre el skip — se filtran ids ya presentes para no duplicar filas.
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await getLastMovements({
+        onlyActiveSession: true,
+        withTotal: true,
+        limit: PAGE_SIZE,
+        skip: movements.length
+      });
+      const next = Array.isArray(data?.items) ? data.items : [];
+      setMovements((prev) => {
+        const seen = new Set(prev.map((m) => m._id));
+        return [...prev, ...next.filter((m) => !seen.has(m._id))];
+      });
+      setTotal(Number(data?.total) || 0);
+    } catch (err) {
+      console.error('Error fetching more movements:', err);
+      message.error('No se pudieron cargar más movimientos');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Con la caja cerrada, los movimientos de la sesión previa ya no aplican.
   // Limpiamos el listado y evitamos el fetch hasta que se abra una nueva.
   useEffect(() => {
     if (!isBoxOpen) {
       setMovements([]);
+      setTotal(0);
       setLoading(false);
       return;
     }
@@ -195,6 +228,13 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
           itemLayout="horizontal"
           dataSource={movements}
           rowKey={(item) => item._id}
+          loadMore={!loading && movements.length < total ? (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              <Button size="small" onClick={loadMore} loading={loadingMore}>
+                Cargar más ({total - movements.length} restantes)
+              </Button>
+            </div>
+          ) : null}
           renderItem={(item) => {
             const hasEdits = Array.isArray(item.edits) && item.edits.length > 0;
             const isLinked = !!item.linkedChargeId;

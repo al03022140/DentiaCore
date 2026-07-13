@@ -734,3 +734,275 @@ describe('A1 · cobro de cita — saldoPendiente consistente al editar items', (
     expect(updated.total - updated.totalPagado).toBe(updated.saldoPendiente);
   });
 });
+
+describe('A-C1 · updateMovement — el efectivo de una caja ABIERTA no puede quedar negativo', () => {
+  // Setup: caja en 0, INCOME CASH 100, EXPENSE CASH 80 → cashOnHand = 20.
+  const setupOpenWithFlow = async () => {
+    const { userId } = await openCajaWith(0);
+    const incRes = mkRes();
+    await cashController.addMovement(mkReq({
+      user: { id: userId },
+      body: { amount: 100, type: 'INCOME', paymentMethod: 'CASH', concept: 'cobro' }
+    }), incRes);
+    await cashController.addMovement(mkReq({
+      user: { id: userId },
+      body: { amount: 80, type: 'EXPENSE', paymentMethod: 'CASH', concept: 'insumos' }
+    }), mkRes());
+    return { userId, incomeId: incRes.body._id.toString() };
+  };
+
+  test('reducir un INCOME CASH por debajo del efectivo ya gastado se rechaza', async () => {
+    const { userId, incomeId } = await setupOpenWithFlow();
+
+    // 100 → 10 dejaría cashOnHand = -70 (efectivo físico imposible)
+    const updRes = mkRes();
+    await cashController.updateMovement(mkReq({
+      user: { id: userId },
+      params: { id: incomeId },
+      body: { amount: 10, reason: 'error de captura' }
+    }), updRes);
+
+    expect(updRes.statusCode).toBe(409);
+    const mov = await CashMovement.findById(incomeId);
+    expect(mov.amount).toBe(100); // intacto
+    expect(mov.edits).toHaveLength(0); // sin rastro de edición fallida
+  });
+
+  test('cambiar un INCOME CASH a DIGITAL que deja el efectivo negativo se rechaza', async () => {
+    const { userId, incomeId } = await setupOpenWithFlow();
+
+    const updRes = mkRes();
+    await cashController.updateMovement(mkReq({
+      user: { id: userId },
+      params: { id: incomeId },
+      body: { paymentMethod: 'DIGITAL', reason: 'era transferencia' }
+    }), updRes);
+
+    expect(updRes.statusCode).toBe(409);
+    const mov = await CashMovement.findById(incomeId);
+    expect(mov.paymentMethod).toBe('CASH');
+  });
+
+  test('edición que mantiene el efectivo ≥ 0 sigue permitida', async () => {
+    const { userId, incomeId } = await setupOpenWithFlow();
+
+    // 100 → 90 deja cashOnHand = 10 → OK
+    const updRes = mkRes();
+    await cashController.updateMovement(mkReq({
+      user: { id: userId },
+      params: { id: incomeId },
+      body: { amount: 90, reason: 'ajuste menor' }
+    }), updRes);
+
+    expect(updRes.statusCode).toBe(200);
+    const mov = await CashMovement.findById(incomeId);
+    expect(mov.amount).toBe(90);
+  });
+
+  test('subir un EXPENSE CASH por encima del disponible se sigue rechazando', async () => {
+    const { userId } = await openCajaWith(100);
+    const expRes = mkRes();
+    await cashController.addMovement(mkReq({
+      user: { id: userId },
+      body: { amount: 50, type: 'EXPENSE', paymentMethod: 'CASH', concept: 'gasto' }
+    }), expRes);
+
+    const updRes = mkRes();
+    await cashController.updateMovement(mkReq({
+      user: { id: userId },
+      params: { id: expRes.body._id.toString() },
+      body: { amount: 150, reason: 'monto real' }
+    }), updRes);
+
+    expect(updRes.statusCode).toBe(409);
+    const mov = await CashMovement.findById(expRes.body._id);
+    expect(mov.amount).toBe(50);
+  });
+});
+
+describe('A-C2 · forceResolveSession', () => {
+  test('rechaza id no-ObjectId con 400 (no 500)', async () => {
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({ params: { id: 'garbage' } }), res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('sesión inexistente → 404', async () => {
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({
+      params: { id: new mongoose.Types.ObjectId().toString() }
+    }), res);
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('cierra una sesión OPEN calculando finalAmount de sus movimientos', async () => {
+    const { userId } = await openCajaWith(1000);
+    await cashController.addMovement(mkReq({
+      user: { id: userId },
+      body: { amount: 500, type: 'INCOME', paymentMethod: 'CASH', concept: 'cobro' }
+    }), mkRes());
+    const session = await BoxSession.findOne({ status: 'OPEN' });
+
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({
+      user: { id: userId },
+      params: { id: session._id.toString() }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.summary.finalCashAmount).toBe(1500);
+    const closed = await BoxSession.findById(session._id);
+    expect(closed.status).toBe('CLOSED');
+    expect(closed.finalAmount).toBe(1500);
+    expect(String(closed.closedBy)).toBe(userId);
+  });
+
+  test('recupera una sesión colgada en CLOSING', async () => {
+    const { userId } = await openCajaWith(200);
+    const session = await BoxSession.findOne({ status: 'OPEN' });
+    await BoxSession.updateOne({ _id: session._id }, { $set: { status: 'CLOSING' } });
+
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({
+      user: { id: userId },
+      params: { id: session._id.toString() }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    const closed = await BoxSession.findById(session._id);
+    expect(closed.status).toBe('CLOSED');
+    expect(closed.finalAmount).toBe(200);
+  });
+
+  test('sesión ya CLOSED → 400 y no se reescribe el corte', async () => {
+    const { userId } = await openCajaWith(300);
+    await cashController.closeBox(mkReq({ user: { id: userId } }), mkRes());
+    const closed = await BoxSession.findOne({ status: 'CLOSED' });
+    const originalClosedBy = String(closed.closedBy);
+
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({
+      user: { id: new mongoose.Types.ObjectId().toString() },
+      params: { id: closed._id.toString() }
+    }), res);
+
+    expect(res.statusCode).toBe(400);
+    const after = await BoxSession.findById(closed._id);
+    expect(String(after.closedBy)).toBe(originalClosedBy);
+  });
+
+  test('bloquea movimientos ANTES de calcular el corte (status CLOSING durante el cálculo)', async () => {
+    const { userId } = await openCajaWith(100);
+    const session = await BoxSession.findOne({ status: 'OPEN' });
+
+    // Interceptar el cálculo: cuando el controlador lea los movimientos de la
+    // sesión, verificamos que la puerta ya esté cerrada (status != OPEN). Si el
+    // corte se calcula con la sesión aún OPEN, un addMovement concurrente puede
+    // colarse después del cálculo y quedar fuera del finalAmount.
+    const origFind = CashMovement.find.bind(CashMovement);
+    let statusDuringCompute = null;
+    const spy = jest.spyOn(CashMovement, 'find').mockImplementation((...args) => {
+      const filter = args[0] || {};
+      if (filter.boxSessionId && String(filter.boxSessionId) === String(session._id) && statusDuringCompute === null) {
+        // Query síncrona-encadenada: capturamos el status en paralelo y el test
+        // lo espera al final (findOneAndUpdate del paso 1 ya ocurrió o no).
+        statusDuringCompute = BoxSession.findById(session._id).then((s) => s.status);
+      }
+      return origFind(...args);
+    });
+
+    const res = mkRes();
+    await cashController.forceResolveSession(mkReq({
+      user: { id: userId },
+      params: { id: session._id.toString() }
+    }), res);
+    spy.mockRestore();
+
+    expect(res.statusCode).toBe(200);
+    expect(await statusDuringCompute).toBe('CLOSING');
+  });
+});
+
+describe('A-C3 · cancelCharge — respuesta consistente en todos los caminos del reverso', () => {
+  const mkChargeWithCashPayment = async (userId, monto = 100) => {
+    const charge = await PatientCharge.create({
+      patientId: new mongoose.Types.ObjectId(),
+      fecha: new Date(),
+      items: [{ nombre: 'X', cantidad: 1, precioUnitario: 300, subtotal: 300 }],
+      total: 300,
+      confirmado: true
+    });
+    await patientChargeController.addPayment(mkReq({
+      user: { id: userId },
+      params: { chargeId: charge._id.toString() },
+      body: { monto, paymentMethod: 'CASH', confirmacion: 'CONFIRMO' }
+    }), mkRes());
+    return charge;
+  };
+
+  test('reverso completo: EXPENSE compensatorio y charge con misma forma', async () => {
+    const { userId } = await openCajaWith(0);
+    const charge = await mkChargeWithCashPayment(userId);
+
+    const res = mkRes();
+    await patientChargeController.cancelCharge(mkReq({
+      user: { id: userId },
+      params: { chargeId: charge._id.toString() },
+      body: { motivo: 'error de cobro', confirmacion: 'CONFIRMO', reversePayments: true }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.reverseStatus).toBe('reversed');
+    expect(res.body.reversedMovementIds).toHaveLength(1);
+    expect(res.body.charge.cancelado).toBe(true);
+    expect(Array.isArray(res.body.charge.pagos)).toBe(true);
+    expect(await CashMovement.countDocuments({ type: 'EXPENSE', linkedChargeId: charge._id })).toBe(1);
+  });
+
+  test('reverso omitido (sin caja abierta): charge con la misma forma que el camino completo', async () => {
+    const { userId } = await openCajaWith(0);
+    const charge = await mkChargeWithCashPayment(userId);
+    await cashController.closeBox(mkReq({ user: { id: userId } }), mkRes());
+
+    const res = mkRes();
+    await patientChargeController.cancelCharge(mkReq({
+      user: { id: userId },
+      params: { chargeId: charge._id.toString() },
+      body: { motivo: 'error de cobro', confirmacion: 'CONFIRMO', reversePayments: true }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.reverseStatus).toBe('skipped');
+    // El cobro queda cancelado y el payload trae el doc completo (mismos
+    // campos que el camino con reverso: pagos, motivo, items).
+    expect(res.body.charge.cancelado).toBe(true);
+    expect(res.body.charge.canceladoMotivo).toBe('error de cobro');
+    expect(Array.isArray(res.body.charge.pagos)).toBe(true);
+    expect(res.body.charge.pagos).toHaveLength(1);
+    // Sin caja abierta NO se crea el EXPENSE compensatorio.
+    expect(await CashMovement.countDocuments({ type: 'EXPENSE', linkedChargeId: charge._id })).toBe(0);
+  });
+
+  test('reverso parcial (pago de otra sesión): charge completo + aviso de ajuste manual', async () => {
+    const { userId } = await openCajaWith(0);
+    const charge = await mkChargeWithCashPayment(userId);
+    // El pago quedó en la sesión 1; se cierra y se abre una sesión nueva.
+    await cashController.closeBox(mkReq({ user: { id: userId } }), mkRes());
+    await openCajaWith(500);
+
+    const res = mkRes();
+    await patientChargeController.cancelCharge(mkReq({
+      user: { id: userId },
+      params: { chargeId: charge._id.toString() },
+      body: { motivo: 'error de cobro', confirmacion: 'CONFIRMO', reversePayments: true }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.reverseStatus).toBe('partial');
+    expect(res.body.reverseMessage).toMatch(/caja distinta|ya cerrada/i);
+    expect(res.body.charge.cancelado).toBe(true);
+    expect(Array.isArray(res.body.charge.pagos)).toBe(true);
+    // No se tocó la caja nueva: el pago pertenece a la sesión cerrada.
+    expect(await CashMovement.countDocuments({ type: 'EXPENSE', linkedChargeId: charge._id })).toBe(0);
+  });
+});
