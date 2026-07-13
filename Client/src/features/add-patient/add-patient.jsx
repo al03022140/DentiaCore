@@ -9,6 +9,7 @@ import API from '../../shared/services/axios-instance';
 import { dataUrlToBlob } from '../../shared/utils/dataUrl';
 import { invalidatePatientsCache } from '../../shared/services/patient-service';
 import { useDraftPersistence } from '../../shared/hooks/useDraftPersistence';
+import { validateFormat } from './validate-format';
 
 // Importar componentes de las secciones
 import Identification from './sections/identification';
@@ -38,19 +39,6 @@ const REQUIRED_FIELDS = [
   { path: ["contacto", "entidad_federativa"], label: "Entidad federativa", step: 1 }
 ];
 
-// TLD de >=2 letras y sin caracteres raros/emojis en local-part o dominio.
-// Debe mantenerse alineado con el validador del modelo (Server/models/patient.js).
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const EMAIL_MAX_LEN = 254; // RFC 5321
-// Número de documento: alfanumérico + guion, mínimo 3 chars (rechaza emojis,
-// símbolos puros y entradas de 1-2 chars claramente inválidas).
-const DOC_NUMERO_REGEX = /^[A-Za-z0-9-]+$/;
-// Acepta el formato visible (espacios, guiones, paréntesis, +), pero
-// requiere que tenga AL MENOS 7 dígitos reales; "((((((" o "+++--" se rechazan.
-const PHONE_ALLOWED_CHARS = /^[\d\s\-+()]+$/;
-const PHONE_MIN_DIGITS = 7;
-const PHONE_MAX_DIGITS = 15;
-
 // Deep-merge: parte de `base` (plantilla por defecto con TODA la estructura
 // anidada) y superpone `source` (datos del paciente, posiblemente parciales).
 // Gana `source`; los arrays se reemplazan; las sub-claves anidadas que faltan
@@ -71,92 +59,10 @@ const deepMerge = (base, source) => {
   return out;
 };
 
-const validateFormat = (data) => {
-  const errors = [];
-  if (data.email && (!EMAIL_REGEX.test(data.email) || data.email.length > EMAIL_MAX_LEN)) {
-    errors.push({ label: 'El correo electrónico tiene un formato inválido' });
-  }
-  const docNumero = data.documento?.numero ? String(data.documento.numero).trim() : '';
-  if (docNumero && (docNumero.length < 3 || !DOC_NUMERO_REGEX.test(docNumero))) {
-    errors.push({ label: 'El número de documento debe tener al menos 3 caracteres y solo letras, números o guiones' });
-  }
-  const phone = data.contacto?.telefono;
-  if (phone) {
-    const digits = String(phone).replace(/\D/g, '');
-    if (!PHONE_ALLOWED_CHARS.test(phone) || digits.length < PHONE_MIN_DIGITS || digits.length > PHONE_MAX_DIGITS) {
-      errors.push({ label: `El teléfono debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos` });
-    }
-  }
-  if (data.fecha_nacimiento) {
-    // Parsear YYYY-MM-DD en hora LOCAL (no UTC) para alinear con el backend y
-    // evitar el corrimiento de un día en zonas con offset negativo. Edad por
-    // calendario, no resta cruda de años.
-    const raw = String(data.fecha_nacimiento).slice(0, 10);
-    const md = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const birthDate = md
-      ? new Date(Number(md[1]), Number(md[2]) - 1, Number(md[3]))
-      : new Date(data.fecha_nacimiento);
-    const today = new Date();
-    if (!Number.isNaN(birthDate.getTime())) {
-      if (birthDate > today) {
-        errors.push({ label: 'La fecha de nacimiento no puede ser futura' });
-      }
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
-      if (age > 120) {
-        errors.push({ label: 'La fecha de nacimiento implica una edad mayor a 120 años' });
-      }
-    }
-  }
-  // Fechas clínicas femeninas: ni el último parto ni la última menstruación
-  // pueden ser futuros (dato incoherente en el expediente NOM-024). El `max`
-  // del input es evadible por teclado/pegado, así que se valida aquí también.
-  const fem = data.informacion_femenina || {};
-  const parseLocalDate = (s) => {
-    const raw = String(s).slice(0, 10);
-    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
-  };
-  const femDateChecks = [
-    ['fecha_ultimo_parto', 'La fecha del último parto no puede ser futura'],
-    ['fecha_ultima_menstruacion', 'La fecha de última menstruación no puede ser futura'],
-  ];
-  for (const [field, label] of femDateChecks) {
-    if (fem[field]) {
-      const d = parseLocalDate(fem[field]);
-      if (!Number.isNaN(d.getTime()) && d > new Date()) {
-        errors.push({ label });
-      }
-    }
-  }
-  // Filas incompletas: el backend descarta en silencio contactos de emergencia
-  // y antecedentes a los que les falta un campo requerido. Avisar para no
-  // perder datos sin que el usuario lo note (vería "guardado correctamente").
-  if (Array.isArray(data.contactos_emergencia)) {
-    data.contactos_emergencia.forEach((c, i) => {
-      if (!c) return;
-      const vals = [c.nombre, c.parentesco, c.telefono];
-      const some = vals.some((v) => v && String(v).trim());
-      const all = vals.every((v) => v && String(v).trim());
-      if (some && !all) {
-        errors.push({ label: `Contacto de emergencia #${i + 1}: completa nombre, parentesco y teléfono (o elimínalo).` });
-      }
-    });
-  }
-  if (Array.isArray(data.antecedentes_heredo_familiares)) {
-    data.antecedentes_heredo_familiares.forEach((a, i) => {
-      if (!a) return;
-      const p = a.parentesco && String(a.parentesco).trim();
-      const ant = a.antecedentes && String(a.antecedentes).trim();
-      const esp = a.parentesco_especifico && String(a.parentesco_especifico).trim();
-      if ((p || ant || esp) && (!p || !ant || (p === 'Otros' && !esp))) {
-        errors.push({ label: `Antecedente familiar #${i + 1}: completa parentesco y antecedente${p === 'Otros' ? ', y especifica el parentesco' : ''} (o elimínalo).` });
-      }
-    });
-  }
-  return errors;
-};
+// validateFormat vive en ./validate-format.js (extraída para testearla sin
+// montar el componente). Espejo de las reglas del servidor: incluye topes de
+// documento (30), nombres (50), textos largos (2000 — el server trunca en
+// silencio más allá), semanas de gestación 0-45 y fechas clínicas no futuras.
 
 // Hace trim a todos los strings (recursivo) antes de enviar al backend.
 // Evita que el usuario teclee "   " en campos required y le aparezca un error

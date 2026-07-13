@@ -10,6 +10,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
             key={`primer-nombre-${shakeKey}`}
             type="text"
             name="primer_nombre"
+            maxLength={50}
             value={formData.primer_nombre || ""}
             onChange={handleChange}
             className={inv('primer_nombre')}
@@ -20,6 +21,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
           <input
             type="text"
             name="otros_nombres"
+            maxLength={50}
             value={formData.otros_nombres || ""}
             onChange={handleChange}
           />
@@ -30,6 +32,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
             key={`apellido-paterno-${shakeKey}`}
             type="text"
             name="apellido_paterno"
+            maxLength={50}
             value={formData.apellido_paterno || ""}
             onChange={handleChange}
             className={inv('apellido_paterno')}
@@ -40,6 +43,7 @@ const PersonalData = ({ formData, handleChange, handleSituacionLaboralChange, in
           <input
             type="text"
             name="apellido_materno"
+            maxLength={50}
             value={formData.apellido_materno || ""}
             onChange={handleChange}
           />

@@ -605,7 +605,11 @@ const PatientSchema = new mongoose.Schema({
     }],
 
     // 📌 Ruta donde se almacenan los archivos del paciente
-    ruta_archivos: { type: String, default: "" },
+    // select:false — es un path ABSOLUTO del filesystem del servidor; no debe
+    // viajar al cliente (fuga de estructura interna). El server no lo lee en
+    // queries: createPatient lo setea en memoria antes del save y el pre-save
+    // sólo lo consulta en docs nuevos (isNew), donde sí está presente.
+    ruta_archivos: { type: String, default: "", select: false },
 
     // Contador atómico de numero_procedimiento para notas de evolución.
     // Antes se calculaba como notas_evolucion.length+1 fuera de cualquier
@@ -866,8 +870,11 @@ PatientSchema.pre('save', async function(next) {
     }
 });
 
-// NOTA: La sanitización XSS de nombres se realiza en el controller via SANITIZERS.sanitizeText
-// (HTML entity encoding). No se duplica aquí para evitar doble procesamiento.
+// NOTA: los strings de entrada sólo se normalizan con trim (controller via
+// SANITIZERS.sanitizeText). El escape XSS es responsabilidad de la capa de
+// salida (React escapa en render; no hay dangerouslySetInnerHTML ni HTML
+// server-side) — el entity-encoding en entrada se retiró porque corrompía
+// datos visibles (migración 0005 decodifica lo legacy).
 
 // ─── Métodos estáticos mejorados ──────────────────────────────────────────────
 
@@ -1000,7 +1007,12 @@ PatientSchema.set('toJSON', {
     transform: function(doc, ret) {
         // Remover campos sensibles en respuestas JSON
         delete ret.__v;
-        
+        // Campos internos del servidor. El select:false no basta para el 201
+        // del alta (el doc recién construido los tiene en memoria y toJSON
+        // los serializaría igual).
+        delete ret.ruta_archivos;
+        delete ret._evolutionNoteCounter;
+
         // Añadir campos virtuales útiles
         ret.fullName = doc.fullName;
         ret.edadCalculada = doc.edadVirtual;

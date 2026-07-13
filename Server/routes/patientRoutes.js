@@ -192,12 +192,6 @@ if (process.env.NODE_ENV !== 'production') {
   router.delete('/', writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 }
 
-// /batch es JSON puro: createPatients lee req.body como array y NO maneja
-// fotos. Antes tenía uploadFoto.array('fotos',10), que escribía a disco fotos
-// que el controller nunca asociaba ni limpiaba → archivos PII huérfanos. Se
-// quita el multer; el alta con foto va por POST '/' (createPatient).
-router.post('/batch', writeLimiter, authorize(['patients.create']), patientCtrl.createPatients);
-
 // Búsqueda server-side de pacientes — para inputs con debounce.
 router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.searchPatients);
 

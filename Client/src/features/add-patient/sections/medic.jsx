@@ -105,6 +105,7 @@ const Medic = ({
                        <input
                          type="date"
                          style={{ width: '200px' }}
+                         max={new Date().toISOString().slice(0, 10)}
                          value={formData.encuesta_medica.informacion_general?.ultimo_examen_medico?.fecha || ""}
                          onChange={(e) => {
                            setField(['encuesta_medica', 'informacion_general', 'ultimo_examen_medico', 'fecha'], e.target.value);

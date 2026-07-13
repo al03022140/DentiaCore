@@ -403,6 +403,43 @@ const validateFemaleDates = (info) => {
     return null;
 };
 
+// Reglas de rango de la ficha (defensa servidor). Se validan a nivel de
+// CONTROLLER sobre el payload ENTRANTE —no en el schema— a propósito: un
+// validador de schema re-validaría el documento COMPLETO en cualquier
+// patient.save() (p. ej. finalizeClinicalHistory) y un dato legacy fuera de
+// rango bloquearía saves que no lo tocan. Devuelve mensaje de error o null.
+const validatePatientFieldRules = (data) => {
+    const MAX_NAME = LIMITS?.MAX_NAME_LENGTH || 50;
+    for (const field of ['primer_nombre', 'otros_nombres', 'apellido_paterno', 'apellido_materno']) {
+        const val = data[field];
+        if (typeof val === 'string' && val.length > MAX_NAME) {
+            return `El campo ${field.replace(/_/g, ' ')} no puede exceder ${MAX_NAME} caracteres`;
+        }
+    }
+    const semanas = data.encuesta_medica?.embarazo?.semanas_gestacion;
+    if (semanas !== undefined && semanas !== null && semanas !== '') {
+        const n = Number(semanas);
+        if (!Number.isFinite(n) || n < 0 || n > 45) {
+            return 'Las semanas de gestación deben estar entre 0 y 45';
+        }
+    }
+    // "Último examen médico" y "última visita al odontólogo" no pueden ser
+    // futuros — mismo criterio de coherencia NOM-024 que validateFemaleDates.
+    const now = Date.now();
+    const dateChecks = [
+        [data.encuesta_medica?.informacion_general?.ultimo_examen_medico?.fecha,
+            'La fecha del último examen médico no puede ser futura'],
+        [data.habitos_higiene?.fecha_ultima_visita_odontologo,
+            'La fecha de la última visita al odontólogo no puede ser futura'],
+    ];
+    for (const [val, msg] of dateChecks) {
+        if (val == null || val === '') continue;
+        const d = new Date(val);
+        if (!Number.isNaN(d.getTime()) && d.getTime() > now) return msg;
+    }
+    return null;
+};
+
 /** 🔹 Crear un paciente con subida de foto */
 exports.createPatient = async (req, res) => {
     // Si multer subió la foto, ya creó la carpeta en uploads/pacientes/<id>,
@@ -505,6 +542,11 @@ exports.createPatient = async (req, res) => {
         // Fechas clínicas femeninas no pueden ser futuras (defensa servidor).
         const femErr = validateFemaleDates(safePatientData.informacion_femenina);
         if (femErr) return res.status(400).json({ message: femErr });
+
+        // Rangos de ficha: nombres ≤50, semanas de gestación 0-45, fechas
+        // médicas no futuras.
+        const ruleErr = validatePatientFieldRules(safePatientData);
+        if (ruleErr) return res.status(400).json({ message: ruleErr });
 
         // documento debe ser un objeto {tipo, numero}. Si llega como string/
         // array/number, las guardas `.numero` lo saltan en silencio (no corre el
@@ -671,109 +713,10 @@ exports.createPatient = async (req, res) => {
     }
 };
 
-/** 🔹 Crear múltiples pacientes (batch) */
-exports.createPatients = async (req, res) => {
-    try {
-        if (!Array.isArray(req.body) || req.body.length === 0) {
-            return res.status(400).json({ message: "Debe enviar un array de pacientes" });
-        }
-
-        const MAX_BATCH = 100;
-        if (req.body.length > MAX_BATCH) {
-            return res.status(400).json({ message: `El batch máximo es de ${MAX_BATCH} pacientes` });
-        }
-
-        const patientsToInsert = [];
-        for (let i = 0; i < req.body.length; i++) {
-            const raw = req.body[i];
-            if (!raw || typeof raw !== 'object') {
-                return res.status(400).json({ message: `Entrada inválida en índice ${i}` });
-            }
-
-            // Whitelist por entrada (mismo set que createPatient) — bloquea
-            // mass-assignment de notas, planes, paciente_id, _id, etc.
-            const safe = {};
-            for (const key of CREATE_ALLOWED_FIELDS) {
-                if (raw[key] !== undefined) safe[key] = raw[key];
-            }
-
-            if (!safe.fecha_nacimiento) {
-                return res.status(400).json({ message: `Falta fecha_nacimiento en índice ${i}` });
-            }
-            const parsed = parseAndValidateBirthDate(safe.fecha_nacimiento);
-            if (!parsed) {
-                return res.status(400).json({ message: `Fecha de nacimiento inválida en índice ${i}` });
-            }
-            if (parsed.error === 'future') {
-                return res.status(400).json({ message: `Fecha de nacimiento futura en índice ${i}` });
-            }
-            if (parsed.error === 'too_old') {
-                return res.status(400).json({ message: `Edad mayor a 120 años en índice ${i}` });
-            }
-            safe.fecha_nacimiento = parsed.date;
-
-            if (safe.documento && safe.documento.numero != null) {
-                safe.documento.numero = String(safe.documento.numero).trim().toUpperCase();
-                if (!safe.documento.numero) {
-                    return res.status(400).json({ message: `Número de documento vacío en índice ${i}` });
-                }
-            }
-
-            const pacienteId = await Patient.generateUniquePatientId();
-            const newPatient = new Patient({
-                ...safe,
-                paciente_id: pacienteId,
-                edad: calcularEdad(safe.fecha_nacimiento),
-                creadoPor: req.user?.id || null
-            });
-            patientsToInsert.push(newPatient);
-        }
-
-        // Best-effort: ordered:false inserta todos los válidos y reporta los
-        // que fallan, en vez de abortar el lote completo en el primer duplicado
-        // (con ordered:true el cliente recibía 500 sin saber qué se insertó y
-        // reintentaba creando duplicados / quemando paciente_id). Devolvemos
-        // inserted + failed[] para que el importador reconcilie.
-        let insertedDocs = [];
-        let failed = [];
-        try {
-            insertedDocs = await Patient.insertMany(patientsToInsert, { ordered: false });
-        } catch (bulkErr) {
-            insertedDocs = Array.isArray(bulkErr.insertedDocs) ? bulkErr.insertedDocs : [];
-            const writeErrors = bulkErr.writeErrors
-                || (bulkErr.result && typeof bulkErr.result.getWriteErrors === 'function' ? bulkErr.result.getWriteErrors() : [])
-                || [];
-            // Si no es un fallo parcial reconocible (p. ej. error de conexión),
-            // delegar al catch externo.
-            if (!writeErrors.length && !insertedDocs.length) throw bulkErr;
-            failed = writeErrors.map((we) => ({
-                index: we.index,
-                code: we.code,
-                message: we.errmsg || (we.err && we.err.errmsg) || 'Error de inserción',
-                keyValue: (we.err && we.err.keyValue) || we.keyValue || null
-            }));
-        }
-
-        return res.status(failed.length === 0 ? 201 : 207).json({
-            message: failed.length === 0
-                ? 'Pacientes creados correctamente'
-                : `Creados ${insertedDocs.length} de ${patientsToInsert.length}; ${failed.length} fallaron`,
-            inserted: insertedDocs.length,
-            failed,
-            patients: insertedDocs
-        });
-
-    } catch (error) {
-        console.error("❌ Error al crear los pacientes:", error);
-        if (error?.name === 'ValidationError') {
-            return res.status(400).json({ message: 'Error de validación', errors: error.errors });
-        }
-        if (error?.code === 11000) {
-            return res.status(409).json({ message: 'Datos duplicados (índice único)', keyValue: error.keyValue || null });
-        }
-        res.status(500).json({ message: "Error al crear los pacientes", error: devError(error) });
-    }
-};
+// NOTA: se eliminó createPatients (POST /patients/batch). No tenía consumidor
+// (ni cliente, ni server, ni tests) y le faltaban las defensas del alta
+// individual (sanitización, fechas femeninas, dedup de paciente_id dentro del
+// lote). Si algún día llega un importador, reescribirlo sobre createPatient.
 
 // Campos que el cliente puede modificar en un PUT. Para evitar
 // mass-assignment + bypass del middleware pre-save (findOneAndUpdate NO
@@ -933,6 +876,10 @@ exports.updatePatient = async (req, res) => {
             const femErr = validateFemaleDates(safeUpdate.informacion_femenina);
             if (femErr) return res.status(400).json({ message: femErr });
         }
+
+        // Rangos de ficha sobre el payload entrante (igual que en create).
+        const ruleErr = validatePatientFieldRules(safeUpdate);
+        if (ruleErr) return res.status(400).json({ message: ruleErr });
 
         // documento debe ser un objeto {tipo, numero}. Un string/array aquí hace
         // que castObject lo descarte a {} y el update "tenga éxito" (200) sin
@@ -2482,6 +2429,10 @@ function parseAndValidateBirthDate(input) {
   if (ageYears > 120) return { error: 'too_old' };
   return { date };
 }
+
+// Sólo para tests unitarios — no es API pública del controller.
+exports._validatePatientFieldRules = validatePatientFieldRules;
+exports._sanitizeAndLimitPayload = sanitizeAndLimitPayload;
 
 // Reintenta el save si colisiona el paciente_id (sólo 9000 IDs posibles: hay
 // race entre exists() y save() en cargas concurrentes).

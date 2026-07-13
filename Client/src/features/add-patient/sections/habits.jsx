@@ -270,6 +270,7 @@ const Habits = ({
                       <label>Fecha Última Visita al Odontólogo</label>
                       <input
                         type="date"
+                        max={new Date().toISOString().slice(0, 10)}
                         value={formData.habitos_higiene.fecha_ultima_visita_odontologo || ""}
                         onChange={(e) =>
                           handleNestedChange("habitos_higiene", "fecha_ultima_visita_odontologo", e.target.value)
