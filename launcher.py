@@ -628,29 +628,40 @@ class DentiaCoreLauncher:
         if env_file.exists() and env_file.stat().st_size > 0:
             try:
                 current = self._parse_simple_env(env_file)
-                secret = (current.get('JWT_SECRET') or '').strip()
-                if len(secret) >= 32:
-                    return True  # Secreto válido — nada que hacer
+                updates = {}
+                # JWT_SECRET: sin uno >=32 chars el server usa un secreto efímero
+                # que invalida las sesiones en cada reinicio.
+                if len((current.get('JWT_SECRET') or '').strip()) < 32:
+                    updates['JWT_SECRET'] = secrets.token_hex(32)
+                # CFG-01: AUDIT_HMAC_SECRET: sin él, en producción el server hace
+                # fail-fast y NO arranca; en dev cae al fallback inseguro que
+                # desactiva la detección de manipulación del audit log (NOM-024).
+                if len((current.get('AUDIT_HMAC_SECRET') or '').strip()) < 32:
+                    updates['AUDIT_HMAC_SECRET'] = secrets.token_hex(32)
 
-                # JWT_SECRET vacío o demasiado corto → reparar sin tocar el resto
-                print(f"⚠️  JWT_SECRET ausente/débil en {env_file} — generando uno fuerte…")
-                if self._update_env_file(env_file, {'JWT_SECRET': secrets.token_hex(32)}):
-                    print("✅ JWT_SECRET reparado (64 chars hex). Las sesiones ahora sobreviven a reinicios.")
+                if not updates:
+                    return True  # Ambos secretos válidos — nada que hacer
+
+                print(f"⚠️  Secretos ausentes/débiles en {env_file} ({', '.join(updates)}) — generando…")
+                if self._update_env_file(env_file, updates):
+                    print(f"✅ Secretos reparados (64 chars hex): {', '.join(updates)}.")
                     return True
-                # Si no se pudo escribir, no bloqueamos el arranque: el server
-                # caerá a un secreto efímero (con warning) pero seguirá funcionando.
-                print(f"⚠️  No se pudo reparar JWT_SECRET en {env_file}; el server usará un secreto efímero.")
+                # Si no se pudo escribir, no bloqueamos el arranque.
+                print(f"⚠️  No se pudieron reparar los secretos en {env_file}.")
                 return True
             except Exception as e:
                 # Ante cualquier fallo de lectura, no bloqueamos el arranque.
-                print(f"⚠️  No se pudo validar JWT_SECRET en {env_file}: {e}")
+                print(f"⚠️  No se pudo validar los secretos en {env_file}: {e}")
                 return True
 
         # ── Caso 1: el archivo falta o está vacío → crear de cero ───────
         print(f"⚠️  {env_file} no existe — creando con valores por defecto…")
 
-        # Generar JWT_SECRET aleatorio (64 chars hex) para evitar el warning
+        # Generar secretos aleatorios (64 chars hex). AUDIT_HMAC_SECRET es
+        # obligatorio (CFG-01): sin él el server no arranca en producción y en
+        # dev cae al fallback inseguro del audit log (NOM-024).
         jwt_secret = secrets.token_hex(32)
+        audit_hmac_secret = secrets.token_hex(32)
 
         env_content = (
             "# Generado automáticamente por el launcher (fallback)\n"
@@ -662,6 +673,7 @@ class DentiaCoreLauncher:
             "CLIENT_URL=http://localhost:5173\n"
             "PUBLIC_URL=http://localhost:5002\n"
             f"JWT_SECRET={jwt_secret}\n"
+            f"AUDIT_HMAC_SECRET={audit_hmac_secret}\n"
             "COOKIE_SECURE=false\n"
         )
         try:

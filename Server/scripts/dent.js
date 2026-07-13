@@ -108,7 +108,28 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
+
+// BE-01 (Logging): redactar valores de query params sensibles antes de que
+// morgan escriba la línea de acceso a disco. `GET /patients/search?q=<nombre>`
+// y `/audit?q=<nombre>` filtraban el nombre buscado (PII) en texto plano al log
+// rotado (retención 14 días). Token `urlSafe` = :url con esos valores ocultos.
+const REDACTED_QUERY_KEYS = new Set(['q', 'search', 'nombre', 'documento', 'query']);
+morgan.token('urlSafe', (req) => {
+  const raw = req.originalUrl || req.url || '';
+  const qIdx = raw.indexOf('?');
+  if (qIdx === -1) return raw;
+  const path = raw.slice(0, qIdx);
+  const params = new URLSearchParams(raw.slice(qIdx + 1));
+  for (const key of params.keys()) {
+    if (REDACTED_QUERY_KEYS.has(key)) params.set(key, 'REDACTED');
+  }
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+});
+const morganFormat = process.env.NODE_ENV === 'production'
+  ? ':remote-addr - :remote-user [:date[clf]] ":method :urlSafe HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'
+  : ':method :urlSafe :status :response-time ms - :res[content-length]';
+app.use(morgan(morganFormat, { stream: logger.stream }));
 
 // Abuse protection: bot guard + global rate limit
 app.use(botGuard);
@@ -125,13 +146,23 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
 });
 
+// SEC-04: saneamiento global de operadores Mongo (`$…`) en body/query/params.
+// Va DESPUÉS de los parsers y ANTES de cualquier ruta para cubrir /api,
+// /api/google y /uploads. `qs` con extended:true permite `?x[$ne]=y`.
+const mongoSanitize = require('../middlewares/mongoSanitize');
+app.use(mongoSanitize);
+
 // 3) Servir archivos estáticos
 const uploadsBase = getUploadsBase();
 fsExtra.ensureDirSync(uploadsBase);
 // C-1: /uploads contiene PHI (adjuntos, odontogramas, fotos de pacientes).
 // Exigir una sesión válida (Bearer o cookie httpOnly) antes del estático.
 const uploadsAuth = require('../middlewares/uploadsAuth');
-app.use('/uploads', uploadsAuth, express.static(uploadsBase));
+// PHI: no cachear en proxies/disco compartido. `private, no-store` evita que
+// una foto/odontograma/firma quede en cachés intermedias con `public` (default).
+app.use('/uploads', uploadsAuth, express.static(uploadsBase, {
+  setHeaders: (res) => res.set('Cache-Control', 'private, no-store')
+}));
 app.use(express.static(path.join(__dirname, '../../Client/dist')));
 
 // 5) Endpoints de debug (async/await) - SOLO EN DESARROLLO
@@ -326,8 +357,12 @@ if (process.env.NODE_ENV !== 'test') {
             // se avisa y se continúa (NO se tumba el arranque). Ver
             // utils/ensureIndexes.js y scripts/findPatientDuplicates.js.
             try {
+                // DB-IDX-01: incluir Examen — su índice {paciente_id, deletedAt}
+                // no se construye solo en prod (autoIndex off) y el acceso por
+                // paciente sin él es COLLSCAN.
                 const Patient = require('../models/patient');
-                await ensureCriticalIndexes([Patient]);
+                const Exam = require('../models/exam');
+                await ensureCriticalIndexes([Patient, Exam]);
             } catch (idxErr) {
                 logger.warn('No se pudieron asegurar los índices al inicio: %s', idxErr?.message || idxErr);
             }
@@ -348,9 +383,31 @@ if (process.env.NODE_ENV !== 'test') {
         });
 
         // 11) Graceful shutdown
+        // BKP-03: cerrar también la conexión a Mongo y garantizar la salida con
+        // un timeout de respaldo. Antes solo hacía server.close(): si una request
+        // en vuelo quedaba bloqueada (p. ej. Mongo colgado tras suspender la
+        // laptop), el callback nunca llegaba y el proceso se quedaba pegado ante
+        // SIGTERM, forzando un SIGKILL que corta escrituras a la mitad. Guard de
+        // doble invocación por si llegan SIGINT y SIGTERM juntos.
+        let shuttingDown = false;
         const gracefulShutdown = () => {
+            if (shuttingDown) return;
+            shuttingDown = true;
             logger.info('🛑 Cerrando servidor...');
-            server.close(() => {
+            // Respaldo: si el drenado no completa en 10s, salir de todos modos.
+            const forceExit = setTimeout(() => {
+                logger.warn('⏱️ Cierre forzado tras timeout de drenado');
+                process.exit(1);
+            }, 10_000);
+            forceExit.unref();
+            server.close(async () => {
+                try {
+                    const mongoose = require('mongoose');
+                    await mongoose.connection.close(false);
+                    logger.info('✅ Conexión a MongoDB cerrada');
+                } catch (e) {
+                    logger.warn('No se pudo cerrar MongoDB limpiamente: %s', e?.message || e);
+                }
                 logger.info('✅ Servidor cerrado');
                 process.exit(0);
             });

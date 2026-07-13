@@ -320,6 +320,16 @@ try {
         Write-Step "JWT_SECRET aleatorio generado (64 chars hex)"
     }
 
+    # CFG-01: AUDIT_HMAC_SECRET — sin él, en produccion el server hace fail-fast
+    # (Server/utils/integrity.js) y NO arranca; en dev cae al fallback inseguro
+    # que desactiva la deteccion de manipulacion del audit log (NOM-024).
+    if (-not $FinalEnv.ContainsKey("AUDIT_HMAC_SECRET") -or [string]::IsNullOrWhiteSpace($FinalEnv["AUDIT_HMAC_SECRET"]) -or $FinalEnv["AUDIT_HMAC_SECRET"].Length -lt 32) {
+        $HmacBytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($HmacBytes)
+        $FinalEnv["AUDIT_HMAC_SECRET"] = ([BitConverter]::ToString($HmacBytes) -replace '-','').ToLower()
+        Write-Step "AUDIT_HMAC_SECRET aleatorio generado (64 chars hex)"
+    }
+
     # Asegurar NODE_ENV (production para LAN install, development si nada definido)
     if (-not $FinalEnv.ContainsKey("NODE_ENV") -or [string]::IsNullOrWhiteSpace($FinalEnv["NODE_ENV"])) {
         $FinalEnv["NODE_ENV"] = "production"
