@@ -15,7 +15,8 @@
 const mongoose = require('mongoose');
 const Usuario = require('../models/users');
 const auditLogger = require('../middlewares/auditLogger');
-const { computeContentHash, getModelName } = require('../utils/signing');
+const { getModelName } = require('../utils/signing');
+const { computeIntegrityHash } = require('../utils/integrity');
 
 /**
  * POST /api/sign/:resourceType/:resourceId
@@ -105,7 +106,7 @@ const signRecord = async (req, res, next) => {
     }
 
     // Calcular hash del contenido al momento de la firma
-    const contentHash = computeContentHash(doc, resourceType);
+    const contentHash = computeIntegrityHash(doc, resourceType);
 
     // Actualizar campos de firma
     doc.firmadoPor = req.user.id;
@@ -172,7 +173,9 @@ const getSignatureStatus = async (req, res, next) => {
 
     const doc = await Model.findById(resourceId)
       .select('firmadoPor firmadoEn contentHash firmaDesactualizada')
-      .populate('firmadoPor', 'nombre email cedulaProfesional firmaDigitalUrl')
+      // No exponer `email` (PII del profesional): el estado de firma sólo
+      // necesita identidad firmante clínica (nombre + cédula NOM-004) y la firma.
+      .populate('firmadoPor', 'nombre cedulaProfesional firmaDigitalUrl')
       .lean();
 
     if (!doc) {

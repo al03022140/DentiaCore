@@ -24,8 +24,10 @@ describe('uploadsAuth — clasificación de ruta', () => {
   test('logos → non-patient', () => {
     expect(classifyUploadPath('/logos/logo.png')).toBe('non-patient');
   });
-  test('firmas a nivel raíz → non-patient', () => {
-    expect(classifyUploadPath('/firmas/x.png')).toBe('non-patient');
+  // SEC-03: la firma digital del doctor (raíz /firmas) es recurso clínico —
+  // exige acceso al expediente, no basta una sesión cualquiera (recepción).
+  test('firmas a nivel raíz → clinical', () => {
+    expect(classifyUploadPath('/firmas/x.png')).toBe('clinical');
   });
 });
 

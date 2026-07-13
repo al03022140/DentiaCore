@@ -8,7 +8,7 @@ const fs = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
 const attachmentCtrl = require('../controllers/attachmentController');
 const checkPatient = require('../middlewares/checkPatient');
-const { authorize } = require('../middlewares/authorize');
+const { authorize, requireClinicalRole } = require('../middlewares/authorize');
 const { writeLimiter, readLimiter } = require('../middlewares/rateLimiter');
 
 const validateId = (req, res, next) => {
@@ -86,17 +86,24 @@ const handleMulterError = (err, req, res, _next) => {
   return res.status(500).json({ message: err?.message || 'Error al subir el adjunto' });
 };
 
+// Los adjuntos son documentos del expediente CLÍNICO (estudios, consentimientos,
+// radiografías). Se exige rol clínico y se quita la variante `.basic`: la
+// recepcionista NO debe listar/subir/borrar adjuntos clínicos (NOM-004 Art. 5.7,
+// LFPDPPP Art. 6 proporcionalidad). `listAttachments` filtraba antes nombre/
+// categoría/descripción de documentos clínicos a `patients.read.basic`.
 router
   .route('/:id/attachments')
   .all(validateId, checkPatient)
   .get(
     readLimiter,
-    authorize(['patients.read', 'patients.read.basic']),
+    requireClinicalRole,
+    authorize(['patients.read']),
     attachmentCtrl.listAttachments
   )
   .post(
     writeLimiter,
-    authorize(['patients.update', 'patients.update.basic']),
+    requireClinicalRole,
+    authorize(['patients.update']),
     uploadAttachment.single('file'),
     handleMulterError,
     attachmentCtrl.createAttachment
@@ -107,7 +114,8 @@ router
   .all(validateId, checkPatient)
   .delete(
     writeLimiter,
-    authorize(['patients.update', 'patients.update.basic']),
+    requireClinicalRole,
+    authorize(['patients.update']),
     attachmentCtrl.deleteAttachment
   );
 

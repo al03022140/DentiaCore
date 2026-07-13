@@ -10,7 +10,7 @@ const OdontogramaModel = require('../models/odontograma');
 const OdontogramaHistory = require('../models/odontogramaHistory');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
-const { computeContentHash } = require('../utils/signing');
+const { computeIntegrityHash } = require('../utils/integrity');
 
 // Logging gated por NODE_ENV: los console.log informativos filtraban
 // patientId y otros datos a stdout en producción. console.error y
@@ -287,7 +287,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
     // clínico (creadoPor/savedBy), no una nota narrativa. Solo cuando nace
     // OFICIAL (un asistente lo deja en BORRADOR y se firmará después).
     if (estadoRegistro === 'OFICIAL' && !odontograma.firmadoEn && !odontograma.contentHash) {
-      const hash = computeContentHash(odontograma, 'odontograma');
+      const hash = computeIntegrityHash(odontograma, 'odontograma');
       await OdontogramaModel.updateOne(
         { _id: odontograma._id },
         { $set: { contentHash: hash, integrityHash: hash } }
@@ -547,7 +547,10 @@ const verificarOdontogramaClinico = async (req, res, next) => {
 
     // ── Datos de una versión específica (paridad con ?version=X) ──
     if (req.query.version) {
-      const entry = await OdontogramaHistory.findOne({ patient: patientId, versionName: req.query.version })
+      // SEC-04: coercer a String — sin esto, `?version[$ne]=x` inyecta un
+      // operador Mongo ($ne/$regex) y recupera versiones sin conocer el nombre.
+      const versionName = String(req.query.version);
+      const entry = await OdontogramaHistory.findOne({ patient: patientId, versionName })
         .sort({ createdAt: -1 })
         .lean();
       if (!entry) {

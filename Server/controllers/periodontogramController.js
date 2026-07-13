@@ -884,8 +884,12 @@ exports.getPeriodontogramData = [
       let updatedAt = periodontogram.current.updatedAt || periodontogram.updatedAt;
 
       if (version) {
+        // SEC-04: coercer a String — sin esto, `?version[$ne]=x` inyecta un
+        // operador Mongo y recupera versiones sin conocer el nombre exacto.
+        // (el guard `collectForbiddenKeys` no cubre `version`: se desestructura antes.)
+        const versionQuery = String(version);
         // En caso excepcional de versiones duplicadas con mismo nombre, tomar la más reciente
-        const historyEntry = await PeriodontogramHistory.findOne({ patient: patientId, versionName: version })
+        const historyEntry = await PeriodontogramHistory.findOne({ patient: patientId, versionName: versionQuery })
           .sort({ createdAt: -1 })
           .lean();
         if (!historyEntry) {

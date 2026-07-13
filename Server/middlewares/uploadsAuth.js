@@ -35,7 +35,7 @@ const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
  */
 const verifyToken = (token) => {
   try {
-    return jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer() });
+    return jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer(), algorithms: ['HS256'] });
   } catch (_e) {
     return null;
   }
@@ -51,6 +51,12 @@ const BASIC_PATIENT_SUBDIRS = new Set(['profile-pic']);
  */
 const classifyUploadPath = (relPath) => {
   const parts = String(relPath || '').split('/').filter(Boolean);
+  // SEC-03: la firma digital del doctor (PNG legalmente vinculante, NOM-004
+  // Art. 5.10 / NOM-013) NO es un archivo genérico de sesión: se trata como
+  // recurso clínico para que un rol sin acceso al expediente (p. ej. recepción)
+  // no pueda descargarla adivinando la URL. Los logos (marca de la clínica)
+  // siguen siendo 'non-patient' (basta sesión).
+  if (parts[0] === 'firmas') return 'clinical';
   if (parts[0] !== 'pacientes') return 'non-patient';
   const subdir = parts[2] || '';
   return BASIC_PATIENT_SUBDIRS.has(subdir) ? 'basic' : 'clinical';

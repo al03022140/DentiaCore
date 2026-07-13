@@ -1,5 +1,21 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
+
+// SEC-05: nonce anti-CSRF del flujo OAuth. Se genera en /auth/url, se guarda
+// en cookie httpOnly y se embebe en el `state`; el callback exige que ambos
+// coincidan. Sin esto, un atacante podía completar el callback con SU cuenta de
+// Google y vincular su Calendar a la sesión de la clínica (OAuth-CSRF).
+const OAUTH_STATE_COOKIE = 'g_oauth_state';
+const buildStateCookieOptions = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    // 'lax' (no 'strict'): la cookie debe viajar en la navegación top-level de
+    // vuelta desde accounts.google.com al callback; 'strict' la bloquearía.
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000, // 10 min: sólo debe sobrevivir el consentimiento
+    path: '/',
+});
 
 // OAuth2 de Google + Calendar v3 vía REST con fetch (sin la dependencia
 // googleapis ~50MB). Solo construimos la URL de consentimiento, intercambiamos/
@@ -101,10 +117,12 @@ router.get('/auth/url', oauthLimiter, (req, res) => {
         const chosenClientUrl = selectClientUrlFromRequest(req) || getClientUrl();
         const returnPath = sanitizeReturnPath(req.query.returnPath || '');
 
-        // Encode client URL + optional return path in OAuth state
-        const statePayload = returnPath
-            ? JSON.stringify({ url: chosenClientUrl, path: returnPath })
-            : chosenClientUrl;
+        // SEC-05: nonce anti-CSRF ligado a esta sesión de navegador (cookie
+        // httpOnly) y embebido en el state. El state siempre va como JSON ahora
+        // (los helpers ya soportan el formato JSON {url, path}).
+        const nonce = crypto.randomBytes(16).toString('hex');
+        res.cookie(OAUTH_STATE_COOKIE, nonce, buildStateCookieOptions());
+        const statePayload = JSON.stringify({ url: chosenClientUrl, path: returnPath || '', nonce });
 
         const url = buildAuthUrl(encodeURIComponent(statePayload));
         res.json({ url });
@@ -134,6 +152,18 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
         cleanupProcessedCodes();
         if (hasRecentProcessedCode(code)) {
             return res.redirect(`${clientUrl}`);
+        }
+
+        // SEC-05: validar el nonce anti-CSRF. El state debe traer el mismo nonce
+        // que se guardó en la cookie httpOnly al iniciar el flujo. Un atacante que
+        // fabrica su propio callback no posee la cookie de la víctima → no coincide.
+        const returnPathForCsrf = getReturnPathFromState(state);
+        const expectedNonce = req.cookies?.[OAUTH_STATE_COOKIE];
+        const providedNonce = getNonceFromState(state);
+        // Cookie de un solo uso: limpiarla pase lo que pase.
+        res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
+        if (!expectedNonce || !providedNonce || !safeEqual(expectedNonce, providedNonce)) {
+            return res.redirect(`${clientUrl}${returnPathForCsrf}?error=oauth_state&message=${encodeURIComponent('Validación anti-CSRF fallida; reinicia la conexión con Google.')}`);
         }
 
         const tokens = await postToken({
@@ -375,6 +405,27 @@ module.exports = router;
          }
          return '';
      } catch { return ''; }
+ }
+
+ // SEC-05: extraer el nonce anti-CSRF del state (formato JSON {url,path,nonce}).
+ function getNonceFromState(stateParam) {
+     if (!stateParam) return null;
+     try {
+         const decoded = decodeURIComponent(stateParam);
+         if (decoded.startsWith('{')) {
+             const n = JSON.parse(decoded).nonce;
+             return typeof n === 'string' && n.length > 0 ? n : null;
+         }
+         return null;
+     } catch { return null; }
+ }
+
+ // Comparación en tiempo constante de dos strings (evita oráculo de timing).
+ function safeEqual(a, b) {
+     const ba = Buffer.from(String(a));
+     const bb = Buffer.from(String(b));
+     if (ba.length !== bb.length) return false;
+     return crypto.timingSafeEqual(ba, bb);
  }
 
 // ── Google OAuth2 / Calendar v3 vía REST (reemplazo de googleapis) ───────────

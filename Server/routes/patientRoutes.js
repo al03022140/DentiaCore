@@ -346,11 +346,14 @@ router
 // odontogramaRoutes.js con la autorización correcta (authorize()).
 // Solo se conserva aquí el endpoint de imagen que NO existe en odontogramaRoutes.
 
-// Endpoint para servir la imagen del odontograma inicial
+// Endpoint para servir la imagen del odontograma inicial.
+// Exige `odontogram.read` igual que el resto de rutas de odontograma (antes
+// sólo validaba sesión + paciente, sin el permiso): un rol sin acceso clínico
+// al odontograma (recepción) no debe poder descargar la imagen.
 router
   .route('/:id/odontograma-inicial/image')
   .all(validateId, checkPatient)
-  .get(async (req, res, next) => {
+  .get(authorize(['odontogram.read']), async (req, res, next) => {
     try {
       const patientId = req.params.id;
       const OdontogramaModel = require('../models/odontograma');
@@ -489,13 +492,6 @@ router
   .route('/:id/evolution-note/:noteId/sign')
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.signExistingEvolutionNote);
-
-// Verificar la integridad de una nota firmada (contentHash + hashes de las
-// imágenes de firma en disco). Sólo lectura, para auditoría (NOM-024).
-router
-  .route('/:id/evolution-note/:noteId/verify')
-  .all(validateId, checkPatient)
-  .get(requireClinicalRole, authorize(['consultas.read']), patientCtrl.verifyEvolutionNoteIntegrity);
 
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router

@@ -81,7 +81,8 @@ const signAccessToken = (user, permissions) => {
     getJwtSecret(),
     {
       expiresIn: getAccessTtl(),
-      issuer: getJwtIssuer()
+      issuer: getJwtIssuer(),
+      algorithm: 'HS256'
     }
   );
 };
@@ -95,7 +96,8 @@ const signRefreshToken = (user) => {
     getJwtSecret(),
     {
       expiresIn: getRefreshTtl(),
-      issuer: getJwtIssuer()
+      issuer: getJwtIssuer(),
+      algorithm: 'HS256'
     }
   );
 };
@@ -218,7 +220,8 @@ const refresh = async (req, res, next) => {
 
     let payload;
     try {
-      payload = jwt.verify(token, getJwtSecret());
+      // Verificar issuer + algorithms igual que `authenticate` (consistencia).
+      payload = jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer(), algorithms: ['HS256'] });
     } catch (_error) {
       return res.status(401).json({ message: 'Refresh token inválido o expirado' });
     }
@@ -241,9 +244,7 @@ const refresh = async (req, res, next) => {
     const matchesPrevious = user.previousRefreshTokenHash && user.previousRefreshTokenHash === incomingHash;
 
     if (!matchesCurrent && !matchesPrevious) {
-      user.refreshTokenHash = null;
-      user.previousRefreshTokenHash = null;
-      user.refreshTokenExpiresAt = null;
+      user.revokeAllSessions();
       await user.save();
       logger.warn(`Refresh token reuse detected for user ${user._id}`);
       return res.status(401).json({ message: 'Refresh token inválido' });
@@ -267,14 +268,12 @@ const logout = async (req, res, next) => {
 
     if (token) {
       try {
-        const payload = jwt.verify(token, getJwtSecret());
+        const payload = jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer(), algorithms: ['HS256'] });
         userIdForAudit = payload.sub;
         const user = await Usuario.findById(payload.sub);
         if (user) {
           userForAudit = user;
-          user.refreshTokenHash = null;
-          user.previousRefreshTokenHash = null;
-          user.refreshTokenExpiresAt = null;
+          user.revokeAllSessions();
           await user.save();
         }
       } catch (_error) {
@@ -530,8 +529,9 @@ const resetPassword = async (req, res, next) => {
     user.contraseña = newPassword;
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
+    // SEC-01: revoca las TRES variantes de refresh (incl. previousRefreshTokenHash),
+    // si no un token robado que ya rotó a "previo" sobrevivía al reset.
+    user.revokeAllSessions();
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     user.lastPasswordChangeAt = new Date();

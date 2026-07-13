@@ -171,6 +171,19 @@ userSchema.methods.compararContraseña = async function(contraseñaIngresada) {
   return await bcrypt.compare(contraseñaIngresada, this.contraseña);
 };
 
+// **Revocar TODAS las sesiones activas** (SEC-01, CWE-613).
+// Limpia los TRES campos de refresh — incluido `previousRefreshTokenHash`,
+// que `refresh()` acepta como válido (tolerancia multi-tab). Omitirlo dejaba
+// sobrevivir un refresh token robado tras un reset de contraseña: el punto
+// único de invalidación evita esa divergencia. Usar en resetPassword,
+// changeMyPassword, updateUser (cambio de contraseña), disableUser, logout y
+// la detección de reuso. NO llama save(): el caller decide cuándo persistir.
+userSchema.methods.revokeAllSessions = function() {
+  this.refreshTokenHash = null;
+  this.previousRefreshTokenHash = null;
+  this.refreshTokenExpiresAt = null;
+};
+
 // **Método para establecer el PIN de 4 dígitos** (roles.MD §9.1)
 userSchema.methods.setPin = async function(pin) {
   if (!/^\d{4}$/.test(pin)) {
