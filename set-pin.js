@@ -1,7 +1,6 @@
 // Script para actualizar el PIN de un usuario existente
 // Uso: node set-pin.js <email> <pin>
 
-const mongoose = require('mongoose');
 const connectDB = require('./Server/config/db');
 const Usuario = require('./Server/models/users');
 
