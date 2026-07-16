@@ -5,6 +5,11 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
+// O-2: fijar TZ del proceso — sin esto, los cortes de caja y timestamps de
+// auditoría dependen de la TZ del SO donde corra el server (silencioso si
+// difiere de la de la clínica). Respeta un TZ explícito del .env si existe.
+process.env.TZ = process.env.TZ || 'America/Mexico_City';
+
 // Importaciones principales
 const express = require('express');
 const cors = require('cors');
@@ -14,6 +19,7 @@ const cookieParser = require('cookie-parser');
 const fsExtra = require('fs-extra');
 const logger = require('../utils/logger');
 const { getUploadsBase } = require('../utils/uploads');
+const { sendAlert } = require('../utils/alerts');
 
 // Importaciones de configuración
 const connectDB = require('../config/db');
@@ -433,14 +439,21 @@ if (process.env.NODE_ENV !== 'test') {
             ? { name: e.name, message: e.message, stack: e.stack }
             : e);
 
+        // D-1: el proceso sigue vivo (ver razón arriba), pero eso no debe
+        // significar que el degradado quede invisible — se alerta además de
+        // loguear (O-1, ver Server/utils/alerts.js). sendAlert nunca lanza.
         process.on('uncaughtException', (err) => {
             logger.error('❌ Excepción no controlada (el server sigue activo)', {
                 err: describeError(err)
             });
+            sendAlert('Excepción no controlada (server sigue activo)', { message: err?.message });
         });
         process.on('unhandledRejection', (reason) => {
             logger.error('⚠️ Promesa rechazada no manejada (el server sigue activo)', {
                 reason: describeError(reason)
+            });
+            sendAlert('Promesa rechazada no manejada (server sigue activo)', {
+                message: reason instanceof Error ? reason.message : String(reason)
             });
         });
     })();

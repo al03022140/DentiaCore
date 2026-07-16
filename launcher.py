@@ -638,6 +638,10 @@ class DentiaCoreLauncher:
                 # desactiva la detección de manipulación del audit log (NOM-024).
                 if len((current.get('AUDIT_HMAC_SECRET') or '').strip()) < 32:
                     updates['AUDIT_HMAC_SECRET'] = secrets.token_hex(32)
+                # O-2: TZ fija — sin esto, los cortes de caja y timestamps de
+                # auditoria dependen de la TZ del SO de esta PC.
+                if not (current.get('TZ') or '').strip():
+                    updates['TZ'] = 'America/Mexico_City'
 
                 if not updates:
                     return True  # Ambos secretos válidos — nada que hacer
@@ -675,6 +679,7 @@ class DentiaCoreLauncher:
             f"JWT_SECRET={jwt_secret}\n"
             f"AUDIT_HMAC_SECRET={audit_hmac_secret}\n"
             "COOKIE_SECURE=false\n"
+            "TZ=America/Mexico_City\n"
         )
         try:
             env_file.parent.mkdir(parents=True, exist_ok=True)

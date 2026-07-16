@@ -18,24 +18,25 @@ Usa `mongodump` (parte de las MongoDB Database Tools). Si no está instalado, el
 
 ---
 
-## 2. Automatizar (backup diario)
+## 2. Automatizar (backup diario + monitoreo)
 
-El script existe; falta dispararlo solo. Configúralo **una vez** en el equipo de la clínica:
+**Ya no hace falta configurarlo a mano (O-1):** `install.sh`/`install.ps1` registran automáticamente, en cada instalación:
 
-**Windows (Task Scheduler):**
+- Backup diario (3am): `node scripts/backup-db.js --keep=14`. Cada corrida exitosa actualiza `backups/last-success.json`.
+- Chequeo de salud cada 4h: `node scripts/check-health.js` — verifica que el backup no esté viejo/ausente, que `/api/health` reporte la DB conectada, y disco libre. Ver [Server/README.md](../../../Server/README.md#-respaldo-monitoreo-y-recuperación) para configurar `ALERT_WEBHOOK_URL` y recibir alertas activas (Slack/Discord/ntfy.sh).
+
+Verificar que quedó registrado: `crontab -l` (macOS/Linux) o `schtasks /query /tn DentiaCore-Backup` (Windows).
+
+**Configuración manual (fallback, o si reinstalaste sin el instalador):**
 
 ```cmd
-schtasks /Create /SC DAILY /ST 23:00 /TN "DentiaCore Backup" ^
+schtasks /Create /SC DAILY /ST 03:00 /TN "DentiaCore-Backup" ^
   /TR "node \"C:\ruta\al\repo\scripts\backup-db.js\" --keep=14"
 ```
 
-**macOS / Linux (cron):**
-
 ```cron
-0 23 * * *  cd /ruta/al/repo && /usr/bin/node scripts/backup-db.js --keep=14 >> backups/backup.log 2>&1
+0 3 * * *  cd /ruta/al/repo && /usr/bin/node scripts/backup-db.js --keep=14 >> backups/backup.log 2>&1
 ```
-
-Recomendación: diario fuera de horario + `--keep=14` (dos semanas). Ajusta según volumen.
 
 ---
 

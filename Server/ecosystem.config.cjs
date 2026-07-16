@@ -11,10 +11,12 @@ module.exports = {
       watch: false,
       max_memory_restart: '512M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        TZ: 'America/Mexico_City'
       },
       env_development: {
-        NODE_ENV: 'development'
+        NODE_ENV: 'development',
+        TZ: 'America/Mexico_City'
       }
     }
   ]
