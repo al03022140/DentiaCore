@@ -50,6 +50,9 @@ jobs:
     # Gate ESTRICTO (Fase 0 de normalización). Hoy queda en rojo a propósito:
     # hay ~583 violaciones legacy que se resuelven en las fases de migración
     # (ver docs/normalizacion/). El objetivo es que el número baje hasta 0.
+    # continue-on-error: no bloquea merges mientras las ~583 violaciones bajan
+    # a 0 — el check queda visible (rojo) en cada PR sin ser obligatorio.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
