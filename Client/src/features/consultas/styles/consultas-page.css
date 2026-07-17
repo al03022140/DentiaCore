@@ -708,7 +708,7 @@
   background: var(--figma-bg-card);
 }
 
-/* ── CTA "Nueva cita" — primaria azul DentiaCore ── */
+/* ── CTA "Nueva consulta" — primaria azul DentiaCore ── */
 .consultas-add-btn {
   display: inline-flex !important;
   align-items: center;
@@ -804,7 +804,7 @@
   box-shadow: inset 3px 0 0 var(--color-primary), var(--figma-shadow-card);
 }
 
-/* Cita "EnCurso" — borde lateral + pulso suave */
+/* Consulta "EnCurso" — borde lateral + pulso suave */
 .consultation-item.in-progress {
   background: var(--consultas-brand-tint);
   border-color: var(--color-primary);
@@ -972,7 +972,7 @@
   font-size: 0.7rem;
 }
 
-/* ── Actividad de la consulta (citas en EnCurso/Pasada/NoShow/Cancelada) ── */
+/* ── Actividad de la consulta (consultas en EnCurso/Pasada/NoShow/Cancelada) ── */
 .consulta-activity__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -1138,4 +1138,33 @@
     gap: 0.4rem;
     margin-right: 0.5rem;
   }
+}
+
+/* ── Materiales de inventario en la consulta ─────────────────── */
+.consulta-materiales__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.consulta-materiales__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.consulta-materiales__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+.consulta-materiales__faltante {
+  color: var(--color-warning);
+  font-style: normal;
+  font-size: 0.82rem;
 }

@@ -58,6 +58,7 @@ const sanitizeUser = (user) => {
     contraseña: _pw,
     pinHash,
     refreshTokenHash,
+    previousRefreshTokenHash,
     refreshTokenExpiresAt,
     failedLoginAttempts,
     lockUntil,
@@ -274,9 +275,8 @@ const updateUser = async (req, res) => {
       }
       user.contraseña = contraseña;
       user.lastPasswordChangeAt = new Date();
-      // Invalidate existing sessions on password change
-      user.refreshTokenHash = null;
-      user.refreshTokenExpiresAt = null;
+      // SEC-01: invalidar TODAS las sesiones (incl. previousRefreshTokenHash).
+      user.revokeAllSessions();
     }
 
     await user.save();
@@ -315,8 +315,8 @@ const disableUser = async (req, res) => {
     }
 
     user.active = false;
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
+    // SEC-01: al desactivar, revocar TODAS las sesiones (incl. previousRefreshTokenHash).
+    user.revokeAllSessions();
     await user.save();
 
     return res.json(sanitizeUser(user));

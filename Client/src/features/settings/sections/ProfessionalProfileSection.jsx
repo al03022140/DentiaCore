@@ -180,7 +180,7 @@ const ProfessionalProfileSection = () => {
     // memoria de archivos enormes y da feedback inmediato. El server valida
     // igual (uploadFirma middleware → 413/400). La firma es legalmente
     // relevante (NOM-004), así que el tipo importa.
-    const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg'];
+    const ALLOWED = ['image/png', 'image/jpeg'];
     if (!ALLOWED.includes(file.type)) {
       setFirmaMsg({ type: 'error', text: 'Solo se aceptan imágenes PNG o JPG' });
       if (e.target) e.target.value = '';

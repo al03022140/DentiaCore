@@ -1,5 +1,6 @@
 // Import required models and dependencies
 const Patient = require('../models/patient.js');
+const { devError } = require('../utils/httpError');
 const Appointment = require('../models/appointment.js');
 const Periodontogram = require('../models/periodontogram.js');
 const Usuario = require('../models/users.js');
@@ -84,7 +85,7 @@ exports.deleteAllPatients = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error al borrar pacientes:', error);
-        res.status(500).json({ message: 'Error al borrar pacientes', error: error.message });
+        res.status(500).json({ message: 'Error al borrar pacientes', error: devError(error) });
     }
 };
 
@@ -230,7 +231,7 @@ exports.getAllPatients = async (req, res) => {
         });
     } catch (error) {
         console.error("❌ Error al obtener los pacientes:", error);
-        res.status(500).json({ message: 'Error al obtener los pacientes', error: error.message });
+        res.status(500).json({ message: 'Error al obtener los pacientes', error: devError(error) });
     }
 };
 
@@ -269,7 +270,7 @@ exports.searchPatients = async (req, res) => {
         res.status(200).json({ patients: sanitized });
     } catch (error) {
         console.error('❌ Error en searchPatients:', error);
-        res.status(500).json({ message: 'Error al buscar pacientes', error: error.message });
+        res.status(500).json({ message: 'Error al buscar pacientes', error: devError(error) });
     }
 };
 
@@ -288,9 +289,16 @@ exports.getPatientById = async (req, res) => {
         return res.status(400).json({ message: "El formato del ID del paciente no es válido" });
       }
   
-      // Buscar usando el _id de MongoDB (excluyendo dados de baja)
-      const patient = await Patient.findOne({ _id: id, deletedAt: null }).exec();
-  
+      // Buscar usando el _id de MongoDB (excluyendo dados de baja).
+      // firmadoPor de las notas se popula con el nombre/cédula del doctor: la
+      // UI (tooltip de firma e impresión del expediente) mostraba el nombre
+      // del USUARIO LOGUEADO como firmante porque nunca recibía el nombre
+      // real — en un documento clínico impreso eso atribuía la firma a la
+      // persona equivocada.
+      const patient = await Patient.findOne({ _id: id, deletedAt: null })
+        .populate({ path: 'notas_evolucion.firmadoPor', select: 'nombre cedulaProfesional' })
+        .exec();
+
       if (!patient) {
         debugLog("⚠️ Paciente no encontrado en la base de datos.");
         return res.status(404).json({ message: "Paciente no encontrado" });
@@ -359,10 +367,10 @@ exports.getPatientById = async (req, res) => {
       
       // Manejo de errores específicos
       if (error.name === 'CastError') {
-        return res.status(400).json({ message: "Formato de ID inválido", error: error.message });
+        return res.status(400).json({ message: "Formato de ID inválido", error: devError(error) });
       }
       
-      res.status(500).json({ message: "Error al obtener el paciente", error: error.message });
+      res.status(500).json({ message: "Error al obtener el paciente", error: devError(error) });
     }
   };
   
@@ -395,6 +403,43 @@ const validateFemaleDates = (info) => {
     const now = Date.now();
     for (const [field, msg] of checks) {
         const val = info[field];
+        if (val == null || val === '') continue;
+        const d = new Date(val);
+        if (!Number.isNaN(d.getTime()) && d.getTime() > now) return msg;
+    }
+    return null;
+};
+
+// Reglas de rango de la ficha (defensa servidor). Se validan a nivel de
+// CONTROLLER sobre el payload ENTRANTE —no en el schema— a propósito: un
+// validador de schema re-validaría el documento COMPLETO en cualquier
+// patient.save() (p. ej. finalizeClinicalHistory) y un dato legacy fuera de
+// rango bloquearía saves que no lo tocan. Devuelve mensaje de error o null.
+const validatePatientFieldRules = (data) => {
+    const MAX_NAME = LIMITS?.MAX_NAME_LENGTH || 50;
+    for (const field of ['primer_nombre', 'otros_nombres', 'apellido_paterno', 'apellido_materno']) {
+        const val = data[field];
+        if (typeof val === 'string' && val.length > MAX_NAME) {
+            return `El campo ${field.replace(/_/g, ' ')} no puede exceder ${MAX_NAME} caracteres`;
+        }
+    }
+    const semanas = data.encuesta_medica?.embarazo?.semanas_gestacion;
+    if (semanas !== undefined && semanas !== null && semanas !== '') {
+        const n = Number(semanas);
+        if (!Number.isFinite(n) || n < 0 || n > 45) {
+            return 'Las semanas de gestación deben estar entre 0 y 45';
+        }
+    }
+    // "Último examen médico" y "última visita al odontólogo" no pueden ser
+    // futuros — mismo criterio de coherencia NOM-024 que validateFemaleDates.
+    const now = Date.now();
+    const dateChecks = [
+        [data.encuesta_medica?.informacion_general?.ultimo_examen_medico?.fecha,
+            'La fecha del último examen médico no puede ser futura'],
+        [data.habitos_higiene?.fecha_ultima_visita_odontologo,
+            'La fecha de la última visita al odontólogo no puede ser futura'],
+    ];
+    for (const [val, msg] of dateChecks) {
         if (val == null || val === '') continue;
         const d = new Date(val);
         if (!Number.isNaN(d.getTime()) && d.getTime() > now) return msg;
@@ -504,6 +549,11 @@ exports.createPatient = async (req, res) => {
         // Fechas clínicas femeninas no pueden ser futuras (defensa servidor).
         const femErr = validateFemaleDates(safePatientData.informacion_femenina);
         if (femErr) return res.status(400).json({ message: femErr });
+
+        // Rangos de ficha: nombres ≤50, semanas de gestación 0-45, fechas
+        // médicas no futuras.
+        const ruleErr = validatePatientFieldRules(safePatientData);
+        if (ruleErr) return res.status(400).json({ message: ruleErr });
 
         // documento debe ser un objeto {tipo, numero}. Si llega como string/
         // array/number, las guardas `.numero` lo saltan en silencio (no corre el
@@ -650,10 +700,10 @@ exports.createPatient = async (req, res) => {
         if (error?.name === 'CastError') {
             return res.status(400).json({
                 message: 'Dato con tipo inválido en el paciente',
-                error: error.message
+                error: devError(error)
             });
         }
-        return res.status(500).json({ message: "Error al crear el paciente", error: error.message });
+        return res.status(500).json({ message: "Error al crear el paciente", error: devError(error) });
     } finally {
         // Limpiar carpeta + foto subida si no llegamos a persistir el paciente
         if (!savedSuccessfully && folderIdToCleanup) {
@@ -670,109 +720,10 @@ exports.createPatient = async (req, res) => {
     }
 };
 
-/** 🔹 Crear múltiples pacientes (batch) */
-exports.createPatients = async (req, res) => {
-    try {
-        if (!Array.isArray(req.body) || req.body.length === 0) {
-            return res.status(400).json({ message: "Debe enviar un array de pacientes" });
-        }
-
-        const MAX_BATCH = 100;
-        if (req.body.length > MAX_BATCH) {
-            return res.status(400).json({ message: `El batch máximo es de ${MAX_BATCH} pacientes` });
-        }
-
-        const patientsToInsert = [];
-        for (let i = 0; i < req.body.length; i++) {
-            const raw = req.body[i];
-            if (!raw || typeof raw !== 'object') {
-                return res.status(400).json({ message: `Entrada inválida en índice ${i}` });
-            }
-
-            // Whitelist por entrada (mismo set que createPatient) — bloquea
-            // mass-assignment de notas, planes, paciente_id, _id, etc.
-            const safe = {};
-            for (const key of CREATE_ALLOWED_FIELDS) {
-                if (raw[key] !== undefined) safe[key] = raw[key];
-            }
-
-            if (!safe.fecha_nacimiento) {
-                return res.status(400).json({ message: `Falta fecha_nacimiento en índice ${i}` });
-            }
-            const parsed = parseAndValidateBirthDate(safe.fecha_nacimiento);
-            if (!parsed) {
-                return res.status(400).json({ message: `Fecha de nacimiento inválida en índice ${i}` });
-            }
-            if (parsed.error === 'future') {
-                return res.status(400).json({ message: `Fecha de nacimiento futura en índice ${i}` });
-            }
-            if (parsed.error === 'too_old') {
-                return res.status(400).json({ message: `Edad mayor a 120 años en índice ${i}` });
-            }
-            safe.fecha_nacimiento = parsed.date;
-
-            if (safe.documento && safe.documento.numero != null) {
-                safe.documento.numero = String(safe.documento.numero).trim().toUpperCase();
-                if (!safe.documento.numero) {
-                    return res.status(400).json({ message: `Número de documento vacío en índice ${i}` });
-                }
-            }
-
-            const pacienteId = await Patient.generateUniquePatientId();
-            const newPatient = new Patient({
-                ...safe,
-                paciente_id: pacienteId,
-                edad: calcularEdad(safe.fecha_nacimiento),
-                creadoPor: req.user?.id || null
-            });
-            patientsToInsert.push(newPatient);
-        }
-
-        // Best-effort: ordered:false inserta todos los válidos y reporta los
-        // que fallan, en vez de abortar el lote completo en el primer duplicado
-        // (con ordered:true el cliente recibía 500 sin saber qué se insertó y
-        // reintentaba creando duplicados / quemando paciente_id). Devolvemos
-        // inserted + failed[] para que el importador reconcilie.
-        let insertedDocs = [];
-        let failed = [];
-        try {
-            insertedDocs = await Patient.insertMany(patientsToInsert, { ordered: false });
-        } catch (bulkErr) {
-            insertedDocs = Array.isArray(bulkErr.insertedDocs) ? bulkErr.insertedDocs : [];
-            const writeErrors = bulkErr.writeErrors
-                || (bulkErr.result && typeof bulkErr.result.getWriteErrors === 'function' ? bulkErr.result.getWriteErrors() : [])
-                || [];
-            // Si no es un fallo parcial reconocible (p. ej. error de conexión),
-            // delegar al catch externo.
-            if (!writeErrors.length && !insertedDocs.length) throw bulkErr;
-            failed = writeErrors.map((we) => ({
-                index: we.index,
-                code: we.code,
-                message: we.errmsg || (we.err && we.err.errmsg) || 'Error de inserción',
-                keyValue: (we.err && we.err.keyValue) || we.keyValue || null
-            }));
-        }
-
-        return res.status(failed.length === 0 ? 201 : 207).json({
-            message: failed.length === 0
-                ? 'Pacientes creados correctamente'
-                : `Creados ${insertedDocs.length} de ${patientsToInsert.length}; ${failed.length} fallaron`,
-            inserted: insertedDocs.length,
-            failed,
-            patients: insertedDocs
-        });
-
-    } catch (error) {
-        console.error("❌ Error al crear los pacientes:", error);
-        if (error?.name === 'ValidationError') {
-            return res.status(400).json({ message: 'Error de validación', errors: error.errors });
-        }
-        if (error?.code === 11000) {
-            return res.status(409).json({ message: 'Datos duplicados (índice único)', keyValue: error.keyValue || null });
-        }
-        res.status(500).json({ message: "Error al crear los pacientes", error: error.message });
-    }
-};
+// NOTA: se eliminó createPatients (POST /patients/batch). No tenía consumidor
+// (ni cliente, ni server, ni tests) y le faltaban las defensas del alta
+// individual (sanitización, fechas femeninas, dedup de paciente_id dentro del
+// lote). Si algún día llega un importador, reescribirlo sobre createPatient.
 
 // Campos que el cliente puede modificar en un PUT. Para evitar
 // mass-assignment + bypass del middleware pre-save (findOneAndUpdate NO
@@ -933,6 +884,10 @@ exports.updatePatient = async (req, res) => {
             if (femErr) return res.status(400).json({ message: femErr });
         }
 
+        // Rangos de ficha sobre el payload entrante (igual que en create).
+        const ruleErr = validatePatientFieldRules(safeUpdate);
+        if (ruleErr) return res.status(400).json({ message: ruleErr });
+
         // documento debe ser un objeto {tipo, numero}. Un string/array aquí hace
         // que castObject lo descarte a {} y el update "tenga éxito" (200) sin
         // cambiar nada (no-op silencioso). Rechazar con un 400 de formato.
@@ -1087,10 +1042,10 @@ exports.updatePatient = async (req, res) => {
         if (error?.name === 'CastError') {
             return res.status(400).json({
                 message: 'Dato con tipo inválido en la actualización del paciente',
-                error: error.message
+                error: devError(error)
             });
         }
-        return res.status(500).json({ message: "Error interno al actualizar el paciente", error: error.message });
+        return res.status(500).json({ message: "Error interno al actualizar el paciente", error: devError(error) });
     } finally {
         // Si subieron foto y el update no fue exitoso (validación, 404, etc.),
         // el archivo de multer quedó huérfano en profile-pic/. Borrarlo.
@@ -1145,6 +1100,13 @@ exports.deletePatient = async (req, res) => {
         const Odontograma = require('../models/odontograma.js');
         const PatientCharge = require('../models/patientCharge.js');
         const PatientAttachment = require('../models/patientAttachment.js');
+        // DB-INT-01: Examen (único con camino de escritura vivo hoy),
+        // Tratamiento y Receta también referencian al paciente por `paciente_id`
+        // y traen los campos de soft-delete; sin esto quedaban registros activos
+        // de un paciente dado de baja (rompe la cancelación LFPDPPP).
+        const Exam = require('../models/exam.js');
+        const Treatment = require('../models/treatment.js');
+        const Prescription = require('../models/prescription.js');
 
         const softDeleteSet = { $set: { deletedAt, deletedBy, deleteReason: cascadeReason } };
         const chargeCancelSet = { $set: { cancelado: true, canceladoEn: deletedAt, canceladoPor: deletedBy, canceladoMotivo: cascadeReason } };
@@ -1161,6 +1123,9 @@ exports.deletePatient = async (req, res) => {
                 Periodontogram.updateMany({ patient: patient._id, deletedAt: null }, softDeleteSet, opts),
                 PatientCharge.updateMany({ patientId: patient._id, cancelado: { $ne: true } }, chargeCancelSet, opts),
                 PatientAttachment.updateMany({ patientId: patient._id, deletedAt: null }, softDeleteSet, opts),
+                Exam.updateMany({ paciente_id: patient._id, deletedAt: null }, softDeleteSet, opts),
+                Treatment.updateMany({ paciente_id: patient._id, deletedAt: null }, softDeleteSet, opts),
+                Prescription.updateMany({ paciente_id: patient._id, deletedAt: null }, softDeleteSet, opts),
             ]);
         };
 
@@ -1206,16 +1171,278 @@ exports.saveOdontogramaScreenshot = (_req, res) => {
 };
 
 
+// Cotas de los campos de contenido de una nota — espejo del maxlength del
+// schema (models/patient.js → notas_evolucion), leídas de ahí para no duplicar
+// la fuente de verdad.
+const NOTE_CONTENT_FIELDS = ['procedimiento', 'observaciones', 'correcciones'];
+const NOTE_FIELD_MAX = Object.fromEntries(NOTE_CONTENT_FIELDS.map((f) => [
+  f, Patient.schema.path('notas_evolucion').schema.path(f).options.maxlength,
+]));
+
 /**
- * Hash determinístico del contenido de una nota de evolución.
- * Se usa como snapshot al firmar (paciente y doctor) para detectar
- * modificaciones posteriores (NOM-024).
+ * Valida tipos y cotas del payload de una nota de evolución ANTES de tocar el
+ * contador, el disco o la BD. Antes estos casos reventaban tarde: un campo
+ * numérico/objeto lanzaba TypeError (500), una fecha no parseable o un campo
+ * sobre el maxlength fallaban recién en el $push con runValidators (500) — ya
+ * con el contador monotónico consumido y, en el camino OFICIAL, con los PNGs
+ * de firma escritos y borrados en rollback.
+ *
+ * @param {object} evolutionNote
+ * @returns {string|null} mensaje de error para un 400, o null si es válido
  */
-// Delega en la utilidad compartida (utils/signing) para que TODOS los caminos
-// de firma de notas calculen el mismo hash. Se conserva el nombre local para
-// no tocar los call sites de este controller.
-function _computeEvolutionNoteHash(note) {
-  return computeEvolutionNoteHash(note);
+function validateEvolutionNotePayload(evolutionNote) {
+  for (const f of NOTE_CONTENT_FIELDS) {
+    const v = evolutionNote[f];
+    if (v !== undefined && v !== null && typeof v !== 'string') {
+      return `El campo ${f} debe ser texto.`;
+    }
+    if (typeof v === 'string' && v.trim().length > NOTE_FIELD_MAX[f]) {
+      return `El campo ${f} excede el máximo de ${NOTE_FIELD_MAX[f]} caracteres.`;
+    }
+  }
+  if (evolutionNote.fecha !== undefined && evolutionNote.fecha !== null
+      && Number.isNaN(new Date(evolutionNote.fecha).getTime())) {
+    return 'La fecha de la nota no es válida.';
+  }
+  return null;
+}
+
+/**
+ * Resuelve quién firma como doctor una nota de evolución (self o cross-user
+ * vía `doctorSignature.asDoctorId`) y valida su autenticación según el
+ * método ('pin' exige firma digital subida + PIN vigente; 'pad' no exige
+ * PIN, el trazo en vivo es la autorización).
+ *
+ * Antes esta lógica estaba duplicada entre addEvolutionNote y
+ * signExistingEvolutionNote (mismo comportamiento, sólo cambiaba el formato).
+ * No escribe en `res` directamente: devuelve `{ ok:false, status, body }` con
+ * el mismo status/body que cada caller ya enviaba, así ninguna respuesta cambia.
+ *
+ * @param {object} params
+ * @param {object} params.doctorSignature - { method, asDoctorId?, pin?, dataUrl? }
+ * @param {object} params.userPerms - permisos efectivos de req.user
+ * @param {object} params.req - request (para req.user.id)
+ * @param {string} [params.pinLockedMessage] - texto exacto del error 429 por PIN
+ *   bloqueado. Los dos call sites originales usaban redacciones ligeramente
+ *   distintas; se preserva vía este parámetro en vez de unificarlas.
+ * @returns {Promise<{ok:true, signerDoctor:object}|{ok:false, status:number, body:object}>}
+ */
+async function resolveSigningDoctor({
+  doctorSignature,
+  userPerms,
+  req,
+  pinLockedMessage = 'PIN del doctor bloqueado por demasiados intentos. Reintenta en {minutos} minuto(s).',
+}) {
+  let signerDoctor;
+
+  // Resolver QUIÉN firma:
+  //  - asDoctorId presente → otro usuario (asistente pidió firma al doctor)
+  //  - sin asDoctorId → req.user (auto-firma — requiere consultas.create)
+  const asDoctorId = doctorSignature.asDoctorId || null;
+  if (asDoctorId) {
+    if (!mongoose.Types.ObjectId.isValid(asDoctorId)) {
+      return { ok: false, status: 400, body: { success: false, error: 'ID de doctor inválido.' } };
+    }
+    signerDoctor = await Usuario.findById(asDoctorId);
+    if (!signerDoctor) {
+      return { ok: false, status: 404, body: { success: false, error: 'Doctor seleccionado no encontrado.' } };
+    }
+    if (signerDoctor.active === false) {
+      return { ok: false, status: 403, body: { success: false, error: 'La cuenta del doctor está desactivada.' } };
+    }
+    if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
+      return { ok: false, status: 403, body: { success: false, error: 'El usuario seleccionado no es doctor.' } };
+    }
+  } else {
+    // Auto-firma — req.user debe poder firmar OFICIAL (NOM-013)
+    if (!hasPermission(userPerms, ['consultas.create'])) {
+      return {
+        ok: false,
+        status: 403,
+        body: { success: false, error: 'No tiene permiso para firmar notas como OFICIAL. Pida al doctor que firme.' },
+      };
+    }
+    signerDoctor = await Usuario.findById(req.user.id);
+    if (!signerDoctor) {
+      return { ok: false, status: 401, body: { success: false, error: 'Usuario no encontrado.' } };
+    }
+    // El firmante OFICIAL debe ser doctor real (NOM-004 Art. 5.10), igual
+    // que en la rama de firma cruzada. Antes la auto-firma solo validaba
+    // el permiso `consultas.create`, dejando que una cuenta no-doctor con
+    // ese permiso firmara como oficial.
+    if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
+      return { ok: false, status: 403, body: { success: false, error: 'Solo un doctor puede firmar la nota como OFICIAL.' } };
+    }
+  }
+
+  // Autenticación del doctor firmante según el método:
+  //  - 'pin': reusa la firma digital subida; exige firma subida + PIN.
+  //  - 'pad' con el MISMO usuario de la sesión: el trazo basta (la sesión ya
+  //    autentica al doctor).
+  //  - 'pad' con OTRO doctor (asDoctorId ajeno — asistente pidiendo firma, o
+  //    doctor firmando en sesión ajena): se exige ADEMÁS el PIN del doctor.
+  //    Antes bastaba un PNG arbitrario como "firma del doctor" (suplantación
+  //    por cualquier cuenta con permisos de captura). Decisión del
+  //    propietario 2026-07-12 — cierra el modo laxo documentado aquí antes.
+  const isCrossUser = Boolean(asDoctorId) && String(asDoctorId) !== String(req.user.id);
+  if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.' },
+    };
+  }
+  if (doctorSignature.method === 'pin' || isCrossUser) {
+    if (!signerDoctor.pinHash) {
+      return {
+        ok: false,
+        status: 400,
+        body: { success: false, error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.' },
+      };
+    }
+    const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
+    if (!pinResult.ok) {
+      if (pinResult.locked) {
+        const minutos = Math.ceil(pinResult.remainingMs / 60000);
+        return {
+          ok: false,
+          status: 429,
+          body: { success: false, error: pinLockedMessage.replace('{minutos}', minutos), locked: true },
+        };
+      }
+      return {
+        ok: false,
+        status: 401,
+        body: { success: false, error: 'PIN del doctor incorrecto.', attemptsLeft: pinResult.attemptsLeft },
+      };
+    }
+  }
+
+  return { ok: true, signerDoctor };
+}
+
+/**
+ * Persiste las firmas (paciente + doctor) de una nota de evolución que se va
+ * a marcar OFICIAL, mutando `note` in-place igual que el código original.
+ *
+ * Antes este bloque estaba duplicado entre addEvolutionNote y
+ * signExistingEvolutionNote (idéntico salvo el mensaje del catch de PIN y si
+ * se loggeaba con console.error). Se preservan ambas diferencias vía
+ * parámetros para no alterar ninguna respuesta ni ningún log existente.
+ *
+ * @param {object} params
+ * @param {object} params.note - subdocumento de la nota (Mongoose), se muta in-place
+ * @param {string} params.patientId
+ * @param {string} params.patientSignature - dataURL de la firma del paciente
+ * @param {object} params.doctorSignature - { method, dataUrl? }
+ * @param {object} params.signerDoctor - Usuario que firma como doctor
+ * @param {Date} params.now
+ * @param {string|null} [params.logContext] - prefijo de console.error si falla el
+ *   snapshot de la firma del doctor; `null` para no loggear (signExistingEvolutionNote no lo hacía)
+ * @param {string} [params.doctorSnapshotFailureMessage] - texto del error 500
+ *   cuando falla el snapshot de la firma del doctor (varía entre call sites)
+ * @returns {Promise<{ok:true, writtenSignaturePaths:string[]}|{ok:false, status:number, body:object}>}
+ */
+async function persistNoteSignatures({
+  note,
+  patientId,
+  patientSignature,
+  doctorSignature,
+  signerDoctor,
+  now,
+  logContext = '[addEvolutionNote]',
+  doctorSnapshotFailureMessage = 'No se pudo persistir el snapshot de la firma del doctor. La nota NO fue guardada. Intente nuevamente o contacte a soporte.',
+}) {
+  const writtenSignaturePaths = [];
+  const noteId = note._id.toString();
+  const contentHash = computeEvolutionNoteHash(note);
+  // Sufijo único POR INTENTO de firma. Antes dos intentos sobre la MISMA nota
+  // (doble submit, o firma concurrente vía Centro de Firmas) escribían
+  // exactamente las mismas rutas (`<noteId>_paciente.png`): el perdedor de la
+  // carrera primero PISABA los PNGs del ganador y luego su rollback los
+  // BORRABA — la nota OFICIAL quedaba apuntando a archivos ajenos o
+  // inexistentes (pérdida de la evidencia de firma). Con sufijo por intento
+  // cada request escribe y revierte SOLO sus propios archivos.
+  const attempt = crypto.randomBytes(4).toString('hex');
+
+  // 1) Firma del paciente. Guardamos también el hash SHA-256 del PNG
+  // (`pacienteFirmaImageHash`) para detectar tampering del archivo
+  // en disco posterior al firmado (no reemplaza PKI, es defensa
+  // en profundidad — un script de auditoría puede comparar).
+  try {
+    const patientSig = await saveSignatureDataUrl(patientSignature, [
+      'pacientes', patientId, 'firmas-notas', `${noteId}_paciente_${attempt}`
+    ]);
+    if (patientSig.absPath) writtenSignaturePaths.push(patientSig.absPath);
+    note.pacienteFirmaUrl = patientSig.publicUrl;
+    note.pacienteFirmadoEn = now;
+    note.pacienteFirmaContentHash = contentHash;
+    note.pacienteFirmaImageHash = patientSig.contentHash;
+  } catch (e) {
+    // La nota no se va a guardar. NO decrementamos el counter: es
+    // monótono por diseño (se aceptan huecos) y un $inc -1 aquí podría
+    // pisar un incremento concurrente de otra nota.
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: `No se pudo guardar la firma del paciente: ${e.message}` },
+    };
+  }
+
+  // 2) Firma del doctor — siempre persistimos un snapshot servible
+  // junto con el hash del PNG.
+  if (doctorSignature.method === 'pad') {
+    try {
+      const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
+        'pacientes', patientId, 'firmas-notas', `${noteId}_doctor_${attempt}`
+      ]);
+      if (docSig.absPath) writtenSignaturePaths.push(docSig.absPath);
+      note.doctorFirmaUrl = docSig.publicUrl;
+      note.doctorFirmaImageHash = docSig.contentHash;
+    } catch (e) {
+      // Rollback: borra la firma del paciente ya escrita. El counter es
+      // monótono (no se decrementa — ver nota arriba).
+      await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+      return {
+        ok: false,
+        status: 400,
+        body: { success: false, error: `No se pudo guardar la firma del doctor: ${e.message}` },
+      };
+    }
+  } else {
+    // PIN: copiar la firma del doctor a la carpeta del paciente como
+    // snapshot inmutable (NOM-024). La verificación previa garantiza que
+    // signerDoctor.firmaDigitalUrl existe.
+    // Si la copia falla, abortamos el guardado completo en vez de dejar
+    // una nota OFICIAL sin firma visible. El usuario verá el error y
+    // podrá reintentar; nada se persiste en la BD (no llamamos a save()).
+    try {
+      const snap = await copyFirmaToSnapshot(signerDoctor.firmaDigitalUrl, [
+        'pacientes', patientId, 'firmas-notas', `${noteId}_doctor_${attempt}`
+      ]);
+      if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
+      note.doctorFirmaUrl = snap.publicUrl;
+      note.doctorFirmaImageHash = snap.contentHash;
+    } catch (e) {
+      if (logContext) console.error(`${logContext} Fallo al copiar snapshot de firma:`, e.message);
+      await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
+      return {
+        ok: false,
+        status: 500,
+        body: { success: false, error: doctorSnapshotFailureMessage },
+      };
+    }
+  }
+  note.doctorFirmaMethod = doctorSignature.method;
+
+  // firmadoPor = el DOCTOR que firmó (puede ser ≠ del creador si fue
+  // cross-user signing iniciado por un asistente).
+  note.firmadoPor = signerDoctor._id;
+  note.firmadoEn = now;
+  note.contentHash = contentHash;
+  note.firmaDesactualizada = false;
+
+  return { ok: true, writtenSignaturePaths };
 }
 
 /** 🔹 Agregar nota de evolución */
@@ -1224,8 +1451,20 @@ exports.addEvolutionNote = async (req, res) => {
     const { id } = req.params;
     const { evolutionNote, patientSignature, doctorSignature } = req.body;
 
+    if (!evolutionNote || typeof evolutionNote !== 'object' || Array.isArray(evolutionNote)) {
+      return res.status(400).json({
+        success: false,
+        error: 'La nota de evolución es requerida.'
+      });
+    }
+    // Tipos, cotas y fecha ANTES de contador/firmas/BD (400 en vez de 500 tardío).
+    const invalidMsg = validateEvolutionNotePayload(evolutionNote);
+    if (invalidMsg) {
+      return res.status(400).json({ success: false, error: invalidMsg });
+    }
+
     // Validar datos de entrada: al menos uno de los campos debe tener contenido
-    const hasContent = evolutionNote && (
+    const hasContent = (
       (evolutionNote.procedimiento && evolutionNote.procedimiento.trim()) ||
       (evolutionNote.observaciones && evolutionNote.observaciones.trim()) ||
       (evolutionNote.correcciones && evolutionNote.correcciones.trim())
@@ -1259,6 +1498,15 @@ exports.addEvolutionNote = async (req, res) => {
     }
 
     const hasSignaturesPayload = Boolean(patientSignature && doctorSignature && doctorSignature.method);
+    // Firma incompleta (una sola de las dos, o doctorSignature sin method):
+    // antes se degradaba en silencio a BORRADOR, descartando una firma del
+    // paciente ya capturada sin avisarle a nadie.
+    if ((patientSignature || doctorSignature) && !hasSignaturesPayload) {
+      return res.status(400).json({
+        success: false,
+        error: 'Firma incompleta: para guardar como OFICIAL se requieren la firma del paciente Y la del doctor (con método). Omita ambas para guardar como BORRADOR.'
+      });
+    }
     const estadoRegistro = hasSignaturesPayload ? 'OFICIAL' : 'BORRADOR';
 
     // ── Si pide OFICIAL, validar todo ──────────────────────────────
@@ -1277,84 +1525,11 @@ exports.addEvolutionNote = async (req, res) => {
         });
       }
 
-      // Resolver QUIÉN firma:
-      //  - asDoctorId presente → otro usuario (asistente pidió firma al doctor)
-      //  - sin asDoctorId → req.user (auto-firma — requiere consultas.create)
-      const asDoctorId = doctorSignature.asDoctorId || null;
-      if (asDoctorId) {
-        if (!mongoose.Types.ObjectId.isValid(asDoctorId)) {
-          return res.status(400).json({ success: false, error: 'ID de doctor inválido.' });
-        }
-        signerDoctor = await Usuario.findById(asDoctorId);
-        if (!signerDoctor) {
-          return res.status(404).json({ success: false, error: 'Doctor seleccionado no encontrado.' });
-        }
-        if (signerDoctor.active === false) {
-          return res.status(403).json({ success: false, error: 'La cuenta del doctor está desactivada.' });
-        }
-        if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
-          return res.status(403).json({ success: false, error: 'El usuario seleccionado no es doctor.' });
-        }
-      } else {
-        // Auto-firma — req.user debe poder firmar OFICIAL (NOM-013)
-        if (!hasPermission(userPerms, ['consultas.create'])) {
-          return res.status(403).json({
-            success: false,
-            error: 'No tiene permiso para firmar notas como OFICIAL. Pida al doctor que firme.'
-          });
-        }
-        signerDoctor = await Usuario.findById(req.user.id);
-        if (!signerDoctor) {
-          return res.status(401).json({ success: false, error: 'Usuario no encontrado.' });
-        }
-        // El firmante OFICIAL debe ser doctor real (NOM-004 Art. 5.10), igual
-        // que en la rama de firma cruzada. Antes la auto-firma solo validaba
-        // el permiso `consultas.create`, dejando que una cuenta no-doctor con
-        // ese permiso firmara como oficial.
-        if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
-          return res.status(403).json({ success: false, error: 'Solo un doctor puede firmar la nota como OFICIAL.' });
-        }
+      const signerResult = await resolveSigningDoctor({ doctorSignature, userPerms, req });
+      if (!signerResult.ok) {
+        return res.status(signerResult.status).json(signerResult.body);
       }
-
-      // Autenticación del doctor firmante según el método:
-      //  - 'pin': reusa la firma digital subida; exige firma subida + PIN.
-      //  - 'pad': el doctor dibuja su firma en vivo; el TRAZO es la
-      //    autorización, por lo que NO se exige PIN (el dataUrl se valida y
-      //    guarda más abajo; saveSignatureDataUrl rechaza dibujos vacíos).
-      //  NOTA DE SEGURIDAD: relajar el PIN en 'pad' reintroduce el riesgo de
-      //  que un asistente con permisos envíe un PNG arbitrario como "firma del
-      //  doctor" (suplantación). Es una decisión explícita del propietario;
-      //  para volver al modo estricto, exigir PIN también aquí.
-      if (doctorSignature.method === 'pin') {
-        if (!signerDoctor.firmaDigitalUrl) {
-          return res.status(400).json({
-            success: false,
-            error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-          });
-        }
-        if (!signerDoctor.pinHash) {
-          return res.status(400).json({
-            success: false,
-            error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.'
-          });
-        }
-        const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
-        if (!pinResult.ok) {
-          if (pinResult.locked) {
-            const minutos = Math.ceil(pinResult.remainingMs / 60000);
-            return res.status(429).json({
-              success: false,
-              error: `PIN del doctor bloqueado por demasiados intentos. Reintenta en ${minutos} minuto(s).`,
-              locked: true
-            });
-          }
-          return res.status(401).json({
-            success: false,
-            error: 'PIN del doctor incorrecto.',
-            attemptsLeft: pinResult.attemptsLeft
-          });
-        }
-      }
+      signerDoctor = signerResult.signerDoctor;
     }
 
     // Calcular numero_procedimiento de forma 100% atómica con un UPDATE de
@@ -1429,7 +1604,13 @@ exports.addEvolutionNote = async (req, res) => {
       observaciones: (evolutionNote.observaciones || '').trim(),
       correcciones: (evolutionNote.correcciones || '').trim(),
       fecha: fechaNota,
-      fechaFormateada: evolutionNote.fechaFormateada || fechaNota.toLocaleDateString('es-ES', {
+      // La etiqueta visible se deriva SIEMPRE de la fecha clínica (la que cubre
+      // el contentHash y vigila el guard de captura extemporánea). Antes se
+      // aceptaba `fechaFormateada` del cliente y la UI la prefiere al
+      // renderizar: una nota firmada podía MOSTRAR una fecha arbitraria
+      // distinta de la fecha hasheada, fuera de toda verificación (el cliente
+      // propio nunca envía este campo — sólo lo explotaría un caller directo).
+      fechaFormateada: fechaNota.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -1455,87 +1636,23 @@ exports.addEvolutionNote = async (req, res) => {
 
     // Rastrea archivos de firma escritos a disco — si la inserción falla
     // los borramos para evitar dejar PNGs huérfanos (BUG-C3).
-    const writtenSignaturePaths = [];
+    let writtenSignaturePaths = [];
 
     // Persistir firmas SOLO si la nota es OFICIAL (BORRADOR sin firma)
     if (estadoRegistro === 'OFICIAL') {
-      const savedSubdoc = noteSubdoc;
-      const noteId = savedSubdoc._id.toString();
-      const contentHash = _computeEvolutionNoteHash(savedSubdoc);
-
-      // 1) Firma del paciente. Guardamos también el hash SHA-256 del PNG
-      // (`pacienteFirmaImageHash`) para detectar tampering del archivo
-      // en disco posterior al firmado (no reemplaza PKI, es defensa
-      // en profundidad — un script de auditoría puede comparar).
-      try {
-        const patientSig = await saveSignatureDataUrl(patientSignature, [
-          'pacientes', id, 'firmas-notas', `${noteId}_paciente.png`
-        ]);
-        if (patientSig.absPath) writtenSignaturePaths.push(patientSig.absPath);
-        savedSubdoc.pacienteFirmaUrl = patientSig.publicUrl;
-        savedSubdoc.pacienteFirmadoEn = now;
-        savedSubdoc.pacienteFirmaContentHash = contentHash;
-        savedSubdoc.pacienteFirmaImageHash = patientSig.contentHash;
-      } catch (e) {
-        // La nota no se va a guardar. NO decrementamos el counter: es
-        // monótono por diseño (se aceptan huecos) y un $inc -1 aquí podría
-        // pisar un incremento concurrente de otra nota.
-        return res.status(400).json({
-          success: false,
-          error: `No se pudo guardar la firma del paciente: ${e.message}`
-        });
+      const signResult = await persistNoteSignatures({
+        note: noteSubdoc,
+        patientId: id,
+        patientSignature,
+        doctorSignature,
+        signerDoctor,
+        now,
+        logContext: '[addEvolutionNote]',
+      });
+      if (!signResult.ok) {
+        return res.status(signResult.status).json(signResult.body);
       }
-
-      // 2) Firma del doctor — siempre persistimos un snapshot servible
-      // junto con el hash del PNG.
-      if (doctorSignature.method === 'pad') {
-        try {
-          const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
-            'pacientes', id, 'firmas-notas', `${noteId}_doctor.png`
-          ]);
-          if (docSig.absPath) writtenSignaturePaths.push(docSig.absPath);
-          savedSubdoc.doctorFirmaUrl = docSig.publicUrl;
-          savedSubdoc.doctorFirmaImageHash = docSig.contentHash;
-        } catch (e) {
-          // Rollback: borra la firma del paciente ya escrita. El counter es
-          // monótono (no se decrementa — ver nota arriba).
-          await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-          return res.status(400).json({
-            success: false,
-            error: `No se pudo guardar la firma del doctor: ${e.message}`
-          });
-        }
-      } else {
-        // PIN: copiar la firma del doctor a la carpeta del paciente como
-        // snapshot inmutable (NOM-024). La verificación previa garantiza que
-        // signerDoctor.firmaDigitalUrl existe.
-        // Si la copia falla, abortamos el guardado completo en vez de dejar
-        // una nota OFICIAL sin firma visible. El usuario verá el error y
-        // podrá reintentar; nada se persiste en la BD (no llamamos a save()).
-        try {
-          const snap = await copyFirmaToSnapshot(signerDoctor.firmaDigitalUrl, [
-            'pacientes', id, 'firmas-notas', `${noteId}_doctor`
-          ]);
-          if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
-          savedSubdoc.doctorFirmaUrl = snap.publicUrl;
-          savedSubdoc.doctorFirmaImageHash = snap.contentHash;
-        } catch (e) {
-          console.error('[addEvolutionNote] Fallo al copiar snapshot de firma:', e.message);
-          await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-          return res.status(500).json({
-            success: false,
-            error: 'No se pudo persistir el snapshot de la firma del doctor. La nota NO fue guardada. Intente nuevamente o contacte a soporte.'
-          });
-        }
-      }
-      savedSubdoc.doctorFirmaMethod = doctorSignature.method;
-
-      // firmadoPor = el DOCTOR que firmó (puede ser ≠ del creador si fue
-      // cross-user signing iniciado por un asistente).
-      savedSubdoc.firmadoPor = signerDoctor._id;
-      savedSubdoc.firmadoEn = now;
-      savedSubdoc.contentHash = contentHash;
-      savedSubdoc.firmaDesactualizada = false;
+      writtenSignaturePaths = signResult.writtenSignaturePaths;
     }
 
     // Insertar la nota con un $push atómico al inicio del array ($position:0),
@@ -1594,10 +1711,22 @@ exports.addEvolutionNote = async (req, res) => {
       }).catch(() => {});
     }
 
+    // firmadoPor enriquecido con el snapshot del firmante ya cargado (misma
+    // forma que el populate de getPatientById): la UI muestra el nombre del
+    // doctor en tooltip/impresión sin tener que recargar el expediente.
+    const responseNote = savedNote.toObject();
+    if (responseNote.firmadoPor && signerDoctor) {
+      responseNote.firmadoPor = {
+        _id: signerDoctor._id,
+        nombre: signerDoctor.nombre,
+        cedulaProfesional: signerDoctor.cedulaProfesional || null,
+      };
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Nota de evolución agregada correctamente',
-      data: savedNote
+      data: responseNote
     });
   } catch (error) {
     console.error('Error al agregar nota de evolución:', error);
@@ -1664,19 +1793,22 @@ exports.updateDraftEvolutionNote = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Permiso insuficiente.' });
     }
 
-    const { procedimiento, observaciones, correcciones } = req.body || {};
     const changes = {};
-    if (typeof procedimiento === 'string') {
-      changes.procedimiento = procedimiento.trim();
-      note.procedimiento = changes.procedimiento;
-    }
-    if (typeof observaciones === 'string') {
-      changes.observaciones = observaciones.trim();
-      note.observaciones = changes.observaciones;
-    }
-    if (typeof correcciones === 'string') {
-      changes.correcciones = correcciones.trim();
-      note.correcciones = changes.correcciones;
+    for (const f of NOTE_CONTENT_FIELDS) {
+      const v = (req.body || {})[f];
+      if (typeof v !== 'string') continue;
+      const trimmed = v.trim();
+      // Cota espejo del schema: el $set posicional de abajo NO corre
+      // validators de Mongoose, así que sin este check el maxlength de
+      // notas_evolucion era bypasseable editando el borrador.
+      if (trimmed.length > NOTE_FIELD_MAX[f]) {
+        return res.status(400).json({
+          success: false,
+          error: `El campo ${f} excede el máximo de ${NOTE_FIELD_MAX[f]} caracteres.`
+        });
+      }
+      changes[f] = trimmed;
+      note[f] = trimmed;
     }
 
     if (Object.keys(changes).length === 0) {
@@ -1731,7 +1863,7 @@ exports.updateDraftEvolutionNote = async (req, res) => {
     console.error('Error en updateDraftEvolutionNote:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Error interno al actualizar la nota.'
+      error: devError(error) || 'Error interno al actualizar la nota.'
     });
   }
 };
@@ -1775,103 +1907,35 @@ exports.signExistingEvolutionNote = async (req, res) => {
 
     const userPerms = getEffectivePermissions(req.user);
 
-    const asDoctorId = doctorSignature.asDoctorId || null;
-    let signerDoctor;
-    if (asDoctorId) {
-      if (!mongoose.Types.ObjectId.isValid(asDoctorId)) {
-        return res.status(400).json({ success: false, error: 'ID de doctor inválido.' });
-      }
-      signerDoctor = await Usuario.findById(asDoctorId);
-      if (!signerDoctor) return res.status(404).json({ success: false, error: 'Doctor seleccionado no encontrado.' });
-      if (signerDoctor.active === false) return res.status(403).json({ success: false, error: 'La cuenta del doctor está desactivada.' });
-      if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
-        return res.status(403).json({ success: false, error: 'El usuario seleccionado no es doctor.' });
-      }
-    } else {
-      if (!hasPermission(userPerms, ['consultas.create'])) {
-        return res.status(403).json({
-          success: false,
-          error: 'No tiene permiso para firmar notas como OFICIAL. Pida al doctor que firme.'
-        });
-      }
-      signerDoctor = await Usuario.findById(req.user.id);
-      if (!signerDoctor) return res.status(401).json({ success: false, error: 'Usuario no encontrado.' });
-      if (!['doctor', 'doctor_admin'].includes(signerDoctor.rol)) {
-        return res.status(403).json({ success: false, error: 'Solo un doctor puede firmar la nota como OFICIAL.' });
-      }
+    const signerResult = await resolveSigningDoctor({
+      doctorSignature,
+      userPerms,
+      req,
+      pinLockedMessage: 'PIN del doctor bloqueado. Reintenta en {minutos} minuto(s).',
+    });
+    if (!signerResult.ok) {
+      return res.status(signerResult.status).json(signerResult.body);
     }
-
-    // 'pin' → exige firma subida + PIN. 'pad' → el dibujo en vivo es la
-    // autorización; no se exige PIN (el dataUrl se valida/guarda abajo).
-    if (doctorSignature.method === 'pin') {
-      if (!signerDoctor.firmaDigitalUrl) {
-        return res.status(400).json({
-          success: false,
-          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-        });
-      }
-      if (!signerDoctor.pinHash) {
-        return res.status(400).json({ success: false, error: 'El doctor no tiene PIN configurado. Configure su PIN en Mi Perfil antes de firmar.' });
-      }
-      const pinResult = await signerDoctor.verificarPinDetallado(doctorSignature.pin || '');
-      if (!pinResult.ok) {
-        if (pinResult.locked) {
-          const minutos = Math.ceil(pinResult.remainingMs / 60000);
-          return res.status(429).json({ success: false, error: `PIN del doctor bloqueado. Reintenta en ${minutos} minuto(s).`, locked: true });
-        }
-        return res.status(401).json({ success: false, error: 'PIN del doctor incorrecto.', attemptsLeft: pinResult.attemptsLeft });
-      }
-    }
+    const signerDoctor = signerResult.signerDoctor;
 
     const now = new Date();
     const noteIdStr = note._id.toString();
-    const contentHash = _computeEvolutionNoteHash(note);
-    const writtenSignaturePaths = [];
 
-    try {
-      const patientSig = await saveSignatureDataUrl(patientSignature, [
-        'pacientes', id, 'firmas-notas', `${noteIdStr}_paciente.png`
-      ]);
-      if (patientSig.absPath) writtenSignaturePaths.push(patientSig.absPath);
-      note.pacienteFirmaUrl = patientSig.publicUrl;
-      note.pacienteFirmadoEn = now;
-      note.pacienteFirmaContentHash = contentHash;
-      note.pacienteFirmaImageHash = patientSig.contentHash;
-    } catch (e) {
-      return res.status(400).json({ success: false, error: `No se pudo guardar la firma del paciente: ${e.message}` });
+    const signResult = await persistNoteSignatures({
+      note,
+      patientId: id,
+      patientSignature,
+      doctorSignature,
+      signerDoctor,
+      now,
+      logContext: null,
+      doctorSnapshotFailureMessage: 'No se pudo persistir el snapshot de la firma del doctor.',
+    });
+    if (!signResult.ok) {
+      return res.status(signResult.status).json(signResult.body);
     }
+    const writtenSignaturePaths = signResult.writtenSignaturePaths;
 
-    if (doctorSignature.method === 'pad') {
-      try {
-        const docSig = await saveSignatureDataUrl(doctorSignature.dataUrl, [
-          'pacientes', id, 'firmas-notas', `${noteIdStr}_doctor.png`
-        ]);
-        if (docSig.absPath) writtenSignaturePaths.push(docSig.absPath);
-        note.doctorFirmaUrl = docSig.publicUrl;
-        note.doctorFirmaImageHash = docSig.contentHash;
-      } catch (e) {
-        await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-        return res.status(400).json({ success: false, error: `No se pudo guardar la firma del doctor: ${e.message}` });
-      }
-    } else {
-      try {
-        const snap = await copyFirmaToSnapshot(signerDoctor.firmaDigitalUrl, [
-          'pacientes', id, 'firmas-notas', `${noteIdStr}_doctor`
-        ]);
-        if (snap.absPath) writtenSignaturePaths.push(snap.absPath);
-        note.doctorFirmaUrl = snap.publicUrl;
-        note.doctorFirmaImageHash = snap.contentHash;
-      } catch (_e) {
-        await Promise.all(writtenSignaturePaths.map(p => fs.remove(p).catch(() => {})));
-        return res.status(500).json({ success: false, error: 'No se pudo persistir el snapshot de la firma del doctor.' });
-      }
-    }
-
-    note.doctorFirmaMethod = doctorSignature.method;
-    note.firmadoPor = signerDoctor._id;
-    note.firmadoEn = now;
-    note.contentHash = contentHash;
-    note.firmaDesactualizada = false;
     note.estadoRegistro = 'OFICIAL';
 
     // Persistir con un $set posicional atómico en vez de patient.save(). El
@@ -1909,32 +1973,44 @@ exports.signExistingEvolutionNote = async (req, res) => {
       resourceType: 'patient',
       resourceId: note._id,
       patientId: patient._id,
-      detalles: { contentHash, noteId: noteIdStr, method: doctorSignature.method }
+      detalles: { contentHash: note.contentHash, noteId: noteIdStr, method: doctorSignature.method }
     }).catch(() => {});
 
-    return res.json({ success: true, message: 'Nota firmada exitosamente como OFICIAL.', data: note });
+    // Igual que en addEvolutionNote: firmadoPor enriquecido con el firmante ya
+    // cargado, para que la UI muestre el nombre real sin recargar.
+    const responseNote = note.toObject();
+    responseNote.firmadoPor = {
+      _id: signerDoctor._id,
+      nombre: signerDoctor.nombre,
+      cedulaProfesional: signerDoctor.cedulaProfesional || null,
+    };
+
+    return res.json({ success: true, message: 'Nota firmada exitosamente como OFICIAL.', data: responseNote });
   } catch (error) {
     console.error('Error en signExistingEvolutionNote:', error);
-    return res.status(500).json({ success: false, error: error.message || 'Error interno al firmar la nota.' });
+    return res.status(500).json({ success: false, error: devError(error) || 'Error interno al firmar la nota.' });
   }
 };
 
 /**
- * 🔹 Verificar la integridad de una nota de evolución firmada.
+ * 🔹 Verificar la integridad de una nota de evolución.
  *
  * GET /patients/:id/evolution-note/:noteId/verify
  *
- * NOM-024-SSA3-2012 (integridad). Comprueba dos cosas que hasta ahora se
- * guardaban pero NUNCA se verificaban:
- *   1. Que el contenido clínico no cambió tras la firma → recomputa el
- *      contentHash y lo compara con el snapshot guardado al firmar.
- *   2. Que los PNG de firma en disco no fueron manipulados → compara el
- *      SHA-256 actual del archivo contra el hash guardado al firmar
- *      (verifySignatureImageHash, que antes era código muerto).
- *
- * Es de sólo lectura y no muta nada; expone un reporte para auditoría.
+ * Recalcula el hash del contenido clínico y los SHA-256 de las imágenes de
+ * firma en disco, y los compara contra lo sellado al firmar. El veredicto
+ * (evaluateNoteIntegrity, utils/signing) aplica las reglas NOM-004/NOM-024:
+ * una OFICIAL exige contenido y firma del doctor íntegros; la firma del
+ * paciente sólo penaliza si está presente y alterada (el Centro de Firmas
+ * produce OFICIALES sin ella por diseño del flujo de delegación).
  */
 exports.verifyEvolutionNoteIntegrity = async (req, res) => {
+  // URL pública almacenada por el server ('/uploads/...') → ruta absoluta.
+  const uploadsPathFromPublicUrl = (publicUrl) => (
+    (typeof publicUrl === 'string' && publicUrl.startsWith('/uploads/'))
+      ? resolveUploadsPath(...publicUrl.replace(/^\/uploads\//, '').split('/'))
+      : null
+  );
   try {
     const { id, noteId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(noteId)) {
@@ -1947,64 +2023,45 @@ exports.verifyEvolutionNoteIntegrity = async (req, res) => {
     const note = patient.notas_evolucion.id(noteId);
     if (!note || note.deletedAt) return res.status(404).json({ success: false, error: 'Nota no encontrada.' });
 
-    // 1) Integridad del contenido vs hash firmado.
-    const expectedContentHash = note.contentHash || null;
-    const actualContentHash = _computeEvolutionNoteHash(note);
-    const contenido = {
-      ok: expectedContentHash ? expectedContentHash === actualContentHash : null,
-      expected: expectedContentHash,
-      actual: actualContentHash,
-      // Si la nota nunca se firmó (BORRADOR), no hay hash de referencia.
-      motivo: expectedContentHash ? undefined : 'nota_sin_firma',
-    };
+    // Contenido vs hash sellado al firmar (null = sin referencia; el veredicto
+    // decide si eso es anomalía según el estado).
+    const computedHash = computeEvolutionNoteHash(note);
+    const contenidoOk = note.contentHash ? computedHash === note.contentHash : null;
 
-    // 2) Integridad de los PNG de firma en disco.
-    // publicUrl es '/uploads/...'; lo mapeamos a ruta absoluta del store.
-    const toAbsPath = (publicUrl) => {
-      if (!publicUrl) return null;
-      const rel = String(publicUrl).replace(/^\/+/, '').replace(/^uploads\//i, '');
-      return resolveUploadsPath(...rel.split('/').filter(Boolean));
-    };
+    // Imágenes de firma vs su SHA-256 sellado (detecta swap del archivo en disco).
+    const firmaPacienteOk = (note.pacienteFirmaUrl && note.pacienteFirmaImageHash)
+      ? (await verifySignatureImageHash(uploadsPathFromPublicUrl(note.pacienteFirmaUrl), note.pacienteFirmaImageHash)).ok
+      : null;
+    let firmaDoctorOk;
+    if (note.doctorFirmaUrl && note.doctorFirmaImageHash) {
+      firmaDoctorOk = (await verifySignatureImageHash(uploadsPathFromPublicUrl(note.doctorFirmaUrl), note.doctorFirmaImageHash)).ok;
+    } else if (note.doctorFirmaMethod === 'pin' && note.firmadoPor) {
+      // Firma electrónica (PIN + contentHash) sin imagen: válida por diseño —
+      // el Centro de Firmas no bloquea ante un fallo de disco del snapshot.
+      firmaDoctorOk = true;
+    } else {
+      firmaDoctorOk = null; // sin evidencia de firma del doctor
+    }
 
-    // Sólo se puede verificar si hay URL de firma Y hash de referencia guardado.
-    // Sin uno u otro → no aplica (null), no se reporta como manipulación.
-    const checkFirma = (url, expectedHash) => {
-      if (!url) return { ok: null, reason: 'sin_firma' };
-      if (!expectedHash) return { ok: null, reason: 'sin_hash_referencia' };
-      return verifySignatureImageHash(toAbsPath(url), expectedHash);
-    };
-    const firmaPaciente = await checkFirma(note.pacienteFirmaUrl, note.pacienteFirmaImageHash);
-    const firmaDoctor = await checkFirma(note.doctorFirmaUrl, note.doctorFirmaImageHash);
-
-    // Veredicto de integridad (función pura). A diferencia del cálculo anterior
-    // (`ok !== false` en las tres comprobaciones), una nota OFICIAL ahora EXIGE
-    // contentHash válido y firma del doctor presente e íntegra; si falta alguno
-    // → NO íntegra. Antes una nota OFICIAL sin hash o sin firma del doctor (p. ej.
-    // firmada por el Centro de Firmas) reportaba `integro: true` falsamente.
-    const { integro, motivos } = evaluateNoteIntegrity({
+    const veredicto = evaluateNoteIntegrity({
       estadoRegistro: note.estadoRegistro,
-      contenidoOk: contenido.ok,
-      firmaPacienteOk: firmaPaciente.ok,
-      firmaDoctorOk: firmaDoctor.ok,
+      contenidoOk,
+      firmaPacienteOk,
+      firmaDoctorOk,
     });
 
     return res.json({
       success: true,
-      data: {
-        noteId: note._id,
-        numero_procedimiento: note.numero_procedimiento,
-        estadoRegistro: note.estadoRegistro,
-        firmaDesactualizada: note.firmaDesactualizada,
-        integro,
-        motivos,
-        contenido,
-        firmaPaciente,
-        firmaDoctor,
-      },
+      integro: veredicto.integro,
+      motivos: veredicto.motivos,
+      checks: { contenidoOk, firmaPacienteOk, firmaDoctorOk },
+      contentHash: { almacenado: note.contentHash || null, calculado: computedHash },
+      estadoRegistro: note.estadoRegistro,
+      firmadoEn: note.firmadoEn || null,
     });
   } catch (error) {
     console.error('Error en verifyEvolutionNoteIntegrity:', error);
-    return res.status(500).json({ success: false, error: 'Error al verificar la integridad de la nota.' });
+    return res.status(500).json({ success: false, error: devError(error) || 'Error interno al verificar la nota.' });
   }
 };
 
@@ -2088,16 +2145,18 @@ exports.finalizeClinicalHistory = async (req, res) => {
 
     // Autenticación del doctor según el método:
     //  - 'pin': reusa la firma digital subida; exige firma subida + PIN.
-    //  - 'pad': el dibujo en vivo es la autorización; no se exige PIN (el
-    //    dataUrl se valida/guarda abajo). Decisión explícita del propietario;
-    //    para volver al modo estricto, exigir PIN también aquí.
-    if (doctorSignature.method === 'pin') {
-      if (!signerDoctor.firmaDigitalUrl) {
-        return res.status(400).json({
-          success: false,
-          error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
-        });
-      }
+    //  - 'pad' con el mismo usuario de la sesión: el trazo basta.
+    //  - 'pad' con OTRO doctor (asDoctorId ajeno): exige ADEMÁS su PIN —
+    //    misma regla que resolveSigningDoctor (notas); cierra la suplantación
+    //    por asistente. Decisión del propietario 2026-07-12.
+    const isCrossUserHC = Boolean(asDoctorId) && String(asDoctorId) !== String(req.user.id);
+    if (doctorSignature.method === 'pin' && !signerDoctor.firmaDigitalUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'El doctor no tiene firma digital subida. Use el pad o suba la firma en Perfil Profesional.'
+      });
+    }
+    if (doctorSignature.method === 'pin' || isCrossUserHC) {
       if (!signerDoctor.pinHash) {
         return res.status(400).json({
           success: false,
@@ -2378,10 +2437,20 @@ exports.addTreatmentPlan = async (req, res) => {
             treatmentPlan.appointmentId || req.body.appointmentId,
             id
         );
+        // Paridad con addEvolutionNote (N1): la etiqueta visible se deriva
+        // SIEMPRE de la fecha clínica del plan — antes se aceptaba
+        // `fechaFormateada` del cliente y el fallback usaba la fecha de
+        // captura (new Date()), no la del plan (un plan retroactivo mostraba
+        // la fecha de captura). Fecha no parseable → 400 (antes CastError→500).
+        if (treatmentPlan.fecha !== undefined && treatmentPlan.fecha !== null
+            && Number.isNaN(new Date(treatmentPlan.fecha).getTime())) {
+            return res.status(400).json({ success: false, error: 'La fecha del plan no es válida.' });
+        }
+        const fechaPlan = treatmentPlan.fecha ? new Date(treatmentPlan.fecha) : new Date();
         const newTreatmentPlan = {
             texto: treatmentPlan.texto.trim(),
-            fecha: treatmentPlan.fecha ? new Date(treatmentPlan.fecha) : new Date(),
-            fechaFormateada: treatmentPlan.fechaFormateada || new Date().toLocaleDateString('es-ES', {
+            fecha: fechaPlan,
+            fechaFormateada: fechaPlan.toLocaleDateString('es-ES', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -2548,6 +2617,10 @@ function parseAndValidateBirthDate(input) {
   if (ageYears > 120) return { error: 'too_old' };
   return { date };
 }
+
+// Sólo para tests unitarios — no es API pública del controller.
+exports._validatePatientFieldRules = validatePatientFieldRules;
+exports._sanitizeAndLimitPayload = sanitizeAndLimitPayload;
 
 // Reintenta el save si colisiona el paciente_id (sólo 9000 IDs posibles: hay
 // race entre exists() y save() en cargas concurrentes).

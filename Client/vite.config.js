@@ -1,6 +1,36 @@
 // vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { build as esbuildBuild } from 'esbuild'
+
+// Vite dev NO transforma CommonJS en archivos fuente .cjs (solo deps de
+// node_modules), así que sirve `module.exports` crudo y los named imports
+// fallan con "does not provide an export named ...".
+// periodontal-stats-core.cjs DEBE seguir siendo .cjs porque el server lo
+// require() (Client es type:module → un .js sería ESM y rompería el require).
+// Este plugin lo convierte a ESM en dev con esbuild; el build de prod ya lo
+// resuelve vía @rollup/plugin-commonjs. El default export = module.exports,
+// por lo que los consumidores del cliente hacen default import + destructuring.
+function devCjsToEsm() {
+  return {
+    name: 'dev-cjs-to-esm',
+    apply: 'serve',
+    enforce: 'pre',
+    async load(id) {
+      const file = id.split('?')[0]
+      if (!file.endsWith('.cjs')) return null
+      const { outputFiles } = await esbuildBuild({
+        entryPoints: [file],
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        write: false,
+        logLevel: 'silent',
+      })
+      return outputFiles[0].text
+    },
+  }
+}
 
 // Puertos permitidos
 const ALLOWED_CLIENT_PORTS = new Set([5173, 5174]);
@@ -16,7 +46,7 @@ const apiPort = (() => {
 })();
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [devCjsToEsm(), react()],
   base: '/',
   server: {
     port: clientPort,
@@ -31,12 +61,6 @@ export default defineConfig({
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
-          });
         }
       },
       '/uploads': {
@@ -47,17 +71,6 @@ export default defineConfig({
           proxy.on('error', (err, _req, _res) => {
             console.error('Error en proxy de uploads:', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('📤 Enviando archivo estático:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('📥 Respuesta de archivo estático:', proxyRes.statusCode, req.url);
-          });
-        },
-        // Configuración específica para archivos estáticos
-        headers: {
-          'Cache-Control': 'public, max-age=31536000', // Cache por 1 año
-          'Accept-Ranges': 'bytes'
         }
       }
     }

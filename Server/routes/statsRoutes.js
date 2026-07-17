@@ -6,7 +6,11 @@ const { readLimiter } = require('../middlewares/rateLimiter');
 const router = express.Router();
 
 // GET /api/stats/summary?from=&to=&group=day|week|month|year
-router.get('/summary', readLimiter, authorize(['stats.read.own', 'stats.read.admin']), statsController.getSummary);
+// Solo admin: getSummary devuelve totales de TODA la clínica (ingresos, pacientes,
+// citas) sin filtro por profesional. Antes admitía 'stats.read.own', con lo que un
+// 'doctor' (que tiene own pero NO cash.read por proporcionalidad LFPDPPP Art. 6)
+// veía ingresos globales. Se alinea con el resto de rutas de stats. M2.
+router.get('/summary', readLimiter, authorize(['stats.read.admin']), statsController.getSummary);
 
 // GET /api/stats/revenue-by-service?from=&to=&group=day|week|month|year
 router.get('/revenue-by-service', readLimiter, authorize(['stats.read.admin']), statsController.getRevenueByService);

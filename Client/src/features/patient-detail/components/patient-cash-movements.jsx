@@ -8,7 +8,7 @@ import {
   getSessionStatus,
 } from '../../../shared/services/cashService';
 import { getChargesByPatient, addPayment } from '../../../shared/services/patientChargeService';
-import { formatMoney } from '../../../shared/utils/money';
+import { formatMoney, round2 } from '../../../shared/utils/money';
 import '../styles/patient-cash-movements.css';
 
 const formatDateGroup = (iso) =>
@@ -20,7 +20,6 @@ const formatTime = (iso) =>
 const PAYMENT_METHOD_LABEL = { CASH: 'Efectivo', DIGITAL: 'Digital' };
 
 const CONFIRM_PHRASE = 'CONFIRMO';
-const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
 
 const PatientCashMovements = ({ patientId }) => {
   const sectionId = useId();

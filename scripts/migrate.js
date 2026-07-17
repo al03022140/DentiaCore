@@ -7,7 +7,7 @@
  * UNA sola vez cada una (idempotente a nivel de runner: registra las aplicadas
  * en la colección `migrations`). Antes de aplicar cualquier pendiente, toma un
  * BACKUP automático (backup-first). El rollback es restaurar ese backup
- * (ver docs/operacion/backups-y-restauracion.md) — no hay `down()`.
+ * (ver docs/server/operacion/backups-y-restauracion.md) — no hay `down()`.
  *
  * Cada migración exporta:
  *   module.exports = {
@@ -26,7 +26,16 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const mongoose = require('mongoose');
+// OJO: la raíz del repo y Server/ tienen cada uno su propio node_modules/mongoose
+// (versiones mayores distintas, 9.x vs 7.x — ver Server/package.json). Un
+// `require('mongoose')` hecho aquí resuelve a la copia de la RAÍZ, que es una
+// instancia separada de la que usan los modelos y las migraciones (todos bajo
+// Server/, que resuelven a la copia de Server/). Conectar la copia de la raíz
+// no conecta la de Server: cualquier query dentro de una migración se queda
+// esperando para siempre (bufferCommands por defecto, sin timeout configurado).
+// Por eso reusamos el connectDB real de la app — mismo mongoose, mismos
+// timeouts — en vez de abrir una conexión propia.
+const connectDB = require(path.join(__dirname, '..', 'Server', 'config', 'db'));
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, 'Server', '.env');
@@ -103,8 +112,8 @@ async function main() {
     return;
   }
 
-  await mongoose.connect(uri);
-  const db = mongoose.connection.db;
+  const connection = await connectDB({ uri, exitOnFail: false });
+  const db = connection.db;
   try {
     const appliedDocs = await db.collection(COLLECTION).find({}, { projection: { id: 1 } }).toArray();
     const appliedIds = new Set(appliedDocs.map((d) => d.id));
@@ -141,10 +150,10 @@ async function main() {
   } catch (err) {
     console.error(`❌ Falló la migración: ${err.message}`);
     console.error('   Nada quedó a medias en el registro; corrige y vuelve a correr (las up son idempotentes).');
-    console.error('   Si los datos quedaron inconsistentes, restaura el backup previo (docs/operacion/backups-y-restauracion.md).');
+    console.error('   Si los datos quedaron inconsistentes, restaura el backup previo (docs/server/operacion/backups-y-restauracion.md).');
     process.exitCode = 1;
   } finally {
-    await mongoose.disconnect();
+    await connection.close();
   }
 }
 

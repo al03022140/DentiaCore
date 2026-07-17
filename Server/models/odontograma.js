@@ -65,13 +65,17 @@ const entrySchema = new Schema({
   },
   // `damage` vacío se permite SOLO en entradas sólo-nota (el textBox del
   // diente que emite el engine con damage '').
+  // maxlength: backstop de las cotas que valida validarEntradasOdontograma
+  // (el middleware responde 400 con contexto; esto ataja escrituras que lo
+  // esquiven). Sólo aplica a escrituras nuevas — docs legacy no se re-validan.
   damage:  {
     type: String,
     default: '',
+    maxlength: 100,
     required: function () { return !(this.note && this.note.trim()); }
   },
-  surface: { type: String, default: 'O' }, // 'O' por Oclusal como default común
-  note:    { type: String, default: '' },
+  surface: { type: String, default: 'O', maxlength: 20 }, // 'O' por Oclusal como default común
+  note:    { type: String, default: '', maxlength: 2000 },
   // Fecha en que se registró/persistió esta entrada. El servidor la estampa con `new Date()`
   // al guardar — los valores enviados por el cliente se ignoran para evitar fechas falsificadas
   // o stale.

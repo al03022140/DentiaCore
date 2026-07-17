@@ -27,5 +27,3 @@ export function setIn(obj, path, value) {
     [key]: rest.length === 0 ? value : setIn(base[key], rest, value),
   };
 }
-
-export default setIn;

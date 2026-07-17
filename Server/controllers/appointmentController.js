@@ -1,4 +1,5 @@
 const Appointment = require('../models/appointment.js');
+const { devError } = require('../utils/httpError');
 const PatientCharge = require('../models/patientCharge.js');
 const ClinicSettings = require('../models/clinicSettings.js');
 const Patient = require('../models/patient.js');
@@ -8,6 +9,7 @@ const PeriodontogramHistory = require('../models/periodontogramHistory.js');
 const Exam = require('../models/exam.js');
 const CashMovement = require('../models/cashMovement.js');
 const mongoose = require('mongoose');
+const { sanitizeAppointmentForBasicRead } = require('../middlewares/authorize');
 
 // Roles que pueden ser titulares de una cita (atender pacientes). Solo
 // 'doctor' y 'doctor_admin' — administrador/superadmin gestionan pero no
@@ -233,16 +235,19 @@ exports.getAllAppointments = async (req, res) => {
             .skip(offset)
             .limit(limit);
 
+        // SEC-02: recepción (acceso básico) no ve PHI clínico de la cita.
+        const shaped = req.filterClinicalData ? items.map(sanitizeAppointmentForBasicRead) : items;
+
         // Mantenemos shape de array para compat. Para paginación explícita el
         // cliente puede pasar X-Include-Total (header) o ?withTotal=true.
         if (req.query.withTotal === 'true') {
             const total = await Appointment.countDocuments(filter);
             res.set('X-Total-Count', total);
-            return res.status(200).json({ items, total, limit, offset });
+            return res.status(200).json({ items: shaped, total, limit, offset });
         }
-        res.status(200).json(items);
+        res.status(200).json(shaped);
     } catch (error) {
-        res.status(500).json({ message: 'Error al obtener las citas', error: error.message });
+        res.status(500).json({ message: 'Error al obtener las citas', error: devError(error) });
     }
 };
 
@@ -263,9 +268,13 @@ exports.getTodayAppointments = async (req, res) => {
             .populate('doctor_id', DOCTOR_FIELDS)
             .sort({ fecha_hora: 1 });
 
-        res.status(200).json(appointments);
+        // SEC-02: recepción (acceso básico) no ve PHI clínico de la cita.
+        const shaped = req.filterClinicalData
+            ? appointments.map(sanitizeAppointmentForBasicRead)
+            : appointments;
+        res.status(200).json(shaped);
     } catch (error) {
-        res.status(500).json({ message: 'Error al obtener las citas de hoy', error: error.message });
+        res.status(500).json({ message: 'Error al obtener las citas de hoy', error: devError(error) });
     }
 };
 
@@ -281,9 +290,11 @@ exports.getAppointmentById = async (req, res) => {
             .populate('estadoHistorial.cambiadoPor', 'nombre');
         if (!appointment || appointment.deletedAt) return res.status(404).json({ message: 'Cita no encontrada' });
 
-        res.status(200).json(appointment);
+        // SEC-02: recepción (acceso básico) no ve PHI clínico de la cita.
+        const shaped = req.filterClinicalData ? sanitizeAppointmentForBasicRead(appointment) : appointment;
+        res.status(200).json(shaped);
     } catch (error) {
-        res.status(500).json({ message: 'Error al obtener la cita', error: error.message });
+        res.status(500).json({ message: 'Error al obtener la cita', error: devError(error) });
     }
 };
 
@@ -436,7 +447,7 @@ exports.createAppointment = async (req, res) => {
                 conflictType: 'doctor'
             });
         }
-        res.status(400).json({ message: 'Error al crear la cita', error: error.message });
+        res.status(400).json({ message: 'Error al crear la cita', error: devError(error) });
     }
 };
 
@@ -787,7 +798,7 @@ exports.updateAppointment = async (req, res) => {
                 conflictType: 'doctor'
             });
         }
-        res.status(400).json({ message: 'Error al actualizar la cita', error: error.message });
+        res.status(400).json({ message: 'Error al actualizar la cita', error: devError(error) });
     }
 };
 
@@ -903,7 +914,7 @@ exports.getAppointmentActivity = async (req, res) => {
             return res.status(400).json({ message: 'ID de cita inválido' });
         }
 
-        const apt = await Appointment.findOne({ _id: id, deletedAt: null }).select('paciente_id doctor_id fecha_hora estado motivo');
+        const apt = await Appointment.findOne({ _id: id, deletedAt: null }).select('paciente_id doctor_id fecha_hora estado motivo materiales');
         if (!apt) return res.status(404).json({ message: 'Cita no encontrada' });
 
         const aptObjectId = new mongoose.Types.ObjectId(id);
@@ -1025,7 +1036,8 @@ exports.getAppointmentActivity = async (req, res) => {
                 periodontogramSnapshots: periodontogramSnapshots.length,
                 exams: exams.length,
                 charge: charge ? 1 : 0,
-                directMovements: directMovements.length
+                directMovements: directMovements.length,
+                materiales: (apt.materiales || []).length
             },
             evolutionNotes,
             treatmentPlans,
@@ -1033,11 +1045,12 @@ exports.getAppointmentActivity = async (req, res) => {
             periodontogramSnapshots,
             exams,
             charge,
-            directMovements
+            directMovements,
+            materiales: apt.materiales || []
         });
     } catch (error) {
         console.error('[appointments] getAppointmentActivity:', error);
-        res.status(500).json({ message: 'Error al obtener actividad de la cita', error: error.message });
+        res.status(500).json({ message: 'Error al obtener actividad de la cita', error: devError(error) });
     }
 };
 
@@ -1077,6 +1090,16 @@ exports.deleteAppointment = async (req, res) => {
             }
         }
 
+        // Bloquea eliminar una cita con materiales de inventario ya
+        // consumidos y sin revertir — borrar la cita deja esos movimientos
+        // huérfanos e irreversibles (revertConsume exige deletedAt:null en
+        // la cita para poder alcanzarlos).
+        if (Array.isArray(appointment.materiales) && appointment.materiales.length > 0) {
+            return res.status(409).json({
+                message: 'No se puede eliminar una cita con materiales de inventario consumidos. Revierte los materiales desde Consultas antes de eliminar.'
+            });
+        }
+
         appointment.deletedAt = new Date();
         appointment.deletedBy = req.user?.id || null;
         appointment.deleteReason = motivo;
@@ -1096,6 +1119,6 @@ exports.deleteAppointment = async (req, res) => {
 
         res.status(200).json({ message: 'Cita eliminada correctamente' });
     } catch (error) {
-        res.status(500).json({ message: 'Error al eliminar la cita', error: error.message });
+        res.status(500).json({ message: 'Error al eliminar la cita', error: devError(error) });
     }
 };

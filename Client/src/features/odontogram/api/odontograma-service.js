@@ -183,57 +183,11 @@ const odontogramaService = {
 
   // NOTA: no existe `deleteInitialOdontogram`. El odontograma inicial es de
   // captura única e inmutable por paciente — no se puede archivar ni borrar.
-
-  /**
-   * Obtiene el historial del odontograma inicial
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<Array>} Array de entradas del historial
-   */
-  async getInitialOdontogramHistory(patientId) {
-    try {
-      const { data } = await API.get(`/patients/${patientId}/odontograma-inicial/history`, { 
-        timeout: DEFAULT_TIMEOUT 
-      });
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      if (error.response?.status === 404) {
-        return [];
-      }
-      throw handleApiError(error);
-    }
-  },
-
-  /**
-   * Añade entradas al historial del odontograma inicial
-   * @param {string} patientId - ID del paciente
-   * @param {Array} entries - Entradas a añadir
-   * @returns {Promise<{message: string, total_historial: number}>}
-   */
-  async addInitialOdontogramHistory(patientId, entries, options = {}) {
-    try {
-      if (!Array.isArray(entries)) {
-        throw new Error('Se esperaba un array de entradas para el historial');
-      }
-      if (entries.length === 0) {
-        console.warn('Se intentó guardar un historial vacío');
-        return { message: 'No hay entradas para guardar', entradas_añadidas: 0 };
-      }
-      // Desnormaliza usando mapToBackend
-      // Normalizar entries para asegurar que sea un array
-      const normalizedEntries = Array.isArray(entries) ? entries : [];
-      const payload = normalizedEntries.map(mapToBackend);
-      const body = { entries: payload };
-      if (options.appointmentId) body.appointmentId = options.appointmentId;
-      const { data } = await API.post(
-        `/patients/${patientId}/odontograma-inicial/history`,
-        body,
-        { timeout: 30000 } // 30s: escritura; evita abortos por Mongo local lento en laptop
-      );
-      return data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
+  //
+  // Eliminados (sin consumidores en la UI, endpoints también retirados del
+  // server): `getInitialOdontogramHistory` (además estaba roto: esperaba un
+  // array pero el server responde {exists, history} → devolvía siempre []),
+  // `addInitialOdontogramHistory` y `deleteClinicalOdontogramState`.
 
   // ── Odontograma Clínico ─────────────────────────────────────────
   /**
@@ -343,69 +297,18 @@ const odontogramaService = {
       );
       return {
         exists: data.exists || false,
+        // versionName del `current` — el selector de versiones lo usa para
+        // marcar la versión activa (antes se caía al heurístico "la más
+        // reciente de la lista").
+        versionName: data.versionName || null,
         datos: Array.isArray(data.datos) ? data.datos.map(mapFromBackend) : [],
         history: Array.isArray(data.history) ? data.history : [],
         updatedAt: data.updatedAt || null
       };
     } catch (error) {
       if (error.response?.status === 404) {
-        return { exists: false, datos: [], history: [], updatedAt: null };
+        return { exists: false, versionName: null, datos: [], history: [], updatedAt: null };
       }
-      throw handleApiError(error);
-    }
-  },
-
-  /**
-   * Obtiene el historial del odontograma clínico
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<Array>} Array de entradas del historial
-   */
-  async getClinicalOdontogramHistory(patientId) {
-    try {
-      const { data } = await API.get(
-        `/patients/${patientId}/odontograma-clinico/history`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return Array.isArray(data.history) ? data.history : [];
-    } catch (error) {
-      if (error.response?.status === 404) {
-        return [];
-      }
-      throw handleApiError(error);
-    }
-  },
-
-  /**
-   * Elimina una entrada del historial del odontograma clínico
-   * @param {string} patientId - ID del paciente
-   * @param {string} entryId - ID de la entrada a eliminar
-   * @returns {Promise<{message: string}>}
-   */
-  async deleteClinicalOdontogramEntry(patientId, entryId) {
-    try {
-      const { data } = await API.delete(
-        `/patients/${patientId}/odontograma-clinico/history/${entryId}`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
-
-  /**
-   * Elimina completamente el estado del odontograma clínico
-   * @param {string} patientId - ID del paciente
-   * @returns {Promise<{message: string}>}
-   */
-  async deleteClinicalOdontogramState(patientId) {
-    try {
-      const { data } = await API.delete(
-        `/patients/${patientId}/odontograma-clinico`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return data;
-    } catch (error) {
       throw handleApiError(error);
     }
   }

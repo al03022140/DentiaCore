@@ -2,18 +2,19 @@
  * 🦷 CONFIGURACIÓN CENTRALIZADA DEL PERIODONTOGRAMA - BACKEND
  * 
  * Configuración unificada para el sistema de periodontograma en el backend.
- * Garantiza consistencia entre frontend y backend.
- * SINCRONIZADO CON CONFIGURACIÓN DEL CLIENTE v1.0.0
- * 
+ *
+ * ⚠️ DUPLICADO PARCIAL de Client/src/shared/config/periodontogram-config.js.
+ * NO están auto-sincronizados: este usa claves EN inglés (PROBING_DEPTH) y el
+ * cliente español camelCase (profundidadSondaje). Si cambias MEASUREMENT_LIMITS,
+ * la lista de dientes o el enum de pronóstico, actualiza AMBOS archivos.
+ *
  * CARACTERÍSTICAS:
  * ✅ Constantes unificadas de dientes
  * ✅ Límites de mediciones estandarizados
  * ✅ Configuración de validación
  * ✅ Configuración de logging
  * ✅ Configuración de caché
- * ✅ Configuración de transformaciones
- * 
- * @version 1.0.0 - CONFIGURACIÓN CENTRALIZADA BACKEND
+ *
  * @author Sistema de Configuración Unificada
  */
 
@@ -123,16 +124,6 @@ const LOGGING_CONFIG = {
 };
 
 /**
- * Configuración de transformaciones
- */
-const TRANSFORMATION_CONFIG = {
-  LEGACY_SUPPORT: true,
-  AUTO_MIGRATE: true,
-  PRESERVE_METADATA: true,
-  VALIDATE_ON_TRANSFORM: true
-};
-
-/**
  * Datos por defecto para un diente según normalización Opción 1 MEJORADA
  */
 const DEFAULT_TOOTH_DATA = {
@@ -140,7 +131,7 @@ const DEFAULT_TOOTH_DATA = {
   arcada: null, // Se determina por el número de diente
   ausente: false, // Boolean (modelo usa Boolean, no Number)
   implante: false, // Boolean
-  pronostico: 'Bueno', // 'Bueno', 'Regular', 'Malo', 'Dudoso'
+  pronostico: 'Bueno', // 'Bueno', 'Regular', 'Malo', 'Dudoso', 'Imposible'
   movilidad: 0,
   anchuraEncia: MEASUREMENT_LIMITS.GUM_WIDTH.default,
   furca: {
@@ -202,8 +193,7 @@ const PERIODONTOGRAM_CONFIG = {
   VALIDATION_CONFIG,
   CACHE_CONFIG,
   LOGGING_CONFIG,
-  TRANSFORMATION_CONFIG,
-  
+
   // Exponer lista de molares y utilidades
   MOLAR_TEETH,
   
@@ -331,6 +321,5 @@ module.exports = {
   DEFAULT_TOOTH_DATA,
   VALIDATION_CONFIG,
   CACHE_CONFIG,
-  LOGGING_CONFIG,
-  TRANSFORMATION_CONFIG
+  LOGGING_CONFIG
 };

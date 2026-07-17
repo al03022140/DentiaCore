@@ -13,12 +13,12 @@ export default {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '\\.(css|less|scss)$': '<rootDir>/src/tests/__mocks__/styleMock.js'
+    '\\.(css|less|scss)$': '<rootDir>/src/tests/__mocks__/styleMock.js',
+    '\\.(svg|png|jpe?g|gif)$': '<rootDir>/src/tests/__mocks__/fileMock.js'
   },
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
   collectCoverageFrom: [
     'src/**/*.{js,jsx}',
-    '!src/index.js',
-    '!src/reportWebVitals.js'
+    '!src/main.jsx'
   ]
 };

@@ -11,6 +11,7 @@
  * Ver roles.MD §5.
  */
 const AuditLog = require('../models/auditLog');
+const logger = require('../utils/logger');
 
 // ── Mapa de método HTTP → evento de auditoría ──────────────────
 const METHOD_EVENT_MAP = {
@@ -37,6 +38,7 @@ const ROUTE_RESOURCE_PATTERNS = [
   [/\/api\/patient-charges/i,                      'cargo'],
   [/\/api\/note-templates/i,                       'plantilla'],
   [/\/api\/settings/i,                             'configuracion'],
+  [/\/api\/inventory/i,                            'inventario'],
 ];
 
 /**
@@ -50,16 +52,23 @@ function detectResourceType(url) {
 }
 
 /**
- * Extraer patientId de params, body o query.
- * Para sub-rutas de pacientes (/api/patients/:id/...) el id del paciente
- * está en req.params.id.
+ * Extraer patientId de params, body, query o (si se pasa) el body de la
+ * respuesta. Para sub-rutas de pacientes (/api/patients/:id/...) el id del
+ * paciente está en req.params.id.
+ *
+ * El fallback a `responseBody?.paciente_id` cubre rutas como
+ * /api/inventory/consume: el cliente solo manda `cita_id` (nunca el
+ * paciente_id directo), así que no hay forma de resolverlo desde el
+ * request — el controller lo agrega a su respuesta para que la línea de
+ * tiempo de auditoría por paciente (NOM-024) no quede ciega a estos eventos.
  */
-function extractPatientId(req) {
+function extractPatientId(req, responseBody) {
   return req.params?.patientId
     || req.body?.patientId
     || req.body?.paciente
     || req.query?.patientId
     || (/\/api\/patients\//.test(req.originalUrl) ? req.params?.id : null)
+    || responseBody?.paciente_id
     || null;
 }
 
@@ -140,7 +149,7 @@ function auditLogger(opciones = {}) {
         const evento = METHOD_EVENT_MAP[method] || 'modificacion_registro';
         const resourceType = detectResourceType(req.originalUrl);
         const resourceId = extractResourceId(req, body);
-        const patientId = extractPatientId(req);
+        const patientId = extractPatientId(req, body);
         const camposEditados = (method === 'PUT' || method === 'PATCH')
           ? detectEditedFields(req)
           : undefined;
@@ -215,7 +224,23 @@ auditLogger.registrarManual = function(req, evento, datos = {}) {
     evento,
     ip:       req.ip || req.connection?.remoteAddress,
     ...datos,
+  }).catch((err) => {
+    // BE-01 (Crítica): NO silenciar el fallo de auditoría NOM-024. Antes los
+    // ~15 call sites hacían `.catch(() => {})` y un fallo transitorio de Mongo
+    // (o E11000 de `seq`) dejaba el evento legal sin registrar y sin traza. Al
+    // loguear aquí, TODOS los llamadores quedan cubiertos de una sola vez;
+    // re-lanzamos para que los que `await` + propagan (signingController) sigan
+    // viendo el error, y el `.catch(()=>{})` de los fire-and-forget ya no oculta
+    // un fallo — solo evita el unhandledRejection de un error ya registrado.
+    logger.error('Fallo al registrar evento de auditoría NOM-024', {
+      evento,
+      userId: req.user?.id || null,
+      error: err?.message || String(err),
+    });
+    throw err;
   });
 };
+
+auditLogger._internal = { extractPatientId, detectResourceType };
 
 module.exports = auditLogger;

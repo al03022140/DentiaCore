@@ -8,10 +8,22 @@ const Tratamiento = require('../models/treatment');
 
 const GRANULARITY_FORMATS = {
   day: '%Y-%m-%d',
-  week: '%Y-W%V',
+  // %G = año de la semana ISO (no %Y = año calendario). En el borde de año
+  // (ej. 2027-01-01) %Y daría "2027-W53" mientras isoWeekString da "2026-W53",
+  // y las keys no cruzan → ingresos/citas de esa semana desaparecen. H1.
+  week: '%G-W%V',
   month: '%Y-%m',
   year: '%Y'
 };
+
+// Zona horaria única para agrupar (Mongo) y etiquetar (JS). $dateToString agrupa
+// en UTC por defecto mientras buildPeriodLabels/parseDateRange usan métodos
+// locales de Date; si difieren, los movimientos cerca de medianoche caen en el
+// bucket del día adyacente y el label del primer/último día no cruza con la key
+// de Mongo (datos que desaparecen). Se fija ambos lados a la MISMA zona. H2.
+// ponytail: usa la TZ del proceso; para fijar la de la clínica, exporta
+//   TZ=America/Mexico_City al arrancar el server.
+const REPORT_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 // Fallback defensivo: el frontend ya traduce a inglés (day/week/month/year)
 // vía GRANULARITY_API_MAP, pero se mantiene por si la API se consume externamente.
@@ -56,7 +68,7 @@ const parseDateRange = (from, to, granularity = 'month') => {
 };
 
 const buildDateGroup = (dateField, format) => ({
-  $dateToString: { format, date: dateField }
+  $dateToString: { format, date: dateField, timezone: REPORT_TZ }
 });
 
 // ISO week number (lunes-domingo, semana 1 = la que contiene el primer jueves).
@@ -78,6 +90,15 @@ const buildPeriodLabels = (start, end, granularity) => {
   const cursor = new Date(start);
   cursor.setHours(0, 0, 0, 0);
   const stop = new Date(end);
+
+  // Para 'week' arrancamos en el LUNES de la semana ISO de `start`. Si no y
+  // `start`/`end` caen en días distintos de la semana, el cursor (+7 desde
+  // `start`) puede saltar por encima de la última semana parcial sin emitir su
+  // label, y las citas/ingresos de esa semana desaparecen del gráfico. H3.
+  if (granularity === 'week') {
+    const isoDay = cursor.getDay() || 7; // getDay: 0=dom..6=sáb; ISO lunes=1
+    cursor.setDate(cursor.getDate() - (isoDay - 1));
+  }
 
   // Tope defensivo: 5 años de días = 1825 puntos. Evita loops infinitos
   // por bugs y limita la respuesta.
@@ -132,7 +153,7 @@ exports.getSummary = async (req, res) => {
         { $sort: { _id: 1 } }
       ]),
 
-      // Total pacientes en rango
+      // Pacientes NUEVOS en el rango (createdAt dentro), no el total histórico.
       Patient.countDocuments({ createdAt: dateFilter, deletedAt: null }),
 
       // Total citas en rango
@@ -160,7 +181,7 @@ exports.getSummary = async (req, res) => {
         totalAmount: revenueTrend.reduce((sum, item) => sum + item.total, 0),
         totalMovements: revenueTrend.reduce((sum, item) => sum + item.count, 0)
       },
-      patients: { total: totalPatients },
+      patients: { newPatients: totalPatients },
       appointments: {
         total: totalAppointments,
         byStatus: statusMap
@@ -462,9 +483,16 @@ exports.getProductivity = async (req, res) => {
     const fmt = GRANULARITY_FORMATS[granularity] || GRANULARITY_FORMATS.month;
     const { start, end } = parseDateRange(from, to, granularity);
 
+    // "Atendida" = cita que YA ocurrió y no fue cancelada ni no-show. No existe
+    // un estado explícito "Atendida"; 'Pasada' se auto-asigna a toda cita pasada
+    // sin cerrar y 'Confirmada' incluye futuras dentro del rango. Contar
+    // fecha_hora <= ahora excluyendo Cancelada/NoShow es coherente con getNoShows. H4.
+    const now = new Date();
+    const cappedEnd = end < now ? end : now;
+
     const [appointmentsByPeriod, revenueByPeriod] = await Promise.all([
       Appointment.aggregate([
-        { $match: { fecha_hora: { $gte: start, $lte: end }, deletedAt: null, estado: { $in: ['Confirmada', 'Pasada'] } } },
+        { $match: { fecha_hora: { $gte: start, $lte: cappedEnd }, deletedAt: null, estado: { $nin: ['Cancelada', 'NoShow'] } } },
         { $group: {
           _id: buildDateGroup('$fecha_hora', fmt),
           count: { $sum: 1 }
@@ -481,10 +509,9 @@ exports.getProductivity = async (req, res) => {
       ])
     ]);
 
-    const labelsSet = new Set();
-    appointmentsByPeriod.forEach(item => labelsSet.add(item._id));
-    revenueByPeriod.forEach(item => labelsSet.add(item._id));
-    const labels = Array.from(labelsSet).sort();
+    // Mismo eje X que el resto de endpoints: labels completos del rango (los
+    // periodos futuros/sin datos quedan en 0), no la unión de periodos con datos. H4.
+    const labels = buildPeriodLabels(start, end, granularity);
 
     const apptMap = {};
     appointmentsByPeriod.forEach(item => { apptMap[item._id] = item.count; });
@@ -536,8 +563,10 @@ exports.getNetEarnings = async (req, res) => {
     const expenseMap = {};
 
     movements.forEach(item => {
+      // Match explícito: si mañana se agrega un 3er tipo al enum, no debe caer
+      // silenciosamente en "Gastos". L2.
       if (item._id.type === 'INCOME') incomeMap[item._id.period] = item.total;
-      else expenseMap[item._id.period] = item.total;
+      else if (item._id.type === 'EXPENSE') expenseMap[item._id.period] = item.total;
     });
 
     const labels = buildPeriodLabels(start, end, granularity);
@@ -612,26 +641,26 @@ exports.getInactivePatients = async (req, res) => {
     const now = new Date();
     const thresholds = [30, 60, 90, 180];
 
-    const counts = await Promise.all(thresholds.map(async days => {
+    // Una sola agregación: última visita por paciente. Antes eran 8 `distinct`
+    // (2 por umbral) trayendo arrays de IDs a memoria + diff en JS, repetido 4×;
+    // y NO filtraba pacientes soft-deleted, así que un paciente archivado con
+    // citas viejas se contaba como "inactivo". M5.
+    const lastVisits = await Appointment.aggregate([
+      { $match: { deletedAt: null } },
+      { $group: { _id: '$paciente_id', lastVisit: { $max: '$fecha_hora' } } },
+      { $lookup: { from: 'patients', localField: '_id', foreignField: '_id', as: 'patient' } },
+      { $unwind: '$patient' },                 // descarta citas huérfanas (sin paciente)
+      { $match: { 'patient.deletedAt': null } }, // excluye pacientes archivados
+      { $project: { lastVisit: 1 } }
+    ]);
+
+    // Inactivo en umbral `days`: su última visita fue ANTES del corte (tiene
+    // historial pero no asiste hace más de `days`).
+    const counts = thresholds.map(days => {
       const cutoff = new Date(now);
       cutoff.setDate(cutoff.getDate() - days);
-
-      // IDs con al menos una cita reciente
-      const recentIds = await Appointment.distinct('paciente_id', {
-        fecha_hora: { $gte: cutoff },
-        deletedAt: null
-      });
-
-      // IDs con alguna cita histórica antes del corte (tienen historial pero ya no vienen)
-      const historicIds = await Appointment.distinct('paciente_id', {
-        fecha_hora: { $lt: cutoff },
-        deletedAt: null
-      });
-
-      const recentSet = new Set(recentIds.map(id => id.toString()));
-      const inactive = historicIds.filter(id => !recentSet.has(id.toString()));
-      return inactive.length;
-    }));
+      return lastVisits.filter(v => v.lastVisit < cutoff).length;
+    });
 
     res.json({
       labels: thresholds.map(d => `+${d} días sin visita`),
@@ -699,7 +728,12 @@ exports.getTreatmentDuration = async (req, res) => {
           ]
         }
       }},
-      { $match: { duracionDias: { $gt: 0 } } },
+      // $gte 0 (no $gt): una cura creada y finalizada el mismo día dura 0 días y
+      // es legítima; excluirla sesgaba el promedio al alza. Sigue descartando
+      // negativas (createdAt posterior a la fecha del ítem). M6.
+      // ponytail: el ancla es createdAt del documento, no la fecha de inicio del
+      //   ítem (no existe ese campo en el subdoc); planes largos inflan la duración.
+      { $match: { duracionDias: { $gte: 0 } } },
       { $group: {
         _id: '$descripcion',
         avgDias: { $avg: '$duracionDias' },
@@ -719,4 +753,8 @@ exports.getTreatmentDuration = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener duración de tratamientos.' });
   }
 };
+
+// Exportados sólo para pruebas unitarias (borde de año — H1 — y semanas
+// parciales — H3). No son parte de la API HTTP.
+exports._internal = { buildPeriodLabels, isoWeekString, parseDateRange };
 

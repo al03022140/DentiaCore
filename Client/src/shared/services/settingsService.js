@@ -99,22 +99,6 @@ export const deleteFirma = async () => {
   return data;
 };
 
-// `version` opcional fuerza cache-bust al `<img>` cuando la firma se acaba
-// de subir o reemplazar (el endpoint sirve siempre desde la misma URL).
-//
-// ⚠️ El endpoint /settings/users/:id/firma está protegido (authenticate +
-// requireClinicalRole) y la autenticación es por header `Authorization: Bearer`.
-// Un `<img src>` del navegador NO envía ese header, así que usar esta URL
-// directamente como `src` devuelve 401 y la imagen no se ve (salvo justo tras
-// subirla, mientras existe el preview local en memoria). Para mostrar la firma
-// persistida usa `fetchFirmaBlobUrl`, que descarga la imagen vía axios (con el
-// token) y devuelve un object URL servible. Se conserva esta función por
-// compatibilidad.
-export const getFirmaUrl = (userId, version) => {
-  const base = `${API.defaults.baseURL}/settings/users/${encodeURIComponent(userId)}/firma`;
-  return version ? `${base}?v=${encodeURIComponent(version)}` : base;
-};
-
 // Descarga la firma del usuario AUTENTICADA (el interceptor de axios adjunta
 // el Bearer token) y devuelve un object URL listo para usar como `<img src>`.
 // El llamador es responsable de hacer URL.revokeObjectURL cuando ya no lo use.
@@ -178,13 +162,6 @@ export const deleteLogo = async () => {
   const { data } = await API.delete('/settings/logo');
   return data;
 };
-
-// ⚠️ GET /settings/logo está detrás de `authenticate` (header Bearer). Un
-// `<img src>` directo NO envía ese header → 401 y el logo nunca se ve. Igual
-// que con la firma, usa `fetchLogoBlobUrl` para mostrar el logo persistido.
-// Se conserva esta función por compatibilidad.
-export const getLogoUrl = () =>
-  `${API.defaults.baseURL}/settings/logo`;
 
 // Descarga el logo de la clínica AUTENTICADO (el interceptor de axios adjunta
 // el Bearer token) y devuelve un object URL listo para usar como `<img src>`.

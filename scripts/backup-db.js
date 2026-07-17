@@ -293,6 +293,17 @@ function main() {
   } catch {
     console.log(`✅ Backup listo: ${finalPath}`);
   }
+
+  // O-1: marcador de última corrida exitosa — scripts/check-health.js lo lee
+  // para alertar si el backup automático dejó de correr o falla en silencio.
+  try {
+    fs.writeFileSync(
+      path.join(BACKUP_BASE, 'last-success.json'),
+      JSON.stringify({ timestamp: new Date().toISOString(), path: finalPath, dbName }, null, 2)
+    );
+  } catch (e) {
+    console.warn(`⚠️  No se pudo escribir last-success.json: ${e.message}`);
+  }
 }
 
 main();

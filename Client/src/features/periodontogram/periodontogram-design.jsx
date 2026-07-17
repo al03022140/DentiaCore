@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo, useEffect, memo, useRef } from 'react';
-import { perfMonitor, withRenderCount } from './utils/perf-monitor';
 import PeriodontogramUtils, { getToothNumberButtonProps, getToothAvailability } from './utils/periodontogram-utils';
 import { VALIDATION_RANGES, ZONE_CONFIG, SELECT_OPTIONS, ROW_DEFINITIONS, FIELD_TYPE_MAP, RESPONSIVE_CONFIG } from './constants/periodontogram-constants';
 import { LINEAR_GRAPHICS_CONFIG } from './utils/config';
@@ -1085,18 +1084,6 @@ const PeriodontogramDesign = ({
     );
   }, [getToothData, onToothSelect, linearGraphicsDerivedOptions.enableLinearGraphics]);
 
-  // TEMPORAL: Verificar si available llega como false
-  // Activar/desactivar monitor según flag
-  useEffect(() => { perfMonitor.enable(debugPerformance); }, [debugPerformance]);
-  if (debugPerformance) { perfMonitor.countRender('PeriodontogramDesign'); }
-
-  // Envolver DataCell con contador de renders si debug. Mantener la referencia
-  // estable entre renders para que React.memo no se invalide.
-  const InstrumentedDataCell = useMemo(
-    () => debugPerformance ? withRenderCount(DataCell, 'DataCell') : DataCell,
-    [debugPerformance]
-  );
-
   return (
     <div
       ref={containerRef}
@@ -1117,7 +1104,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
+                <DataCell key={`${toothNumber}-${row.key}`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
               ))}
             </div>
           ))}
@@ -1153,7 +1140,7 @@ const PeriodontogramDesign = ({
             <div key={`upper-pal-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
               {upperTeeth.map(toothNumber => (
-                <InstrumentedDataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" renderCell={renderCell} toothData={getToothData(toothNumber)} />
+                <DataCell key={`${toothNumber}-${row.key}-pal`} toothNumber={toothNumber} row={row} side="palatine" renderCell={renderCell} toothData={getToothData(toothNumber)} />
               ))}
             </div>
           ))}
@@ -1172,7 +1159,7 @@ const PeriodontogramDesign = ({
             <div key={`lower-ling-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" renderCell={renderCell} toothData={getToothData(toothNumber)} />
+                    <DataCell key={`${toothNumber}-${row.key}-ling`} toothNumber={toothNumber} row={row} side="lingual" renderCell={renderCell} toothData={getToothData(toothNumber)} />
                   ))}
             </div>
           ))}
@@ -1208,7 +1195,7 @@ const PeriodontogramDesign = ({
             <div key={`lower-vest-${row.key}`} className="data-row">
               <div className="row-label">{row.label}</div>
                   {lowerTeeth.map(toothNumber => (
-                    <InstrumentedDataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
+                    <DataCell key={`${toothNumber}-${row.key}-lower`} toothNumber={toothNumber} row={row} side="vestibular" renderCell={renderCell} toothData={getToothData(toothNumber)} />
                   ))}
             </div>
           ))}

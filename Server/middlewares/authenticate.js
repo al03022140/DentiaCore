@@ -14,7 +14,8 @@ const authenticate = (req, res, next) => {
   }
 
   try {
-    const payload = jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer() });
+    // algorithms fijo (defensa en profundidad contra confusión de algoritmo).
+    const payload = jwt.verify(token, getJwtSecret(), { issuer: getJwtIssuer(), algorithms: ['HS256'] });
 
     // Rechazar refresh tokens en rutas protegidas: solo los access tokens
     // (que no llevan `type`) deben autorizar el acceso a la API.

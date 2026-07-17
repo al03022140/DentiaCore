@@ -69,7 +69,7 @@ function getSignableFields(resourceType) {
  * @param {*} value
  * @returns {*} valor normalizado, listo para JSON.stringify determinista
  */
-function normalizeForHash(value) {
+function normalizeForHash(value, visited = new WeakSet()) {
   if (value === null || value === undefined) return value;
 
   // Primitivos
@@ -84,22 +84,30 @@ function normalizeForHash(value) {
   if (value._bsontype) return value.toString();
   if (typeof value.toHexString === 'function') return value.toHexString();
 
+  // Ciclos: un Map de subdocumentos Mongoose puede traer una referencia
+  // interna de vuelta al padre (p.ej. current.teeth en periodontograma), y
+  // la recursión sin guarda revienta el stack (confirmado: RangeError al
+  // re-sellar periodontogramas reales en migración 0001). Mismo fix que el
+  // normalizeDataForHash del cliente (universal-tooth-validator.js).
+  if (visited.has(value)) return '[Circular]';
+  visited.add(value);
+
   // Map → objeto plano con llaves ordenadas
   if (value instanceof Map) {
     const out = {};
     for (const key of [...value.keys()].sort()) {
-      out[key] = normalizeForHash(value.get(key));
+      out[key] = normalizeForHash(value.get(key), visited);
     }
     return out;
   }
 
   // Array → normaliza cada elemento (preserva orden, NO se reordena)
-  if (Array.isArray(value)) return value.map(normalizeForHash);
+  if (Array.isArray(value)) return value.map((v) => normalizeForHash(v, visited));
 
   // Objeto plano → llaves ordenadas
   const out = {};
   for (const key of Object.keys(value).sort()) {
-    out[key] = normalizeForHash(value[key]);
+    out[key] = normalizeForHash(value[key], visited);
   }
   return out;
 }

@@ -83,6 +83,11 @@ const examSchema = new mongoose.Schema({
     timestamps: true // 🔹 Agrega `createdAt` y `updatedAt` automáticamente
 });
 
+// DB-IDX-01/03: acceso primario del expediente = "exámenes del paciente X
+// activos". Sin este índice `find({paciente_id, deletedAt:null})` era COLLSCAN
+// (solo appointmentId estaba indexado). Alineado con el patrón de treatment.js.
+examSchema.index({ paciente_id: 1, deletedAt: 1 });
+
 // Marca firmaDesactualizada = true automáticamente cuando se edita el
 // contenido firmado tras la firma.
 const { attachSignatureInvalidationHook } = require('../utils/signature-invalidation');

@@ -21,6 +21,7 @@ const Sidebar = () => {
   // a todos (incluido doctor_admin) salvo superadmin. Enumeramos las variantes
   // reales, igual que canViewCash/canViewPatients.
   const canViewStats = hasPermission(permissions, ['stats.read', 'stats.read.own', 'stats.read.admin']);
+  const canViewInventory = hasPermission(permissions, ['inventory.read', 'inventory.manage']);
 
   const handleNavClick = () => {
     close();
@@ -59,6 +60,11 @@ const Sidebar = () => {
               {canViewStats && (
                 <li>
                   <Link to="/estadisticas" onClick={handleNavClick} className={location.pathname === '/estadisticas' ? 'active' : ''}>Estadísticas</Link>
+                </li>
+              )}
+              {canViewInventory && (
+                <li>
+                  <Link to="/inventario" onClick={handleNavClick} className={location.pathname === '/inventario' ? 'active' : ''}>Inventario</Link>
                 </li>
               )}
               <li>

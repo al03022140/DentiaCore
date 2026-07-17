@@ -3,6 +3,7 @@ const CashMovement = require('../models/cashMovement');
 const BoxSession = require('../models/boxSession');
 const PatientCharge = require('../models/patientCharge');
 const Patient = require('../models/patient');
+const logger = require('../utils/logger');
 
 const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 const safeNum = (n) => (Number.isFinite(n) ? n : 0);
@@ -179,24 +180,36 @@ exports.forceResolveSession = async (req, res) => {
       return res.status(401).json({ message: 'Usuario requerido' });
     }
     const { id } = req.params;
-    const session = await BoxSession.findById(id);
-    if (!session) {
-      return res.status(404).json({ message: 'Sesión no encontrada' });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'ID de sesión inválido' });
     }
-    if (session.status === 'CLOSED') {
+
+    // Cerrar la puerta ANTES de calcular (mismo orden que closeBox): el flip a
+    // CLOSING bloquea addMovement/addPayment, así el corte no puede perder un
+    // movimiento insertado durante el cálculo (quedaría en una sesión CLOSED
+    // sin contar en finalAmount). Si algo falla después, la sesión queda
+    // CLOSING — recuperable con otro force-resolve, igual que un closeBox
+    // crasheado.
+    const session = await BoxSession.findOneAndUpdate(
+      { _id: id, status: { $ne: 'CLOSED' } },
+      { $set: { status: 'CLOSING' } },
+      { new: true }
+    );
+    if (!session) {
+      const existed = await BoxSession.exists({ _id: id });
+      if (!existed) return res.status(404).json({ message: 'Sesión no encontrada' });
       return res.status(400).json({ message: 'La sesión ya está cerrada' });
     }
 
     const movements = await CashMovement.find({ boxSessionId: session._id });
     const summary = summarizeMovements(movements, session.initialAmount);
 
-    // Guarda atómica (antes era read-check-save, no atómico): cerramos en UNA
-    // operación sólo si la sesión NO está ya CLOSED. El flip directo a CLOSED
-    // garantiza un único ganador — un segundo force-resolve (o un closeBox
-    // concurrente) ve `status: CLOSED`, el filtro $ne falla y recibe null, así
-    // que NO pisa closedBy/endTime/finalAmount del primer cierre. Sin esto, dos
-    // resoluciones concurrentes cerraban la misma sesión dos veces con corte y
-    // responsable no deterministas (trazabilidad NOM-024 corrupta).
+    // Guarda atómica: cerramos en UNA operación sólo si la sesión NO está ya
+    // CLOSED. El flip garantiza un único ganador — un segundo force-resolve
+    // concurrente ve `status: CLOSED`, el filtro $ne falla y recibe null, así
+    // que NO pisa closedBy/endTime/finalAmount del primer cierre (dos cierres
+    // con corte y responsable no deterministas corromperían la trazabilidad
+    // NOM-024).
     const closed = await BoxSession.findOneAndUpdate(
       { _id: session._id, status: { $ne: 'CLOSED' } },
       {
@@ -535,7 +548,7 @@ exports.addMovement = async (req, res) => {
     });
     if (!sessionStillOpen) {
       try { await CashMovement.deleteOne({ _id: movement._id }); }
-      catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+      catch (rbErr) { logger.error('CRITICAL: rollback CashMovement falló (movimiento huérfano en caja)', { movementId: movement._id, error: rbErr?.message || String(rbErr) }); }
       return res.status(409).json({
         message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
       });
@@ -549,7 +562,7 @@ exports.addMovement = async (req, res) => {
       const allMovements = await CashMovement.find({ boxSessionId: activeSession._id });
       if (isCashWithdrawalOverdrawn(allMovements, activeSession.initialAmount, movement._id)) {
         try { await CashMovement.deleteOne({ _id: movement._id }); }
-        catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+        catch (rbErr) { logger.error('CRITICAL: rollback CashMovement falló (movimiento huérfano en caja)', { movementId: movement._id, error: rbErr?.message || String(rbErr) }); }
         return res.status(409).json({
           message: 'Fondos insuficientes: otro retiro concurrente consumió el efectivo disponible. Reintente.'
         });
@@ -690,30 +703,6 @@ exports.updateMovement = async (req, res) => {
       return res.status(400).json({ message: 'No hay cambios que aplicar' });
     }
 
-    // Si la edición afecta el flujo de efectivo en la sesión, validar fondos.
-    if (changes.amount || changes.paymentMethod) {
-      const targetAmount = nextAmount ?? movement.amount;
-      const targetPaymentMethod = nextPaymentMethod ?? movement.paymentMethod;
-
-      if (movement.type === 'EXPENSE' && targetPaymentMethod === 'CASH' && movement.boxSessionId) {
-        const session = await BoxSession.findById(movement.boxSessionId);
-        if (session) {
-          // Recomputar el efectivo disponible excluyendo este movimiento, luego
-          // restar el monto nuevo.
-          const others = await CashMovement.find({
-            boxSessionId: session._id,
-            _id: { $ne: movement._id }
-          });
-          const { cashOnHand } = summarizeMovements(others, session.initialAmount);
-          if (cashOnHand < targetAmount) {
-            return res.status(400).json({
-              message: `Fondos insuficientes para esta edición. Disponible (sin este movimiento): $${cashOnHand}`
-            });
-          }
-        }
-      }
-    }
-
     // Validar estructura de changes antes de persistir (BUG-18 guard contra
     // payloads corruptos: solo permitir keys conocidas con {from, to}).
     const ALLOWED_CHANGE_KEYS = ['amount', 'paymentMethod', 'concept', 'patientId'];
@@ -739,32 +728,39 @@ exports.updateMovement = async (req, res) => {
       changes: sanitizedChanges
     });
 
-    // BUG-6: si la sesión del movimiento está CLOSED, recalcular finalAmount
-    // para que los reportes históricos sigan cuadrando.
-    // M-9: validamos ANTES de persistir el movimiento para no dejar un estado
-    // inconsistente (movimiento editado pero corte no actualizado). El recálculo
-    // usa los valores YA editados en memoria, sustituyendo el movimiento actual.
+    // A-C1: si la edición toca el flujo (monto o método), recalcular el corte
+    // proyectado de la sesión — CUALQUIERA sea su status. Antes sólo se
+    // validaba el caso EXPENSE+CASH (pre-check) y las sesiones CLOSED, así que
+    // bajar un INCOME en efectivo (o pasarlo a DIGITAL) podía dejar una caja
+    // ABIERTA con efectivo físico negativo. La proyección usa los valores YA
+    // editados en memoria, sustituyendo el movimiento actual, y se valida
+    // ANTES de persistir para no dejar estado inconsistente (M-9).
     let sessionToUpdate = null;
     if (movement.boxSessionId && (changes.amount || changes.paymentMethod)) {
       const sess = await BoxSession.findById(movement.boxSessionId);
-      if (sess && sess.status === 'CLOSED') {
+      if (sess) {
         const allMovs = await CashMovement.find({ boxSessionId: sess._id });
         // Sustituir el movimiento que se está editando por su versión en memoria
         const projected = allMovs.map((m) =>
           m._id.equals(movement._id) ? movement : m
         );
         const recalc = summarizeMovements(projected, sess.initialAmount);
-        // No permitir que la edición de un movimiento histórico deje el corte
-        // de una sesión CERRADA en negativo: un corte consolidado no debe poder
-        // reescribirse a un efectivo físico imposible (< 0).
+        // El efectivo físico nunca puede ser negativo — ni reescribiendo un
+        // corte consolidado (CLOSED) ni editando en una caja abierta.
         if (recalc.cashOnHand < 0) {
           return res.status(409).json({
-            message: 'La edición dejaría el corte de una caja ya cerrada en negativo. ' +
-              'No se permite reescribir la contabilidad consolidada de esa forma.'
+            message: sess.status === 'CLOSED'
+              ? 'La edición dejaría el corte de una caja ya cerrada en negativo. ' +
+                'No se permite reescribir la contabilidad consolidada de esa forma.'
+              : `Fondos insuficientes: la edición dejaría el efectivo de la caja en $${recalc.cashOnHand}.`
           });
         }
-        sess.finalAmount = recalc.cashOnHand;
-        sessionToUpdate = sess;
+        // BUG-6: en sesiones CLOSED, actualizar finalAmount para que los
+        // reportes históricos sigan cuadrando.
+        if (sess.status === 'CLOSED') {
+          sess.finalAmount = recalc.cashOnHand;
+          sessionToUpdate = sess;
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import plusIcon from '../../../assets/images/icons/plus.svg';
+import TrashIcon from './TrashIcon';
 
 const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
   return (
@@ -40,6 +41,7 @@ const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
           <button
             type="button"
             className="trash-button"
+            aria-label="Eliminar contacto"
             onClick={() =>
               setFormData((prev) => ({
                 ...prev,
@@ -47,7 +49,7 @@ const EmergencyInfo = ({ formData, handleArrayChange, setFormData }) => {
               }))
             }
           >
-            🗑️
+            <TrashIcon />
           </button>
         </div>
       ))}

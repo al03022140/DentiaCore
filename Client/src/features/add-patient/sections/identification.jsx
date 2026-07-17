@@ -27,6 +27,7 @@ const Identification = ({ formData, handleNestedChange, invalidFields = new Set(
             key={`doc-numero-${shakeKey}`}
             type="text"
             name="documento_numero"
+            maxLength={30}
             value={formData.documento?.numero || ""}
             onChange={(e) => handleNestedChange("documento", "numero", e.target.value)}
             className={inv('documento.numero')}

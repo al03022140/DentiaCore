@@ -1,17 +1,7 @@
 import API from './axios-instance';
 
-// El backend devuelve { charges, total, limit, skip } — desempaquetamos `charges`
-// para mantener compatibilidad con consumidores que esperan un array.
-export const getAllCharges = async (pendingOnly = false, { skip = 0, limit = 100 } = {}) => {
-  const params = new URLSearchParams();
-  if (pendingOnly) params.set('pendingOnly', 'true');
-  if (skip) params.set('skip', String(skip));
-  if (limit && limit !== 100) params.set('limit', String(limit));
-  const qs = params.toString();
-  const { data } = await API.get(`/patient-charges${qs ? `?${qs}` : ''}`);
-  return Array.isArray(data) ? data : (data?.charges ?? []);
-};
-
+// El backend devuelve { charges, total, limit, skip }; este wrapper preserva el
+// meta (total) para indicadores de paginación.
 export const getAllChargesWithMeta = async (pendingOnly = false, { skip = 0, limit = 100 } = {}) => {
   const params = new URLSearchParams();
   if (pendingOnly) params.set('pendingOnly', 'true');

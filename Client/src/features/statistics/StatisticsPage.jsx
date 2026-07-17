@@ -3,13 +3,6 @@ import './styles/statistics-page.css';
 import ChartRenderer from './components/ChartRenderer';
 import { fetchMetricData } from './data/statsService';
 
-const TAB_CONFIG = [
-  { id: 'overview', label: 'General' },
-  { id: 'financial', label: 'Finanzas' },
-  { id: 'patients', label: 'Pacientes' },
-  { id: 'operations', label: 'Operaciones' }
-];
-
 const METRICS = [
   {
     id: 'total-revenue',
@@ -25,7 +18,7 @@ const METRICS = [
     description: 'Cierres por turno y discrepancias detectadas.',
     category: 'Operaciones',
     temporalities: ['diaria', 'semanal', 'mensual'],
-    visualizations: ['barra', 'heatmap']
+    visualizations: ['barra']
   },
   {
     id: 'patient-type-trend',
@@ -95,93 +88,72 @@ const TEMPORALITY_LABELS = {
 const VISUALIZATION_LABELS = {
   linea: 'Linea',
   barra: 'Barra',
-  pastel: 'Pastel',
-  heatmap: 'Heatmap'
+  pastel: 'Pastel'
 };
 
 const SLOT_COUNT = 4;
 const METRIC_ORDER = METRICS.map(metric => metric.id);
-const LOCAL_STORAGE_KEY = 'dent-statistics-layout-v1';
-const KEYBOARD_INSTRUCTIONS_ID = 'statistics-keyboard-instructions';
+// v2: el layout pasó de un mapa por pestaña a un único arreglo plano de slots.
+const LOCAL_STORAGE_KEY = 'dent-statistics-layout-v2';
 
 const sortMetricIds = ids => {
   const unique = Array.from(new Set(ids));
   return METRIC_ORDER.filter(id => unique.includes(id));
 };
 
-const getTabLabel = tabId => TAB_CONFIG.find(tab => tab.id === tabId)?.label || 'pestaña';
-
-const buildEmptyLayout = () => {
-  const structure = {};
-  TAB_CONFIG.forEach(tab => {
-    structure[tab.id] = Array.from({ length: SLOT_COUNT }, () => null);
-  });
-  return structure;
-};
+const buildEmptyLayout = () => Array.from({ length: SLOT_COUNT }, () => null);
 
 const sanitizeStoredState = raw => {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
 
-  const layout = buildEmptyLayout();
   const occupied = new Set();
+  const slots = Array.isArray(raw.layout) ? raw.layout : [];
 
-  TAB_CONFIG.forEach(tab => {
-    const slots = Array.isArray(raw.layout?.[tab.id]) ? raw.layout[tab.id] : [];
-    layout[tab.id] = layout[tab.id].map((_, index) => {
-      const slot = slots[index];
-      if (!slot || !METRIC_ORDER.includes(slot.metricId)) {
-        return null;
-      }
-      const metric = METRICS.find(item => item.id === slot.metricId);
-      if (!metric) {
-        return null;
-      }
-      const granularity = metric.temporalities.includes(slot.granularity)
-        ? slot.granularity
-        : metric.temporalities[0];
-      const visualization = metric.visualizations.includes(slot.visualization)
-        ? slot.visualization
-        : metric.visualizations[0];
+  const layout = buildEmptyLayout().map((_, index) => {
+    const slot = slots[index];
+    if (!slot || !METRIC_ORDER.includes(slot.metricId)) {
+      return null;
+    }
+    const metric = METRICS.find(item => item.id === slot.metricId);
+    if (!metric) {
+      return null;
+    }
+    const granularity = metric.temporalities.includes(slot.granularity)
+      ? slot.granularity
+      : metric.temporalities[0];
+    const visualization = metric.visualizations.includes(slot.visualization)
+      ? slot.visualization
+      : metric.visualizations[0];
 
-      occupied.add(metric.id);
-      return {
-        metricId: metric.id,
-        granularity,
-        visualization,
-        status: 'idle',
-        data: null,
-        error: null,
-        requestId: null
-      };
-    });
+    occupied.add(metric.id);
+    return {
+      metricId: metric.id,
+      granularity,
+      visualization,
+      status: 'idle',
+      data: null,
+      error: null,
+      requestId: null
+    };
   });
 
   const available = Array.isArray(raw.availableMetricIds)
     ? sortMetricIds(raw.availableMetricIds.filter(id => METRIC_ORDER.includes(id) && !occupied.has(id)))
     : METRIC_ORDER.filter(id => !occupied.has(id));
 
-  const activeTab = TAB_CONFIG.some(tab => tab.id === raw.activeTab)
-    ? raw.activeTab
-    : TAB_CONFIG[0].id;
-
-  return { layout, availableMetricIds: available, activeTab };
+  return { layout, availableMetricIds: available };
 };
 
-const serializeLayout = layout => {
-  const payload = {};
-  Object.entries(layout).forEach(([tabId, slots]) => {
-    payload[tabId] = slots.map(slot => (slot
-      ? {
-          metricId: slot.metricId,
-          granularity: slot.granularity,
-          visualization: slot.visualization
-        }
-      : null));
-  });
-  return payload;
-};
+const serializeLayout = layout =>
+  layout.map(slot => (slot
+    ? {
+        metricId: slot.metricId,
+        granularity: slot.granularity,
+        visualization: slot.visualization
+      }
+    : null));
 
 const readStoredState = () => {
   if (typeof window === 'undefined') {
@@ -214,16 +186,10 @@ const StatisticsPage = () => {
     return map;
   }, []);
 
-  const [activeTab, setActiveTab] = useState(bootState?.activeTab ?? TAB_CONFIG[0].id);
   const [availableMetricIds, setAvailableMetricIds] = useState(bootState?.availableMetricIds ?? METRIC_ORDER);
   const [layout, setLayout] = useState(() => {
     if (bootState?.layout) {
-      const restored = {};
-      TAB_CONFIG.forEach(tab => {
-        const slots = bootState.layout[tab.id] || [];
-        restored[tab.id] = slots.map(slot => (slot ? { ...slot } : null));
-      });
-      return restored;
+      return bootState.layout.map(slot => (slot ? { ...slot } : null));
     }
     return buildEmptyLayout();
   });
@@ -233,7 +199,7 @@ const StatisticsPage = () => {
   const [announcement, setAnnouncement] = useState('');
   const requestCounterRef = useRef(0);
 
-  const startDataFetch = useCallback((tabId, slotIndex, metricId, granularity, visualization) => {
+  const startDataFetch = useCallback((slotIndex, metricId, granularity, visualization) => {
     if (!metricMap.has(metricId)) {
       return;
     }
@@ -242,7 +208,7 @@ const StatisticsPage = () => {
     requestCounterRef.current = requestId;
 
     setLayout(prevLayout => {
-      const nextSlots = [...prevLayout[tabId]];
+      const nextSlots = [...prevLayout];
       nextSlots[slotIndex] = {
         metricId,
         granularity,
@@ -252,16 +218,13 @@ const StatisticsPage = () => {
         error: null,
         requestId
       };
-      return {
-        ...prevLayout,
-        [tabId]: nextSlots
-      };
+      return nextSlots;
     });
 
     fetchMetricData(metricId, { granularity, visualization })
       .then(response => {
         setLayout(prevLayout => {
-          const nextSlots = [...prevLayout[tabId]];
+          const nextSlots = [...prevLayout];
           const current = nextSlots[slotIndex];
           if (!current || current.metricId !== metricId || current.requestId !== requestId) {
             return prevLayout;
@@ -274,15 +237,12 @@ const StatisticsPage = () => {
             error: null
           };
 
-          return {
-            ...prevLayout,
-            [tabId]: nextSlots
-          };
+          return nextSlots;
         });
       })
       .catch(error => {
         setLayout(prevLayout => {
-          const nextSlots = [...prevLayout[tabId]];
+          const nextSlots = [...prevLayout];
           const current = nextSlots[slotIndex];
           if (!current || current.metricId !== metricId || current.requestId !== requestId) {
             return prevLayout;
@@ -295,10 +255,7 @@ const StatisticsPage = () => {
             error: error.message || 'No se pudo cargar la metrica.'
           };
 
-          return {
-            ...prevLayout,
-            [tabId]: nextSlots
-          };
+          return nextSlots;
         });
       });
   }, [metricMap]);
@@ -320,15 +277,15 @@ const StatisticsPage = () => {
     setHighlightSlotKey(null);
   };
 
-  const handleDragOverSlot = (event, tabId, slotIndex) => {
+  const handleDragOverSlot = (event, slotIndex) => {
     if (!draggedMetricId) {
       return;
     }
     event.preventDefault();
-    setHighlightSlotKey(`${tabId}-${slotIndex}`);
+    setHighlightSlotKey(`${slotIndex}`);
   };
 
-  const handleDropOnSlot = (event, tabId, slotIndex) => {
+  const handleDropOnSlot = (event, slotIndex) => {
     event.preventDefault();
     const metricId = event.dataTransfer.getData('text/plain') || draggedMetricId;
     if (!metricId || !availableMetricIds.includes(metricId)) {
@@ -337,7 +294,7 @@ const StatisticsPage = () => {
     }
 
     const metricDefinition = metricMap.get(metricId);
-    const currentSlot = layout[tabId][slotIndex];
+    const currentSlot = layout[slotIndex];
     setOpenGranularityMenu(null);
 
     if (!metricDefinition) {
@@ -347,7 +304,6 @@ const StatisticsPage = () => {
     }
 
     startDataFetch(
-      tabId,
       slotIndex,
       metricId,
       metricDefinition.temporalities[0],
@@ -362,27 +318,24 @@ const StatisticsPage = () => {
       return sortMetricIds(nextIds);
     });
 
-    announce(`Métrica ${metricDefinition.title} colocada en ${getTabLabel(tabId)} slot ${slotIndex + 1}.`);
+    announce(`Métrica ${metricDefinition.title} colocada en slot ${slotIndex + 1}.`);
 
     setDraggedMetricId(null);
     setHighlightSlotKey(null);
   };
 
-  const handleReturnMetric = (tabId, slotIndex) => {
-    const slotData = layout[tabId][slotIndex];
+  const handleReturnMetric = (slotIndex) => {
+    const slotData = layout[slotIndex];
     if (!slotData) {
       return;
     }
 
-    setOpenGranularityMenu(prev => (prev === `${tabId}-${slotIndex}` ? null : prev));
+    setOpenGranularityMenu(prev => (prev === `${slotIndex}` ? null : prev));
 
     setLayout(prevLayout => {
-      const nextSlots = [...prevLayout[tabId]];
+      const nextSlots = [...prevLayout];
       nextSlots[slotIndex] = null;
-      return {
-        ...prevLayout,
-        [tabId]: nextSlots
-      };
+      return nextSlots;
     });
 
     setAvailableMetricIds(prevIds => sortMetricIds([...prevIds, slotData.metricId]));
@@ -391,22 +344,22 @@ const StatisticsPage = () => {
     announce(`Métrica ${metric?.title || slotData.metricId} devuelta a la lista.`);
   };
 
-  const handleGranularityChange = (tabId, slotIndex, granularity) => {
-    const slotData = layout[tabId][slotIndex];
+  const handleGranularityChange = (slotIndex, granularity) => {
+    const slotData = layout[slotIndex];
     if (!slotData) {
       return;
     }
 
-    startDataFetch(tabId, slotIndex, slotData.metricId, granularity, slotData.visualization);
+    startDataFetch(slotIndex, slotData.metricId, granularity, slotData.visualization);
   };
 
-  const handleVisualizationChange = (tabId, slotIndex, visualization) => {
-    const slotData = layout[tabId][slotIndex];
+  const handleVisualizationChange = (slotIndex, visualization) => {
+    const slotData = layout[slotIndex];
     if (!slotData) {
       return;
     }
 
-    startDataFetch(tabId, slotIndex, slotData.metricId, slotData.granularity, visualization);
+    startDataFetch(slotIndex, slotData.metricId, slotData.granularity, visualization);
   };
 
   const getMetric = metricId => metricMap.get(metricId);
@@ -425,39 +378,36 @@ const StatisticsPage = () => {
     }
 
     const payload = {
-      activeTab,
       availableMetricIds,
       layout: serializeLayout(layout)
     };
 
     window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-  }, [activeTab, availableMetricIds, layout]);
+  }, [availableMetricIds, layout]);
 
   useEffect(() => {
     if (!bootState) {
       return;
     }
 
-    TAB_CONFIG.forEach(tab => {
-      (bootState.layout[tab.id] || []).forEach((slot, index) => {
-        if (slot) {
-          startDataFetch(tab.id, index, slot.metricId, slot.granularity, slot.visualization);
-        }
-      });
+    (bootState.layout || []).forEach((slot, index) => {
+      if (slot) {
+        startDataFetch(index, slot.metricId, slot.granularity, slot.visualization);
+      }
     });
   }, [bootState, startDataFetch]);
 
-  const renderSlot = (tabId, slotIndex) => {
-    const slotKey = `${tabId}-${slotIndex}`;
-    const slotData = layout[tabId][slotIndex];
+  const renderSlot = (slotIndex) => {
+    const slotKey = `${slotIndex}`;
+    const slotData = layout[slotIndex];
 
     if (!slotData) {
       return (
         <div
           key={slotKey}
           className={`chart-slot chart-slot--empty ${highlightSlotKey === slotKey ? 'chart-slot--active' : ''}`}
-          onDragOver={event => handleDragOverSlot(event, tabId, slotIndex)}
-          onDrop={event => handleDropOnSlot(event, tabId, slotIndex)}
+          onDragOver={event => handleDragOverSlot(event, slotIndex)}
+          onDrop={event => handleDropOnSlot(event, slotIndex)}
           onDragLeave={() => setHighlightSlotKey(null)}
           role="button"
           tabIndex={0}
@@ -478,8 +428,8 @@ const StatisticsPage = () => {
       <div
         key={slotKey}
         className={`chart-slot chart-slot--filled ${highlightSlotKey === slotKey ? 'chart-slot--active' : ''}`}
-        onDragOver={event => handleDragOverSlot(event, tabId, slotIndex)}
-        onDrop={event => handleDropOnSlot(event, tabId, slotIndex)}
+        onDragOver={event => handleDragOverSlot(event, slotIndex)}
+        onDrop={event => handleDropOnSlot(event, slotIndex)}
         onDragLeave={() => setHighlightSlotKey(null)}
         role="button"
         tabIndex={0}
@@ -489,7 +439,7 @@ const StatisticsPage = () => {
         <button
           type="button"
           className="chart-slot__remove"
-          onClick={() => handleReturnMetric(tabId, slotIndex)}
+          onClick={() => handleReturnMetric(slotIndex)}
           aria-label="Quitar gráfica"
         >
           ✕
@@ -535,7 +485,7 @@ const StatisticsPage = () => {
                         role="option"
                         aria-selected={slotData.granularity === option}
                         onClick={() => {
-                          handleGranularityChange(tabId, slotIndex, option);
+                          handleGranularityChange(slotIndex, option);
                           closeGranularityMenu();
                         }}
                       >
@@ -553,7 +503,7 @@ const StatisticsPage = () => {
                     key={option}
                     type="button"
                     className={`viz-chip ${slotData.visualization === option ? 'viz-chip--active' : ''}`}
-                    onClick={() => handleVisualizationChange(tabId, slotIndex, option)}
+                    onClick={() => handleVisualizationChange(slotIndex, option)}
                   >
                     {VISUALIZATION_LABELS[option]}
                   </button>
@@ -577,7 +527,7 @@ const StatisticsPage = () => {
               <button
                 type="button"
                 className="chart-slot__retry"
-                onClick={() => startDataFetch(tabId, slotIndex, slotData.metricId, slotData.granularity, slotData.visualization)}
+                onClick={() => startDataFetch(slotIndex, slotData.metricId, slotData.granularity, slotData.visualization)}
               >
                 Reintentar
               </button>
@@ -604,15 +554,15 @@ const StatisticsPage = () => {
         {announcement || ' '}
       </div>
       <div className="statistics-page__left">
-        <div className="statistics-chart-grid" role="tabpanel">
-          {Array.from({ length: SLOT_COUNT }, (_, index) => renderSlot(activeTab, index))}
+        <div className="statistics-chart-grid">
+          {Array.from({ length: SLOT_COUNT }, (_, index) => renderSlot(index))}
         </div>
       </div>
 
       <aside className="statistics-page__right">
         <header className="metrics-panel__header">
           <h3>Metricas disponibles</h3>
-          <p>Arrastra para componer la pestaña activa.</p>
+          <p>Arrastra para componer el tablero.</p>
         </header>
         <div className="metrics-panel__list" role="list">
           {availableMetricIds.map(metricId => {

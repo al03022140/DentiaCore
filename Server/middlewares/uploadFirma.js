@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const multer = require('multer');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
@@ -24,7 +25,11 @@ const storage = multer.diskStorage({
     const userId = req.user?._id || req.user?.id;
     if (!userId) return cb(new Error('Usuario no autenticado'));
     const ext = MIME_TO_EXT[file.mimetype] || '.png';
-    cb(null, `${userId}_firma_${Date.now()}${ext}`);
+    // SEC-03: sufijo aleatorio para que el nombre no sea adivinable a partir
+    // del userId + timestamp (defensa en profundidad; el gate real es que
+    // /uploads/firmas ahora exige rol clínico en uploadsAuth).
+    const rand = crypto.randomBytes(6).toString('hex');
+    cb(null, `${userId}_firma_${Date.now()}_${rand}${ext}`);
   }
 });
 

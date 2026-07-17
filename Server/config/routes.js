@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 const patientRoutes = require('../routes/patientRoutes');
 const periodontogramRoutes = require('../routes/periodontogramRoutes');
 const cashRoutes = require('../routes/cashRoutes');
@@ -16,6 +17,7 @@ const patientChargeRoutes = require('../routes/patientChargeRoutes');
 const attachmentRoutes = require('../routes/attachmentRoutes');
 const auditRoutes = require('../routes/auditRoutes');
 const signingRoutes = require('../routes/signingRoutes');
+const inventoryRoutes = require('../routes/inventoryRoutes');
 const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
 const snapshotCapture = require('../middlewares/snapshotCapture');
@@ -39,8 +41,12 @@ const configureRoutes = () => {
     };
     const readyState = mongoose.connection?.readyState ?? 0;
     const dbStatus = stateMap[readyState] || `unknown(${readyState})`;
-    res.json({
-      status: 'ok',
+    // OBS-02: devolver 503 cuando la DB no está conectada para que un monitor
+    // por código de estado (schtasks/cron sondeando /api/health) detecte la
+    // degradación. Antes SIEMPRE respondía 200 aunque Mongo estuviera caído.
+    const healthy = readyState === 1;
+    res.status(healthy ? 200 : 503).json({
+      status: healthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       db: {
@@ -90,6 +96,7 @@ const configureRoutes = () => {
   router.use('/patient-charges', patientChargeRoutes);
   router.use('/audit', auditRoutes);
   router.use('/sign', signingRoutes);
+  router.use('/inventory', inventoryRoutes);
 
   // Capturar rutas no encontradas
   router.use('*', (req, res) => {
@@ -105,7 +112,13 @@ const configureRoutes = () => {
   router.use((err, req, res, _next) => {
     const statusCode = err.statusCode || err.status || 500;
     const message = statusCode === 500 ? 'Error interno del servidor' : err.message;
-    console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err);
+    // OBS-04: al log estructurado/rotado (winston), no a stdout suelto — antes
+    // los errores de request no llegaban al archivo rotado que soporte revisa.
+    logger.error(`[ERROR] ${req.method} ${req.originalUrl}`, {
+      status: statusCode,
+      error: err?.message || String(err),
+      stack: err?.stack,
+    });
     if (!res.headersSent) {
       res.status(statusCode).json({ error: message });
     }

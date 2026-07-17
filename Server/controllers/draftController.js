@@ -12,14 +12,17 @@
  *   body: { draftIds: [...], pin: '****' }
  *   Requiere PIN válido. Transiciona cada DRAFT → OFICIAL.
  */
+const crypto = require('crypto');
 const OdontogramaModel = require('../models/odontograma');
+const { devError } = require('../utils/httpError');
 const Periodontogram = require('../models/periodontogram');
 const Exam = require('../models/exam');
 const Patient = require('../models/patient');
 const Usuario = require('../models/users');
 const auditLogger = require('../middlewares/auditLogger');
 const { normalizeRole, isAdminRole, hasPermission, getEffectivePermissions } = require('../utils/permissions');
-const { computeContentHash, computeEvolutionNoteHash } = require('../utils/signing');
+const { computeEvolutionNoteHash } = require('../utils/signing');
+const { computeIntegrityHash } = require('../utils/integrity');
 const { copyFirmaToSnapshot } = require('../utils/saveSignatureImage');
 
 // Roles autorizados a firmar drafts (NOM-013). Admin/superadmin/doctor_admin
@@ -81,8 +84,13 @@ async function attachDoctorSignatureToNote(note, signer, patientId) {
   note.doctorFirmaMethod = 'pin';
   if (!signer || !signer.firmaDigitalUrl) return;
   try {
+    // Sufijo único por intento — mismo motivo que en persistNoteSignatures
+    // (patientsController): dos intentos de firma concurrentes sobre la misma
+    // nota no deben compartir ruta de archivo, o el perdedor pisa/borra el
+    // snapshot que la nota OFICIAL del ganador ya referencia.
+    const attempt = crypto.randomBytes(4).toString('hex');
     const snap = await copyFirmaToSnapshot(signer.firmaDigitalUrl, [
-      'pacientes', String(patientId), 'firmas-notas', `${note._id.toString()}_doctor`,
+      'pacientes', String(patientId), 'firmas-notas', `${note._id.toString()}_doctor_${attempt}`,
     ]);
     note.doctorFirmaUrl = snap.publicUrl;
     note.doctorFirmaImageHash = snap.contentHash;
@@ -207,6 +215,123 @@ async function findNoteSubdoc(noteId) {
 }
 
 /**
+ * Firma una nota de evolución en BORRADOR como OFICIAL (subdoc de Patient).
+ * Comparte la lógica que antes estaba duplicada entre signDraft (un solo
+ * borrador) y batchSign (un lote): guardia de estado, rol del firmante, hash
+ * de integridad, snapshot de la firma del doctor y persistencia atómica.
+ *
+ * Los mensajes de error SÍ difieren entre signDraft y batchSign (uno
+ * responde con `res`, el otro acumula en un array `errores`), así que este
+ * helper no arma el mensaje: devuelve un `code` y cada caller decide el
+ * texto, preservando exactamente la redacción que ya usaba.
+ *
+ * @param {string} id - _id de la nota
+ * @param {object} req - request (para req.user: rol + id del firmante)
+ * @param {object} signerUser - documento Usuario ya autenticado por PIN en el
+ *   caller (el mismo `user` que verificó el PIN); se usa para el snapshot de
+ *   `firmaDigitalUrl` en attachDoctorSignatureToNote.
+ * @returns {Promise<{ok:true, note:object, patientId:*} | {ok:false, status:number, code:'not_found'|'invalid_state'|'not_doctor'|'conflict'}>}
+ */
+async function signNoteDraft(id, req, signerUser) {
+  const found = await findNoteSubdoc(id);
+  if (!found) return { ok: false, status: 404, code: 'not_found' };
+  const { patient, note } = found;
+  if (note.estadoRegistro !== 'BORRADOR') {
+    return { ok: false, status: 400, code: 'invalid_state' };
+  }
+  // Sólo un dentista puede ser el autor/firmante de una nota clínica
+  // (NOM-004 Art. 5.10). Antes administrador/superadmin con draft.approve
+  // podían quedar como `firmadoPor` de una nota de evolución.
+  if (!isDoctorSigner(req.user)) {
+    return { ok: false, status: 403, code: 'not_doctor' };
+  }
+
+  note.estadoRegistro = 'OFICIAL';
+  note.firmadoPor = req.user.id;
+  note.firmadoEn = new Date();
+  // Snapshot del contentHash al firmar (igual que signExistingEvolutionNote
+  // y que la rama de modelos top-level). Antes este path dejaba la nota
+  // OFICIAL con contentHash=null → sin forma de detectar manipulación
+  // posterior (NOM-024 / NOM-004 Art. 5.10).
+  note.contentHash = computeEvolutionNoteHash(note);
+  note.firmaDesactualizada = false;
+  // Adjunta la firma del doctor (method='pin' + snapshot si tiene imagen).
+  // Sin esto la nota quedaba OFICIAL sin ninguna firma del doctor.
+  await attachDoctorSignatureToNote(note, signerUser, patient._id);
+  // Limpiar marca de rechazo si la había.
+  note.rechazadoEn = null;
+  note.rechazadoPor = null;
+  note.rechazoMotivo = null;
+  // Persistir con $set posicional atómico (no patient.save(), que pierde
+  // notas concurrentes — ver persistNoteOfficial). Si la nota dejó de estar
+  // en BORRADOR entre la lectura y aquí (firmada/modificada en paralelo),
+  // matchedCount=0 → conflicto sin pisar nada. El snapshot de firma ya
+  // escrito se deja: su ruta está indexada por noteId y borrarla podría
+  // eliminar la del firmante que sí ganó la carrera.
+  const matched = await persistNoteOfficial(patient._id, note);
+  if (!matched) {
+    return { ok: false, status: 409, code: 'conflict' };
+  }
+
+  return { ok: true, note, patientId: patient._id };
+}
+
+/**
+ * Firma un borrador de un modelo clínico de nivel superior (odontograma,
+ * periodontograma, examen) como OFICIAL. Comparte la lógica que antes estaba
+ * duplicada entre signDraft y batchSign: resolución del modelo, guardia de
+ * estado, hash de integridad y limpieza de campos de rechazo.
+ *
+ * Igual que signNoteDraft, devuelve un `code` en vez de un mensaje armado
+ * para que cada caller preserve su propia redacción de error.
+ *
+ * @param {string} id
+ * @param {string} resourceType
+ * @param {object} user - req.user (para firmadoPor/autorizadoPor)
+ * @param {string} [logContext] - prefijo del console.warn si falla el hash (varía entre call sites)
+ * @returns {Promise<{ok:true, doc:object} | {ok:false, status:number, code:'unsupported_type'|'not_found'|'invalid_state'}>}
+ */
+async function signTopLevelDraft(id, resourceType, user, logContext = '[signDraft]') {
+  const resolved = resolveModel(resourceType);
+  if (!resolved) {
+    return { ok: false, status: 400, code: 'unsupported_type' };
+  }
+
+  const { model, fieldName, resourceTypeForHash } = resolved;
+  const doc = await model.findById(id);
+  if (!doc) {
+    return { ok: false, status: 404, code: 'not_found' };
+  }
+
+  if (doc[fieldName] !== 'BORRADOR') {
+    return { ok: false, status: 400, code: 'invalid_state' };
+  }
+
+  // Transicionar BORRADOR → OFICIAL + snapshot del contentHash (BUG-M2:
+  // antes no se recomputaba, dejando el doc OFICIAL sin hash actualizado).
+  doc[fieldName] = 'OFICIAL';
+  doc.firmadoPor = user.id;
+  doc.firmadoEn = new Date();
+  doc.autorizadoPor = user.id;
+  try {
+    doc.contentHash = computeIntegrityHash(doc, resourceTypeForHash);
+    if (doc.schema?.path('firmaDesactualizada')) doc.firmaDesactualizada = false;
+  } catch (hashErr) {
+    console.warn(`${logContext} No se pudo calcular contentHash:`, hashErr.message);
+  }
+  // Limpia campos de rechazo previo si los hubiera.
+  if (doc.schema?.path('rechazoMotivo')) {
+    doc.rechazoMotivo = null;
+    doc.rechazadoEn = null;
+    doc.rechazadoPor = null;
+  }
+
+  await doc.save();
+
+  return { ok: true, doc };
+}
+
+/**
  * GET /api/drafts — Listar borradores pendientes.
  *
  * Visibilidad:
@@ -277,7 +402,7 @@ const listDrafts = async (req, res) => {
     return res.json({ count: drafts.length, drafts });
   } catch (error) {
     console.error('[DraftController] Error al listar borradores:', error);
-    return res.status(500).json({ message: 'Error al listar borradores', error: error.message });
+    return res.status(500).json({ message: 'Error al listar borradores', error: devError(error) });
   }
 };
 
@@ -326,108 +451,49 @@ const signDraft = async (req, res) => {
 
     // ── Notas de evolución (subdoc) ────────────────────────────
     if (resourceType === NOTE_RESOURCE) {
-      const found = await findNoteSubdoc(id);
-      if (!found) return res.status(404).json({ message: 'Borrador no encontrado' });
-      const { patient, note } = found;
-      if (note.estadoRegistro !== 'BORRADOR') {
-        return res.status(400).json({ message: 'El registro no está en estado BORRADOR' });
-      }
-      // Sólo un dentista puede ser el autor/firmante de una nota clínica
-      // (NOM-004 Art. 5.10). Antes administrador/superadmin con draft.approve
-      // podían quedar como `firmadoPor` de una nota de evolución.
-      if (!isDoctorSigner(req.user)) {
-        return res.status(403).json({
-          message: 'Sólo un doctor (o doctor administrador) puede firmar una nota de evolución como OFICIAL.'
-        });
-      }
-
-      note.estadoRegistro = 'OFICIAL';
-      note.firmadoPor = req.user.id;
-      note.firmadoEn = new Date();
-      // Snapshot del contentHash al firmar (igual que signExistingEvolutionNote
-      // y que la rama de modelos top-level). Antes este path dejaba la nota
-      // OFICIAL con contentHash=null → sin forma de detectar manipulación
-      // posterior (NOM-024 / NOM-004 Art. 5.10).
-      note.contentHash = computeEvolutionNoteHash(note);
-      note.firmaDesactualizada = false;
-      // Adjunta la firma del doctor (method='pin' + snapshot si tiene imagen).
-      // Sin esto la nota quedaba OFICIAL sin ninguna firma del doctor.
-      await attachDoctorSignatureToNote(note, user, patient._id);
-      // Limpiar marca de rechazo si la había.
-      note.rechazadoEn = null;
-      note.rechazadoPor = null;
-      note.rechazoMotivo = null;
-      // Persistir con $set posicional atómico (no patient.save(), que pierde
-      // notas concurrentes — ver persistNoteOfficial). Si la nota dejó de estar
-      // en BORRADOR entre la lectura y aquí (firmada/modificada en paralelo),
-      // matchedCount=0 → 409 sin pisar nada. El snapshot de firma ya escrito se
-      // deja: su ruta está indexada por noteId y borrarla podría eliminar la del
-      // firmante que sí ganó la carrera.
-      const matched = await persistNoteOfficial(patient._id, note);
-      if (!matched) {
-        return res.status(409).json({
-          message: 'La nota ya fue firmada o modificada por otra operación. Recargue e intente de nuevo.'
-        });
+      const result = await signNoteDraft(id, req, user);
+      if (!result.ok) {
+        const messages = {
+          not_found: 'Borrador no encontrado',
+          invalid_state: 'El registro no está en estado BORRADOR',
+          not_doctor: 'Sólo un doctor (o doctor administrador) puede firmar una nota de evolución como OFICIAL.',
+          conflict: 'La nota ya fue firmada o modificada por otra operación. Recargue e intente de nuevo.',
+        };
+        return res.status(result.status).json({ message: messages[result.code] });
       }
 
       await auditLogger.registrarManual(req, 'borrador_aprobado', {
         resourceType: NOTE_RESOURCE,
-        resourceId: note._id,
-        patientId: patient._id,
-        detalles: { contentHash: note.contentHash, doctorFirmaMethod: note.doctorFirmaMethod },
+        resourceId: result.note._id,
+        patientId: result.patientId,
+        detalles: { contentHash: result.note.contentHash, doctorFirmaMethod: result.note.doctorFirmaMethod },
       });
 
-      return res.json({ message: 'Borrador firmado correctamente', noteId: note._id });
+      return res.json({ message: 'Borrador firmado correctamente', noteId: result.note._id });
     }
 
     // ── Modelos top-level ──────────────────────────────────────
-    const resolved = resolveModel(resourceType);
-    if (!resolved) {
-      return res.status(400).json({ message: `Tipo de recurso '${resourceType}' no soporta borradores` });
+    const result = await signTopLevelDraft(id, resourceType, req.user, '[signDraft]');
+    if (!result.ok) {
+      const messages = {
+        unsupported_type: `Tipo de recurso '${resourceType}' no soporta borradores`,
+        not_found: 'Borrador no encontrado',
+        invalid_state: 'El registro no está en estado BORRADOR',
+      };
+      return res.status(result.status).json({ message: messages[result.code] });
     }
-
-    const { model, fieldName, resourceTypeForHash } = resolved;
-    const doc = await model.findById(id);
-    if (!doc) {
-      return res.status(404).json({ message: 'Borrador no encontrado' });
-    }
-
-    if (doc[fieldName] !== 'BORRADOR') {
-      return res.status(400).json({ message: 'El registro no está en estado BORRADOR' });
-    }
-
-    // Transicionar BORRADOR → OFICIAL + snapshot del contentHash (BUG-M2:
-    // antes no se recomputaba, dejando el doc OFICIAL sin hash actualizado).
-    doc[fieldName] = 'OFICIAL';
-    doc.firmadoPor = req.user.id;
-    doc.firmadoEn = new Date();
-    doc.autorizadoPor = req.user.id;
-    try {
-      doc.contentHash = computeContentHash(doc, resourceTypeForHash);
-      if (doc.schema?.path('firmaDesactualizada')) doc.firmaDesactualizada = false;
-    } catch (hashErr) {
-      console.warn('[signDraft] No se pudo calcular contentHash:', hashErr.message);
-    }
-    // Limpia campos de rechazo previo si los hubiera.
-    if (doc.schema?.path('rechazoMotivo')) {
-      doc.rechazoMotivo = null;
-      doc.rechazadoEn = null;
-      doc.rechazadoPor = null;
-    }
-
-    await doc.save();
 
     await auditLogger.registrarManual(req, 'borrador_aprobado', {
       resourceType,
-      resourceId: doc._id,
-      patientId: doc.patientId || doc.paciente_id || null,
-      detalles: { contentHash: doc.contentHash || null },
+      resourceId: result.doc._id,
+      patientId: result.doc.patientId || result.doc.paciente_id || null,
+      detalles: { contentHash: result.doc.contentHash || null },
     });
 
-    return res.json({ message: 'Borrador firmado correctamente', doc });
+    return res.json({ message: 'Borrador firmado correctamente', doc: result.doc });
   } catch (error) {
     console.error('[DraftController] Error al firmar borrador:', error);
-    return res.status(500).json({ message: 'Error al firmar borrador', error: error.message });
+    return res.status(500).json({ message: 'Error al firmar borrador', error: devError(error) });
   }
 };
 
@@ -441,6 +507,13 @@ const batchSign = async (req, res) => {
 
     if (!Array.isArray(draftIds) || draftIds.length === 0) {
       return res.status(400).json({ message: 'draftIds debe ser un array no vacío' });
+    }
+    // BE-03: cota de tamaño del lote. Cada ítem hace queries + I/O de disco
+    // (copia de firma) en un for...of secuencial; sin tope, "Firmar todo" con
+    // cientos de borradores bloquea el worker HTTP de forma proporcional.
+    const MAX_BATCH_SIGN = 100;
+    if (draftIds.length > MAX_BATCH_SIGN) {
+      return res.status(400).json({ message: `No se pueden firmar más de ${MAX_BATCH_SIGN} borradores por lote` });
     }
 
     if (!pin) {
@@ -488,87 +561,37 @@ const batchSign = async (req, res) => {
 
         // Notas de evolución (subdoc)
         if (resourceType === NOTE_RESOURCE) {
-          const found = await findNoteSubdoc(id);
-          if (!found) {
-            errores.push({ id, resourceType, error: 'No encontrado' });
+          const result = await signNoteDraft(id, req, user);
+          if (!result.ok) {
+            const messages = {
+              not_found: 'No encontrado',
+              invalid_state: 'No está en estado BORRADOR',
+              not_doctor: 'Sólo un doctor puede firmar notas de evolución como OFICIAL',
+              conflict: 'La nota ya no estaba en BORRADOR (firmada o modificada en paralelo)',
+            };
+            errores.push({ id, resourceType, error: messages[result.code] });
             continue;
           }
-          const { patient, note } = found;
-          if (note.estadoRegistro !== 'BORRADOR') {
-            errores.push({ id, resourceType, error: 'No está en estado BORRADOR' });
-            continue;
-          }
-          // Sólo un dentista puede ser el autor de una nota clínica (NOM-004
-          // Art. 5.10) — administrador/superadmin no firman notas de evolución.
-          if (!isDoctorSigner(req.user)) {
-            errores.push({ id, resourceType, error: 'Sólo un doctor puede firmar notas de evolución como OFICIAL' });
-            continue;
-          }
-          note.estadoRegistro = 'OFICIAL';
-          note.firmadoPor = req.user.id;
-          note.firmadoEn = new Date();
-          // Snapshot del contentHash al firmar (ver nota en signDraft).
-          note.contentHash = computeEvolutionNoteHash(note);
-          note.firmaDesactualizada = false;
-          // Adjunta la firma del doctor (method='pin' + snapshot si tiene imagen).
-          await attachDoctorSignatureToNote(note, user, patient._id);
-          note.rechazadoEn = null;
-          note.rechazadoPor = null;
-          note.rechazoMotivo = null;
-          // $set posicional atómico en vez de patient.save() (anti pérdida de
-          // notas por concurrencia — ver persistNoteOfficial). Si la nota dejó
-          // de estar en BORRADOR en paralelo, se reporta como error de este item
-          // sin abortar el resto del lote ni pisar cambios ajenos.
-          const matched = await persistNoteOfficial(patient._id, note);
-          if (!matched) {
-            errores.push({ id, resourceType, error: 'La nota ya no estaba en BORRADOR (firmada o modificada en paralelo)' });
-            continue;
-          }
-          aprobados.push(note._id);
-          resultados.push({ id: note._id, resourceType, status: 'aprobado' });
+          aprobados.push(result.note._id);
+          resultados.push({ id: result.note._id, resourceType, status: 'aprobado' });
           continue;
         }
 
-        const resolved = resolveModel(resourceType);
-        if (!resolved) {
-          errores.push({ id, resourceType, error: 'Tipo no soportado' });
+        const result = await signTopLevelDraft(id, resourceType, req.user, '[batchSign]');
+        if (!result.ok) {
+          const messages = {
+            unsupported_type: 'Tipo no soportado',
+            not_found: 'No encontrado',
+            invalid_state: 'No está en estado BORRADOR',
+          };
+          errores.push({ id, resourceType, error: messages[result.code] });
           continue;
         }
 
-        const { model, fieldName, resourceTypeForHash } = resolved;
-        const doc = await model.findById(id);
-
-        if (!doc) {
-          errores.push({ id, resourceType, error: 'No encontrado' });
-          continue;
-        }
-
-        if (doc[fieldName] !== 'BORRADOR') {
-          errores.push({ id, resourceType, error: 'No está en estado BORRADOR' });
-          continue;
-        }
-
-        doc[fieldName] = 'OFICIAL';
-        doc.firmadoPor = req.user.id;
-        doc.firmadoEn = new Date();
-        doc.autorizadoPor = req.user.id;
-        try {
-          doc.contentHash = computeContentHash(doc, resourceTypeForHash);
-          if (doc.schema?.path('firmaDesactualizada')) doc.firmaDesactualizada = false;
-        } catch (hashErr) {
-          console.warn('[batchSign] No se pudo calcular contentHash:', hashErr.message);
-        }
-        if (doc.schema?.path('rechazoMotivo')) {
-          doc.rechazoMotivo = null;
-          doc.rechazadoEn = null;
-          doc.rechazadoPor = null;
-        }
-        await doc.save();
-
-        aprobados.push(doc._id);
-        resultados.push({ id: doc._id, resourceType, status: 'aprobado' });
+        aprobados.push(result.doc._id);
+        resultados.push({ id: result.doc._id, resourceType, status: 'aprobado' });
       } catch (err) {
-        errores.push({ id, resourceType: item.resourceType, error: err.message });
+        errores.push({ id, resourceType: item.resourceType, error: devError(err) });
       }
     }
 
@@ -589,7 +612,7 @@ const batchSign = async (req, res) => {
     });
   } catch (error) {
     console.error('[DraftController] Error en firma en lote:', error);
-    return res.status(500).json({ message: 'Error en firma en lote', error: error.message });
+    return res.status(500).json({ message: 'Error en firma en lote', error: devError(error) });
   }
 };
 
@@ -613,6 +636,12 @@ const rejectDraft = async (req, res) => {
     }
 
     const motivoTrim = motivo.trim();
+    // Cota espejo del maxlength de rechazoMotivo en el schema (500): el $set
+    // posicional de persistNoteRejected no corre validators, y en top-level el
+    // doc.save() convertía el exceso en un 500 de ValidationError.
+    if (motivoTrim.length > 500) {
+      return res.status(400).json({ message: 'El motivo excede el máximo de 500 caracteres.' });
+    }
     const now = new Date();
 
     // ── Notas de evolución (subdoc) ────────────────────────────
@@ -683,7 +712,7 @@ const rejectDraft = async (req, res) => {
     return res.json({ message: 'Borrador rechazado', motivo: motivoTrim });
   } catch (error) {
     console.error('[DraftController] Error al rechazar borrador:', error);
-    return res.status(500).json({ message: 'Error al rechazar borrador', error: error.message });
+    return res.status(500).json({ message: 'Error al rechazar borrador', error: devError(error) });
   }
 };
 

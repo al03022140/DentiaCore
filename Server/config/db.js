@@ -16,6 +16,14 @@ const connectDB = async (options = {}) => {
     const baseDelayMs = Number.isInteger(options.baseDelayMs) ? options.baseDelayMs : 1000; // 1s base
     const exitOnFail = options.exitOnFail !== undefined ? options.exitOnFail : true;
 
+    // Fail-fast si falta la URI: sin esto, mongoose.connect(undefined) falla con
+    // un error críptico del driver y se reintenta 5x (~31s) antes de rendirse.
+    if (!uri) {
+        logger.error('🛑 MONGODB_URI no está definido; no se puede conectar a MongoDB');
+        if (exitOnFail) process.exit(1);
+        throw new Error('MONGODB_URI no definido');
+    }
+
     // Configurar timeouts para evitar cuelgues
     const mongooseOptions = {
         // 5s (antes 10s): si mongod no responde (p. ej. la laptop volvió de
@@ -75,7 +83,10 @@ const connectDB = async (options = {}) => {
                 continue;
             }
 
-            logger.error('🛑 No se pudo conectar a MongoDB después de %d intentos', maxRetries, { uri });
+            // Redacta credenciales (mongodb://user:pass@host) antes de loggear:
+            // el log rota con retención de 14 días y el password no debe quedar en claro.
+            const safeUri = String(uri).replace(/\/\/[^@]+@/, '//***@');
+            logger.error('🛑 No se pudo conectar a MongoDB después de %d intentos', maxRetries, { uri: safeUri });
             if (exitOnFail) {
                 process.exit(1);
             } else {

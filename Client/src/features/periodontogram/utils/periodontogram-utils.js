@@ -47,7 +47,6 @@ export const FURCA_LEVELS = {
 const _cache = {
   toothPositions: new Map(),
   imagePaths: new Map(),
-  validationResults: new Map(),
   toothNames: new Map()
 };
 
@@ -136,14 +135,6 @@ export const PeriodontogramUtils = {
     _cache.imagePaths.set(cacheKey, imagePath);
     
     return imagePath;
-  },
-
-  /**
-   * Obtiene la ruta de imagen de fondo del diente
-   */
-  getToothBackgroundImagePath(toothNumber) {
-    const section = this.getToothSection(toothNumber);
-    return `/images/Periodontogram/background/background-${section}.png`;
   },
 
   /**
@@ -243,67 +234,6 @@ export const PeriodontogramUtils = {
   },
 
   /**
-   * Determina el color según el valor clínico usando configuración centralizada
-   */
-  getColorByValue(value, type = 'depth') {
-    const numValue = parseFloat(value);
-    
-    if (type === 'depth') {
-      return PERIODONTOGRAM_CONFIG.getIndicatorColor('probingDepth', numValue);
-    }
-    
-    if (type === 'margin') {
-      // Margen firmado: recesión = NEGATIVO (raíz expuesta). Positivo = margen
-      // coronal al LAC (inflamación/hiperplasia). Coherente con NIC = PS − MG y
-      // con la detección de recesión (margin <= -umbral).
-      if (numValue < 0) return PERIODONTOGRAM_CONFIG.UI_COLORS.gingivalMargin.recession;
-      return PERIODONTOGRAM_CONFIG.UI_COLORS.gingivalMargin.inflammation;
-    }
-    
-    return '#000000';
-  },
-
-  /**
-   * Interpreta el valor clínico
-   */
-  getInterpretation(value, type = 'depth') {
-    const numValue = parseFloat(value);
-    
-    if (type === 'depth') {
-      if (numValue <= 3) return 'Saludable';
-      if (numValue <= 5) return 'Gingivitis/Periodontitis leve';
-      return 'Periodontitis moderada a severa';
-    }
-    
-    if (type === 'margin') {
-      if (numValue >= 0) return 'Recesión gingival';
-      return 'Inflamación/Hiperplasia';
-    }
-    
-    return 'Sin interpretación';
-  },
-
-  /**
-   * Obtiene todos los dientes de una arcada
-   */
-  getArchTeeth(arch) {
-    if (arch === 'upper') {
-      return [...UPPER_TEETH];
-    }
-    if (arch === 'lower') {
-      return [...LOWER_TEETH];
-    }
-    return [];
-  },
-
-  /**
-   * Obtiene todos los dientes válidos
-   */
-  getAllTeeth() {
-    return [...UPPER_TEETH, ...LOWER_TEETH];
-  },
-
-  /**
    * Determina si un diente puede tener furca
    */
   canHaveFurca(toothNumber, isVestibular = true, isPalatine = false) {
@@ -351,122 +281,6 @@ export const PeriodontogramUtils = {
     return [...LOWER_TEETH];
   },
 
-  /**
-   * Obtiene el color para el valor de placa usando configuración centralizada
-   */
-  getPlaqueColor(value) {
-    return PERIODONTOGRAM_CONFIG.getIndicatorColor('plaque', value);
-  },
-
-  /**
-   * Obtiene el color para profundidad de sondaje usando configuración centralizada
-   */
-  getProbingDepthColor(value) {
-    return PERIODONTOGRAM_CONFIG.getIndicatorColor('probingDepth', value);
-  },
-
-  /**
-   * Calcula índice de severidad periodontal
-   */
-  calculatePeriodontalSeverity(avgDepth, bleedingPercentage, plaquePercentage) {
-    let score = 0;
-    
-    // Profundidad de sondaje
-    if (avgDepth > 6) score += 3;
-    else if (avgDepth > 4) score += 2;
-    else if (avgDepth > 3) score += 1;
-    
-    // Sangrado
-    if (bleedingPercentage > 50) score += 3;
-    else if (bleedingPercentage > 25) score += 2;
-    else if (bleedingPercentage > 10) score += 1;
-    
-    // Placa
-    if (plaquePercentage > 50) score += 2;
-    else if (plaquePercentage > 25) score += 1;
-    
-    if (score <= 2) return { level: 'mild', text: 'Periodontitis leve' };
-    if (score <= 5) return { level: 'moderate', text: 'Periodontitis moderada' };
-    return { level: 'severe', text: 'Periodontitis severa' };
-  },
-
-  /**
-   * Obtiene arrays optimizados de dientes para las 4 caras específicas del periodontograma
-   * Orden estándar dental: derecha a izquierda del paciente
-   */
-  getOptimizedToothArrays() {
-    return {
-      upperVestibular: [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28],
-      upperPalatine: [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28],
-      lowerVestibular: [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38],
-      lowerLingual: [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38]
-    };
-  },
-
-  /**
-   * Obtiene los dientes superiores vestibulares
-   */
-  getUpperVestibular() {
-    return [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28];
-  },
-
-  /**
-   * Obtiene los dientes superiores palatinos
-   */
-  getUpperPalatine() {
-    return [11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28];
-  },
-
-  /**
-   * Obtiene los dientes inferiores vestibulares
-   */
-  getLowerVestibular() {
-    return [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38];
-  },
-
-  /**
-   * Obtiene los dientes inferiores linguales
-   */
-  getLowerLingual() {
-    return [41, 42, 43, 44, 45, 46, 47, 48, 31, 32, 33, 34, 35, 36, 37, 38];
-  },
-
-  /**
-   * Limpia el cache para optimización de memoria
-   */
-  clearCache(type = 'all') {
-    switch (type) {
-      case 'positions':
-        _cache.toothPositions.clear();
-        break;
-      case 'images':
-        _cache.imagePaths.clear();
-        break;
-      case 'validation':
-        _cache.validationResults.clear();
-        break;
-      case 'names':
-        _cache.toothNames.clear();
-        break;
-      case 'all':
-      default:
-        Object.values(_cache).forEach(cache => cache.clear());
-        break;
-    }
-  },
-
-  /**
-   * Obtiene estadísticas del cache para monitoreo
-   */
-  getCacheStats() {
-    return {
-      positions: _cache.toothPositions.size,
-      images: _cache.imagePaths.size,
-      validation: _cache.validationResults.size,
-      names: _cache.toothNames.size,
-      total: Object.values(_cache).reduce((total, cache) => total + cache.size, 0)
-    };
-  },
 };
 
 /**
@@ -474,10 +288,9 @@ export const PeriodontogramUtils = {
  */
 export const clonePeriodontogramData = (periodontogramData) => {
   if (!periodontogramData) return null;
-  
+
   try {
-    // Usar JSON para clonación profunda optimizada
-    return JSON.parse(JSON.stringify(periodontogramData));
+    return structuredClone(periodontogramData);
   } catch (error) {
     console.error('[PeriodontogramUtils] Error al clonar datos:', error);
     return null;

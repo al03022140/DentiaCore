@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
-import API from '../services/axios-instance';
+import API, { triggerTokenRefresh } from '../services/axios-instance';
 import { getSettings } from '../services/settingsService';
 import './styles/lock-screen.css';
 import lockBlockedIcon from '../../assets/images/icons/Lock blocked.svg';
@@ -47,6 +47,8 @@ export const LockScreenProvider = ({ children }) => {
   const [warningRemainingMs, setWarningRemainingMs] = useState(null);
   const lastActivityRef = useRef(Date.now());
   const checkIntervalRef = useRef(null);
+  // Evita repetir el chequeo de sesión más de una vez por bloqueo.
+  const sessionCheckedRef = useRef(false);
   // Timeout configurable desde Configuración → Seguridad (en ms).
   // Se inicializa con default y se sobreescribe al cargar settings.
   const inactivityTimeoutMsRef = useRef(DEFAULT_INACTIVITY_MIN * 60 * 1000);
@@ -247,6 +249,48 @@ export const LockScreenProvider = ({ children }) => {
       setIsLocked(true);
     }
   }, [user]);
+
+  // Si al volver a la pantalla bloqueada la sesión ya murió (el refresh token
+  // expiró mientras estaba bloqueada), pedir el PIN es inútil: igual termina en
+  // /login. En ese caso saltamos el PIN y vamos directo al login. Sólo se
+  // comprueba con la pestaña visible (el usuario volvió) y una vez por bloqueo,
+  // para no mantener viva la sesión mientras la estación está desatendida.
+  useEffect(() => {
+    if (!isLocked) { sessionCheckedRef.current = false; return undefined; }
+
+    // Si el usuario desbloquea con PIN correcto mientras este chequeo sigue
+    // en vuelo (red lenta), el efecto se limpia (isLocked pasa a false) pero
+    // la promesa ya en curso no se cancela sola — sin este guard, una
+    // respuesta 401 tardía dispararía logout() justo después de un
+    // desbloqueo exitoso.
+    let cancelled = false;
+
+    const checkSession = () => {
+      if (sessionCheckedRef.current) return;
+      if (document.visibilityState !== 'visible') return;
+      sessionCheckedRef.current = true;
+      triggerTokenRefresh().catch((err) => {
+        if (cancelled) return;
+        if (err?.response?.status === 401) {
+          // Sesión muerta: a login sin pedir PIN.
+          sessionStorage.removeItem('dentiacore_locked');
+          logout();
+        } else {
+          // Error de red/servidor transitorio: permitir reintento y dejar el PIN.
+          sessionCheckedRef.current = false;
+        }
+      });
+    };
+
+    checkSession();
+    document.addEventListener('visibilitychange', checkSession);
+    window.addEventListener('focus', checkSession);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', checkSession);
+      window.removeEventListener('focus', checkSession);
+    };
+  }, [isLocked, logout]);
 
   const handlePinSubmit = (e) => {
     e.preventDefault();

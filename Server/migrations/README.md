@@ -37,7 +37,7 @@ module.exports = {
 - **Idempotente:** `up()` debe poder correr dos veces sin daño (filtra por lo que
   aún no está migrado). Si falla a la mitad, se corrige y se vuelve a correr.
 - **Forward-only:** no hay `down()`. El rollback es **restaurar el backup previo**
-  (ver `docs/operacion/backups-y-restauracion.md`).
+  (ver `docs/server/operacion/backups-y-restauracion.md`).
 - **Ops crudas, no modelos:** usa `db.collection(...)`, no los modelos Mongoose de
   la app (evita acoplarte a su versión/validaciones).
 - **Trampas de Mongoose (doc 03 §14):** los renombres por alias y los getters NO

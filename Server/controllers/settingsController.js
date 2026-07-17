@@ -1,9 +1,11 @@
 const ClinicSettings = require('../models/clinicSettings');
+const { devError } = require('../utils/httpError');
 const Usuario = require('../models/users');
 const AuditLog = require('../models/auditLog');
 const path = require('path');
 const fsExtra = require('fs-extra');
 const { resolveUploadsPath } = require('../utils/uploads');
+const { validateMimeByMagicBytes } = require('../utils/fileMagicBytes');
 const { validatePasswordStrength } = require('../utils/crypto');
 const {
   VALID_ROLES, normalizeRole, validatePermissionAssignment, isOverrideProtectedRole,
@@ -20,7 +22,7 @@ exports.getSettings = async (req, res) => {
     const settings = await ClinicSettings.getSettings();
     res.json(settings);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener configuración', error: error.message });
+    res.status(500).json({ message: 'Error al obtener configuración', error: devError(error) });
   }
 };
 
@@ -99,7 +101,7 @@ exports.updateSettings = async (req, res) => {
 
     res.json(settings);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar configuración', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar configuración', error: devError(error) });
   }
 };
 
@@ -110,7 +112,7 @@ exports.getRolePermissions = async (req, res) => {
     const settings = await ClinicSettings.getSettings();
     res.json(settings.rolePermissionOverrides || {});
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener permisos por rol', error: error.message });
+    res.status(500).json({ message: 'Error al obtener permisos por rol', error: devError(error) });
   }
 };
 
@@ -154,7 +156,7 @@ exports.updateRolePermissions = async (req, res) => {
     await settings.save();
     res.json({ message: 'Permisos actualizados', role: normalizeRole(role), permissions });
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar permisos del rol', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar permisos del rol', error: devError(error) });
   }
 };
 
@@ -169,10 +171,10 @@ exports.updateMyPreferences = async (req, res) => {
       if (req.body[key] !== undefined) updates[`preferences.${key}`] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true })
-      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
+      .select('-contraseña -refreshTokenHash -previousRefreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar preferencias', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar preferencias', error: devError(error) });
   }
 };
 
@@ -199,13 +201,13 @@ exports.changeMyPassword = async (req, res) => {
 
     user.contraseña = newPassword;
     user.lastPasswordChangeAt = new Date();
-    // Invalidate existing sessions — force re-login with new password
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
+    // SEC-01: invalidar TODAS las sesiones (incl. previousRefreshTokenHash) —
+    // forzar re-login con la nueva contraseña sin dejar un token previo vivo.
+    user.revokeAllSessions();
     await user.save();
     res.json({ message: 'Contraseña actualizada correctamente. Inicie sesión nuevamente.' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al cambiar contraseña', error: error.message });
+    res.status(500).json({ message: 'Error al cambiar contraseña', error: devError(error) });
   }
 };
 
@@ -231,7 +233,7 @@ exports.changeMyPin = async (req, res) => {
     await user.save();
     res.json({ message: 'PIN actualizado correctamente' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al cambiar PIN', error: error.message });
+    res.status(500).json({ message: 'Error al cambiar PIN', error: devError(error) });
   }
 };
 
@@ -246,10 +248,10 @@ exports.updateProfessionalProfile = async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true })
-      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
+      .select('-contraseña -refreshTokenHash -previousRefreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar perfil profesional', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar perfil profesional', error: devError(error) });
   }
 };
 
@@ -259,8 +261,19 @@ exports.uploadFirma = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó imagen de firma' });
 
+    // BE-03: validar el contenido real por magic bytes, no solo el MIME que
+    // declara el cliente (la firma es un activo legal NOM-004). Mismo patrón que
+    // attachmentController. Se borra el archivo si el sniff no coincide.
+    const firmaSniff = await validateMimeByMagicBytes(req.file.path, req.file.mimetype);
+    if (!firmaSniff.ok) {
+      await fsExtra.remove(req.file.path).catch(() => {});
+      return res.status(415).json({ message: 'El archivo de firma no es una imagen PNG/JPG válida' });
+    }
+
     const userId = req.user._id || req.user.id;
-    const user = await Usuario.findById(userId);
+    // Sólo necesitamos el filename anterior para limpiarlo del disco; no hace
+    // falta cargar (ni revalidar) el documento completo.
+    const user = await Usuario.findById(userId).select('firmaDigitalUrl');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
     // Eliminar firma anterior si existe
@@ -269,29 +282,69 @@ exports.uploadFirma = async (req, res) => {
       await fsExtra.remove(oldPath).catch(() => {});
     }
 
-    user.firmaDigitalUrl = req.file.filename;
-    await user.save();
-    res.json({ message: 'Firma subida correctamente', firmaDigitalUrl: user.firmaDigitalUrl });
+    // Persistencia ATÓMICA de un único campo que controla el servidor (el
+    // filename lo genera multer). Se usa findByIdAndUpdate con
+    // runValidators:false a propósito: `user.save()` revalida TODO el documento
+    // y dispara el hook pre('save'), de modo que CUALQUIER campo legado/inválido
+    // ajeno a la firma (p.ej. un enum viejo en preferences, o un email que ya no
+    // cumple el regex) abortaba la subida con un 500 aunque la firma fuera
+    // correcta. Aquí no hay nada del usuario que validar.
+    const updated = await Usuario.findByIdAndUpdate(
+      userId,
+      { $set: { firmaDigitalUrl: req.file.filename } },
+      { new: true, runValidators: false }
+    );
+    if (!updated) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    res.json({ message: 'Firma subida correctamente', firmaDigitalUrl: updated.firmaDigitalUrl });
   } catch (error) {
-    res.status(500).json({ message: 'Error al subir firma', error: error.message });
+    // Si quedara una validación previa (p.ej. exigir cédula antes de firmar),
+    // devolvemos un 400 legible en vez del 500 genérico. El cliente muestra
+    // `data.message` (ProfessionalProfileSection.jsx:305).
+    if (error && error.name === 'ValidationError') {
+      const detalle = Object.values(error.errors || {}).map((e) => e.message).join(' ');
+      return res.status(400).json({
+        message: detalle || 'No se pudo guardar la firma: revisa tu perfil profesional (cédula, etc.).'
+      });
+    }
+    res.status(500).json({ message: 'Error al subir firma', error: devError(error) });
   }
 };
 
 exports.deleteFirma = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
-    const user = await Usuario.findById(userId);
+    // Sólo necesitamos el filename para borrarlo del disco; no cargamos ni
+    // revalidamos el documento completo.
+    const user = await Usuario.findById(userId).select('firmaDigitalUrl');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
     if (user.firmaDigitalUrl) {
       const filePath = resolveUploadsPath('firmas', path.basename(user.firmaDigitalUrl));
       await fsExtra.remove(filePath).catch(() => {});
-      user.firmaDigitalUrl = null;
-      await user.save();
+      // Limpieza ATÓMICA del único campo, igual que en uploadFirma: evitamos
+      // `user.save()` (revalida TODO el documento y dispara el pre('save')) para
+      // que un campo legado/inválido ajeno a la firma no aborte el borrado.
+      // `null` es el valor "sin firma" del esquema (firmaDigitalUrl default:null,
+      // users.js:110) y lo que esperan los chequeos `!!firmaDigitalUrl` del
+      // cliente (hasFirma, ProfessionalProfileSection.jsx:41/68).
+      await Usuario.findByIdAndUpdate(
+        userId,
+        { $set: { firmaDigitalUrl: null } },
+        { new: true, runValidators: false }
+      );
     }
     res.json({ message: 'Firma eliminada' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar firma', error: error.message });
+    // Mismo trato que uploadFirma: 400 legible ante ValidationError, 500 sólo
+    // para errores inesperados.
+    if (error && error.name === 'ValidationError') {
+      const detalle = Object.values(error.errors || {}).map((e) => e.message).join(' ');
+      return res.status(400).json({
+        message: detalle || 'No se pudo eliminar la firma: revisa tu perfil profesional.'
+      });
+    }
+    res.status(500).json({ message: 'Error al eliminar firma', error: devError(error) });
   }
 };
 
@@ -311,7 +364,7 @@ exports.getFirma = async (req, res) => {
     }
     res.sendFile(filePath);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener firma', error: error.message });
+    res.status(500).json({ message: 'Error al obtener firma', error: devError(error) });
   }
 };
 
@@ -326,13 +379,13 @@ exports.updateMyProfile = async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const user = await Usuario.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true })
-      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
+      .select('-contraseña -refreshTokenHash -previousRefreshTokenHash -pinHash -passwordResetToken');
     res.json(user);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ message: 'El correo electrónico ya está en uso' });
     }
-    res.status(500).json({ message: 'Error al actualizar perfil', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar perfil', error: devError(error) });
   }
 };
 
@@ -362,11 +415,11 @@ exports.updateUserPermissions = async (req, res) => {
     }
 
     const user = await Usuario.findByIdAndUpdate(userId, { $set: { permissions } }, { new: true })
-      .select('-contraseña -refreshTokenHash -pinHash -passwordResetToken');
+      .select('-contraseña -refreshTokenHash -previousRefreshTokenHash -pinHash -passwordResetToken');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar permisos', error: error.message });
+    res.status(500).json({ message: 'Error al actualizar permisos', error: devError(error) });
   }
 };
 
@@ -375,6 +428,13 @@ exports.updateUserPermissions = async (req, res) => {
 exports.uploadLogo = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó imagen de logo' });
+
+    // BE-04: mismo sniff de magic bytes que la firma (el logo se sirve estático).
+    const logoSniff = await validateMimeByMagicBytes(req.file.path, req.file.mimetype);
+    if (!logoSniff.ok) {
+      await fsExtra.remove(req.file.path).catch(() => {});
+      return res.status(415).json({ message: 'El archivo de logo no es una imagen válida' });
+    }
 
     const settings = await ClinicSettings.getSettings();
 
@@ -388,7 +448,7 @@ exports.uploadLogo = async (req, res) => {
     await settings.save();
     res.json({ message: 'Logo subido correctamente', logoUrl: settings.logoUrl });
   } catch (error) {
-    res.status(500).json({ message: 'Error al subir logo', error: error.message });
+    res.status(500).json({ message: 'Error al subir logo', error: devError(error) });
   }
 };
 
@@ -403,7 +463,7 @@ exports.deleteLogo = async (req, res) => {
     }
     res.json({ message: 'Logo eliminado' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar logo', error: error.message });
+    res.status(500).json({ message: 'Error al eliminar logo', error: devError(error) });
   }
 };
 
@@ -419,6 +479,6 @@ exports.getLogo = async (req, res) => {
     }
     res.sendFile(filePath);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener logo', error: error.message });
+    res.status(500).json({ message: 'Error al obtener logo', error: devError(error) });
   }
 };

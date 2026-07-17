@@ -113,7 +113,7 @@ El `launcher.py` permite iniciar y detener servicios con configuración guiada.
 - Modo LAN (red local):
   - Expone el backend en `HOST=0.0.0.0` y sirve el frontend estático desde `Server/Client/dist`.
   - `PUBLIC_URL` debe ser la URL accesible en la red, por ejemplo `http://<ip-del-servidor>:5002`.
-  - Intenta usar PM2 (`pm2 start ecosystem.config.cjs --only dent-api`) y cae a `npm run start` si PM2 no está presente.
+  - Intenta usar PM2 (`pm2 start ecosystem.config.cjs --only dentiacore-api`) y cae a `npm run start` si PM2 no está presente.
   - Recomendación: agrega una regla de firewall para el puerto 5002 (ver ejemplo arriba) y usa IP fija.
 
 ### Troubleshooting rápido
@@ -141,46 +141,25 @@ El `launcher.py` permite iniciar y detener servicios con configuración guiada.
 - Formato consistente con timestamps
 - Rotación automática de archivos
 
-## 🛡️ Respaldo y Mantenimiento
+## 🛡️ Respaldo, monitoreo y recuperación
 
-### Copias de seguridad semanales
-- **Archivos clínicos**: Copia el contenido de `C:\ProgramData\DENT\uploads` (o el valor que definas en `UPLOADS_DIR`).
-- **Base de datos**: Ejecuta `mongodump --db dent --out C:\Backups\Dent\%date%` desde una consola con permisos.
-- **Logs**: Opcionalmente preserva `C:\ProgramData\DENT\logs` para auditoría.
+### Automático (O-1)
+`install.sh`/`install.ps1` registran, sin intervención manual:
+- **Backup diario (3am)**: `node scripts/backup-db.js --keep=14` (mongodump → `backups/<db>_<fecha>.tar.gz`, rota y conserva 14). Cada corrida exitosa actualiza `backups/last-success.json`.
+- **Chequeo de salud (cada 4h)**: `node scripts/check-health.js` — verifica que el último backup no esté viejo, que `/api/health` responda con la DB conectada, y disco libre. Alerta por webhook si algo falla.
+- **Alertas**: configura `ALERT_WEBHOOK_URL` en `Server/.env` (placeholder ya viene comentado tras instalar) con cualquier URL que acepte `{text}` — Slack, Discord, ntfy.sh. Sin esta variable, los chequeos igual corren y quedan en el log (`backups/backup.log`, `backups/health-check.log`), solo no notifican activamente.
+- Ver tarea: `crontab -l` (macOS/Linux) o `schtasks /query /tn DentiaCore-Backup` (Windows).
 
-### Restaurar un entorno
-1. Detén el servicio (por ejemplo, `pm2 stop dent-api`).
-2. Restaura los archivos: copia el respaldo de `uploads` al directorio configurado en `UPLOADS_DIR`.
-3. Restaura la base de datos: `mongorestore --db dent --drop C:\Backups\Dent\<fecha>\dent`.
-4. Vuelve a iniciar el servicio (`pm2 start dent-api` o el comando que uses).
+### Manual
+```bash
+npm run backup:db                 # mongodump → backups/<db>_<fecha>.tar.gz
+node scripts/restore-db.js backups/<archivo>.tar.gz --uri="mongodb://127.0.0.1:27017/DentiaCore_test" --drop --force   # probar en BD scratch
+node scripts/restore-db.js backups/<archivo>.tar.gz --drop --force   # restaurar a producción (dry-run por defecto sin --force)
+```
+- **Uploads**: respalda por separado la carpeta configurada en `UPLOADS_DIR` (default `Server/uploads`) — `update.sh`/`update.ps1` ya lo hacen antes de cada actualización.
+- Antes de restaurar a producción: `pm2 stop dentiacore-api`; después: `pm2 start dentiacore-api` (verifica con `pm2 describe dentiacore-api`).
 
-### Automatización recomendada
-- Programa tareas en el Programador de Windows para ejecutar los comandos de `mongodump` y copiar `uploads`.
-- Verifica periódicamente que los respaldos se completen y mantén al menos 2-3 versiones históricas.
-
-## 🛡️ Respaldo y Recuperación
-
-### Programar respaldos semanales
-- **Uploads**: Copia la carpeta `C:\ProgramData\DENT\uploads` a un medio externo o unidad de red.
-- **Base de datos**:
-	- Usa `mongodump` con el servicio MongoDB en ejecución:
-		```powershell
-		mongodump --db dent --out "C:\Backups\Dent\$(Get-Date -Format yyyy-MM-dd)"
-		```
-	- Automatiza este comando con el Programador de Tareas de Windows.
-
-### Restaurar entorno
-1. Detén el servicio o proceso de la aplicación.
-2. Restaura la carpeta de uploads:
-	 ```powershell
-	 robocopy "<ruta respaldo uploads>" "C:\ProgramData\DENT\uploads" /MIR
-	 ```
-3. Restaura la base de datos:
-	 ```powershell
-	 mongorestore --db dent "C:\Backups\Dent\<fecha>\dent"
-	 ```
-4. Verifica permisos NTFS para que el usuario del servicio tenga acceso a `C:\ProgramData\DENT\uploads` y `C:\ProgramData\DENT\logs`.
-5. Reinicia el servicio (PM2 o el servicio Windows configurado).
+Detalle y checklist completos: [docs/server/operacion/backups-y-restauracion.md](../docs/server/operacion/backups-y-restauracion.md).
 
 ---
 

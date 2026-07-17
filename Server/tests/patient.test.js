@@ -407,4 +407,24 @@ describe('Integración Completa', () => {
             ).resolves.toBeTruthy();
         });
     });
+
+    describe('Campos internos ocultos en respuestas', () => {
+
+        test('toJSON no expone ruta_archivos ni _evolutionNoteCounter (cubre el 201 del alta)', async () => {
+            const patient = new Patient(validPatientData());
+            await patient.save();
+            // El doc recién guardado los tiene en memoria (select:false no
+            // aplica a docs construidos), pero toJSON debe filtrarlos.
+            expect(patient.ruta_archivos).toBeTruthy();
+            const json = patient.toJSON();
+            expect(json.ruta_archivos).toBeUndefined();
+            expect(json._evolutionNoteCounter).toBeUndefined();
+        });
+
+        test('las queries no cargan ruta_archivos (select:false)', async () => {
+            const created = await Patient.create(validPatientData());
+            const found = await Patient.findById(created._id);
+            expect(found.ruta_archivos).toBeUndefined();
+        });
+    });
 });

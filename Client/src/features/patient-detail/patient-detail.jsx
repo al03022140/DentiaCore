@@ -36,9 +36,10 @@ import "./styles/patient-detail.css";
 import userNot from "../../assets/images/icons/Profile Default.svg";
 import AddPatient from "../add-patient/add-patient.jsx";
 import API from '../../shared/services/axios-instance.js';
-import { formatDateToDDMMYYYY } from '../../shared/utils/date-utils';
 import OdontogramClinicalSection from '../odontogram/components/odontogram-clinical-section.jsx';
-import { sortVersionsDesc } from '../../shared/utils/version-name.js';
+// Mismo módulo que el periodontograma (parsea el sello UTC con Date.UTC). El
+// viejo version-name.js (borrado) corría las etiquetas por el offset horario.
+import { sortVersionsDesc } from '../../shared/utils/periodontogram-version-time.js';
 import OdontogramInitialSection from '../odontogram/components/odontogram-initial-section.jsx';
 import PatientInfoHeader from './components/patient-info-header.jsx';
 import PatientAppointmentsInfo from './components/patient-appointments-info.jsx';
@@ -166,7 +167,6 @@ const PatientDetail = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [initialData, setInitialData] = useState([]);
   const [initialExists, setInitialExists] = useState(false);
-  const [odontogramHistory, setOdontogramHistory] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
@@ -181,7 +181,6 @@ const PatientDetail = () => {
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
-  const [clinicalOdontogramExists, setClinicalOdontogramExists] = useState(false);
   // Versionado del odontograma clínico (paridad con el periodontograma).
   const [clinicalVersionList, setClinicalVersionList] = useState([]);
   const [clinicalSelectedVersion, setClinicalSelectedVersion] = useState(null);
@@ -241,17 +240,9 @@ const PatientDetail = () => {
     }
   }, [patientId]);
 
-  const normalizeHistory = useCallback((rawHistory = []) => {
-    return rawHistory.map(item => ({
-      ...item,
-      fecha: item.fecha || item.createdAt || formatDateToDDMMYYYY(new Date()),
-    }));
-  }, []);
-
   const resetOdontogramState = useCallback(() => {
     setInitialExists(false);
     setInitialData([]);
-    setOdontogramHistory([]);
   }, []);
 
   const fetchPatientData = useCallback(async () => {
@@ -322,7 +313,6 @@ const PatientDetail = () => {
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
         setInitialExists(true);
-        setOdontogramHistory(normalizeHistory(data.history));
         setInitialOdontogramLoadStatus('saved');
       } else {
         resetOdontogramState();
@@ -336,12 +326,11 @@ const PatientDetail = () => {
       setInitialOdontogramLoadStatus('error');
       fetchedInitialRef.current = false; // permitir reintento
     }
-  }, [patientId, normalizeHistory, resetOdontogramState]);
+  }, [patientId, resetOdontogramState]);
 
-  const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
+  const handleSaveSuccess = useCallback(async (datos) => {
     setInitialData(datos || []);
     setInitialExists(true);
-    setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setInitialOdontogramLoadStatus('saved');
     try {
       // Refresca desde el servidor para asegurar que estamos viendo el estado real
@@ -351,7 +340,7 @@ const PatientDetail = () => {
     } catch (err) {
       console.error('Error al refrescar datos del odontograma inicial:', err);
     }
-  }, [normalizeHistory, checkInitialOdontogram]);
+  }, [checkInitialOdontogram]);
 
   useEffect(() => {
     resetOdontogramState();
@@ -373,7 +362,6 @@ const PatientDetail = () => {
         options
       );
       setClinicalOdontogramData(result.datos || entryData || []);
-      setClinicalOdontogramExists(result.exists ?? true);
       setClinicalOdontogramUpdatedAt(result.updatedAt || null);
       // Refrescar la lista de versiones y seleccionar la recién creada.
       try {
@@ -389,17 +377,16 @@ const PatientDetail = () => {
       const code = err?.code || err?.response?.data?.error?.code;
       const isStale = code === 'ODONTOGRAMA_STALE';
       if (isStale) {
-        message.warning('Otro usuario modificó este odontograma. Recargando cambios…');
-        // Recargar para refrescar updatedAt y datos antes del próximo intento.
-        try {
-          const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-          const fresh = await odontogramaService.default.getClinicalOdontogramState(patientId);
-          setClinicalOdontogramData(fresh.datos || []);
-          setClinicalOdontogramExists(fresh.exists || false);
-          setClinicalOdontogramUpdatedAt(fresh.updatedAt || null);
-        } catch (refreshErr) {
-          console.error('Error refrescando odontograma clínico tras 409:', refreshErr);
-        }
+        // NO recargar datos del servidor sobre el canvas: la sección sincroniza
+        // el canvas con clinicalData, así que "refrescar" aquí PISABA el
+        // trabajo del usuario que perdió la carrera (y a los 4s el snapshot
+        // del draft en localStorage se sobreescribía con lo del servidor —
+        // pérdida irrecuperable). El canvas conserva sus cambios; al recargar
+        // la página verá lo nuevo y el modal de recuperación le ofrecerá su
+        // borrador local para re-aplicarlo. El token updatedAt se queda stale
+        // a propósito: reintentar sin recargar seguirá dando 409 en vez de
+        // pisar en silencio la versión del otro usuario.
+        message.warning('Otro usuario modificó este odontograma. Tus cambios siguen en el canvas (y en el borrador local); recarga la página para ver la versión más reciente antes de volver a guardar.', 8);
         // Ya avisamos al usuario con un warning: marcamos para que el hijo no
         // duplique el mensaje, pero IGUAL propagamos para que NO muestre éxito.
         err.handled = true;
@@ -431,19 +418,9 @@ const PatientDetail = () => {
     }
   }, [patientId]);
 
-  const handleDeleteClinicalCanvasState = useCallback(async () => {
-    try {
-      const odontogramaService = await import('../odontogram/api/odontograma-service.js');
-      await odontogramaService.default.deleteClinicalOdontogramState(patientId);
-      setClinicalOdontogramData([]);
-      setClinicalOdontogramExists(false);
-      message.success('Estado del odontograma clínico eliminado exitosamente');
-      await fetchPatientData();
-    } catch (err) {
-      console.error('Error al eliminar estado del odontograma clínico:', err);
-      message.error('Error al eliminar el estado del odontograma clínico');
-    }
-  }, [patientId, fetchPatientData]);
+  // NOTA: se eliminó handleDeleteClinicalCanvasState — la sección clínica no
+  // exponía ningún control que invocara onDelete y el DELETE del server se
+  // retiró (ver odontogramaController).
 
   const handleEditClick = useCallback(() => setIsEditModalOpen(true), []);
 
@@ -608,7 +585,6 @@ const PatientDetail = () => {
         ]);
         if (cancelled) return;
         setClinicalOdontogramData(clinicalState.datos || []);
-        setClinicalOdontogramExists(clinicalState.exists || false);
         setClinicalOdontogramUpdatedAt(clinicalState.updatedAt || null);
         const ordered = sortVersionsDesc(versions || []);
         setClinicalVersionList(ordered);
@@ -617,7 +593,6 @@ const PatientDetail = () => {
       } catch {
         if (cancelled) return;
         setClinicalOdontogramData([]);
-        setClinicalOdontogramExists(false);
         setClinicalOdontogramUpdatedAt(null);
         setClinicalVersionList([]);
         setClinicalSelectedVersion(null);
@@ -702,6 +677,7 @@ const PatientDetail = () => {
                 initialSnapshotStatus={initialOdontogramLoadStatus}
                 onSaveSuccess={handleSaveSuccess}
                 areScriptsReady={areScriptsReadyState}
+                updatedAt={initialOdontogramUpdatedAt}
               />
             </OdontogramErrorBoundary>
           ) : !areScriptsReadyState && !initializationError ? (
@@ -715,7 +691,6 @@ const PatientDetail = () => {
               <OdontogramClinicalSection
                 patientId={patientId}
                 clinicalData={clinicalOdontogramData}
-                onDelete={handleDeleteClinicalCanvasState}
                 onDataSave={handleSaveClinicalCanvasData}
                 versionList={clinicalVersionList}
                 selectedVersion={clinicalSelectedVersion}

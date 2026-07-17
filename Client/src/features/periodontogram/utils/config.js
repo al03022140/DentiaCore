@@ -200,20 +200,6 @@ export const REAL_TIME_FEEDBACK_CONFIG = {
 };
 
 /**
- * Colores extendidos
- */
-export const EXTENDED_COLORS = {
-  primary: '#007bff',
-  secondary: '#6c757d',
-  success: '#28a745',
-  danger: '#dc3545',
-  warning: '#ffc107',
-  info: '#17a2b8',
-  light: '#f8f9fa',
-  dark: '#343a40'
-};
-
-/**
  * Configuración de métricas de calidad
  */
 export const QUALITY_METRICS_CONFIG = {
@@ -244,7 +230,6 @@ export default {
   ADVANCED_PERFORMANCE_CONFIG,
   ADVANCED_HOVER_CONFIG,
   REAL_TIME_FEEDBACK_CONFIG,
-  EXTENDED_COLORS,
   QUALITY_METRICS_CONFIG,
   ADVANCED_LOGGING_CONFIG
 };

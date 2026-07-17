@@ -1,9 +1,8 @@
-// Helper: mergea `patch` (objeto parcial) en el sub-objeto del path dado,
-// SIEMPRE leyendo del state más reciente (setFormData funcional). Evita
-// stale-closure bugs cuando dos onChange consecutivos modifican distintas
-// keys del mismo sub-objeto (p.ej. lateral_derecho y lateral_izquierdo, o
-// los 4 inputs de mordida_abierta.medidas): si el segundo onChange leía
-// `formData.x.y` desde la closure, sobreescribía el cambio del primero.
+// Helper: mergea `patch` (objeto parcial) en el sub-objeto del path dado, a
+// cualquier profundidad. Los handlers handle*NestedChange sólo alcanzan 3
+// niveles; rutas de 4 (p.ej. movilidad_mandibular.lateralidad.lateral_derecho
+// o mordida_abierta.medidas) necesitan este helper genérico. Usa setFormData
+// funcional, así que siempre lee del state más reciente.
 const mergeAtPath = (setFormData, path, patch) => {
   setFormData((prev) => {
     const next = { ...prev };

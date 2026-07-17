@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
 import { getDoctors } from '../services/settingsService';
@@ -19,6 +19,9 @@ import SignaturePadModal from './SignaturePadModal.jsx';
  *  - Si el doctor seleccionado NO tiene firmaDigitalUrl, la opción PIN
  *    queda deshabilitada con un mensaje claro — debe subir su firma en
  *    "Perfil Profesional" antes, o usar el pad.
+ *  - Si el doctor seleccionado es DISTINTO al usuario logueado, el pad exige
+ *    ADEMÁS su PIN (el backend lo valida): el trazo solo no autentica cuando
+ *    la sesión no es la del firmante (anti-suplantación, 2026-07-12).
  *  - Fallback: si la lista de doctores no carga y el usuario logueado es
  *    doctor, se permite firmar como sí mismo (el backend valida su PIN).
  *
@@ -50,6 +53,7 @@ export default function DoctorSignStep({
   const [pin, setPin] = useState('');
   const [padOpen, setPadOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const pinInputRef = useRef(null);
 
   // SIEMPRE cargamos la lista de doctores: cualquier doctor puede firmar con
   // su PIN, independientemente de la cuenta clínica logueada.
@@ -98,6 +102,12 @@ export default function DoctorSignStep({
 
   const pinDisabled = effectiveDoctor && effectiveDoctor.hasFirma === false;
 
+  // Firma cruzada: el doctor seleccionado NO es el usuario de la sesión. En
+  // ese caso el pad requiere además el PIN del doctor (el backend lo exige).
+  const isCrossSigning = !useSelfFallback
+    && !!selectedDoctorId
+    && String(selectedDoctorId) !== String(user?.id || '');
+
   // Si el doctor seleccionado no tiene firma, forzar method=pad
   useEffect(() => {
     if (pinDisabled && method === 'pin') setMethod('pad');
@@ -127,6 +137,14 @@ export default function DoctorSignStep({
       });
     } catch (err) {
       setSubmitError(err?.response?.data?.error || err?.message || 'Error al firmar');
+    } finally {
+      // Limpiar el PIN tras CADA intento. Si fue incorrecto, el campo queda
+      // vacío y enfocado para reintentar sin borrarlo a mano; si fue correcto,
+      // el modal se cierra y limpiarlo es inocuo. Va en `finally` (no solo en
+      // `catch`) para cubrir también la firma de notas ya guardadas, cuyo
+      // handler muestra el error pero NO relanza la excepción.
+      setPin('');
+      setTimeout(() => pinInputRef.current?.focus(), 0);
     }
   };
 
@@ -137,10 +155,15 @@ export default function DoctorSignStep({
       setSubmitError('Selecciona el doctor que firmará.');
       return;
     }
+    if (isCrossSigning && !/^\d{4}$/.test(pin)) {
+      setSubmitError('Al firmar por otro doctor, ingrese además su PIN de 4 dígitos.');
+      return;
+    }
     try {
       await onConfirm({
         method: 'pad',
         dataUrl: pngDataUrl,
+        ...(isCrossSigning ? { pin } : {}),
         ...(useSelfFallback ? {} : { asDoctorId: selectedDoctorId }),
       });
     } catch (err) {
@@ -231,6 +254,7 @@ export default function DoctorSignStep({
                 <label htmlFor="doctor-pin-input">PIN del doctor (4 dígitos)</label>
                 <input
                   id="doctor-pin-input"
+                  ref={pinInputRef}
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
@@ -267,6 +291,25 @@ export default function DoctorSignStep({
                     ? 'El doctor firmará en la tableta Wacom (o podrá pasar a firmar en pantalla).'
                     : 'El doctor dibujará su firma en el pad.'}
                 </p>
+                {isCrossSigning && (
+                  <div className="doctor-sign-pin">
+                    <label htmlFor="doctor-pad-pin-input">PIN del doctor (4 dígitos)</label>
+                    <input
+                      id="doctor-pad-pin-input"
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      pattern="\d{4}"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="••••"
+                      disabled={loading}
+                    />
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#888' }}>
+                      Al firmar por otro doctor, el pad requiere además su PIN.
+                    </p>
+                  </div>
+                )}
                 {submitError && <p className="signature-pad-error">{submitError}</p>}
                 <div className="signature-pad-actions">
                   <button
@@ -281,7 +324,7 @@ export default function DoctorSignStep({
                     type="button"
                     className="signature-pad-btn signature-pad-btn-confirm"
                     onClick={() => setPadOpen(true)}
-                    disabled={loading || (!useSelfFallback && !selectedDoctorId)}
+                    disabled={loading || (!useSelfFallback && !selectedDoctorId) || (isCrossSigning && pin.length !== 4)}
                   >
                     {stuConfigured ? 'Abrir tableta Wacom' : 'Abrir pad'}
                   </button>

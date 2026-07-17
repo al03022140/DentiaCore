@@ -10,8 +10,7 @@ const GRANULARITY_API_MAP = {
 const CHART_TYPE_MAP = {
   linea: 'line',
   barra: 'bar',
-  pastel: 'pie',
-  heatmap: 'bar'
+  pastel: 'pie'
 };
 
 // Paleta alineada con `Client/src/features/main-page/components/patient-stats.jsx`
@@ -102,17 +101,6 @@ const fetchPatientTypeTrend = async (granularity, visualization) => {
 const fetchNoShows = async (granularity, visualization) => {
   const params = buildParams(granularity);
   const { data } = await API.get('/stats/no-shows', { params });
-
-  return {
-    chartType: CHART_TYPE_MAP[visualization] || 'line',
-    labels: data.labels,
-    datasets: styleDatasets(data.datasets, visualization)
-  };
-};
-
-const fetchProductivity = async (granularity, visualization) => {
-  const params = buildParams(granularity);
-  const { data } = await API.get('/stats/productivity', { params });
 
   return {
     chartType: CHART_TYPE_MAP[visualization] || 'line',

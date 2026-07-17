@@ -11,6 +11,7 @@ import PeriodontogramService from '../../../shared/services/periodontogram-servi
 import { toTriple, pickFaceTriplesFromFourFaces } from '../../../shared/utils/periodontogram-helpers.js';
 import { useUnsavedChanges } from '../../../shared/contexts/UnsavedChangesContext.jsx';
 import { useDraftPersistence } from '../../../shared/hooks/useDraftPersistence.js';
+import { sortVersionsDesc, formatVersionLabel } from '../../../shared/utils/periodontogram-version-time.js';
 import '../styles/periodontogram-section.css';
 import { logger } from '../../../shared/utils/logger';
 
@@ -87,6 +88,12 @@ const PeriodontogramSection = ({ patientId }) => {
   });
   const draftPromptedRef = useRef(false);
   useEffect(() => { draftPromptedRef.current = false; }, [patientId]);
+  // Concurrencia optimista: updatedAt del DOCUMENTO principal (lo devuelve el
+  // server en GET /data como documentUpdatedAt y en la respuesta del save).
+  // Se reenvía como expectedUpdatedAt al guardar; si otro usuario/pestaña
+  // guardó entre tanto, el server responde 409 PERIODONTOGRAMA_STALE en vez
+  // de pisar sus cambios en silencio.
+  const expectedUpdatedAtRef = useRef(null);
   // Dedupe de warnings de validación: evita spam si el usuario tipea fuera de rango.
   const lastValidationWarnRef = useRef({ key: null, time: 0 });
 
@@ -117,80 +124,10 @@ const PeriodontogramSection = ({ patientId }) => {
     [patientId]
   );
 
-  // Helper: parse different versionName formats to a sortable timestamp (ms)
-  const parseVersionNameToTime = useCallback((name) => {
-    if (!name || typeof name !== 'string') return NaN;
-    try {
-      // Special case: Archivado_YYYY-MM-DD or Archivado_YYYY-MM-DD_HH-mm-ss
-      const mArchived = name.match(/^Archivado_(\d{4})-(\d{2})-(\d{2})(?:_(\d{2})-(\d{2})-(\d{2}))?$/);
-      if (mArchived) {
-        const [, yyyyA, mma, dda, HHa, MMa, SSa] = mArchived;
-        const year = Number(yyyyA);
-        const month = Number(mma) - 1;
-        const day = Number(dda);
-        const hour = Number(HHa ?? '00');
-        const minute = Number(MMa ?? '00');
-        const second = Number(SSa ?? '00');
-        if (year >= 1970 && year <= 2100) {
-          return new Date(year, month, day, hour, minute, second).getTime();
-        }
-      }
-      // Case 1: DD-MM-YYYY_HH-mm-ss
-      const m1 = name.match(/^(\d{2})-(\d{2})-(\d{4})_(\d{2})-(\d{2})-(\d{2})$/);
-      if (m1) {
-        const [, dd, mm, yyyy, HH, MM, SS] = m1;
-        return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(HH), Number(MM), Number(SS)).getTime();
-      }
-      // Case 2: Embedded ISO-compact within string, e.g., v001_20250912T235822663Z or 20250912T235822
-      const m2 = name.match(/(\d{4})(\d{2})(\d{2})[T_\-]?(\d{2})(\d{2})(\d{2})/);
-      if (m2) {
-        const [, yyyy, MM, dd, HH, mm, SS] = m2;
-        const year = Number(yyyy);
-        if (year >= 1970 && year <= 2100) {
-          return new Date(year, Number(MM) - 1, Number(dd), Number(HH), Number(mm), Number(SS)).getTime();
-        }
-      }
-      // Fallback: try Date parse
-      const t = Date.parse(name);
-      return isNaN(t) ? NaN : t;
-    } catch {
-      return NaN;
-    }
-  }, []);
-
-  const sortVersionsDesc = useCallback((versions = []) => {
-    try {
-      const withKey = versions.map((v) => ({ v, t: parseVersionNameToTime(v) }));
-      withKey.sort((a, b) => {
-        const aOk = Number.isFinite(a.t);
-        const bOk = Number.isFinite(b.t);
-        if (aOk && bOk) return b.t - a.t; // newer first
-        if (aOk && !bOk) return -1; // known time before unknown
-        if (!aOk && bOk) return 1;
-        // both unknown -> lexical desc
-        return String(b.v).localeCompare(String(a.v));
-      });
-      return withKey.map(x => x.v);
-    } catch {
-      return Array.isArray(versions) ? versions.slice().sort((a, b) => String(b).localeCompare(String(a))) : [];
-    }
-  }, [parseVersionNameToTime]);
-
-  // Helper: format version option label as dd/mm/yyyy HH:MM:SS if parsable; else show raw
-  const formatVersionLabel = useCallback((name) => {
-    const t = parseVersionNameToTime(name);
-    if (!Number.isFinite(t)) return String(name);
-    const d = new Date(t);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = String(d.getFullYear());
-    const HH = String(d.getHours()).padStart(2, '0');
-    const MM = String(d.getMinutes()).padStart(2, '0');
-    const SS = String(d.getSeconds()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} ${HH}:${MM}:${SS}`;
-  }, [parseVersionNameToTime]);
-
-  
+  // parseVersionNameToTime / sortVersionsDesc / formatVersionLabel viven en
+  // shared/utils/periodontogram-version-time.js (extraídas para testearlas;
+  // incluyen el fix de sellos ISO-compactos UTC que antes se mostraban con la
+  // hora corrida por el offset local).
 
   /* -------------------- VALIDACIÓN DE RANGOS -------------------- */
   const validateMeasurementValue = useCallback((field, value) => {
@@ -308,6 +245,7 @@ const PeriodontogramSection = ({ patientId }) => {
           const latestVersion = orderedVersions[0];
           const backendData = await PeriodontogramService.getData(patientId, latestVersion, { signal });
           if (isAborted()) return;
+          expectedUpdatedAtRef.current = backendData?.documentUpdatedAt || null;
           const normalizedData = convertBackendDataToFrontend(backendData);
           setPeriodontogramData(normalizedData);
           setSelectedVersion(latestVersion);
@@ -319,10 +257,12 @@ const PeriodontogramSection = ({ patientId }) => {
           setLoadFailed(true);
           setPeriodontogramData(createEmptyPeriodontogram());
           setSelectedVersion(null);
+          expectedUpdatedAtRef.current = null;
         }
       } else {
         setPeriodontogramData(createEmptyPeriodontogram());
         setSelectedVersion(null);
+        expectedUpdatedAtRef.current = null;
       }
 
       if (typeof UniversalToothValidator.invalidateCache === 'function') {
@@ -550,6 +490,9 @@ const PeriodontogramSection = ({ patientId }) => {
     
     try {
       const backendData = await PeriodontogramService.getData(patientId, ver);
+      // El token de concurrencia es del documento principal, sin importar qué
+      // versión del historial se esté viendo (el guardado escribe en current).
+      expectedUpdatedAtRef.current = backendData?.documentUpdatedAt || expectedUpdatedAtRef.current;
       const normalizedData = convertBackendDataToFrontend(backendData);
 
       setPeriodontogramData(normalizedData);
@@ -577,21 +520,10 @@ const PeriodontogramSection = ({ patientId }) => {
     saveStateForRollback();
     
     try {
-      // Si es la primera vez que se guarda, crear el periodontograma en el backend
-      if (!periodontogramExists) {
-        try {
-          await PeriodontogramService.createPeriodontogram(patientId);
-          setPeriodontogramExists(true);
-          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('✅ Periodontograma creado exitosamente en el backend');
-        } catch (createError) {
-          if (createError.response?.status === 409) {
-            if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📝 Periodontograma ya existe, continuando con guardado');
-            setPeriodontogramExists(true);
-          } else {
-            throw createError;
-          }
-        }
-      }
+      // NOTA: ya NO se hace POST de creación antes del primer guardado — el
+      // PUT /data auto-crea el periodontograma si no existe. El POST previo
+      // generaba además una versión espuria 'v1' vacía en el historial que
+      // aparecía en el selector.
 
       if (ADVANCED_LOGGING_CONFIG.enabled) {
         logger.log('🔍 DATOS ANTES DE TRANSFORMAR:', {
@@ -786,16 +718,24 @@ const PeriodontogramSection = ({ patientId }) => {
       if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📋 Datos unificados y validados:', validatedData);
       
       // Recalcular estadísticas para asegurar consistencia
-  // Calcular estadísticas desde la estructura de UI (campos ingleses con 4-caras)
-  const stats = UniversalToothValidator.calculateStatistics({ teeth: periodontogramData.teeth || {} });
+      // (desde la estructura de UI: campos ingleses con 4-caras)
+      const stats = UniversalToothValidator.calculateStatistics({ teeth: periodontogramData.teeth || {} });
       const payload = {
         teeth: validatedData.teeth,
         statistics: stats,
-        versionName: validatedData.version
+        versionName: validatedData.version,
+        // Token de concurrencia optimista (sólo si ya hay algo persistido):
+        // si otro usuario guardó entre nuestra carga y este save, el server
+        // responde 409 PERIODONTOGRAMA_STALE en vez de pisarlo.
+        ...(periodontogramExists && expectedUpdatedAtRef.current
+          ? { expectedUpdatedAt: expectedUpdatedAtRef.current }
+          : {})
       };
-      
+
       const saveResponse = await PeriodontogramService.saveData(patientId, payload);
       const nextVersionName = saveResponse?.versionName ?? saveResponse?.version ?? payload.versionName;
+      // El server devuelve el updatedAt resultante — token del siguiente save.
+      expectedUpdatedAtRef.current = saveResponse?.updatedAt || expectedUpdatedAtRef.current;
       setPeriodontogramExists(true);
       setPeriodontogramData((prev) => {
         if (!prev) return prev;

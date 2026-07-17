@@ -79,6 +79,15 @@ const PatientCard = memo(function PatientCard({ patient, onClick }) {
     onClick(patient._id);
   }, [onClick, patient._id]);
 
+  // FE-A11Y-04: la tarjeta es el punto de entrada más usado; sin esto era
+  // inoperable por teclado. Enter/Space la activan igual que el click.
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(patient._id);
+    }
+  }, [onClick, patient._id]);
+
   const handleImgError = useCallback((e) => {
     e.target.onerror = null;
     e.target.src = userNot;
@@ -89,6 +98,10 @@ const PatientCard = memo(function PatientCard({ patient, onClick }) {
     <div
       className="patient-card"
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir expediente de ${fullName}`}
       title={fullName}
     >
       <div className="patient-photo">

@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Radio, Skeleton, Button, Segmented, Alert, Popconfirm, message } from 'antd';
 import { EyeOutlined, EyeInvisibleOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import { getSessionBalance, getStaleSessions, forceResolveSession } from '../../shared/services/cashService';
-import { formatMoney } from '../../shared/utils/money';
-
-// Format compacto sin decimales para el dashboard (montos suelen ser redondos).
-const formatMXN = (amount) => formatMoney(amount, { showDecimals: false });
+import { formatMoneyCompact as formatMXN } from '../../shared/utils/money';
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '—';
@@ -205,7 +202,7 @@ const CashDashboard = () => {
         {loading ? (
           <Skeleton.Input active size="large" />
         ) : (
-          <p className={`balance-amount${(view === 'balance' && summary.net < 0) ? ' balance-amount--negative' : ''}`}>
+          <p className={`balance-amount${(view === 'balance' && (method === 'cash' ? summary.cashNet : method === 'digital' ? summary.digitalNet : summary.net) < 0) ? ' balance-amount--negative' : ''}`}>
             {getDisplayAmount()}
           </p>
         )}

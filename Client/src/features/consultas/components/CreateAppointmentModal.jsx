@@ -421,6 +421,7 @@ const CreateAppointmentModal = ({
               placeholder="Ej: Limpieza, Revisión, Extracción..."
               value={motivo}
               onChange={e => setMotivo(e.target.value)}
+              maxLength={500}
             />
           </div>
 
@@ -433,6 +434,7 @@ const CreateAppointmentModal = ({
               value={comentario}
               onChange={e => setComentario(e.target.value)}
               rows={3}
+              maxLength={2000}
             />
           </div>
 

@@ -37,7 +37,7 @@ export const deleteAttachment = async (patientId, attachmentId) => {
 // M-13: los archivos viven en el servidor de la API (p. ej. :5002), no en el
 // origen del frontend. Antes se anteponía `window.location.origin`, lo que en
 // producción daba 404 salvo que un proxy reenviara /uploads. Usamos la base de
-// la API (igual que getLogoUrl/getFirmaUrl) para construir una URL correcta.
+// la API (igual que fetchLogoBlobUrl/fetchFirmaBlobUrl) para construir una URL correcta.
 export const buildAttachmentUrl = (relativeUrl) => {
   if (!relativeUrl) return '';
   if (relativeUrl.startsWith('http')) return relativeUrl;

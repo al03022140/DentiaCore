@@ -35,7 +35,10 @@ const PeriodontogramHistorySchema = new mongoose.Schema({
   versionName: {
     type: String,
     required: true,
-    default: 'Inicial'
+    default: 'Inicial',
+    // La colección es inmutable (append-only): sin tope, un nombre gigante
+    // queda para siempre. El controller también valida ≤200 con un 400 claro.
+    maxlength: 200
   },
   teeth: {
     type: mongoose.Schema.Types.Mixed,

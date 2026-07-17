@@ -177,6 +177,7 @@ const AccountsPermissionsSection = () => {
   const [tab, setTab] = useState(initialTab);
   const [openRoles, setOpenRoles] = useState({});
   const [savingRole, setSavingRole] = useState(null);
+  const [savingUser, setSavingUser] = useState(false);
 
   const permGroups = useMemo(() => buildGroups(), []);
 
@@ -249,13 +250,16 @@ const AccountsPermissionsSection = () => {
   };
 
   const saveUserPerms = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || savingUser) return;
     setMsg(null);
+    setSavingUser(true);
     try {
       await updateUserPermissions(selectedUser._id || selectedUser.id, userPerms);
       setMsg({ type: 'success', text: `Permisos de ${selectedUser.nombre} actualizados` });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -426,7 +430,7 @@ const AccountsPermissionsSection = () => {
                 </div>
               ))}
               <div className="settings-actions">
-                <button className="settings-btn-primary" onClick={saveUserPerms}>Guardar permisos</button>
+                <button className="settings-btn-primary" onClick={saveUserPerms} disabled={savingUser}>{savingUser ? 'Guardando…' : 'Guardar permisos'}</button>
               </div>
             </div>
           )}

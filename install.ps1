@@ -320,6 +320,16 @@ try {
         Write-Step "JWT_SECRET aleatorio generado (64 chars hex)"
     }
 
+    # CFG-01: AUDIT_HMAC_SECRET — sin él, en produccion el server hace fail-fast
+    # (Server/utils/integrity.js) y NO arranca; en dev cae al fallback inseguro
+    # que desactiva la deteccion de manipulacion del audit log (NOM-024).
+    if (-not $FinalEnv.ContainsKey("AUDIT_HMAC_SECRET") -or [string]::IsNullOrWhiteSpace($FinalEnv["AUDIT_HMAC_SECRET"]) -or $FinalEnv["AUDIT_HMAC_SECRET"].Length -lt 32) {
+        $HmacBytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($HmacBytes)
+        $FinalEnv["AUDIT_HMAC_SECRET"] = ([BitConverter]::ToString($HmacBytes) -replace '-','').ToLower()
+        Write-Step "AUDIT_HMAC_SECRET aleatorio generado (64 chars hex)"
+    }
+
     # Asegurar NODE_ENV (production para LAN install, development si nada definido)
     if (-not $FinalEnv.ContainsKey("NODE_ENV") -or [string]::IsNullOrWhiteSpace($FinalEnv["NODE_ENV"])) {
         $FinalEnv["NODE_ENV"] = "production"
@@ -329,12 +339,26 @@ try {
         $FinalEnv["COOKIE_SECURE"] = "false"
     }
 
+    # O-2: TZ fija — sin esto, los cortes de caja y timestamps de auditoria
+    # dependen de la TZ del SO (silencioso si difiere de la de la clinica).
+    if (-not $FinalEnv.ContainsKey("TZ")) {
+        $FinalEnv["TZ"] = "America/Mexico_City"
+    }
+
     $NewContent = @()
     foreach ($Key in $FinalEnv.Keys) {
         $NewContent += "$Key=$($FinalEnv[$Key])"
     }
     Write-Utf8NoBom -Path $EnvFile -Content (($NewContent -join "`n") + "`n")
     Write-Ok ".env actualizado (IP: $DetectedIP). Secretos conservados y JWT_SECRET garantizado."
+
+    # O-1: ALERT_WEBHOOK_URL es opcional — sin ella, check-health.js solo
+    # imprime en el log de la tarea programada sin notificar activamente.
+    # Placeholder comentado para que sea facil de encontrar y activar.
+    $EnvRaw = Get-Content $EnvFile -Raw
+    if ($EnvRaw -notmatch '(?m)^#?\s*ALERT_WEBHOOK_URL=') {
+        Add-Content -Path $EnvFile -Value "`n# O-1: URL de webhook (Slack/Discord/ntfy.sh/etc.) para alertas de backup/salud.`n# ALERT_WEBHOOK_URL=https://hooks.slack.com/services/..."
+    }
 
     # Client/.env — necesario porque Vite hornea VITE_API_URL en el bundle de producción.
     # En .gitignore, así que NO viene en descargas frescas de GitHub.
@@ -368,6 +392,32 @@ try {
         Write-Warn "Node.js $NodeVersionRaw supera el rango probado por el proyecto (engines: >=18 <=22). Si hay fallos de build/runtime, instala Node 20/22 LTS."
     }
     Write-Ok "Node.js validado: $NodeVersionRaw"
+
+    Write-Header "3.5. RESPALDO Y MONITOREO AUTOMATICOS"
+
+    # O-1: registrar backup diario (3am) y chequeo de salud (cada 4h) via el
+    # Programador de Tareas de Windows. Idempotente: -Force sobreescribe la
+    # tarea si ya existia (misma definicion, no se duplica).
+    try {
+        $NodeExe = (Get-Command node -ErrorAction Stop).Source
+        New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot 'backups') | Out-Null
+
+        $BackupAction = New-ScheduledTaskAction -Execute $NodeExe -Argument 'scripts\backup-db.js --keep=14' -WorkingDirectory $RepoRoot
+        $BackupTrigger = New-ScheduledTaskTrigger -Daily -At 3am
+        Register-ScheduledTask -TaskName 'DentiaCore-Backup' -Action $BackupAction -Trigger $BackupTrigger `
+            -Description 'Respaldo automatico de la base de datos de DentiaCore' -Force | Out-Null
+
+        $HealthAction = New-ScheduledTaskAction -Execute $NodeExe -Argument 'scripts\check-health.js' -WorkingDirectory $RepoRoot
+        $HealthTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 4) -RepetitionDuration ([TimeSpan]::MaxValue)
+        Register-ScheduledTask -TaskName 'DentiaCore-HealthCheck' -Action $HealthAction -Trigger $HealthTrigger `
+            -Description 'Chequeo de salud (backup/DB/disco) de DentiaCore' -Force | Out-Null
+
+        Write-Ok "Backup diario (3am) y chequeo de salud (cada 4h) registrados en el Programador de Tareas."
+    } catch {
+        Write-Warn "No se pudo registrar el Programador de Tareas ($($_.Exception.Message)). Agrega manualmente:"
+        Write-Host "    schtasks /create /tn DentiaCore-Backup /tr `"node $RepoRoot\scripts\backup-db.js --keep=14`" /sc daily /st 03:00"
+        Write-Host "    schtasks /create /tn DentiaCore-HealthCheck /tr `"node $RepoRoot\scripts\check-health.js`" /sc hourly /mo 4"
+    }
 
     Run-NpmInstall $RepoRoot
 

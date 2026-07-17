@@ -14,33 +14,19 @@
  * y el campo `firmaDesactualizada` se marca como true.
  */
 const crypto = require('crypto');
-const { computeIntegrityHash, getSignableFields } = require('./integrity');
+const { RESOURCE_MODEL_MAP: ALL_RESOURCE_MODELS } = require('./resourceModelMap');
 
-// ── Mapa resourceType → modelo Mongoose name ──────────────────
-// Sólo se incluyen los modelos que tienen controller/rutas CRUD reales.
-// `tratamiento` y `receta` están definidos en /models pero NO tienen
-// endpoint para crear/editar el documento — exponer un endpoint de firma
-// sobre docs imposibles era superficie muerta. Si en el futuro se
-// implementa CRUD para ellos, re-agregar aquí.
-const RESOURCE_MODEL_MAP = {
-  patient:         'Patient',
-  examen:          'Examen',
-  periodontograma: 'Periodontogram',
-  odontograma:     'Odontograma',
-};
-
-/**
- * Calcula el hash del contenido clínico de un documento.
- * Es el mismo que computeIntegrityHash pero semánticamente representa
- * el snapshot al momento de la firma.
- *
- * @param {object} doc - Documento Mongoose
- * @param {string} resourceType - Tipo de recurso
- * @returns {string} SHA-256 hex
- */
-function computeContentHash(doc, resourceType) {
-  return computeIntegrityHash(doc, resourceType);
-}
+// ── Mapa resourceType → modelo Mongoose name (firma electrónica) ──
+// Subconjunto del mapa canónico (./resourceModelMap): sólo los modelos que
+// tienen controller/rutas CRUD reales. `tratamiento`, `receta` y `cita` están
+// en el mapa canónico (los usa auditoría) pero NO tienen endpoint para
+// crear/editar el documento — exponer un endpoint de firma sobre docs
+// imposibles era superficie muerta. Si en el futuro se implementa CRUD para
+// ellos, sumarlos a SIGNABLE_RESOURCE_TYPES.
+const SIGNABLE_RESOURCE_TYPES = ['patient', 'examen', 'periodontograma', 'odontograma'];
+const RESOURCE_MODEL_MAP = Object.fromEntries(
+  SIGNABLE_RESOURCE_TYPES.map((key) => [key, ALL_RESOURCE_MODELS[key]])
+);
 
 /**
  * Hash determinístico del contenido clínico de una nota de evolución (subdoc
@@ -78,15 +64,16 @@ function getModelName(resourceType) {
 /**
  * Veredicto de integridad de una nota de evolución a partir de los resultados
  * de comprobación ya calculados (contenido + firmas). Función PURA (sin I/O)
- * para poder testearla aislada.
+ * para poder testearla aislada. La consume verifyEvolutionNoteIntegrity
+ * (patientsController) — GET /patients/:id/evolution-note/:noteId/verify.
  *
  * Reglas (NOM-004 Art. 5.10 / NOM-024):
  *  - Cualquier comprobación que dé `false` (hash que no coincide) ⇒ manipulación.
  *  - Una nota OFICIAL DEBE tener, además: contentHash de referencia que coincida
  *    (contenidoOk === true) y firma del doctor presente e íntegra
- *    (firmaDoctorOk === true). Antes, si esas piezas faltaban se reportaban como
- *    "no aplica" (null) y NO afectaban `integro`: una nota OFICIAL sin
- *    contentHash o sin firma del doctor reportaba `integro: true` falsamente.
+ *    (firmaDoctorOk === true). Si esas piezas faltan (null) la nota OFICIAL
+ *    NO se reporta íntegra: una OFICIAL sin hash o sin firma del doctor es
+ *    una anomalía que debe salir a la luz, no un "no aplica".
  *  - La firma del PACIENTE es informativa: el flujo interactivo la captura, pero
  *    la firma en lote (Centro de Firmas) firma sólo con el doctor. Sólo penaliza
  *    si está presente y alterada (ok === false).
@@ -119,10 +106,7 @@ function evaluateNoteIntegrity({ estadoRegistro, contenidoOk, firmaPacienteOk, f
 }
 
 module.exports = {
-  computeContentHash,
   computeEvolutionNoteHash,
   evaluateNoteIntegrity,
   getModelName,
-  getSignableFields,
-  RESOURCE_MODEL_MAP,
 };

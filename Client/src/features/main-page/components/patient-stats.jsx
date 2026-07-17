@@ -52,11 +52,12 @@ const PatientStats = () => {
             try {
                 setLoading(true);
                 setError(null);
-                const now = new Date();
-                const from = new Date(now.getFullYear(), 0, 1).toISOString();
-                const to = now.toISOString();
+                // Sólo group (sin from/to): así el backend aplica su ventana por
+                // defecto — la MISMA que usa StatisticsPage, que tampoco manda
+                // from/to. Antes Home mandaba YTD y Estadísticas la ventana
+                // default, y la misma métrica mostraba números distintos. M1.
                 const { data } = await API.get(selectedStat.endpoint, {
-                    params: { from, to, group: 'month' },
+                    params: { group: 'month' },
                     signal: controller.signal,
                 });
                 if (cancelled) return;
@@ -91,13 +92,14 @@ const PatientStats = () => {
         const ctx = chartRef.current.getContext('2d');
         if (chartInstanceRef.current) chartInstanceRef.current.destroy();
 
-        // Normalize: summary returns { revenue } shape
+        // Normalize: /stats/summary devuelve forma { revenue: { labels, data } };
+        // el resto devuelve { labels, datasets }. El `||` liga más fuerte que el
+        // ternario, así que la versión anterior evaluaba la condición
+        // `datasets || revenue?.datasets` (falsa para summary, que no trae
+        // `revenue.datasets`) y rawDatasets quedaba en [] → barras vacías. C1.
         const labels = chartData.labels || chartData.revenue?.labels || [];
-        const rawDatasets = chartData.datasets || chartData.revenue?.datasets
-            ? (chartData.datasets || (chartData.revenue
-                ? [{ label: 'Ingresos', data: chartData.revenue.data }]
-                : []))
-            : [];
+        const rawDatasets = chartData.datasets
+            || (chartData.revenue ? [{ label: 'Ingresos', data: chartData.revenue.data }] : []);
 
         chartInstanceRef.current = new Chart(ctx, {
             type: selectedStat.type,

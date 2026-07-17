@@ -5,7 +5,7 @@
  *            NOM-013-SSA1-2015, LFPDPPP (2025).
  *
  * Cada rol respeta el principio de mínimo privilegio (LFPDPPP Art. 6).
- * Ver roles.MD en la raíz del proyecto para la documentación completa.
+ * Ver roles.MD (ahora en docs/server/) para la documentación completa.
  */
 
 const ROLE_PERMISSIONS = {
@@ -34,6 +34,10 @@ const ROLE_PERMISSIONS = {
     'periodontogram.read',
     'consultas.read',
     'exams.read',
+    // BE-02: exams.delete (archivar examen) es acción administrativa análoga a
+    // patients.delete; sin esto la ruta DELETE /exams/:id era inalcanzable para
+    // todo rol real (solo el bypass de superadmin), funcionalidad rota en prod.
+    'exams.delete',
     // Citas — CRUD completo
     'appointments.read',
     'appointments.create',
@@ -42,6 +46,10 @@ const ROLE_PERMISSIONS = {
     // Caja
     'cash.read',
     'cash.manage',
+    // Inventario — gestión completa (es función administrativa, no clínica)
+    'inventory.read',
+    'inventory.manage',
+    'inventory.consume',
     // Estadísticas — todas
     'stats.read.admin',
     'stats.read.own',
@@ -73,11 +81,13 @@ const ROLE_PERMISSIONS = {
     'odontogram.read', 'odontogram.create', 'odontogram.update',
     'periodontogram.read', 'periodontogram.create', 'periodontogram.update',
     'consultas.read', 'consultas.create', 'consultas.update',
-    'exams.read', 'exams.create', 'exams.update',
+    'exams.read', 'exams.create', 'exams.update', 'exams.delete', // BE-02: ver administrador
     // Citas — CRUD completo (delete de admin)
     'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
     // Caja (de admin)
     'cash.read', 'cash.manage',
+    // Inventario (de admin) + consumo en cita (de doctor)
+    'inventory.read', 'inventory.manage', 'inventory.consume',
     // Estadísticas — propias + administrativas
     'stats.read.own', 'stats.read.admin',
     // Usuarios — CRUD (de admin)
@@ -120,6 +130,10 @@ const ROLE_PERMISSIONS = {
     'appointments.update',
     // NO appointments.delete — solo admin/recepcionista
     'stats.read.own',
+    // Inventario — consulta y registro de consumo durante la atención.
+    // NO inventory.manage: entradas/ajustes de stock son función administrativa.
+    'inventory.read',
+    'inventory.consume',
     // NO cash.read — LFPDPPP Art. 6: proporcionalidad, no necesario para función clínica
     'draft.approve',            // transicionar DRAFT → OFICIAL con firma
     'drafts.batch_sign',        // firmar borradores en lote (Centro de Firmas Pendientes)
@@ -155,6 +169,8 @@ const ROLE_PERMISSIONS = {
     'consultas.update.draft',        // edición de borrador propio
     'exams.read',                    // matriz §3: asistente tiene R sobre exámenes
     'appointments.read',
+    'inventory.read',                // consultar stock/caducidades
+    'inventory.consume',             // registra material usado durante el procedimiento
     'notes.template.use',            // plantillas de evolución Anti-Olvidos
     'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina
@@ -173,6 +189,7 @@ const ROLE_PERMISSIONS = {
     'appointments.delete',
     'cash.read',
     'cash.manage',
+    'inventory.read',                // ver stock/alertas (p. ej. avisar reposición)
     'stats.read.admin',
     'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina
@@ -190,8 +207,7 @@ const getPermissionsForRole = (role) => {
 };
 
 const mergePermissions = (basePermissions = [], extraPermissions = []) => {
-  const merged = new Set([...(basePermissions || []), ...(extraPermissions || [])]);
-  return Array.from(merged);
+  return [...new Set([...(basePermissions || []), ...(extraPermissions || [])])];
 };
 
 /**

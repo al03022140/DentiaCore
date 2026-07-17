@@ -15,7 +15,7 @@ function fmtTime(iso) {
   return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-/** Agrupar logs por una key que devuelve [groupKey, sortableDate] */
+/** Agrupa logs en un Map<key, log[]> usando keyFn(log). */
 function groupBy(logs, keyFn) {
   const map = new Map();
   for (const log of logs) {
@@ -35,6 +35,10 @@ const ROL_LABELS = {
   asistente: 'Asistente',
 };
 
+// Tope de página del servidor (auditController clampa a 500): usarlo en el
+// export minimiza requests al traer todas las páginas del filtro.
+const EXPORT_LIMIT = 500;
+
 // ── Componente principal ─────────────────────────────────────
 
 const TraceabilitySection = () => {
@@ -45,6 +49,9 @@ const TraceabilitySection = () => {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  // Conjunto completo (todas las páginas) que se monta solo durante el export.
+  const [exportLogs, setExportLogs] = useState(null);
 
   // Filtros
   const [users, setUsers] = useState([]);
@@ -65,14 +72,18 @@ const TraceabilitySection = () => {
   // Suelen ser muchos y poco relevantes para auditar acciones clínicas.
   const [hideUnlocks, setHideUnlocks] = useState(false);
 
+  // Durante el export se monta el conjunto completo; el resto del tiempo es la
+  // página actual. Render, header y footer derivan de aquí.
+  const sourceLogs = exportLogs ?? logs;
+
   // Logs después de aplicar el filtro de desbloqueos.
   const filteredLogs = useMemo(
-    () => (hideUnlocks ? logs.filter((l) => l.evento !== 'pantalla_desbloqueada') : logs),
-    [logs, hideUnlocks]
+    () => (hideUnlocks ? sourceLogs.filter((l) => l.evento !== 'pantalla_desbloqueada') : sourceLogs),
+    [sourceLogs, hideUnlocks]
   );
   const hiddenUnlocksCount = useMemo(
-    () => logs.filter((l) => l.evento === 'pantalla_desbloqueada').length,
-    [logs]
+    () => sourceLogs.filter((l) => l.evento === 'pantalla_desbloqueada').length,
+    [sourceLogs]
   );
 
   // Cargar usuarios al montar
@@ -93,35 +104,34 @@ const TraceabilitySection = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Buscar logs ──
+  // Filtros del tab actual (sin page/limit), o null si faltan datos o el rango
+  // es inválido. Rango invertido (Desde > Hasta) avisa explícitamente en vez de
+  // fingir "no hay registros". Comparación lexicográfica válida con YYYY-MM-DD.
+  const buildFilters = useCallback(() => {
+    if (tab === 'usuario') {
+      if (!selectedUserId) return null;
+      if (dateFrom && dateTo && dateFrom > dateTo) {
+        setError("El rango de fechas es inválido: 'Desde' es posterior a 'Hasta'.");
+        return null;
+      }
+      const f = { userId: selectedUserId };
+      if (dateFrom) f.desde = dateFrom;
+      if (dateTo) f.hasta = dateTo;
+      return f;
+    }
+    if (tab === 'fecha') return singleDate ? { date: singleDate } : null;
+    if (tab === 'paciente') return selectedPatient ? { patientId: selectedPatient._id } : null;
+    return null;
+  }, [tab, selectedUserId, dateFrom, dateTo, singleDate, selectedPatient]);
+
+  // ── Buscar logs (una página) ──
   const fetchLogs = useCallback(async (pageNum = 1) => {
+    const base = buildFilters();
+    if (!base) { setLogs([]); setTotal(0); return; }
     setLoading(true);
     setError(null);
     try {
-      const filters = { page: pageNum, limit: 100 };
-
-      if (tab === 'usuario') {
-        if (!selectedUserId) { setLogs([]); setTotal(0); setLoading(false); return; }
-        // Rango invertido (Desde > Hasta) devolvería 0 resultados sin explicar
-        // por qué; avisar explícitamente en vez de fingir "no hay registros".
-        // Comparación lexicográfica válida con fechas YYYY-MM-DD de ancho fijo.
-        if (dateFrom && dateTo && dateFrom > dateTo) {
-          setError("El rango de fechas es inválido: 'Desde' es posterior a 'Hasta'.");
-          setLogs([]); setTotal(0); setLoading(false);
-          return;
-        }
-        filters.userId = selectedUserId;
-        if (dateFrom) filters.desde = dateFrom;
-        if (dateTo) filters.hasta = dateTo;
-      } else if (tab === 'fecha') {
-        if (!singleDate) { setLogs([]); setTotal(0); setLoading(false); return; }
-        filters.date = singleDate;
-      } else if (tab === 'paciente') {
-        if (!selectedPatient) { setLogs([]); setTotal(0); setLoading(false); return; }
-        filters.patientId = selectedPatient._id;
-      }
-
-      const res = await getAuditLogs(filters);
+      const res = await getAuditLogs({ ...base, page: pageNum, limit: 100 });
       setLogs(res.logs || []);
       setTotal(res.total || 0);
       setPages(res.pages || 1);
@@ -132,7 +142,7 @@ const TraceabilitySection = () => {
     } finally {
       setLoading(false);
     }
-  }, [tab, selectedUserId, dateFrom, dateTo, singleDate, selectedPatient]);
+  }, [buildFilters]);
 
   // Auto-buscar cuando cambia el filtro principal
   useEffect(() => {
@@ -179,13 +189,47 @@ const TraceabilitySection = () => {
     setPage(1);
   };
 
-  // ── Exportar PDF (window.print) ──
-  const handleExportPDF = () => {
-    // No exportar mientras carga ni si no hay registros visibles: imprimiría
-    // una vista parcial o vacía.
-    if (loading || filteredLogs.length === 0) return;
-    window.print();
+  // ── Exportar PDF: trae TODAS las páginas del filtro actual (no solo la
+  // visible) y las imprime, para que el PDF sea el registro completo. ──
+  const handleExportPDF = async () => {
+    if (loading || exporting || total === 0) return;
+    const base = buildFilters();
+    if (!base) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const all = [];
+      let pageNum = 1;
+      let totalPages = 1;
+      do {
+        const res = await getAuditLogs({ ...base, page: pageNum, limit: EXPORT_LIMIT });
+        all.push(...(res.logs || []));
+        totalPages = res.pages || 1;
+        pageNum += 1;
+      } while (pageNum <= totalPages);
+      if (all.length === 0) {
+        setError('No hay registros para exportar.');
+        setExporting(false);
+        return;
+      }
+      setExportLogs(all);
+    } catch {
+      setError('No se pudieron exportar todos los registros. Intenta de nuevo.');
+      setExporting(false);
+    }
   };
+
+  // Cuando exportLogs ya está en el DOM, imprimir en el siguiente frame y luego
+  // limpiar para volver a la vista paginada.
+  useEffect(() => {
+    if (!exportLogs) return undefined;
+    const id = requestAnimationFrame(() => {
+      window.print();
+      setExportLogs(null);
+      setExporting(false);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [exportLogs]);
 
   // ── Renderizado de logs agrupados ──
   const renderLogs = () => {
@@ -426,9 +470,9 @@ const TraceabilitySection = () => {
           <button
             className="settings-btn-primary"
             onClick={handleExportPDF}
-            disabled={loading || filteredLogs.length === 0}
+            disabled={loading || exporting || total === 0}
           >
-            Exportar PDF
+            {exporting ? 'Exportando…' : 'Exportar PDF'}
           </button>
         </div>
       )}

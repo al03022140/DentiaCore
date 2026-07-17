@@ -45,6 +45,16 @@ async function saveSignatureDataUrl(dataUrl, segments) {
   if (buffer.length > MAX_BYTES) {
     throw new Error(`La firma excede el tamaño máximo (${Math.round(MAX_BYTES / 1024)}KB)`);
   }
+  // Magic bytes: el MIME declarado en el dataURL debe coincidir con el
+  // contenido real (paridad con validateMimeByMagicBytes de los uploads
+  // multipart). Sin esto, cualquier bytes con prefijo "data:image/png" se
+  // escribía bajo /uploads como si fuera la imagen de una firma.
+  const magicOk = ext === 'png'
+    ? buffer.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    : buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
+  if (!magicOk) {
+    throw new Error('La firma no es una imagen PNG/JPG válida.');
+  }
 
   const dirSegments = segments.slice(0, -1);
   let filename = segments[segments.length - 1];
@@ -130,4 +140,4 @@ async function verifySignatureImageHash(absPath, expectedHash) {
   return { ok: actual === expectedHash, expected: expectedHash, actual };
 }
 
-module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash, MAX_BYTES };
+module.exports = { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash };

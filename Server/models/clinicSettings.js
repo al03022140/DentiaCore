@@ -71,7 +71,10 @@ clinicSettingsSchema.pre('save', function (next) {
       if (!svc || typeof svc.nombre !== 'string') continue;
       const nombre = svc.nombre.trim();
       if (!nombre) continue;
-      const key = nombre.toLowerCase();
+      // Normaliza acentos además de mayúsculas — sin esto "Extracción" y
+      // "Extraccion" convivían como dos servicios "distintos" y rompían en
+      // silencio el match de Kits de inventario contra el nombre real.
+      const key = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       if (seen.has(key)) continue;
       seen.add(key);
       const precio = Number(svc.precioDefault);

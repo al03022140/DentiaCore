@@ -447,7 +447,7 @@ function UserFormModal({ target, onClose, onSave, assignableRoles, currentUserId
           {requiresCedula && (
             <div className="settings-form-group">
               <label htmlFor="user-cedula">
-                Cédula profesional {requiresCedula && <span style={{ color: '#dc2626' }}>*</span>}
+                Cédula profesional {requiresCedula && <span style={{ color: 'var(--color-danger)' }}>*</span>}
               </label>
               <input
                 id="user-cedula"
@@ -478,7 +478,7 @@ function UserFormModal({ target, onClose, onSave, assignableRoles, currentUserId
                   required
                   autoComplete="new-password"
                 />
-                <small className="settings-form-hint">Mínimo 8 caracteres. Debe incluir mayúsculas, minúsculas y números.</small>
+                <small className="settings-form-hint">Mínimo 8 caracteres con mayúsculas, minúsculas, números y un carácter especial.</small>
               </div>
 
               <div className="settings-form-group">
@@ -562,7 +562,7 @@ function ResetPasswordModal({ target, onClose, onSubmit }) {
               autoFocus
               disabled={saving}
             />
-            <small className="settings-form-hint">Mínimo 8 caracteres con mayúsculas, minúsculas y números.</small>
+            <small className="settings-form-hint">Mínimo 8 caracteres con mayúsculas, minúsculas, números y un carácter especial.</small>
           </div>
 
           <div className="settings-form-group">

@@ -192,12 +192,6 @@ if (process.env.NODE_ENV !== 'production') {
   router.delete('/', writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 }
 
-// /batch es JSON puro: createPatients lee req.body como array y NO maneja
-// fotos. Antes tenía uploadFoto.array('fotos',10), que escribía a disco fotos
-// que el controller nunca asociaba ni limpiaba → archivos PII huérfanos. Se
-// quita el multer; el alta con foto va por POST '/' (createPatient).
-router.post('/batch', writeLimiter, authorize(['patients.create']), patientCtrl.createPatients);
-
 // Búsqueda server-side de pacientes — para inputs con debounce.
 router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.searchPatients);
 
@@ -346,11 +340,14 @@ router
 // odontogramaRoutes.js con la autorización correcta (authorize()).
 // Solo se conserva aquí el endpoint de imagen que NO existe en odontogramaRoutes.
 
-// Endpoint para servir la imagen del odontograma inicial
+// Endpoint para servir la imagen del odontograma inicial.
+// Exige `odontogram.read` igual que el resto de rutas de odontograma (antes
+// sólo validaba sesión + paciente, sin el permiso): un rol sin acceso clínico
+// al odontograma (recepción) no debe poder descargar la imagen.
 router
   .route('/:id/odontograma-inicial/image')
   .all(validateId, checkPatient)
-  .get(async (req, res, next) => {
+  .get(authorize(['odontogram.read']), async (req, res, next) => {
     try {
       const patientId = req.params.id;
       const OdontogramaModel = require('../models/odontograma');
@@ -372,8 +369,17 @@ router
   const imageUrl = odontograma.current.imageUrl;
       // Remover el prefijo '/uploads' de la URL para obtener la ruta relativa
       const relativePath = imageUrl.replace(/^\/uploads\//, '');
-      const imagePath = path.join(uploadsBase, relativePath);
-      
+      const imagePath = path.resolve(uploadsBase, relativePath);
+
+      // Contención: imageUrl viene de BD (histórico generado por el server),
+      // pero un valor legacy corrupto con '..' no debe escapar de uploads.
+      if (!imagePath.startsWith(path.resolve(uploadsBase) + path.sep)) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'IMAGE_NOT_FOUND', message: 'Imagen del odontograma inicial no encontrada' }
+        });
+      }
+
       // Verificar que el archivo existe
       const exists = await fs.pathExists(imagePath);
       if (!exists) {
@@ -490,12 +496,12 @@ router
   .all(validateId, checkPatient)
   .post(requireClinicalRole, authorize(['consultas.create', 'consultas.create.draft']), patientCtrl.signExistingEvolutionNote);
 
-// Verificar la integridad de una nota firmada (contentHash + hashes de las
-// imágenes de firma en disco). Sólo lectura, para auditoría (NOM-024).
+// Verificar integridad de una nota (hash de contenido + imágenes de firma vs
+// lo sellado al firmar). Lectura clínica; no muta nada.
 router
   .route('/:id/evolution-note/:noteId/verify')
   .all(validateId, checkPatient)
-  .get(requireClinicalRole, authorize(['consultas.read']), patientCtrl.verifyEvolutionNoteIntegrity);
+  .get(requireClinicalRole, authorize(['patients.read']), patientCtrl.verifyEvolutionNoteIntegrity);
 
 // ── Consentimiento de la historia clínica (NOM-004 §4.5 + LFPDPPP Art. 8/16) ──
 router

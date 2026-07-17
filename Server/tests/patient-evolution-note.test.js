@@ -1,61 +1,30 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
-const jwt = require('jsonwebtoken');
 
 const app = require('../scripts/dent');
 const Patient = require('../models/patient');
-const Usuario = require('../models/users');
-const { getEffectivePermissions } = require('../utils/permissions');
-const { getJwtSecret } = require('../utils/crypto');
+const { createUser, withMongoMemoryServer } = require('./helpers/testAuth');
 
 jest.setTimeout(30000);
 
-const JWT_SECRET = getJwtSecret();
-
-function makeToken(user) {
-  const permissions = getEffectivePermissions(user);
-  return jwt.sign(
-    { sub: user._id.toString(), role: user.rol, permissions },
-    JWT_SECRET,
-    { expiresIn: '1h', issuer: 'dentia-core' }
-  );
-}
-
-let mongoServer;
 let authToken;
 
 describe('POST /api/patients/:id/evolution-note', () => {
+  const mongoMemory = withMongoMemoryServer();
+
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    const uri = mongoServer.getUri();
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
-    }
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
-      connectTimeoutMS: 5000
-    });
+    await mongoMemory.start();
 
     // Create a doctor user for authentication
     // cedulaProfesional: obligatoria para doctores desde feat(firma Wacom)
-    const user = await Usuario.create({
+    const created = await createUser({
       nombre: 'Dr. Test',
       email: `evo-test-${Date.now()}@test.com`,
-      contraseña: 'Password123!',
-      rol: 'doctor',
       cedulaProfesional: 'CED-TEST-EVO'
     });
-    authToken = makeToken(user);
+    authToken = created.token;
   });
 
-  afterAll(async () => {
-    await mongoose.disconnect();
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
-  });
+  afterAll(() => mongoMemory.stop());
 
   afterEach(async () => {
     await Patient.deleteMany({});

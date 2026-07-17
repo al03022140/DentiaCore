@@ -3,6 +3,7 @@ const CashMovement = require('../models/cashMovement');
 const BoxSession = require('../models/boxSession');
 const mongoose = require('mongoose');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
+const logger = require('../utils/logger');
 
 const CONFIRM_PHRASE = 'CONFIRMO';
 const round2 = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
@@ -295,7 +296,7 @@ exports.addPayment = async (req, res) => {
     });
     if (!sessionStillOpen) {
       try { await CashMovement.deleteOne({ _id: movement._id }); }
-      catch (rbErr) { console.error('CRITICAL: rollback CashMovement falló:', { movementId: movement._id, rbErr }); }
+      catch (rbErr) { logger.error('CRITICAL: rollback CashMovement falló (movimiento huérfano)', { movementId: movement._id, error: rbErr?.message || String(rbErr) }); }
       return res.status(409).json({
         message: 'La caja se cerró durante el registro. Reintente cuando la caja esté abierta de nuevo.'
       });
@@ -349,9 +350,9 @@ exports.addPayment = async (req, res) => {
       } catch (rollbackErr) {
         // Si esto falla, queda un CashMovement huérfano. Loguear para
         // reconciliación manual.
-        console.error('CRITICAL: Rollback de CashMovement falló:', {
+        logger.error('CRITICAL: Rollback de CashMovement falló (movimiento huérfano)', {
           movementId: movement._id,
-          rollbackErr
+          error: rollbackErr?.message || String(rollbackErr)
         });
       }
       return res.status(409).json({
@@ -422,6 +423,17 @@ exports.cancelCharge = async (req, res) => {
       if (!existed) return res.status(404).json({ message: 'Cobro no encontrado' });
       return res.status(400).json({ message: 'El cobro ya está cancelado' });
     }
+
+    // Populate ÚNICO aquí: todos los returns de abajo (completo, parcial,
+    // omitido) devuelven la misma forma de `charge`. Antes los caminos
+    // parciales devolvían el doc sin populate y el frontend recibía payloads
+    // distintos según el resultado del reverso.
+    await charge.populate([
+      { path: 'appointmentId', select: 'fecha_hora motivo estado' },
+      { path: 'pagos.registradoPor', select: 'nombre' },
+      { path: 'creadoPor', select: 'nombre' },
+      { path: 'canceladoPor', select: 'nombre' }
+    ]);
 
     // Reverso opcional de los pagos a la caja OPEN actual.
     const reversedMovementIds = [];
@@ -501,7 +513,7 @@ exports.cancelCharge = async (req, res) => {
           const stillOpen = await BoxSession.exists({ _id: activeSession._id, status: 'OPEN' });
           if (!stillOpen) {
             try { await CashMovement.deleteOne({ _id: expense._id }); }
-            catch (rbErr) { console.error('CRITICAL: rollback reverso falló:', { movementId: expense._id, rbErr }); }
+            catch (rbErr) { logger.error('CRITICAL: rollback reverso falló (movimiento huérfano)', { movementId: expense._id, error: rbErr?.message || String(rbErr) }); }
             reverseInterrupted = true;
             break;
           }
@@ -513,7 +525,7 @@ exports.cancelCharge = async (req, res) => {
             const cashOnHandAfter = await getCashOnHand(activeSession._id, activeSession.initialAmount);
             if (cashOnHandAfter < 0) {
               try { await CashMovement.deleteOne({ _id: expense._id }); }
-              catch (rbErr) { console.error('CRITICAL: rollback reverso (fondos) falló:', { movementId: expense._id, rbErr }); }
+              catch (rbErr) { logger.error('CRITICAL: rollback reverso (fondos) falló (movimiento huérfano)', { movementId: expense._id, error: rbErr?.message || String(rbErr) }); }
               skippedInsufficientFunds++;
               continue;
             }
@@ -549,14 +561,8 @@ exports.cancelCharge = async (req, res) => {
       }
     }
 
-    const populated = await PatientCharge.findById(charge._id)
-      .populate('appointmentId', 'fecha_hora motivo estado')
-      .populate('pagos.registradoPor', 'nombre')
-      .populate('creadoPor', 'nombre')
-      .populate('canceladoPor', 'nombre');
-
     res.json({
-      charge: populated,
+      charge,
       reverseStatus: wantsReverse ? (reversedMovementIds.length > 0 ? 'reversed' : 'not_needed') : 'kept',
       reversedMovementIds
     });

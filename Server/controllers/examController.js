@@ -1,4 +1,5 @@
 const Exam = require('../models/exam.js');
+const { devError } = require('../utils/httpError');
 const Patient = require('../models/patient.js');
 const Doctor = require('../models/users.js');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
@@ -7,9 +8,24 @@ const { resolvePatientAppointmentId } = require('../utils/appointmentValidation'
 // 📌 Obtener todos los exámenes
 exports.getAllExams = async (req, res) => {
     try {
-        const exams = await Exam.find({ deletedAt: null }).populate('paciente_id', 'primer_nombre apellido_paterno apellido_materno')
-                                       .populate('doctor_id', 'nombre email');
-        if (!exams.length) return res.status(200).json([]);
+        // DB-IDX-01: paginación obligatoria + orden estable. Antes traía TODA la
+        // colección a memoria con doble populate (bomba de heap a escala). Se
+        // mantiene el shape de array por compatibilidad; ?withTotal=true añade
+        // el conteo por header para paginación explícita del cliente.
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+        const filter = { deletedAt: null };
+        const exams = await Exam.find(filter)
+            .populate('paciente_id', 'primer_nombre apellido_paterno apellido_materno')
+            .populate('doctor_id', 'nombre email')
+            .sort({ createdAt: -1 })
+            .skip(offset)
+            .limit(limit);
+        if (req.query.withTotal === 'true') {
+            const total = await Exam.countDocuments(filter);
+            res.set('X-Total-Count', total);
+            return res.status(200).json({ items: exams, total, limit, offset });
+        }
         res.status(200).json(exams);
     } catch (_error) {
         res.status(500).json({ message: 'Error al obtener los exámenes' });
@@ -99,7 +115,7 @@ exports.createExam = async (req, res) => {
 
     } catch (error) {
         if (error.name === 'ValidationError' || error.name === 'CastError') {
-            return res.status(400).json({ message: 'Error al crear el examen', error: error.message });
+            return res.status(400).json({ message: 'Error al crear el examen', error: devError(error) });
         }
         res.status(500).json({ message: 'Error interno al crear el examen' });
     }
@@ -170,7 +186,7 @@ exports.updateExam = async (req, res) => {
 
     } catch (error) {
         if (error.name === 'ValidationError' || error.name === 'CastError') {
-            return res.status(400).json({ message: 'Error al actualizar el examen', error: error.message });
+            return res.status(400).json({ message: 'Error al actualizar el examen', error: devError(error) });
         }
         res.status(500).json({ message: 'Error interno al actualizar el examen' });
     }

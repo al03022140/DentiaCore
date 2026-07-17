@@ -3,7 +3,7 @@
  * Versión temporal sin dependencias complejas
  */
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { getToothData } from "./utils/periodontogram-utils";
 import { UniversalToothValidator } from "../../shared/validators/universal-tooth-validator";
@@ -18,61 +18,14 @@ const StatisticsPanel = ({
   teeth = [],
   compact = false
 }) => {
+  // El padre actualiza `data` de forma inmutable en cada edición (nueva
+  // referencia + teeth nuevo + lastModified), así que el useMemo de estadísticas
+  // depende de `data` y recalcula solo cuando cambia. Antes había tres mecanismos
+  // solapados para lo mismo sobre un único memo (forceUpdate con debounce de
+  // 150ms, dataKey con hash, sampleDataVersion), y el validador ya cachea por su
+  // cuenta con su propio hash. M7.
   const [sampleDataVersion, setSampleDataVersion] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0);
-  const debounceRef = useRef(null);
-  
-  // Forzar actualización cuando cambien los datos
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    debounceRef.current = setTimeout(() => {
-      setForceUpdate(prev => prev + 1);
-    }, 150);
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
-    };
-  }, [data?.teeth, data?.selectedTooth, data?.lastModified, data?.updatedAt, data?.statistics]);
-  
-  // Crear una clave única basada en los datos para forzar recálculo
-  const dataKey = useMemo(() => {
-    if (!data?.teeth) return `no-data-${sampleDataVersion}`;
-    
-    // Crear un hash más eficiente de los datos
-    const teethKeys = Object.keys(data.teeth).sort();
-    const teethCount = teethKeys.length;
-    
-    // Calcular un hash simple de los datos relevantes para estadísticas
-    let dataHash = 0;
-    teethKeys.forEach(toothNumber => {
-      const tooth = data.teeth[toothNumber];
-      if (tooth) {
-        // Hash de datos relevantes para estadísticas
-        const relevantData = {
-          absent: tooth.absent,
-          bleeding: tooth.bleeding,
-          plaque: tooth.plaque,
-          probingDepth: tooth.probingDepth,
-          gingivalMargin: tooth.gingivalMargin
-        };
-        const dataStr = JSON.stringify(relevantData);
-        for (let i = 0; i < dataStr.length; i++) {
-          dataHash = ((dataHash << 5) - dataHash + dataStr.charCodeAt(i)) & 0xffffffff;
-        }
-      }
-    });
-    
-    const selectedTooth = data.selectedTooth || 'none';
-    const timestamp = data.lastModified || data.updatedAt || Date.now();
-    const statisticsHash = data.statistics ? JSON.stringify(data.statistics).length : 0;
-    
-    return `${teethCount}-${dataHash}-${selectedTooth}-${timestamp}-${statisticsHash}-${sampleDataVersion}-${forceUpdate}`;
-   }, [data?.teeth, data?.selectedTooth, data?.lastModified, data?.updatedAt, data?.statistics, sampleDataVersion, forceUpdate]);
-  
+
   // Función para crear datos de prueba específicos
   const createSampleData = () => {
     let bleedingSitesCreated = 0;
@@ -177,40 +130,28 @@ const StatisticsPanel = ({
   const statistics = useMemo(() => {
     if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('🔄 StatisticsPanel: Recalculando estadísticas...', {
       hasData: !!data,
-      dataKey,
       sampleDataVersion,
       teethCount: data?.teeth ? Object.keys(data.teeth).length : 0,
       hasPreCalculatedStats: !!data?.statistics
     });
-    
+
     if (data) {
-      // SIEMPRE recalcular estadísticas desde los datos de dientes para reflejar ediciones en tiempo real
+      // Con dientes: SIEMPRE devolver el cálculo en vivo, aunque dé ceros — es la
+      // verdad de los datos actuales. Antes, un resultado en ceros se caía a las
+      // estadísticas pre-calculadas, lo que enmascaraba gráficas legítimamente
+      // vacías y podía mostrar números viejos. La pre-calculada solo se usa cuando
+      // NO hay dientes que recalcular. M7.
       if (data.teeth && Object.keys(data.teeth).length > 0) {
-        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Recalculando estadísticas desde dientes...');
-        const result = UniversalToothValidator.calculateStatistics(data);
-        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Estadísticas calculadas:', result);
-        
-        // Si el cálculo produjo todo ceros, intentar usar pre-calculadas como fallback
-        if (areStatisticsAllZero(result) && data.statistics && !areStatisticsAllZero(data.statistics)) {
-          if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Cálculo dio ceros, usando estadísticas pre-calculadas como fallback');
-          const normalized = normalizeStatistics(data.statistics);
-          return normalized;
-        }
-        
-        return result;
+        return UniversalToothValidator.calculateStatistics(data);
       }
-      
-      // Si no hay dientes pero sí estadísticas pre-calculadas, usarlas
+
+      // Sin dientes pero con estadísticas pre-calculadas: usarlas.
       if (data.statistics && !areStatisticsAllZero(data.statistics)) {
-        if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Sin dientes, usando estadísticas pre-calculadas:', data.statistics);
-        const normalized = normalizeStatistics(data.statistics);
-        return normalized;
+        return normalizeStatistics(data.statistics);
       }
-      
-      // Fallback: calcular (resultará en ceros)
-      if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('⚠️ StatisticsPanel: Sin dientes ni estadísticas, calculando vacío...');
-      const result = UniversalToothValidator.calculateStatistics(data);
-      return result;
+
+      // Sin dientes ni estadísticas: calcular (dará ceros).
+      return UniversalToothValidator.calculateStatistics(data);
     } else {
       // Crear datos de muestra para demostración
       const sampleData = createSampleData();
@@ -232,7 +173,7 @@ const StatisticsPanel = ({
       if (ADVANCED_LOGGING_CONFIG.enabled) logger.log('📊 StatisticsPanel: Estadísticas de muestra calculadas:', result);
       return result;
     }
-  }, [data, sampleDataVersion, dataKey, forceUpdate]);
+  }, [data, sampleDataVersion]);
 
   if (compact) {
     return (
@@ -275,12 +216,12 @@ const StatisticsPanel = ({
             fontSize: '14px',
             color: '#1976d2'
           }}>
-            <img src={stadisticsIcon} alt="" width="16" height="16" className="theme-icon" /> <strong>Fórmulas con 96 sitios (32×3):</strong><br/>
+            <img src={stadisticsIcon} alt="" width="16" height="16" className="theme-icon" /> <strong>Fórmulas (6 sitios por diente = 2 caras × 3):</strong><br/>
             • %SS = (Sitios con sangrado / Sitios válidos de dientes presentes) × 100<br/>
             • %P = (Sitios con placa / Sitios válidos de dientes presentes) × 100<br/>
             • Media PS = ∑profundidades reales / # sitios válidos (≠999)<br/>
             • Media NIC = ∑(profundidad − margen) / # sitios válidos (≠999)<br/>
-            <em><img src={checkCircle2Icon} alt="✓" width="14" height="14" className="theme-icon" /> Base: 96 sitios totales, ajustado por {statistics.presentTeeth} dientes presentes</em>
+            <em><img src={checkCircle2Icon} alt="✓" width="14" height="14" className="theme-icon" /> Base: {statistics.presentTeeth} dientes presentes × 6 sitios</em>
           </div>
           <button 
             onClick={() => setSampleDataVersion(prev => prev + 1)}

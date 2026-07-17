@@ -1,6 +1,56 @@
-import { useState } from 'react';
 import plusIcon from '../../../assets/images/icons/plus.svg';
+import TrashIcon from './TrashIcon';
 import { useNestedFormState } from '../../../shared/hooks/useNestedFormState';
+
+// Opciones de frecuencia compartidas por Tabaquismo y Alcoholismo.
+const FRECUENCIAS = ['Diario', '6 veces a la semana', '5 veces a la semana', '4 veces a la semana', '3 veces a la semana', '2 veces a la semana', '1 vez a la semana', '1 vez cada 2 semanas', '1 vez cada 3 semanas', '1 vez al mes', 'Ocasional'];
+
+// Enfermedades graves adicionales: [key, label] = checkbox simple. Los 3
+// marcadores (diabetes/hepatitis/infarto_corazon) tienen sub-campo y se
+// renderizan como bloque aparte, en su posicion original del grid.
+const ENFERMEDADES = [
+  ['angina_pecho', 'Angina de Pecho'],
+  ['arteriosclerosis', 'Arteriosclerosis'],
+  ['asma', 'Asma'],
+  ['convulsiones_epilepsia', 'Convulsiones/Epilepsia'],
+  ['dano_valvulas', 'Daño en Válvulas'],
+  'diabetes',
+  ['enfermedad_paget', 'Enfermedad de Paget'],
+  ['enfermedades_rinon', 'Enfermedades del Riñón'],
+  ['enfermedades_familiares', 'Enfermedades Familiares'],
+  ['enfisema', 'Enfisema'],
+  ['fiebre_reumatica', 'Fiebre Reumática'],
+  ['gastritis_ulcera', 'Gastritis/Úlcera'],
+  'hepatitis',
+  ['hipertension', 'Hipertensión'],
+  ['hipertiroidismo', 'Hipertiroidismo'],
+  'infarto_corazon',
+  ['insuficiencia_renal', 'Insuficiencia Renal'],
+  ['lupus_eritematoso', 'Lupus Eritematoso'],
+  ['marcapasos', 'Marcapasos'],
+  ['osteogenesis_imperfecta', 'Osteogénesis Imperfecta'],
+  ['osteoporosis', 'Osteoporosis'],
+  ['paratiroidismo', 'Paratiroidismo'],
+  ['presion_arterial_baja', 'Presión Arterial Baja'],
+  ['radiaciones_cara_cuello', 'Radiaciones Cara/Cuello'],
+  ['retencion_liquidos', 'Retención de Líquidos'],
+  ['rinitis_alergica', 'Rinitis Alérgica'],
+  ['sinusitis', 'Sinusitis'],
+  ['soplo_cardiaco', 'Soplo Cardíaco'],
+  ['tos_persistente_sangre', 'Tos Persistente con Sangre'],
+  ['trastornos_coagulacion', 'Trastornos de Coagulación'],
+  ['transfusiones_sanguineas', 'Transfusiones Sanguíneas'],
+  ['transplantes_organos', 'Transplantes de Órganos'],
+  ['tratamiento_inmuno_supresion', 'Tratamiento Inmunosupresor'],
+  ['tuberculosis', 'Tuberculosis'],
+  ['anemia', 'Anemia'],
+  ['sida', 'SIDA'],
+  ['hipotiroidismo', 'Hipotiroidismo'],
+  ['cancer', 'Cáncer'],
+  ['esclerodermia', 'Esclerodermia'],
+  ['enfermedades_sangre', 'Enfermedades de la Sangre'],
+  ['presion_arterial_alta', 'Presión Arterial Alta'],
+];
 
 const Medic = ({ 
   formData, 
@@ -12,17 +62,10 @@ const Medic = ({
   handleEnfermedadGraveChange,
   handleArrayChange 
 }) => {
-  // Estado local para mostrar/ocultar secciones de Medicación y Alergias
-  const [showMedicacion, setShowMedicacion] = useState(
-    Array.isArray(formData.encuesta_medica?.medicacion) && formData.encuesta_medica.medicacion.length > 0
-  );
-  const [showAlergias, setShowAlergias] = useState(
-    Array.isArray(formData.encuesta_medica?.alergias) && formData.encuesta_medica.alergias.length > 0
-  );
-
   // Setter inmutable por ruta: reemplaza el patrón repetido de setFormData
   // anidado (ver useNestedFormState).
   const setField = useNestedFormState(setFormData);
+  const sel = formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas;
 
   return (
     <section className="form-section">
@@ -62,6 +105,7 @@ const Medic = ({
                        <input
                          type="date"
                          style={{ width: '200px' }}
+                         max={new Date().toISOString().slice(0, 10)}
                          value={formData.encuesta_medica.informacion_general?.ultimo_examen_medico?.fecha || ""}
                          onChange={(e) => {
                            setField(['encuesta_medica', 'informacion_general', 'ultimo_examen_medico', 'fecha'], e.target.value);
@@ -236,17 +280,7 @@ const Medic = ({
                          }}
                        >
                          <option value="">Seleccione...</option>
-                         <option value="Diario">Diario</option>
-                         <option value="6 veces a la semana">6 veces a la semana</option>
-                         <option value="5 veces a la semana">5 veces a la semana</option>
-                         <option value="4 veces a la semana">4 veces a la semana</option>
-                         <option value="3 veces a la semana">3 veces a la semana</option>
-                         <option value="2 veces a la semana">2 veces a la semana</option>
-                         <option value="1 vez a la semana">1 vez a la semana</option>
-                         <option value="1 vez cada 2 semanas">1 vez cada 2 semanas</option>
-                         <option value="1 vez cada 3 semanas">1 vez cada 3 semanas</option>
-                         <option value="1 vez al mes">1 vez al mes</option>
-                         <option value="Ocasional">Ocasional</option>
+                         {FRECUENCIAS.map((f) => <option key={f} value={f}>{f}</option>)}
                        </select>
                      </div>
                    )}
@@ -272,17 +306,7 @@ const Medic = ({
                          }}
                        >
                          <option value="">Seleccione...</option>
-                         <option value="Diario">Diario</option>
-                         <option value="6 veces a la semana">6 veces a la semana</option>
-                         <option value="5 veces a la semana">5 veces a la semana</option>
-                         <option value="4 veces a la semana">4 veces a la semana</option>
-                         <option value="3 veces a la semana">3 veces a la semana</option>
-                         <option value="2 veces a la semana">2 veces a la semana</option>
-                         <option value="1 vez a la semana">1 vez a la semana</option>
-                         <option value="1 vez cada 2 semanas">1 vez cada 2 semanas</option>
-                         <option value="1 vez cada 3 semanas">1 vez cada 3 semanas</option>
-                         <option value="1 vez al mes">1 vez al mes</option>
-                         <option value="Ocasional">Ocasional</option>
+                         {FRECUENCIAS.map((f) => <option key={f} value={f}>{f}</option>)}
                        </select>
                      </div>
                    )}
@@ -309,8 +333,9 @@ const Medic = ({
                                type="button"
                                onClick={() => handleRemoveItem('cirugias_previas', index)}
                                className="trash-button"
+                               aria-label="Eliminar cirugía"
                              >
-                               🗑️
+                               <TrashIcon />
                              </button>
                           </div>
                         ))}
@@ -374,555 +399,95 @@ const Medic = ({
                     <div className="enfermedades-multiples-section">
                       <h3>Seleccione las enfermedades que padece:</h3>
                       <div className="enfermedades-grid">
-                        
-                        {/* Angina de Pecho */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.angina_pecho || false}
-                              onChange={(e) => handleEnfermedadGraveChange('angina_pecho', e.target.checked)}
-                            />
-                            Angina de Pecho
-                          </label>
-                        </div>
-
-                        {/* Arteriosclerosis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.arteriosclerosis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('arteriosclerosis', e.target.checked)}
-                            />
-                            Arteriosclerosis
-                          </label>
-                        </div>
-
-                        {/* Asma */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.asma || false}
-                              onChange={(e) => handleEnfermedadGraveChange('asma', e.target.checked)}
-                            />
-                            Asma
-                          </label>
-                        </div>
-
-                        {/* Convulsiones/Epilepsia */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.convulsiones_epilepsia || false}
-                              onChange={(e) => handleEnfermedadGraveChange('convulsiones_epilepsia', e.target.checked)}
-                            />
-                            Convulsiones/Epilepsia
-                          </label>
-                        </div>
-
-                        {/* Daño en Válvulas */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.dano_valvulas || false}
-                              onChange={(e) => handleEnfermedadGraveChange('dano_valvulas', e.target.checked)}
-                            />
-                            Daño en Válvulas
-                          </label>
-                        </div>
-
-                        {/* Diabetes */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes?.checked || false}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'checked'], e.target.checked);
-                              }}
-                            />
-                            Diabetes
-                          </label>
-                          {formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes?.checked && (
-                            <select
-                              value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.diabetes?.tipo || ""}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'tipo'], e.target.value);
-                              }}
-                            >
-                              <option value="">Seleccione tipo</option>
-                              <option value="Tipo 1">Tipo 1</option>
-                              <option value="Tipo 2">Tipo 2</option>
-                              <option value="Gestacional">Gestacional</option>
-                            </select>
-                          )}
-                        </div>
-
-                        {/* Enfermedad de Paget */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.enfermedad_paget || false}
-                              onChange={(e) => handleEnfermedadGraveChange('enfermedad_paget', e.target.checked)}
-                            />
-                            Enfermedad de Paget
-                          </label>
-                        </div>
-
-                        {/* Enfermedades del Riñón */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.enfermedades_rinon || false}
-                              onChange={(e) => handleEnfermedadGraveChange('enfermedades_rinon', e.target.checked)}
-                            />
-                            Enfermedades del Riñón
-                          </label>
-                        </div>
-
-                        {/* Enfermedades Familiares */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.enfermedades_familiares || false}
-                              onChange={(e) => handleEnfermedadGraveChange('enfermedades_familiares', e.target.checked)}
-                            />
-                            Enfermedades Familiares
-                          </label>
-                        </div>
-
-                        {/* Enfisema */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.enfisema || false}
-                              onChange={(e) => handleEnfermedadGraveChange('enfisema', e.target.checked)}
-                            />
-                            Enfisema
-                          </label>
-                        </div>
-
-                        {/* Fiebre Reumática */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.fiebre_reumatica || false}
-                              onChange={(e) => handleEnfermedadGraveChange('fiebre_reumatica', e.target.checked)}
-                            />
-                            Fiebre Reumática
-                          </label>
-                        </div>
-
-                        {/* Gastritis/Úlcera */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.gastritis_ulcera || false}
-                              onChange={(e) => handleEnfermedadGraveChange('gastritis_ulcera', e.target.checked)}
-                            />
-                            Gastritis/Úlcera
-                          </label>
-                        </div>
-
-                        {/* Hepatitis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis?.checked || false}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'checked'], e.target.checked);
-                              }}
-                            />
-                            Hepatitis
-                          </label>
-                          {formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis?.checked && (
-                            <select
-                              value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hepatitis?.tipo || ""}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'tipo'], e.target.value);
-                              }}
-                            >
-                              <option value="">Seleccione tipo</option>
-                              <option value="A">Hepatitis A</option>
-                              <option value="B">Hepatitis B</option>
-                              <option value="C">Hepatitis C</option>
-                              <option value="D">Hepatitis D</option>
-                              <option value="E">Hepatitis E</option>
-                            </select>
-                          )}
-                        </div>
-
-                        {/* Hipertensión */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hipertension || false}
-                              onChange={(e) => handleEnfermedadGraveChange('hipertension', e.target.checked)}
-                            />
-                            Hipertensión
-                          </label>
-                        </div>
-
-                        {/* Hipertiroidismo */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hipertiroidismo || false}
-                              onChange={(e) => handleEnfermedadGraveChange('hipertiroidismo', e.target.checked)}
-                            />
-                            Hipertiroidismo
-                          </label>
-                        </div>
-
-                        {/* Infarto de Corazón */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon?.checked || false}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'checked'], e.target.checked);
-                              }}
-                            />
-                            Infarto de Corazón
-                          </label>
-                          {formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon?.checked && (
-                            <input
-                              type="date"
-                              value={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.infarto_corazon?.fecha || ""}
-                              onChange={(e) => {
-                                setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'fecha'], e.target.value);
-                              }}
-                              placeholder="Fecha del infarto"
-                            />
-                          )}
-                        </div>
-
-                        {/* Insuficiencia Renal */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.insuficiencia_renal || false}
-                              onChange={(e) => handleEnfermedadGraveChange('insuficiencia_renal', e.target.checked)}
-                            />
-                            Insuficiencia Renal
-                          </label>
-                        </div>
-
-                        {/* Lupus Eritematoso */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.lupus_eritematoso || false}
-                              onChange={(e) => handleEnfermedadGraveChange('lupus_eritematoso', e.target.checked)}
-                            />
-                            Lupus Eritematoso
-                          </label>
-                        </div>
-
-                        {/* Marcapasos */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.marcapasos || false}
-                              onChange={(e) => handleEnfermedadGraveChange('marcapasos', e.target.checked)}
-                            />
-                            Marcapasos
-                          </label>
-                        </div>
-
-                        {/* Osteogénesis Imperfecta */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.osteogenesis_imperfecta || false}
-                              onChange={(e) => handleEnfermedadGraveChange('osteogenesis_imperfecta', e.target.checked)}
-                            />
-                            Osteogénesis Imperfecta
-                          </label>
-                        </div>
-
-                        {/* Osteoporosis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.osteoporosis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('osteoporosis', e.target.checked)}
-                            />
-                            Osteoporosis
-                          </label>
-                        </div>
-
-                        {/* Paratiroidismo */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.paratiroidismo || false}
-                              onChange={(e) => handleEnfermedadGraveChange('paratiroidismo', e.target.checked)}
-                            />
-                            Paratiroidismo
-                          </label>
-                        </div>
-
-                        {/* Presión Arterial Baja */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.presion_arterial_baja || false}
-                              onChange={(e) => handleEnfermedadGraveChange('presion_arterial_baja', e.target.checked)}
-                            />
-                            Presión Arterial Baja
-                          </label>
-                        </div>
-
-                        {/* Radiaciones Cara/Cuello */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.radiaciones_cara_cuello || false}
-                              onChange={(e) => handleEnfermedadGraveChange('radiaciones_cara_cuello', e.target.checked)}
-                            />
-                            Radiaciones Cara/Cuello
-                          </label>
-                        </div>
-
-                        {/* Retención de Líquidos */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.retencion_liquidos || false}
-                              onChange={(e) => handleEnfermedadGraveChange('retencion_liquidos', e.target.checked)}
-                            />
-                            Retención de Líquidos
-                          </label>
-                        </div>
-
-                        {/* Rinitis Alérgica */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.rinitis_alergica || false}
-                              onChange={(e) => handleEnfermedadGraveChange('rinitis_alergica', e.target.checked)}
-                            />
-                            Rinitis Alérgica
-                          </label>
-                        </div>
-
-                        {/* Sinusitis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.sinusitis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('sinusitis', e.target.checked)}
-                            />
-                            Sinusitis
-                          </label>
-                        </div>
-
-                        {/* Soplo Cardíaco */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.soplo_cardiaco || false}
-                              onChange={(e) => handleEnfermedadGraveChange('soplo_cardiaco', e.target.checked)}
-                            />
-                            Soplo Cardíaco
-                          </label>
-                        </div>
-
-                        {/* Tos Persistente con Sangre */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.tos_persistente_sangre || false}
-                              onChange={(e) => handleEnfermedadGraveChange('tos_persistente_sangre', e.target.checked)}
-                            />
-                            Tos Persistente con Sangre
-                          </label>
-                        </div>
-
-                        {/* Trastornos de Coagulación */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.trastornos_coagulacion || false}
-                              onChange={(e) => handleEnfermedadGraveChange('trastornos_coagulacion', e.target.checked)}
-                            />
-                            Trastornos de Coagulación
-                          </label>
-                        </div>
-
-                        {/* Transfusiones Sanguíneas */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.transfusiones_sanguineas || false}
-                              onChange={(e) => handleEnfermedadGraveChange('transfusiones_sanguineas', e.target.checked)}
-                            />
-                            Transfusiones Sanguíneas
-                          </label>
-                        </div>
-
-                        {/* Transplantes de Órganos */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.transplantes_organos || false}
-                              onChange={(e) => handleEnfermedadGraveChange('transplantes_organos', e.target.checked)}
-                            />
-                            Transplantes de Órganos
-                          </label>
-                        </div>
-
-                        {/* Tratamiento Inmunosupresor */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.tratamiento_inmuno_supresion || false}
-                              onChange={(e) => handleEnfermedadGraveChange('tratamiento_inmuno_supresion', e.target.checked)}
-                            />
-                            Tratamiento Inmunosupresor
-                          </label>
-                        </div>
-
-                        {/* Tuberculosis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.tuberculosis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('tuberculosis', e.target.checked)}
-                            />
-                            Tuberculosis
-                          </label>
-                        </div>
-
-                        {/* Anemia */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.anemia || false}
-                              onChange={(e) => handleEnfermedadGraveChange('anemia', e.target.checked)}
-                            />
-                            Anemia
-                          </label>
-                        </div>
-
-                        {/* SIDA */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.sida || false}
-                              onChange={(e) => handleEnfermedadGraveChange('sida', e.target.checked)}
-                            />
-                            SIDA
-                          </label>
-                        </div>
-
-                        {/* Arteriosclerosis */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.arteriosclerosis || false}
-                              onChange={(e) => handleEnfermedadGraveChange('arteriosclerosis', e.target.checked)}
-                            />
-                            Arteriosclerosis
-                          </label>
-                        </div>
-
-                        {/* Hipotiroidismo */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.hipotiroidismo || false}
-                              onChange={(e) => handleEnfermedadGraveChange('hipotiroidismo', e.target.checked)}
-                            />
-                            Hipotiroidismo
-                          </label>
-                        </div>
-
-                        {/* Cáncer */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.cancer || false}
-                              onChange={(e) => handleEnfermedadGraveChange('cancer', e.target.checked)}
-                            />
-                            Cáncer
-                          </label>
-                        </div>
-
-                        {/* Esclerodermia */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.esclerodermia || false}
-                              onChange={(e) => handleEnfermedadGraveChange('esclerodermia', e.target.checked)}
-                            />
-                            Esclerodermia
-                          </label>
-                        </div>
-
-                        {/* Enfermedades de la Sangre */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.enfermedades_sangre || false}
-                              onChange={(e) => handleEnfermedadGraveChange('enfermedades_sangre', e.target.checked)}
-                            />
-                            Enfermedades de la Sangre
-                          </label>
-                        </div>
-
-                        {/* Presión Arterial Alta */}
-                        <div className="form-group">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={formData.encuesta_medica.informacion_general?.enfermedad_grave_adicional?.enfermedades_seleccionadas?.presion_arterial_alta || false}
-                              onChange={(e) => handleEnfermedadGraveChange('presion_arterial_alta', e.target.checked)}
-                            />
-                            Presión Arterial Alta
-                          </label>
-                        </div>
-
+                        {ENFERMEDADES.map((item) => {
+                          if (item === 'diabetes') {
+                            return (
+                              <div className="form-group" key="diabetes">
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={sel?.diabetes?.checked || false}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'checked'], e.target.checked)}
+                                  />
+                                  Diabetes
+                                </label>
+                                {sel?.diabetes?.checked && (
+                                  <select
+                                    value={sel?.diabetes?.tipo || ""}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'diabetes', 'tipo'], e.target.value)}
+                                  >
+                                    <option value="">Seleccione tipo</option>
+                                    <option value="Tipo 1">Tipo 1</option>
+                                    <option value="Tipo 2">Tipo 2</option>
+                                    <option value="Gestacional">Gestacional</option>
+                                  </select>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (item === 'hepatitis') {
+                            return (
+                              <div className="form-group" key="hepatitis">
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={sel?.hepatitis?.checked || false}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'checked'], e.target.checked)}
+                                  />
+                                  Hepatitis
+                                </label>
+                                {sel?.hepatitis?.checked && (
+                                  <select
+                                    value={sel?.hepatitis?.tipo || ""}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'hepatitis', 'tipo'], e.target.value)}
+                                  >
+                                    <option value="">Seleccione tipo</option>
+                                    <option value="A">Hepatitis A</option>
+                                    <option value="B">Hepatitis B</option>
+                                    <option value="C">Hepatitis C</option>
+                                    <option value="D">Hepatitis D</option>
+                                    <option value="E">Hepatitis E</option>
+                                  </select>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (item === 'infarto_corazon') {
+                            return (
+                              <div className="form-group" key="infarto_corazon">
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={sel?.infarto_corazon?.checked || false}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'checked'], e.target.checked)}
+                                  />
+                                  Infarto de Corazón
+                                </label>
+                                {sel?.infarto_corazon?.checked && (
+                                  <input
+                                    type="date"
+                                    value={sel?.infarto_corazon?.fecha || ""}
+                                    onChange={(e) => setField(['encuesta_medica', 'informacion_general', 'enfermedad_grave_adicional', 'enfermedades_seleccionadas', 'infarto_corazon', 'fecha'], e.target.value)}
+                                    placeholder="Fecha del infarto"
+                                  />
+                                )}
+                              </div>
+                            );
+                          }
+                          const [key, label] = item;
+                          return (
+                            <div className="form-group" key={key}>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={sel?.[key] || false}
+                                  onChange={(e) => handleEnfermedadGraveChange(key, e.target.checked)}
+                                />
+                                {label}
+                              </label>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -935,45 +500,36 @@ const Medic = ({
                   {/* SECCIÓN: MEDICACIÓN */}
                   <div className="medicacion-col">
                     <h3>Medicación</h3>
-                    {showMedicacion && (
-                      <>
-                        {(Array.isArray(formData.encuesta_medica.medicacion) ? formData.encuesta_medica.medicacion : []).map((med, index) => (
-                          <div key={index} className="form-group-grid array-item">
-                            <input
-                              className="medicacion-input"
-                              type="text"
-                              placeholder="Nombre del medicamento"
-                              value={med.nombre || ""}
-                              onChange={(e) => handleArrayChange("medicacion", index, "nombre", e.target.value, "encuesta_medica")}
-                            />
-                            <input
-                              className="medicacion-input"
-                              type="text"
-                              placeholder="Dosis"
-                              value={med.dosis || ""}
-                              onChange={(e) => handleArrayChange("medicacion", index, "dosis", e.target.value, "encuesta_medica")}
-                            />
-                            <input
-                              className="medicacion-input"
-                              type="text"
-                              placeholder="Frecuencia"
-                              value={med.frecuencia || ""}
-                              onChange={(e) => handleArrayChange("medicacion", index, "frecuencia", e.target.value, "encuesta_medica")}
-                            />
-                            {Array.isArray(formData.encuesta_medica.medicacion) && formData.encuesta_medica.medicacion.length > 0 && (
-                              <button className="trash-button" type="button" onClick={() => handleRemoveItem("medicacion", index)}>🗑️</button>
-                            )}
-                          </div>
-                        ))}
-                      </>
-                    )}
+                    {(Array.isArray(formData.encuesta_medica.medicacion) ? formData.encuesta_medica.medicacion : []).map((med, index) => (
+                      <div key={index} className="form-group-grid array-item">
+                        <input
+                          className="medicacion-input"
+                          type="text"
+                          placeholder="Nombre del medicamento"
+                          value={med.nombre || ""}
+                          onChange={(e) => handleArrayChange("medicacion", index, "nombre", e.target.value, "encuesta_medica")}
+                        />
+                        <input
+                          className="medicacion-input"
+                          type="text"
+                          placeholder="Dosis"
+                          value={med.dosis || ""}
+                          onChange={(e) => handleArrayChange("medicacion", index, "dosis", e.target.value, "encuesta_medica")}
+                        />
+                        <input
+                          className="medicacion-input"
+                          type="text"
+                          placeholder="Frecuencia"
+                          value={med.frecuencia || ""}
+                          onChange={(e) => handleArrayChange("medicacion", index, "frecuencia", e.target.value, "encuesta_medica")}
+                        />
+                        <button className="trash-button" type="button" aria-label="Eliminar medicación" onClick={() => handleRemoveItem("medicacion", index)}><TrashIcon /></button>
+                      </div>
+                    ))}
                     <button
                       className="action-button"
                       type="button"
-                      onClick={() => {
-                        if (!showMedicacion) setShowMedicacion(true);
-                        handleAddItem("medicacion", { nombre: "", dosis: "", frecuencia: "" });
-                      }}
+                      onClick={() => handleAddItem("medicacion", { nombre: "", dosis: "", frecuencia: "" })}
                     >
                       <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Medicación
                     </button>
@@ -982,38 +538,29 @@ const Medic = ({
                   {/* SECCIÓN: ALERGIAS */}
                   <div className="alergias-col">
                     <h3>Alergias</h3>
-                    {showAlergias && (
-                      <>
-                        {(Array.isArray(formData.encuesta_medica.alergias) ? formData.encuesta_medica.alergias : []).map((alergia, index) => (
-                          <div key={index} className="form-group-grid array-item">
-                            <input
-                              className="alergia-input"
-                              type="text"
-                              placeholder="Sustancia"
-                              value={alergia.sustancia || ""}
-                              onChange={(e) => handleArrayChange("alergias", index, "sustancia", e.target.value,"encuesta_medica")}
-                            />
-                            <input
-                              className="alergia-input"
-                              type="text"
-                              placeholder="Reacción"
-                              value={alergia.reaccion || ""}
-                              onChange={(e) => handleArrayChange("alergias", index, "reaccion", e.target.value,"encuesta_medica")}
-                            />
-                            {Array.isArray(formData.encuesta_medica.alergias) && formData.encuesta_medica.alergias.length > 0 && (
-                              <button className="trash-button" type="button" onClick={() => handleRemoveItem("alergias", index)}>🗑️</button>
-                            )}
-                          </div>
-                        ))}
-                      </>
-                    )}
+                    {(Array.isArray(formData.encuesta_medica.alergias) ? formData.encuesta_medica.alergias : []).map((alergia, index) => (
+                      <div key={index} className="form-group-grid array-item">
+                        <input
+                          className="alergia-input"
+                          type="text"
+                          placeholder="Sustancia"
+                          value={alergia.sustancia || ""}
+                          onChange={(e) => handleArrayChange("alergias", index, "sustancia", e.target.value,"encuesta_medica")}
+                        />
+                        <input
+                          className="alergia-input"
+                          type="text"
+                          placeholder="Reacción"
+                          value={alergia.reaccion || ""}
+                          onChange={(e) => handleArrayChange("alergias", index, "reaccion", e.target.value,"encuesta_medica")}
+                        />
+                        <button className="trash-button" type="button" aria-label="Eliminar alergia" onClick={() => handleRemoveItem("alergias", index)}><TrashIcon /></button>
+                      </div>
+                    ))}
                     <button
                       className="action-button"
                       type="button"
-                      onClick={() => {
-                        if (!showAlergias) setShowAlergias(true);
-                        handleAddItem("alergias", { sustancia: "", reaccion: "" });
-                      }}
+                      onClick={() => handleAddItem("alergias", { sustancia: "", reaccion: "" })}
                     >
                       <img src={plusIcon} alt="+" width="16" height="16" className="theme-icon" /> Agregar Alergia
                     </button>

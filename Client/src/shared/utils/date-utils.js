@@ -53,11 +53,7 @@ export function formatDateToDDMMYYYY(date) {
         dateObj = new Date();
     }
     
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const year = dateObj.getFullYear();
-    
-    return `${day}/${month}/${year}`;
+    return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(dateObj);
 }
 
 /**
@@ -66,36 +62,4 @@ export function formatDateToDDMMYYYY(date) {
  */
 export function getCurrentDateFormatted() {
     return formatDateToDDMMYYYY(new Date());
-}
-
-/**
- * Convierte una fecha en formato dd/mm/yyyy a ISO string para el backend
- * @param {string} ddmmyyyy - Fecha en formato dd/mm/yyyy
- * @returns {string} Fecha en formato ISO
- */
-export function convertDDMMYYYYToISO(ddmmyyyy) {
-    if (!ddmmyyyy || typeof ddmmyyyy !== 'string') {
-        return new Date().toISOString();
-    }
-    
-    const parts = ddmmyyyy.split('/');
-    if (parts.length !== 3) {
-        return new Date().toISOString();
-    }
-    
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // Los meses en JS son 0-indexados
-    const year = parseInt(parts[2], 10);
-    
-    const date = new Date(year, month, day);
-    return date.toISOString();
-}
-
-/**
- * Convierte una fecha ISO a formato dd/mm/yyyy
- * @param {string} isoDate - Fecha en formato ISO
- * @returns {string} Fecha en formato dd/mm/yyyy
- */
-export function convertISOToDDMMYYYY(isoDate) {
-    return formatDateToDDMMYYYY(isoDate);
 }

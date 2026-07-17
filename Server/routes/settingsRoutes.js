@@ -69,7 +69,10 @@ const settingsValidationRules = [
 ];
 
 // ── Clinic Settings ──────────────────────────────────────────
-router.get('/', settingsController.getSettings);
+// Requiere `settings.read` (lo tienen todos los roles). Antes sin authorize:
+// devolvía ClinicSettings completo — incl. `rolePermissionOverrides` — a
+// cualquier sesión autenticada.
+router.get('/', authorize(['settings.read']), settingsController.getSettings);
 router.patch(
   '/',
   authorize(['settings.update']),

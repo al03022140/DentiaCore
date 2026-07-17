@@ -1,15 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
-import { Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descriptions, Statistic } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Radio, Select, message, Descriptions } from 'antd';
 import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, SearchOutlined, LockOutlined } from '@ant-design/icons';
 import { addMovement, closeBox } from '../../shared/services/cashService';
 import { getAllPatients } from '../../shared/services/patient-service';
-import { formatMoney } from '../../shared/utils/money';
+import { formatMoneyCompact as formatMXN } from '../../shared/utils/money';
 
 const { confirm } = Modal;
-
-// BUG-B1: moneda centralizada en shared/utils/money. Se ajusta a la divisa
-// configurada en Settings → Caja (default MXN).
-const formatMXN = (value) => formatMoney(value, { showDecimals: false });
 
 const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBox }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,7 +103,7 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
         <div className="cash-card__extra">
           {isBoxOpen
             ? <Button type="link" danger onClick={handleCloseBox}>Cerrar Caja</Button>
-            : <Button type="link" onClick={onRequestOpenBox}>Abrir Caja</Button>}
+            : <Button type="link" className="cash-open-glow" onClick={onRequestOpenBox}>Abrir Caja</Button>}
         </div>
       </div>
 
@@ -149,7 +145,7 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
           <Form.Item
             name="amount"
             label="Monto"
-            rules={[{ required: true, message: 'Ingrese el monto' }]}
+            rules={[{ required: true, message: 'Ingrese el monto' }, { type: 'number', min: 0.01, message: 'El monto debe ser mayor a 0' }]}
           >
             <InputNumber
               style={{ width: '100%' }}
@@ -220,14 +216,14 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="Monto Inicial">{formatMXN(closeSummary.initialAmount)}</Descriptions.Item>
             <Descriptions.Item label="Efectivo Final">{formatMXN(closeSummary.finalCashAmount)}</Descriptions.Item>
-            <Descriptions.Item label="Total Ingresos"><Statistic value={closeSummary.totalIncome} prefix="$" valueStyle={{ color: '#4caf50', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
-            <Descriptions.Item label="Total Egresos"><Statistic value={closeSummary.totalExpense} prefix="$" valueStyle={{ color: '#e53e3e', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
+            <Descriptions.Item label="Total Ingresos"><span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{formatMXN(closeSummary.totalIncome)}</span></Descriptions.Item>
+            <Descriptions.Item label="Total Egresos"><span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{formatMXN(closeSummary.totalExpense)}</span></Descriptions.Item>
             <Descriptions.Item label="Ing. Efectivo">{formatMXN(closeSummary.cashIncome)}</Descriptions.Item>
             <Descriptions.Item label="Ing. Digital">{formatMXN(closeSummary.digitalIncome)}</Descriptions.Item>
             <Descriptions.Item label="Egr. Efectivo">{formatMXN(closeSummary.cashExpense)}</Descriptions.Item>
             <Descriptions.Item label="Egr. Digital">{formatMXN(closeSummary.digitalExpense)}</Descriptions.Item>
             <Descriptions.Item label="Movimientos">{closeSummary.movementCount}</Descriptions.Item>
-            <Descriptions.Item label="Balance Neto"><Statistic value={closeSummary.net} prefix="$" valueStyle={{ color: closeSummary.net >= 0 ? '#4caf50' : '#e53e3e', fontSize: 14, fontWeight: 600 }} /></Descriptions.Item>
+            <Descriptions.Item label="Balance Neto"><span style={{ color: closeSummary.net >= 0 ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600 }}>{formatMXN(closeSummary.net)}</span></Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

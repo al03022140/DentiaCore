@@ -283,9 +283,36 @@ else
     print_ok "JWT_SECRET existente conservado"
 fi
 
+# CFG-01: Garantizar AUDIT_HMAC_SECRET fuerte (misma lógica que JWT_SECRET).
+# En producción el server hace fail-fast si falta (Server/utils/integrity.js):
+# sin este secreto la instalación NO arranca, o en dev cae al fallback inseguro
+# que DESACTIVA la detección de manipulación del audit log (NOM-024).
+CURRENT_HMAC="$(grep -E '^AUDIT_HMAC_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '[:space:]')"
+if [ "${#CURRENT_HMAC}" -lt 32 ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        NEW_HMAC="$(openssl rand -hex 32)"
+    elif command -v node >/dev/null 2>&1; then
+        NEW_HMAC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+    else
+        NEW_HMAC="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    grep -v -E '^AUDIT_HMAC_SECRET=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+    echo "AUDIT_HMAC_SECRET=$NEW_HMAC" >> "$ENV_FILE.tmp"
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+    print_ok "AUDIT_HMAC_SECRET aleatorio generado (64 chars hex)"
+else
+    print_ok "AUDIT_HMAC_SECRET existente conservado"
+fi
+
 # COOKIE_SECURE off por default (no usamos HTTPS en LAN local) — paridad con install.ps1
 if ! grep -qE '^COOKIE_SECURE=' "$ENV_FILE"; then
     echo "COOKIE_SECURE=false" >> "$ENV_FILE"
+fi
+
+# O-2: TZ fija — sin esto, los cortes de caja y timestamps de auditoría
+# dependen de la TZ del SO (silencioso si difiere de la de la clínica).
+if ! grep -qE '^TZ=' "$ENV_FILE"; then
+    echo "TZ=America/Mexico_City" >> "$ENV_FILE"
 fi
 
 # Client/.env — Vite hornea VITE_API_URL en el bundle de producción.
@@ -510,6 +537,43 @@ PLIST_EOF
     echo "  - Doble-click en $APP_BUNDLE"
     echo "  - O desde terminal: open $APP_BUNDLE"
     echo "  - O: $REPO_ROOT/DentiaCore"
+fi
+
+print_header "6. RESPALDO Y MONITOREO AUTOMÁTICOS"
+
+# O-1: registrar backup diario (3am) y chequeo de salud (cada 4h) en cron.
+# Idempotente vía CRON_TAG: si ya existen entradas marcadas, no duplica.
+CRON_TAG="# DentiaCore-managed (no editar a mano; lo regenera install.sh)"
+if command -v crontab >/dev/null 2>&1; then
+    EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
+    if echo "$EXISTING_CRON" | grep -qF "$CRON_TAG"; then
+        print_ok "Tareas cron de DentiaCore ya registradas — sin cambios."
+    else
+        mkdir -p "$REPO_ROOT/backups"
+        NEW_CRON="$EXISTING_CRON
+0 3 * * * cd $REPO_ROOT && /usr/bin/env node scripts/backup-db.js --keep=14 >> backups/backup.log 2>&1 $CRON_TAG
+0 */4 * * * cd $REPO_ROOT && /usr/bin/env node scripts/check-health.js >> backups/health-check.log 2>&1 $CRON_TAG"
+        if echo "$NEW_CRON" | crontab - 2>/dev/null; then
+            print_ok "Backup diario (3am) y chequeo de salud (cada 4h) registrados en cron."
+        else
+            print_warn "No se pudo registrar cron automáticamente (¿permisos?). Agrega manualmente con 'crontab -e':"
+            echo "    0 3 * * * cd $REPO_ROOT && node scripts/backup-db.js --keep=14"
+            echo "    0 */4 * * * cd $REPO_ROOT && node scripts/check-health.js"
+        fi
+    fi
+else
+    print_warn "crontab no disponible en este sistema — programa el backup manualmente (ver Server/README.md)."
+fi
+
+# ALERT_WEBHOOK_URL es opcional: sin él, check-health.js solo imprime en el
+# log de cron sin notificar activamente. Se deja como placeholder comentado
+# para que sea fácil de encontrar y activar.
+if ! grep -qE '^ALERT_WEBHOOK_URL=' "$ENV_FILE" 2>/dev/null && ! grep -q '^# ALERT_WEBHOOK_URL=' "$ENV_FILE" 2>/dev/null; then
+    {
+        echo ""
+        echo "# O-1: URL de webhook (Slack/Discord/ntfy.sh/etc.) para alertas de backup/salud."
+        echo "# ALERT_WEBHOOK_URL=https://hooks.slack.com/services/..."
+    } >> "$ENV_FILE"
 fi
 
 print_header "✅ INSTALACIÓN COMPLETADA"

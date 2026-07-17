@@ -140,7 +140,7 @@ export const getDamageNameByCode = (damageCode) => {
  * @param {string|number} toothNumber - Número del diente
  * @returns {string} - Número formateado (ej: '1121' -> '11-21')
  */
-const formatToothNumber = (toothNumber) => {
+export const formatToothNumber = (toothNumber) => {
   const toothStr = String(toothNumber);
   
   // Si el número tiene 4 dígitos y parece ser dos dientes concatenados
@@ -372,69 +372,56 @@ export const normalizeEntriesForEngine = (entries) => {
   return out;
 };
 
-/**
- * Verifica si un array contiene un elemento (por diente, tipo y superficie)
- * @param {Array} array - Array a verificar
- * @param {Object} element - Elemento a buscar
- * @param {Array} props - Propiedades a comparar
- * @returns {boolean} - true si el elemento existe, false en caso contrario
- */
-export const includesEntry = (array, element, props = ['diente','tipo','superficie']) => {
-  if (!Array.isArray(array) || typeof element !== 'object' || element == null) {
-    return false;
-  }
-  return array.some(item =>
-    props.every(prop => item?.[prop] === element?.[prop])
-  );
-};
-
-// Alias para compatibilidad con tu componente
-export const arrayContainsElement = includesEntry;
+// NOTA: se eliminó `patchEnginePrototype`. Se invocaba en main.jsx ANTES de que
+// los scripts del engine cargaran (carga lazy en patient-detail), así que nunca
+// aplicaba — era un no-op con console.warn. El fetch que pretendía anular
+// (checkInitialOdontogramStatus → /has-initial-odontogram) se quitó del propio
+// engine.js junto con el endpoint.
 
 /**
- * Combina dos arrays sin duplicados, comparando ciertas props
- * @param {Array} a1 - Primer array
- * @param {Array} a2 - Segundo array
- * @param {Array} props - Propiedades a comparar
- * @returns {Array} - Array combinado sin duplicados
+ * Compara dos conjuntos de entradas por CONTENIDO clínico (diente/espacio,
+ * daño, superficie, nota), ignorando fecha, keys de UI y orden. Ambos lados
+ * pasan por `normalizeEntriesForEngine`, así que acepta forma de engine
+ * (getData) o de servidor (mapFromBackend) indistintamente.
+ * @param {Array} a
+ * @param {Array} b
+ * @returns {boolean}
  */
-export const mergeEntries = (a1, a2, props = ['diente','tipo','superficie']) => {
-  const arr1 = Array.isArray(a1) ? a1 : [];
-  const arr2 = Array.isArray(a2) ? a2 : [];
-  return [
-    ...arr1,
-    ...arr2.filter(el => !includesEntry(arr1, el, props))
-  ];
+export const sameEntryContent = (a, b) => {
+  const keysOf = (entries) => normalizeEntriesForEngine(entries)
+    .map(e => `${e.space ? `s:${e.space}` : `t:${e.tooth}`}|${e.damage}|${e.surface}|${e.note}`)
+    .sort();
+  const ka = keysOf(a);
+  const kb = keysOf(b);
+  return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
 };
 
 /**
- * Parchea el Engine para evitar polling infinito de checkInitialOdontogramStatus
- * Útil para tests o desarrollo local.
+ * Limpia TODO el estado clínico del engine (ambas denticiones y ambos sets de
+ * espacios). Necesario antes de cargar una versión: `loadOdontogramaData` es
+ * ADITIVO (aplica daños sobre lo existente sin quitar nada), así que cambiar
+ * de versión sin reset fusionaba versiones en el canvas. El `reset()` propio
+ * del engine sólo limpia la dentición ACTIVA (this.mouth/this.spaces).
+ * @param {Object} engine - instancia de window.Engine
  */
-export function disableInitialCheckPolling() {
-  if (window.Engine && !window.Engine.prototype._patchedCheck) {
-    window.Engine.prototype._patchedCheck = true;
-    window.Engine.prototype._originalCheckInitialOdontogramStatus = window.Engine.prototype.checkInitialOdontogramStatus;
-    window.Engine.prototype.checkInitialOdontogramStatus = () => Promise.resolve({ hasSaved: false });
-  }
-}
-
-export function patchEnginePrototype() {
-  if (window.Engine) {
-    if (!window.Engine.prototype._originalCheckInitialOdontogramStatus) {
-      window.Engine.prototype._originalCheckInitialOdontogramStatus = window.Engine.prototype.checkInitialOdontogramStatus;
-      window.Engine.prototype.checkInitialOdontogramStatus = function() {
-        this.hasSavedInitialOdontogram = false;
-        return Promise.resolve({ hasSaved: false });
-      };
-    }
-    // Aquí puedes añadir otros parches si los necesitas
-    return true;
-  } else {
-    console.warn('Engine no disponible para aplicar parche.');
-    return false;
-  }
-}
+export const resetEngineData = (engine) => {
+  if (!engine) return;
+  [engine.odontAdult, engine.odontChild].forEach(teeth => {
+    (Array.isArray(teeth) ? teeth : []).forEach(tooth => {
+      if (!tooth) return;
+      if (Array.isArray(tooth.damages)) tooth.damages.length = 0;
+      if (tooth.textBox) tooth.textBox.text = '';
+      (Array.isArray(tooth.checkBoxes) ? tooth.checkBoxes : []).forEach(cb => {
+        if (cb) cb.state = 0;
+      });
+    });
+  });
+  [engine.odontSpacesAdult, engine.odontSpacesChild].forEach(spaces => {
+    (Array.isArray(spaces) ? spaces : []).forEach(space => {
+      if (space && Array.isArray(space.damages)) space.damages.length = 0;
+    });
+  });
+};
 
 // Export por defecto para compatibilidad legacy
 const utils = {
@@ -443,12 +430,11 @@ const utils = {
   getDamageNameByCode,
   DAMAGE_NAMES,
   prepareDataSource,
-  includesEntry,
-  mergeEntries,
+  formatToothNumber,
   damageToCode,
   normalizeEntriesForEngine,
-  disableInitialCheckPolling,
-  patchEnginePrototype
+  sameEntryContent,
+  resetEngineData
 };
 
 export default utils;

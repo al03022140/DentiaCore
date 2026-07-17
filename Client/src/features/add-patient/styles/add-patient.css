@@ -23,13 +23,6 @@
   box-shadow: 0 0 0 2px rgba(229,62,62,0.25);
 }
 
-/* Limpiar el rojo en cuanto el usuario escribe algo */
-.add-patient-wrapper input.field-invalid:not(:placeholder-shown),
-.add-patient-wrapper select.field-invalid:not([value=""]) {
-  border-color: var(--color-border-medium) !important;
-  background-color: unset !important;
-}
-
 /* Estilos base */
  .add-patient-wrapper {
   font: var(--text-body-default);
@@ -369,45 +362,10 @@
   box-sizing: border-box;
 }
 
-/* Botones para recorte y subida de imagen */
-.add-patient-wrapper .upload-button,
+/* Botón Guardar del recorte de imagen */
 .add-patient-wrapper .crop-button {
   display: block;
   margin: 10px auto;
-}
-
-/* Plantilla de alineación (Cropper) */
-.add-patient-wrapper .overlay-template {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80%;
-  height: 80%;
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* =========================
-   Muestra/Oculta campos de cepillo
-========================= */
-.add-patient-wrapper .cepillo-dental-fields {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; 
-  opacity: 0;
-  max-height: none;
-  visibility: hidden;
-  overflow: visible;
-}
-
-/* Mostrar cuando 'show' está activo */
-.add-patient-wrapper .cepillo-dental-fields.show {
-  visibility: visible;
-  opacity: 1;
 }
 
 /* Ajuste del título principal */
@@ -459,29 +417,6 @@
   pointer-events: none;
 }
 
-/* Controles de imagen dentro de la foto */
-.add-patient-wrapper .image-controls {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: flex;
-  gap: 8px;
-}
-
-.add-patient-wrapper .image-controls .crop-button {
-  --btn-padding: 6px 10px;
-  --btn-font: var(--text-label);
-}
-
-.add-patient-wrapper .image-controls .crop-button:hover {
-  transform: scale(1.05);
-}
-
-.add-patient-wrapper .upload-button {
-  margin-top: 10px;
-  --btn-padding: 6px 12px;
-}
-
 .add-patient-wrapper .right-section {
   display: flex !important;
   gap: 1rem !important;
@@ -493,7 +428,7 @@
 }
 
 
-.add-patient-wrapper .medicacion-col, 
+.add-patient-wrapper .medicacion-col,
 .add-patient-wrapper .alergias-col {
   padding: 1rem;
   flex: 1 1 min(220px, 100%);
@@ -505,6 +440,16 @@
   border: 1px solid var(--color-border-medium);
   border-radius: 1rem;
   box-sizing: border-box;
+}
+
+/* Centrar el título y el botón "Agregar" de cada columna (no las filas). */
+.add-patient-wrapper .medicacion-col > h3,
+.add-patient-wrapper .alergias-col > h3 {
+  text-align: center;
+}
+.add-patient-wrapper .medicacion-col > .action-button,
+.add-patient-wrapper .alergias-col > .action-button {
+  align-self: center;
 }
 
 
@@ -632,7 +577,8 @@
 }
 
 .encuesta-medica-container .right-section {
-  flex: 1 1 min(300px, 100%);
+  /* un poco más de ancho que las enfermedades de la izquierda (antes 300px) */
+  flex: 1.2 1 min(360px, 100%);
   min-width: 0;
   height: 100%;
   overflow-y: hidden;
@@ -714,11 +660,38 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
   font: var(--text-body-xs);
 }
 
-/* Botón de trash para arrays (NO para foto del paciente) */
+/* Dentro de una fila de array el form-group no necesita margen inferior; sin
+   esto su input queda 1rem por encima del fondo de la fila y el botón de
+   basura se ve "elevado" respecto al campo. */
+.array-item .form-group {
+  margin-bottom: 0;
+}
+
+/* Botón de trash para arrays (NO para foto del paciente): plano, con ícono SVG
+   y alineado al fondo (a la altura del input). Sin el relleno + borde grueso +
+   scale del .trash-button global, que lo hacían verse elevado. */
 .array-item .trash-button {
-  padding: 8px 12px;
+  align-self: flex-end;
+  flex: 0 0 auto;
+  width: 40px;
   min-width: 40px;
   height: 40px;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid var(--color-red-250);
+  border-radius: 8px;
+  color: var(--color-red-650);
+}
+.array-item .trash-button:hover {
+  background-color: var(--color-red-50);
+  border-color: var(--color-red-650);
+  transform: none;
+}
+.array-item .trash-button:active {
+  background-color: var(--color-red-650);
+  border-color: var(--color-red-650);
+  color: var(--color-bg-white);
+  transform: none;
 }
 
 .medicacion-input,
@@ -792,15 +765,6 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
 .form-section .form-group-grid .form-group:last-of-type {
   flex: 2 1 min(220px, 100%);
   min-width: 0;
-}
-
-.form-section .form-group-grid .array-item .trash-button {
-  flex: 0 0 auto;
-  width: 40px;
-  min-width: 40px;
-  max-width: 40px;
-  align-self: flex-end;
-  margin-bottom: 1rem;
 }
 
 /* =========================

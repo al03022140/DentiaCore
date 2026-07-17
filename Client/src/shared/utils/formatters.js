@@ -158,25 +158,6 @@ export const formatDateEs = (date, empty = 'No especificado') => {
 };
 
 /**
- * Formatea un número de teléfono
- * @param {string} phone - Número de teléfono
- * @returns {string} Número formateado
- */
-export const formatPhone = (phone) => {
-  if (!phone) return "";
-  
-  // Eliminar caracteres no numéricos
-  const cleaned = phone.replace(/\D/g, '');
-  
-  // Aplicar formato según la longitud
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  }
-  
-  return phone; // Devolver original si no cumple con el formato esperado
-};
-
-/**
  * Formatea una fecha y hora en formato localizado
  * @param {string|Date} dateTimeStr - Fecha y hora a formatear
  * @returns {string} Fecha y hora formateada según la configuración regional

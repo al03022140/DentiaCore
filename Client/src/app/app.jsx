@@ -17,12 +17,12 @@ import ErrorBoundary from '../shared/components/error-boundary';
 import CashPage from '../features/cash/CashPage';
 import ConsultasPage from '../features/consultas/ConsultasPage';
 import StatisticsPage from '../features/statistics/StatisticsPage';
+import InventoryPage from '../features/inventory/InventoryPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
-import PermissionGate from './auth/PermissionGate';
 import DraftsCenter from '../features/consultas/DraftsCenter';
 import SettingsPage from '../features/settings/SettingsPage';
-import UsersPage from '../features/users/UsersPage';
+import NotFound from '../shared/components/NotFound';
 import { SidebarProvider } from '../shared/contexts/SidebarContext';
 
 const antdTheme = {
@@ -137,9 +137,11 @@ const App = () => {
             <Route path="/consultas" element={<ConsultasPage />} />
             <Route path="/caja" element={<CashPage />} />
             <Route path="/estadisticas" element={<StatisticsPage />} />
-            <Route path="/usuarios" element={<UsersPage />} />
+            <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
             <Route path="/configuracion/:section" element={<SettingsPage />} />
+            {/* FE-01: catch-all dentro del layout — muestra 404 con sidebar/header. */}
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
       </Routes>

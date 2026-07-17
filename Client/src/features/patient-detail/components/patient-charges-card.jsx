@@ -3,12 +3,11 @@ import { Modal, Input, Select, message, Popconfirm, Checkbox } from 'antd';
 import { getChargesByPatient, createCharge, addPayment, cancelCharge } from '../../../shared/services/patientChargeService';
 import { getSettings } from '../../../shared/services/settingsService';
 import { getSessionStatus } from '../../../shared/services/cashService';
-import { formatMoney } from '../../../shared/utils/money';
+import { formatMoney, round2 } from '../../../shared/utils/money';
 import API from '../../../shared/services/axios-instance';
 import '../styles/patient-charges-card.css';
 
 const CONFIRM_PHRASE = 'CONFIRMO';
-const round2 = (n) => Math.round((Number.isFinite(Number(n)) ? Number(n) : 0) * 100) / 100;
 
 // Notifica al resto de la app que algo cambió en caja para que CashPage,
 // CashDashboard y patient-cash-movements refresquen sin que el usuario

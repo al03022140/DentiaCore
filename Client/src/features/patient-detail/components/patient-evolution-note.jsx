@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Input, message } from 'antd';
+import { Input, Modal, message } from 'antd';
 import API from '../../../shared/services/axios-instance.js';
 import SignatureBadge from '../../../shared/components/SignatureBadge.jsx';
 import SignaturePadModal from '../../../shared/components/SignaturePadModal.jsx';
@@ -21,6 +21,15 @@ const buildPatientFullName = (p) => {
 // índice solo para notas sin _id. Debe coincidir entre el render de las cards,
 // la selección de casillas y el filtro de impresión para no desincronizarse.
 const noteKeyOf = (n, idx) => (n && n._id) ? n._id : `note-${idx}`;
+
+// Motivos del endpoint de verificación de integridad → texto legible.
+const VERIFY_MOTIVOS = {
+  contenido_alterado: 'El contenido de la nota fue modificado después de la firma.',
+  oficial_sin_hash_contenido: 'La nota es OFICIAL pero no tiene hash de contenido de referencia.',
+  firma_doctor_alterada: 'La imagen de la firma del doctor no coincide con la sellada al firmar.',
+  oficial_sin_firma_doctor: 'La nota es OFICIAL pero no tiene firma del doctor íntegra.',
+  firma_paciente_alterada: 'La imagen de la firma del paciente no coincide con la sellada al firmar.',
+};
 
 const PatientEvolutionNote = ({
   patientId,
@@ -89,20 +98,89 @@ const PatientEvolutionNote = ({
   // Nombre del profesional para la etiqueta bajo la línea de firma del doctor.
   const doctorDisplayName = user?.nombre || 'Profesional tratante';
 
-  // Flujo de firma:
-  //   null     → estado inicial (form editable)
-  //   'patient' → modal de pad para que firme el paciente
-  //   'doctor'  → DoctorSignStep para que firme el doctor (con selector si asistente)
+  // Flujo de firma unificado (nota nueva y nota ya guardada):
+  //   signStep   null → sin modal abierto | 'patient' → pad del paciente | 'doctor' → DoctorSignStep
+  //   signTarget null → nota nueva (submitNote) | { noteId, index } → nota existente (BORRADOR → OFICIAL)
   const [signStep, setSignStep] = useState(null);
+  const [signTarget, setSignTarget] = useState(null);
   const [patientSigDataUrl, setPatientSigDataUrl] = useState(null);
 
-  // Flujo de firma para notas ya guardadas (BORRADOR → OFICIAL)
-  //   null     → sin modal abierto
-  //   'patient' → pad del paciente
-  //   'doctor'  → firma del doctor (PIN o pad)
-  const [existingSignStep, setExistingSignStep] = useState(null);
-  const [existingSignTarget, setExistingSignTarget] = useState(null); // { noteId, index }
-  const [existingPatientSig, setExistingPatientSig] = useState(null);
+  // Edición inline de un BORRADOR propio (PATCH /evolution-note/:noteId). El
+  // server exige creador-o-admin y estado BORRADOR; aquí solo se muestra al
+  // creador para no ofrecer un botón que acabaría en 403.
+  const [editingKey, setEditingKey] = useState(null);
+  const [editValues, setEditValues] = useState({ procedimiento: '', observaciones: '', correcciones: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Verificación de integridad (GET /evolution-note/:noteId/verify).
+  const [verifyingKey, setVerifyingKey] = useState(null);
+
+  const startEditNote = (n, key) => {
+    setEditingKey(key);
+    setEditValues({
+      procedimiento: n.procedimiento || '',
+      observaciones: n.observaciones || '',
+      correcciones: n.correcciones || '',
+    });
+  };
+
+  const cancelEditNote = () => {
+    if (savingEdit) return;
+    setEditingKey(null);
+  };
+
+  const saveEditNote = async (noteId) => {
+    const hasAny = Object.values(editValues).some(v => (v || '').trim());
+    if (!hasAny) {
+      message.error('La nota no puede quedar vacía (requiere procedimiento, observaciones o correcciones).');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await API.patch(`/patients/${patientId}/evolution-note/${noteId}`, editValues);
+      const payload = res?.data;
+      if (payload?.success && payload?.data) {
+        setNotes(prev => prev.map(x => (x._id === noteId ? { ...x, ...payload.data } : x)));
+        setEditingKey(null);
+        message.success('Borrador actualizado.');
+      } else {
+        message.error(payload?.error || 'No se pudo actualizar la nota.');
+      }
+    } catch (err) {
+      // 409 = la firmaron en paralelo (ya no es editable); 403 = no es el creador.
+      message.error(err?.response?.data?.error || 'No se pudo actualizar la nota.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleVerifyNote = async (n, key) => {
+    setVerifyingKey(key);
+    try {
+      const res = await API.get(`/patients/${patientId}/evolution-note/${n._id}/verify`);
+      const d = res?.data;
+      if (d?.success && d.integro) {
+        message.success(`Nota #${n.numero_procedimiento}: íntegra — el contenido y las firmas coinciden con lo sellado al firmar.`);
+      } else if (d?.success) {
+        Modal.warning({
+          title: `Nota #${n.numero_procedimiento}: integridad comprometida`,
+          content: (
+            <ul style={{ paddingLeft: 18, margin: '8px 0 0' }}>
+              {(d.motivos || []).map((m) => (
+                <li key={m}>{VERIFY_MOTIVOS[m] || m}</li>
+              ))}
+            </ul>
+          ),
+        });
+      } else {
+        message.error(d?.error || 'No se pudo verificar la nota.');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.error || 'No se pudo verificar la nota.');
+    } finally {
+      setVerifyingKey(null);
+    }
+  };
 
   useEffect(() => {
     if (Array.isArray(initialEvolutionNotes)) {
@@ -122,6 +200,7 @@ const PatientEvolutionNote = ({
 
   const resetSignFlow = () => {
     setSignStep(null);
+    setSignTarget(null);
     setPatientSigDataUrl(null);
   };
 
@@ -187,8 +266,12 @@ const PatientEvolutionNote = ({
     }
   };
 
-  const handleSignAndSave = () => {
-    setError(null);
+  // Inicia el flujo de firma. target=null → nota nueva (limpia el error del
+  // form, igual que antes handleSignAndSave); target={noteId,index} → nota
+  // existente (antes handleSignExistingNote no limpiaba error; se preserva).
+  const handleStartDoctorSign = (target = null) => {
+    if (!target) setError(null);
+    setSignTarget(target);
     setSignStep('patient');
   };
 
@@ -208,46 +291,29 @@ const PatientEvolutionNote = ({
     setSignStep('doctor');
   };
 
+  // Nota nueva (signTarget=null) → submitNote (el error se propaga, igual
+  // que antes). Nota existente → POST .../sign; ante fallo deja el modal
+  // abierto para reintentar (no relanza), igual que antes
+  // handleExistingDoctorSigned.
   const handleDoctorSigned = async (doctorSignature) => {
-    await submitNote({
-      patientSignature: patientSigDataUrl,
-      doctorSignature,
-    });
-  };
+    if (!signTarget) {
+      await submitNote({
+        patientSignature: patientSigDataUrl,
+        doctorSignature,
+      });
+      return;
+    }
 
-  const handleCancelSign = () => {
-    if (loading) return;
-    resetSignFlow();
-  };
-
-  const resetExistingSignFlow = () => {
-    setExistingSignStep(null);
-    setExistingSignTarget(null);
-    setExistingPatientSig(null);
-  };
-
-  const handleSignExistingNote = (noteId, index) => {
-    setExistingSignTarget({ noteId, index });
-    setExistingSignStep('patient');
-  };
-
-  const handleExistingPatientSigned = (pngDataUrl) => {
-    setExistingPatientSig(pngDataUrl);
-    setExistingSignStep('doctor');
-  };
-
-  const handleExistingDoctorSigned = async (doctorSignature) => {
-    if (!existingSignTarget) return;
     setLoading(true);
     try {
-      const { noteId } = existingSignTarget;
+      const { noteId } = signTarget;
       // Timeout 30s como en la creación (sube firmas + valida PIN + escribe en
       // Mongo). Esta vía SÍ es segura ante reintentos: el server exige que la
       // nota siga en BORRADOR, así que un reintento tras firmar devuelve 409 sin
       // duplicar nada.
       const response = await API.post(
         `/patients/${patientId}/evolution-note/${noteId}/sign`,
-        { patientSignature: existingPatientSig, doctorSignature },
+        { patientSignature: patientSigDataUrl, doctorSignature },
         { timeout: 30000 }
       );
       const payload = response?.data;
@@ -260,7 +326,7 @@ const PatientEvolutionNote = ({
           (n._id && updated._id && n._id === updated._id) || n._id === noteId ? updated : n
         )));
         message.success('Nota firmada y marcada como OFICIAL.');
-        resetExistingSignFlow();
+        resetSignFlow();
       } else {
         // No confirmado: dejamos el modal abierto para reintentar.
         const msg = payload?.error || payload?.message || 'No se pudo confirmar la firma. Intente nuevamente.';
@@ -272,6 +338,11 @@ const PatientEvolutionNote = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelSign = () => {
+    if (loading) return;
+    resetSignFlow();
   };
 
   // Imprime SOLO las notas seleccionadas dentro de un IFRAME aislado.
@@ -434,6 +505,7 @@ const PatientEvolutionNote = ({
               placeholder="Describe el procedimiento realizado"
               rows={3}
               autoSize={{ minRows: 3, maxRows: 12 }}
+              maxLength={5000}
             />
           </div>
           <div className="form-row">
@@ -444,6 +516,7 @@ const PatientEvolutionNote = ({
               placeholder="Observaciones adicionales"
               rows={3}
               autoSize={{ minRows: 3, maxRows: 12 }}
+              maxLength={20000}
             />
           </div>
           <div className="form-row">
@@ -454,6 +527,7 @@ const PatientEvolutionNote = ({
               placeholder="Correcciones o ajustes realizados"
               rows={2}
               autoSize={{ minRows: 2, maxRows: 12 }}
+              maxLength={20000}
             />
           </div>
 
@@ -472,7 +546,7 @@ const PatientEvolutionNote = ({
             <button
               type="button"
               className="save-button"
-              onClick={handleSignAndSave}
+              onClick={() => handleStartDoctorSign()}
               disabled={!isFormValid || loading}
             >
               {loading
@@ -510,7 +584,7 @@ const PatientEvolutionNote = ({
         <div className="patient-evolution-note__cards">
           {Array.isArray(notes) && notes.length > 0 ? (
             notes.map((n, idx) => {
-              const noteKey = n._id || `note-${idx}`;
+              const noteKey = noteKeyOf(n, idx);
               const isExpanded = expandedNotes.has(noteKey);
               // Número canónico del backend. No usamos idx+1 como fallback:
               // tras filtrar notas soft-deleted hay huecos legítimos y idx+1
@@ -524,6 +598,14 @@ const PatientEvolutionNote = ({
                 || (n.observaciones || '').length > 110
                 || (n.correcciones || '').length > 110;
               const showToggle = isLong;
+              const isEditing = editingKey === noteKey;
+              // Solo el creador ve "Editar" (el server además acepta admins,
+              // pero mostrarlo a terceros acabaría en 403).
+              const creadoPorId = n.creadoPor && typeof n.creadoPor === 'object' ? n.creadoPor._id : n.creadoPor;
+              const canEditThisDraft = !hideForm && canCreateDraft
+                && n.estadoRegistro === 'BORRADOR' && n._id
+                && creadoPorId && String(creadoPorId) === String(user?.id || '');
+              const canVerify = !hideForm && n.estadoRegistro === 'OFICIAL' && n._id;
 
               return (
                 <article
@@ -550,6 +632,14 @@ const PatientEvolutionNote = ({
                           <span className="evolution-note-card__sep" aria-hidden="true">·</span>
                           <span className="evolution-note-card__date">{date}</span>
                         </>
+                      )}
+                      {n.estadoRegistro === 'BORRADOR' && (
+                        <span
+                          className="evolution-note-card__draft-badge"
+                          title="Nota sin firmar — no es oficial todavía"
+                        >
+                          BORRADOR
+                        </span>
                       )}
                     </h3>
                     <div className="evolution-note-card__sigs">
@@ -583,7 +673,7 @@ const PatientEvolutionNote = ({
                             firmaDesactualizada={n.firmaDesactualizada}
                             contentHash={n.contentHash}
                             canSign={canSignOfficial}
-                            onSignClick={() => handleSignExistingNote(n._id, idx)}
+                            onSignClick={() => handleStartDoctorSign({ noteId: n._id, index: idx })}
                           />
                         )}
                       </div>
@@ -610,6 +700,68 @@ const PatientEvolutionNote = ({
                     </div>
                   </header>
 
+                  {/* El doctor rechazó este borrador desde el Centro de Firmas.
+                      El motivo se persiste precisamente para que el creador lo
+                      vea aquí y corrija — antes no se mostraba en ningún lado. */}
+                  {n.estadoRegistro === 'BORRADOR' && n.rechazoMotivo && (
+                    <div className="evolution-note-card__rejected" role="alert">
+                      <strong>
+                        Rechazada por el doctor
+                        {n.rechazadoEn ? ` el ${new Date(n.rechazadoEn).toLocaleDateString('es-MX')}` : ''}:
+                      </strong>{' '}
+                      {n.rechazoMotivo}
+                    </div>
+                  )}
+
+                  {isEditing ? (
+                    <div className="evolution-note-card__edit">
+                      <label htmlFor={`edit-proc-${noteKey}`}>Procedimiento</label>
+                      <Input.TextArea
+                        id={`edit-proc-${noteKey}`}
+                        value={editValues.procedimiento}
+                        onChange={(e) => setEditValues(v => ({ ...v, procedimiento: e.target.value }))}
+                        autoSize={{ minRows: 2, maxRows: 10 }}
+                        maxLength={5000}
+                        disabled={savingEdit}
+                      />
+                      <label htmlFor={`edit-obs-${noteKey}`}>Observaciones</label>
+                      <Input.TextArea
+                        id={`edit-obs-${noteKey}`}
+                        value={editValues.observaciones}
+                        onChange={(e) => setEditValues(v => ({ ...v, observaciones: e.target.value }))}
+                        autoSize={{ minRows: 2, maxRows: 10 }}
+                        maxLength={20000}
+                        disabled={savingEdit}
+                      />
+                      <label htmlFor={`edit-corr-${noteKey}`}>Correcciones</label>
+                      <Input.TextArea
+                        id={`edit-corr-${noteKey}`}
+                        value={editValues.correcciones}
+                        onChange={(e) => setEditValues(v => ({ ...v, correcciones: e.target.value }))}
+                        autoSize={{ minRows: 2, maxRows: 10 }}
+                        maxLength={20000}
+                        disabled={savingEdit}
+                      />
+                      <div className="evolution-note-card__edit-actions">
+                        <button
+                          type="button"
+                          className="save-button save-button--secondary"
+                          onClick={cancelEditNote}
+                          disabled={savingEdit}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          className="save-button"
+                          onClick={() => saveEditNote(n._id)}
+                          disabled={savingEdit}
+                        >
+                          {savingEdit ? 'Guardando…' : 'Guardar cambios'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="evolution-note-card__body">
                     {hasProcedimiento && (
                       <p className={`evolution-note-card__field${isExpanded ? '' : ' is-clamped'}`}>
@@ -639,16 +791,40 @@ const PatientEvolutionNote = ({
                       <p className="evolution-note-card__empty">Nota sin contenido registrado.</p>
                     )}
                   </div>
+                  )}
 
-                  {showToggle && (
-                    <button
-                      type="button"
-                      className="evolution-note-card__toggle"
-                      aria-expanded={isExpanded}
-                      onClick={() => toggleNoteExpanded(noteKey)}
-                    >
-                      {isExpanded ? 'Ver menos ▴' : 'Ver más ▾'}
-                    </button>
+                  {!isEditing && (showToggle || canEditThisDraft || canVerify) && (
+                    <div className="evolution-note-card__footer no-print">
+                      {canEditThisDraft && (
+                        <button
+                          type="button"
+                          className="evolution-note-card__action-btn"
+                          onClick={() => startEditNote(n, noteKey)}
+                        >
+                          Editar borrador
+                        </button>
+                      )}
+                      {canVerify && (
+                        <button
+                          type="button"
+                          className="evolution-note-card__action-btn"
+                          onClick={() => handleVerifyNote(n, noteKey)}
+                          disabled={verifyingKey === noteKey}
+                        >
+                          {verifyingKey === noteKey ? 'Verificando…' : 'Verificar integridad'}
+                        </button>
+                      )}
+                      {showToggle && (
+                        <button
+                          type="button"
+                          className="evolution-note-card__toggle"
+                          aria-expanded={isExpanded}
+                          onClick={() => toggleNoteExpanded(noteKey)}
+                        >
+                          {isExpanded ? 'Ver menos ▴' : 'Ver más ▾'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </article>
               );
@@ -720,7 +896,7 @@ const PatientEvolutionNote = ({
       </div>
       )}
 
-      {/* PASO 1 — Firma del paciente */}
+      {/* PASO 1 — Firma del paciente (nueva nota o nota ya guardada, según signTarget) */}
       <SignaturePadModal
         isOpen={signStep === 'patient'}
         onClose={handleCancelSign}
@@ -734,38 +910,11 @@ const PatientEvolutionNote = ({
         loading={loading}
       />
 
-      {/* PASO 2 — Firma del doctor (self o cross-user vía selector) */}
+      {/* PASO 2 — Firma del doctor (self o cross-user vía selector), nueva nota o nota ya guardada */}
       <DoctorSignStep
         isOpen={signStep === 'doctor'}
         onClose={handleCancelSign}
         onConfirm={handleDoctorSigned}
-        title="Firma del doctor"
-        subtitle={canSignOfficial
-          ? 'Confirma la autoría con tu PIN o redibujando tu firma.'
-          : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
-        consentText={doctorConsentText}
-        loading={loading}
-      />
-
-      {/* PASO 1 — Firma del paciente (nota ya guardada) */}
-      <SignaturePadModal
-        isOpen={existingSignStep === 'patient'}
-        onClose={() => { if (!loading) resetExistingSignFlow(); }}
-        onConfirm={handleExistingPatientSigned}
-        title="Firma del paciente"
-        subtitle="Consentimiento de la nota de evolución"
-        signerName={patientFullName}
-        signerRole="Paciente"
-        consentText={patientConsentText}
-        confirmLabel="Confirmar firma del paciente"
-        loading={loading}
-      />
-
-      {/* PASO 2 — Firma del doctor (nota ya guardada) */}
-      <DoctorSignStep
-        isOpen={existingSignStep === 'doctor'}
-        onClose={() => { if (!loading) resetExistingSignFlow(); }}
-        onConfirm={handleExistingDoctorSigned}
         title="Firma del doctor"
         subtitle={canSignOfficial
           ? 'Confirma la autoría con tu PIN o redibujando tu firma.'

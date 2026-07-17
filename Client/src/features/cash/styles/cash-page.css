@@ -112,42 +112,6 @@
   min-height: 0;
 }
 
-/* ── Ant Design Overrides (reset total → reutiliza la card nativa) ── */
-.cash-card .ant-card {
-  box-shadow: none;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-
-.cash-card .ant-card-body {
-  padding: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.cash-card .ant-card-head {
-  border-bottom: 1px solid var(--figma-border-default);
-  padding: 0 0 0.75rem 0;
-  margin-bottom: 1rem;
-  min-height: auto;
-}
-
-.cash-card .ant-card-head-title {
-  padding: 0;
-  font-family: var(--font-family-primary);
-  font-size: 1.25rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.3;
-  color: var(--color-primary);
-  letter-spacing: -0.01em;
-}
-
-.cash-card .ant-card-extra {
-  padding: 0;
-}
-
 /* ─────────────────────────────────────────────
    Dashboard de balance — variante COMPACTA
    La card ocupa la fila superior (~275px). El contenido debe caber sin
@@ -424,6 +388,35 @@
   height: auto;
   border-radius: var(--figma-radius-sm);
   transition: background var(--figma-transition-fast);
+}
+
+/* "Abrir Caja": glow que respira para invitar a abrir la caja. El botón solo
+   se muestra cuando la caja está cerrada, así que el latido se apaga solo al
+   abrirla (pasa a ser "Cerrar Caja"). color-mix sobre --color-primary lo hace
+   theme-aware (azul marca en claro, azul brillante en oscuro). */
+@keyframes cash-open-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+    background: var(--cash-brand-tint);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background: var(--cash-brand-tint-strong);
+  }
+}
+
+.cash-card__extra .ant-btn-link.cash-open-glow {
+  border-radius: var(--figma-radius-sm);
+  animation: cash-open-breathe 2.4s ease-in-out infinite;
+}
+
+/* Accesibilidad: si el usuario prefiere menos movimiento, glow fijo sin latido. */
+@media (prefers-reduced-motion: reduce) {
+  .cash-card__extra .ant-btn-link.cash-open-glow {
+    animation: none;
+    background: var(--cash-brand-tint);
+    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  }
 }
 
 .cash-card .ant-card-extra .ant-btn-link:not(.ant-btn-dangerous) {
