@@ -26,9 +26,9 @@
   align-items: flex-start;
   gap: 2px;
   padding: 10px 14px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-bg-white);
   cursor: pointer;
   text-align: left;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
@@ -39,7 +39,7 @@
 }
 
 .inventory-alerts__card.is-active {
-  border-color: #1677ff;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
 }
 
@@ -49,9 +49,9 @@
   line-height: 1.1;
 }
 
-.inventory-alerts__card--red .inventory-alerts__count { color: #cf1322; }
-.inventory-alerts__card--orange .inventory-alerts__count { color: #d46b08; }
-.inventory-alerts__card--gold .inventory-alerts__count { color: #ad8b00; }
+.inventory-alerts__card--red .inventory-alerts__count { color: var(--color-danger); }
+.inventory-alerts__card--orange .inventory-alerts__count { color: var(--color-warning); }
+.inventory-alerts__card--gold .inventory-alerts__count { color: var(--color-warning); }
 
 /* Toolbar */
 .inventory-toolbar {
@@ -73,9 +73,9 @@
 
 /* Tabla */
 .inventory-item__name { font-weight: 600; }
-.inventory-item__category { font-size: 0.78rem; color: #8c8c8c; }
-.inventory-stock--zero { color: #cf1322; font-weight: 700; }
-.inventory-muted { color: #999; }
+.inventory-item__category { font-size: 0.78rem; color: var(--color-text-muted); }
+.inventory-stock--zero { color: var(--color-danger); font-weight: 700; }
+.inventory-muted { color: var(--color-text-muted); }
 
 .inventory-row-actions {
   display: inline-flex;
@@ -115,7 +115,7 @@
 }
 
 .inventory-form__fieldset {
-  border: 1px dashed #d9d9d9;
+  border: 1px dashed var(--color-border-light);
   border-radius: 8px;
   padding: 10px 12px;
 }
@@ -130,16 +130,16 @@
 .inventory-form__hint {
   margin: 0;
   font-size: 0.78rem;
-  color: #8c8c8c;
+  color: var(--color-text-muted);
 }
 
-.inventory-option__meta { color: #8c8c8c; font-size: 0.8rem; }
+.inventory-option__meta { color: var(--color-text-muted); font-size: 0.8rem; }
 
 /* Kardex */
 .inventory-kardex__loading { text-align: center; padding: 32px 0; }
 .inventory-kardex__main { width: 100%; }
-.inventory-kardex__saldo { color: #8c8c8c; font-size: 0.82rem; }
-.inventory-kardex__meta { color: #8c8c8c; font-size: 0.78rem; margin-top: 2px; }
+.inventory-kardex__saldo { color: var(--color-text-muted); font-size: 0.82rem; }
+.inventory-kardex__meta { color: var(--color-text-muted); font-size: 0.78rem; margin-top: 2px; }
 .inventory-kardex__motivo { font-size: 0.82rem; margin-top: 2px; }
 
 /* Kits */
@@ -152,7 +152,7 @@
 
 .inventory-kits__hint {
   margin: 0;
-  color: #8c8c8c;
+  color: var(--color-text-muted);
   font-size: 0.85rem;
   flex: 1;
 }
@@ -169,7 +169,7 @@
 .inventory-consume__warning {
   margin: 0 0 6px;
   font-size: 0.78rem;
-  color: #d46b08;
+  color: var(--color-warning);
 }
 
 @media (max-width: 640px) {

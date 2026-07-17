@@ -1164,7 +1164,7 @@
 }
 
 .consulta-materiales__faltante {
-  color: #d46b08;
+  color: var(--color-warning);
   font-style: normal;
   font-size: 0.82rem;
 }
