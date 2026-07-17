@@ -264,7 +264,13 @@ function main() {
       process.exit(res.status || 1);
     }
     console.log(`✅ Restore completado en la BD "${targetDb}".`);
-    console.log('   Verifica: conteos por colección y que las firmas NOM-024 sigan válidas.');
+    console.log('');
+    console.log('   Paso de ACEPTACIÓN (O-9) — verifica la integridad NOM-024 restaurada:');
+    console.log(`     npm run verify:audit${args.uri ? ` -- --uri="${targetUri}"` : ''}`);
+    console.log('   Un "cadena ROTA" casi siempre significa que el AUDIT_HMAC_SECRET del');
+    console.log('   .env no es el que selló estos datos: restaura el secreto original');
+    console.log('   (nunca lo regeneres sobre una BD existente).');
+    console.log('   Verifica también: conteos por colección y firmas de documentos.');
   } finally {
     for (const d of tmpDirs) {
       try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }

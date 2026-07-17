@@ -5,6 +5,8 @@
 
 > Antes de meter datos reales en producción, este flujo debe estar **probado**: un backup que nunca se restauró no es un backup, es una ilusión.
 
+> **El backup NO incluye los secretos.** `AUDIT_HMAC_SECRET` (y `JWT_SECRET`) viven en `Server/.env`, no en la BD. Sin el `AUDIT_HMAC_SECRET` original, la cadena de auditoría NOM-024 restaurada **no se puede verificar** (queda indistinguible de una manipulación). Respalda `Server/.env` por separado y **nunca lo regeneres sobre una BD existente** — ver §6.
+
 ---
 
 ## 1. Hacer un backup
@@ -59,6 +61,7 @@ npm run restore:db -- backups/DentiaCore_<ts>.tar.gz \
 - Conteos por colección coinciden con producción (`patients`, `appointments`, `cashmovements`, `auditlogs`, …).
 - Abrir algunos expedientes restaurados y confirmar que los datos están completos.
 - **Firmas NOM-024:** los documentos firmados siguen verificando (`firmaDesactualizada` no se dispara).
+- **Cadena de auditoría NOM-024:** `npm run verify:audit -- --uri="mongodb://127.0.0.1:27017/DentiaCore_restore_test"` da `✅ Cadena íntegra`. Un `❌ Cadena ROTA` con `hash_mismatch` masivo significa que el `AUDIT_HMAC_SECRET` del `.env` no es el que selló los datos.
 - La app levanta apuntada a la BD scratch y los flujos clave funcionan.
 
 Cuando la prueba pase, **borra la BD scratch**. Repite esta prueba periódicamente (p. ej. mensual) y tras cualquier cambio de esquema.
@@ -74,6 +77,12 @@ npm run restore:db -- backups/DentiaCore_<ts>.tar.gz --drop --force
 
 Sin `--uri`, el destino es `MONGODB_URI` de `Server/.env` (producción). `--drop` reemplaza las colecciones. **Toma un backup fresco del estado actual antes**, por si necesitas volver atrás.
 
+**Si es recuperación en hardware nuevo:** restaura primero `Server/.env` con el `AUDIT_HMAC_SECRET` **original** (el que respaldaste con los datos), nunca uno regenerado. Luego corre el paso de aceptación:
+
+```bash
+npm run verify:audit    # cadena de auditoría restaurada → debe dar "✅ Cadena íntegra"
+```
+
 ---
 
 ## 5. Checklist de producción (backups)
@@ -84,3 +93,17 @@ Sin `--uri`, el destino es `MONGODB_URI` de `Server/.env` (producción). `--drop
 - [ ] Backups en medio **cifrado** y con permisos de SO restringidos.
 - [ ] **Copia fuera del equipo** (disco externo cifrado o nube) — el disco de la clínica puede fallar.
 - [ ] Rotación activa (`--keep=N`) para no llenar el disco.
+- [ ] **`Server/.env` respaldado por separado** (medio seguro, distinto del dump) — sin `AUDIT_HMAC_SECRET` la auditoría restaurada no verifica.
+- [ ] **Restauración probada corre `npm run verify:audit`** y da "Cadena íntegra".
+
+---
+
+## 6. El secreto de integridad NOM-024 (crítico)
+
+La cadena de auditoría (`auditlogs`) se sella con un HMAC cuya clave es `AUDIT_HMAC_SECRET` (`Server/.env`). `verifyChain` recomputa cada entrada con el secreto **actual**; no hay `keyId` por entrada. Consecuencias operativas:
+
+- **El secreto NO está en la BD ni en el backup.** Un `mongodump` respalda los datos pero no su verificabilidad. Respalda `Server/.env` en un medio seguro y **separado** del dump (juntos, quien los obtenga puede alterar datos y re-firmar la cadena sin dejar rastro).
+- **Nunca regeneres `AUDIT_HMAC_SECRET` sobre una BD existente.** Invalida el sello de toda la historia previa: `verifyChain` pasará a reportar `hash_mismatch` en cada entrada. Los instaladores (`install.sh`/`install.ps1`/`launcher.py`) **conservan** el secreto existente en un update in-place; el riesgo es una reinstalación o una recuperación manual.
+- **Paso de aceptación tras restaurar:** `npm run verify:audit` (o `-- --uri="<BD scratch>"`). `✅ Cadena íntegra` = el secreto restaurado es el correcto. `❌ Cadena ROTA` = el `.env` no trae el secreto original.
+
+> La fragilidad ante **rotación** de llaves (versionar el secreto para rotarlo sin invalidar el pasado) es otro tema, en el roadmap como R-1. O-9 solo garantiza que el secreto **actual** no se pierda.

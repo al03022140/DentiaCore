@@ -15,6 +15,7 @@
     "test": "npm run test:server && npm run test:client",
     "backup:db": "node scripts/backup-db.js",
     "restore:db": "node scripts/restore-db.js",
+    "verify:audit": "node scripts/verify-audit-chain.js",
     "migrate": "node scripts/migrate.js",
     "migrate:dry": "node scripts/migrate.js --dry-run"
   },

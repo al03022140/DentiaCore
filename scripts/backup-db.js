@@ -180,6 +180,35 @@ function rotateBackups(keepN) {
   }
 }
 
+// O-9: el backup contiene los DATOS pero NO los secretos que prueban su
+// integridad (AUDIT_HMAC_SECRET, JWT_SECRET viven en Server/.env). Sin el
+// secreto de auditoría, la cadena NOM-024 no se puede verificar tras restaurar
+// en otro equipo. NO lo copiamos junto al dump a propósito: datos + secreto en
+// el mismo medio permiten forjar y re-firmar la cadena. Solo lo recordamos.
+function printSecretBackupReminder() {
+  const hasSecret = (loadEnvValue('AUDIT_HMAC_SECRET') || '').trim().length >= 32;
+  console.log('');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('⚠️  RESPALDA TAMBIÉN LOS SECRETOS (Server/.env)');
+  console.log('──────────────────────────────────────────────────────────────');
+  console.log('Este backup guarda los DATOS, pero NO el AUDIT_HMAC_SECRET que');
+  console.log('verifica la integridad del expediente (NOM-024). Sin él, una');
+  console.log('restauración en hardware nuevo queda indistinguible de una');
+  console.log('manipulación.');
+  console.log('');
+  console.log('  • Respalda Server/.env en un medio seguro y SEPARADO de este');
+  console.log('    backup (no en el mismo disco: datos + secreto juntos permiten');
+  console.log('    forjar y re-firmar la cadena).');
+  console.log('  • NUNCA regeneres AUDIT_HMAC_SECRET sobre una BD existente:');
+  console.log('    invalida toda la historia previa.');
+  if (!hasSecret) {
+    console.log('');
+    console.log('  ❗ ADEMÁS: AUDIT_HMAC_SECRET falta o es < 32 chars en Server/.env.');
+    console.log('     Este backup se toma SIN un secreto de integridad válido.');
+  }
+  console.log('──────────────────────────────────────────────────────────────');
+}
+
 // ── Main ───────────────────────────────────────────────────────
 
 function parseArgs(argv) {
@@ -304,6 +333,9 @@ function main() {
   } catch (e) {
     console.warn(`⚠️  No se pudo escribir last-success.json: ${e.message}`);
   }
+
+  // O-9: recordar que el secreto de integridad debe respaldarse por separado.
+  printSecretBackupReminder();
 }
 
 main();

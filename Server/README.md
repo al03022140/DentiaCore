@@ -155,8 +155,10 @@ El `launcher.py` permite iniciar y detener servicios con configuración guiada.
 npm run backup:db                 # mongodump → backups/<db>_<fecha>.tar.gz
 node scripts/restore-db.js backups/<archivo>.tar.gz --uri="mongodb://127.0.0.1:27017/DentiaCore_test" --drop --force   # probar en BD scratch
 node scripts/restore-db.js backups/<archivo>.tar.gz --drop --force   # restaurar a producción (dry-run por defecto sin --force)
+npm run verify:audit              # tras restaurar: cadena de auditoría NOM-024 → "Cadena íntegra"
 ```
 - **Uploads**: respalda por separado la carpeta configurada en `UPLOADS_DIR` (default `Server/uploads`) — `update.sh`/`update.ps1` ya lo hacen antes de cada actualización.
+- **Secretos (O-9)**: respalda `Server/.env` por separado (medio seguro, distinto del dump) — contiene `AUDIT_HMAC_SECRET`, sin el cual la cadena de auditoría restaurada no verifica. **Nunca lo regeneres sobre una BD existente.**
 - Antes de restaurar a producción: `pm2 stop dentiacore-api`; después: `pm2 start dentiacore-api` (verifica con `pm2 describe dentiacore-api`).
 
 Detalle y checklist completos: [docs/server/operacion/backups-y-restauracion.md](../docs/server/operacion/backups-y-restauracion.md).
