@@ -4,7 +4,7 @@
 > **Fuentes:** `docs/AUDITORIA_TECNICA_INTEGRAL.md` (8 fases, 120 hallazgos) + `CONFIG_AUDIT_2026-07-13.md` (H1–H4).
 > **Naturaleza:** este documento NO contiene código. Es la lista de lo que falta cerrar y la planeación para que otra persona lo ejecute. La verificación del cierre la hace Arquitectura contra el criterio de aceptación de cada ítem (ver más abajo).
 >
-> **Pasada de cierre 2026-07-16:** C-1, O-1..O-8 y D-1..D-4 CERRADOS (comando de verificación de cada ítem corrido contra el repo real, ver anotaciones inline). Abierto: **V-2** (requiere la BD real de la clínica) y **O-9** (nuevo — el secreto de auditoría debe viajar con el backup; endurece la restauración de O-1). Roadmap fuera de V1: **R-1** (versionado de llaves del audit log HMAC). Detalle en cada sección.
+> **Pasada de cierre 2026-07-16:** C-1, O-1..O-8 y D-1..D-4 CERRADOS (comando de verificación de cada ítem corrido contra el repo real, ver anotaciones inline). Abierto: **V-2** (requiere la BD real de la clínica). **O-9 CERRADO 2026-07-17** (commit `59e60471` → v1.0.1: el secreto de auditoría se respalda con el backup; endurece la restauración de O-1). Roadmap fuera de V1: **R-1** (versionado de llaves del audit log HMAC). Detalle en cada sección.
 
 ---
 
@@ -149,8 +149,8 @@ Ordenado por la secuencia recomendada (§6). Severidad: 🔴 Crítica · 🟠 Al
 
 ---
 
-### O-9 · 🟠 El secreto de auditoría debe viajar con el backup (endurecimiento de restore · V1)
-**⚠️ ABIERTO — nace del hallazgo de verificación en O-1.** El audit log NOM-024 usa un HMAC con clave `AUDIT_HMAC_SECRET` (`auditLog.js:263-293`: `verifyChain` recomputa cada entrada con el secreto **actual**, sin `keyId` por entrada). `backup-db.js` sólo hace `mongodump` — el secreto NO viaja en el backup. Consecuencia: si el `.env` se pierde/regenera o se restaura en hardware nuevo con otro secreto, **toda la historia clínica queda no-verificable e indistinguible de manipulación** (la prueba de restore de O-1 sólo verificó porque reusó el mismo `.env`). Los instaladores preservan el secreto en un update in-place, pero un desastre/reinstalación no está cubierto.
+### O-9 · ✅ CERRADO (2026-07-17) · El secreto de auditoría debe viajar con el backup (endurecimiento de restore · V1)
+**✅ RESUELTO (commit `59e60471` → v1.0.1):** aviso en `backup-db.js` de respaldar `Server/.env` por separado (sin copiar el secreto junto al dump, a propósito); `scripts/verify-audit-chain.js` nuevo (`npm run verify:audit`) corre `verifyChain()` como paso de aceptación del restore, cableado en `restore-db.js`; runbook (§6) y README prohíben regenerar el secreto sobre una BD existente. **Diagnóstico original (de O-1):** El audit log NOM-024 usa un HMAC con clave `AUDIT_HMAC_SECRET` (`auditLog.js:263-293`: `verifyChain` recomputa cada entrada con el secreto **actual**, sin `keyId` por entrada). `backup-db.js` sólo hace `mongodump` — el secreto NO viaja en el backup. Consecuencia: si el `.env` se pierde/regenera o se restaura en hardware nuevo con otro secreto, **toda la historia clínica queda no-verificable e indistinguible de manipulación** (la prueba de restore de O-1 sólo verificó porque reusó el mismo `.env`). Los instaladores preservan el secreto en un update in-place, pero un desastre/reinstalación no está cubierto.
 - **Origen:** verificación 2026-07-16 (nota en O-1) · **Riesgo:** adyacente al #1 (pérdida de la *verificabilidad* del expediente legal, no de los datos)
 - **Archivos:** `scripts/backup-db.js`, `scripts/restore-db.js`, runbook de backup en `Server/README.md`, `update.sh`/`update.ps1`.
 - **Qué hacer:** (a) que el respaldo incluya `AUDIT_HMAC_SECRET` (y `JWT_SECRET`) junto a los datos —copiados a un destino seguro y separado, pero recuperables con el dump—; como mínimo, que `backup-db.js` emita un aviso final "respalda también `Server/.env`" y el runbook lo documente como paso obligatorio. (b) Añadir `verifyChain()` al procedimiento de restore como paso de aceptación. (c) Regla explícita en README/runbook: **nunca regenerar `AUDIT_HMAC_SECRET` sobre una BD existente**.
@@ -220,10 +220,10 @@ Verificado el 2026-07-16. Se lista para que nadie replanifique trabajo hecho.
 - [x] O-5, O-6 cerrados (README, índice). *(2026-07-16)*
 - [x] O-7, O-8 cerrados (ya lo estaban antes de este plan; verificados). *(2026-07-16)*
 - [x] V-1 verificado. [x] V-3 verificado. **[ ] V-2 sigue abierto — requiere la BD real de la clínica, acción del operador.**
-- [ ] **O-9 abierto (V1)** — `AUDIT_HMAC_SECRET` debe respaldarse junto a los datos y el restore debe correr `verifyChain()`; sin esto el backup respalda datos pero no su verificabilidad.
+- [x] **O-9 cerrado (v1.0.1, 2026-07-17)** — `backup-db.js` avisa de respaldar `Server/.env`; `npm run verify:audit` (nuevo) corre `verifyChain()` como paso de aceptación del restore; runbook/README prohíben regenerar el secreto.
 - [x] D-1..D-4 decididas y documentadas arriba (D-1 keep-alive+alertas, D-2 verificado y diferido, D-3 fuera de V1, D-4 no aplicaba). *(2026-07-16)*
 - [ ] `AUDITORIA_TECNICA_INTEGRAL.md` §5 (Release Checklist) revisado ítem por ítem contra este documento — pendiente, no cubierto por esta pasada (esta pasada cerró específicamente el contenido de este plan, no un re-barrido completo del checklist original).
-- **Bloqueantes para producción con datos de la clínica: V-2** (correr `update.sh`/`update.ps1` contra la BD real la primera vez) y **O-9** (asegurar que el secreto de auditoría se respalde con los datos — sin él, una restauración a hardware nuevo pierde la verificabilidad del expediente legal).
+- **Bloqueante para producción con datos de la clínica: V-2** (correr `update.sh`/`update.ps1` contra la BD real la primera vez). **O-9 ya cerrado** (2026-07-17, v1.0.1): el secreto de auditoría se respalda con los datos y el restore corre `verifyChain()`.
 
 Los ítems de la Fase 8 (SaaS) quedan **fuera** de la V1 por diseño: son insumo de la decisión de negocio, no del release.
 
