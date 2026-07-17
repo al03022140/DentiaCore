@@ -46,6 +46,10 @@ const ROLE_PERMISSIONS = {
     // Caja
     'cash.read',
     'cash.manage',
+    // Inventario — gestión completa (es función administrativa, no clínica)
+    'inventory.read',
+    'inventory.manage',
+    'inventory.consume',
     // Estadísticas — todas
     'stats.read.admin',
     'stats.read.own',
@@ -82,6 +86,8 @@ const ROLE_PERMISSIONS = {
     'appointments.read', 'appointments.create', 'appointments.update', 'appointments.delete',
     // Caja (de admin)
     'cash.read', 'cash.manage',
+    // Inventario (de admin) + consumo en cita (de doctor)
+    'inventory.read', 'inventory.manage', 'inventory.consume',
     // Estadísticas — propias + administrativas
     'stats.read.own', 'stats.read.admin',
     // Usuarios — CRUD (de admin)
@@ -124,6 +130,10 @@ const ROLE_PERMISSIONS = {
     'appointments.update',
     // NO appointments.delete — solo admin/recepcionista
     'stats.read.own',
+    // Inventario — consulta y registro de consumo durante la atención.
+    // NO inventory.manage: entradas/ajustes de stock son función administrativa.
+    'inventory.read',
+    'inventory.consume',
     // NO cash.read — LFPDPPP Art. 6: proporcionalidad, no necesario para función clínica
     'draft.approve',            // transicionar DRAFT → OFICIAL con firma
     'drafts.batch_sign',        // firmar borradores en lote (Centro de Firmas Pendientes)
@@ -159,6 +169,8 @@ const ROLE_PERMISSIONS = {
     'consultas.update.draft',        // edición de borrador propio
     'exams.read',                    // matriz §3: asistente tiene R sobre exámenes
     'appointments.read',
+    'inventory.read',                // consultar stock/caducidades
+    'inventory.consume',             // registra material usado durante el procedimiento
     'notes.template.use',            // plantillas de evolución Anti-Olvidos
     'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina
@@ -177,6 +189,7 @@ const ROLE_PERMISSIONS = {
     'appointments.delete',
     'cash.read',
     'cash.manage',
+    'inventory.read',                // ver stock/alertas (p. ej. avisar reposición)
     'stats.read.admin',
     'settings.read',                 // leer configuración de clínica
     'session.lock',                  // Modo Cortina

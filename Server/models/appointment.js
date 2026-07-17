@@ -71,6 +71,22 @@ const appointmentSchema = new mongoose.Schema({
         default: 0,
         min: 0
     },
+    // ── Materiales de inventario consumidos (módulo Inventario) ─────────
+    // Snapshot inmutable escrito EXCLUSIVAMENTE por inventoryController
+    // (consumo/reversa) — nunca por updateAppointment (no está en su
+    // whitelist, a propósito). nombre/unidad van denormalizados para que
+    // renombrar el catálogo no altere lo registrado en la cita.
+    materiales: [{
+        item_id: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem', required: true },
+        nombre: { type: String, required: true, trim: true, maxlength: 120 },
+        unidad: { type: String, trim: true, maxlength: 30, default: 'pieza' },
+        cantidad: { type: Number, required: true, min: 0 },
+        // Faltante reportado si el stock no alcanzó (se consumió lo disponible).
+        faltante: { type: Number, min: 0, default: 0 },
+        movimiento_id: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryMovement', default: null },
+        registradoEn: { type: Date, default: Date.now },
+        registradoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null }
+    }],
     // ── Integración Google Calendar ────────────────────────────
     googleEventId: { type: String, default: null, index: true },
     googleCalendarId: { type: String, default: null },

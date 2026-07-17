@@ -914,7 +914,7 @@ exports.getAppointmentActivity = async (req, res) => {
             return res.status(400).json({ message: 'ID de cita inválido' });
         }
 
-        const apt = await Appointment.findOne({ _id: id, deletedAt: null }).select('paciente_id doctor_id fecha_hora estado motivo');
+        const apt = await Appointment.findOne({ _id: id, deletedAt: null }).select('paciente_id doctor_id fecha_hora estado motivo materiales');
         if (!apt) return res.status(404).json({ message: 'Cita no encontrada' });
 
         const aptObjectId = new mongoose.Types.ObjectId(id);
@@ -1036,7 +1036,8 @@ exports.getAppointmentActivity = async (req, res) => {
                 periodontogramSnapshots: periodontogramSnapshots.length,
                 exams: exams.length,
                 charge: charge ? 1 : 0,
-                directMovements: directMovements.length
+                directMovements: directMovements.length,
+                materiales: (apt.materiales || []).length
             },
             evolutionNotes,
             treatmentPlans,
@@ -1044,7 +1045,8 @@ exports.getAppointmentActivity = async (req, res) => {
             periodontogramSnapshots,
             exams,
             charge,
-            directMovements
+            directMovements,
+            materiales: apt.materiales || []
         });
     } catch (error) {
         console.error('[appointments] getAppointmentActivity:', error);
@@ -1086,6 +1088,16 @@ exports.deleteAppointment = async (req, res) => {
                     message: 'No se puede eliminar una cita cerrada con cobro confirmado. Cancela el cobro antes.'
                 });
             }
+        }
+
+        // Bloquea eliminar una cita con materiales de inventario ya
+        // consumidos y sin revertir — borrar la cita deja esos movimientos
+        // huérfanos e irreversibles (revertConsume exige deletedAt:null en
+        // la cita para poder alcanzarlos).
+        if (Array.isArray(appointment.materiales) && appointment.materiales.length > 0) {
+            return res.status(409).json({
+                message: 'No se puede eliminar una cita con materiales de inventario consumidos. Revierte los materiales desde Consultas antes de eliminar.'
+            });
         }
 
         appointment.deletedAt = new Date();

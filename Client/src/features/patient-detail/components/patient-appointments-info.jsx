@@ -27,6 +27,18 @@ const PatientAppointmentsInfo = ({
         </p>
         <p><strong>Motivo:</strong> <span>{cita.motivo || 'N/A'}</span></p>
         <p><strong>Estado:</strong> <span>{cita.estado || 'N/A'}</span></p>
+        {Array.isArray(cita.materiales) && cita.materiales.length > 0 && (
+          <div className="patient-appointments-info__materials">
+            <strong>Materiales utilizados:</strong>
+            <ul>
+              {cita.materiales.map((m) => (
+                <li key={m._id || `${m.nombre}-${m.cantidad}`}>
+                  {m.nombre} — {m.cantidad} {m.unidad || ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </article>
     );
   };
@@ -72,7 +84,8 @@ PatientAppointmentsInfo.propTypes = {
   ultimaCita: PropTypes.shape({
     fecha_hora: PropTypes.string.isRequired,
     motivo: PropTypes.string,
-    estado: PropTypes.string
+    estado: PropTypes.string,
+    materiales: PropTypes.array
   }),
   proximaCita: PropTypes.shape({
     fecha_hora: PropTypes.string.isRequired,

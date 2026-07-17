@@ -17,6 +17,7 @@ import ErrorBoundary from '../shared/components/error-boundary';
 import CashPage from '../features/cash/CashPage';
 import ConsultasPage from '../features/consultas/ConsultasPage';
 import StatisticsPage from '../features/statistics/StatisticsPage';
+import InventoryPage from '../features/inventory/InventoryPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from '../features/auth/LoginPage';
 import DraftsCenter from '../features/consultas/DraftsCenter';
@@ -136,6 +137,7 @@ const App = () => {
             <Route path="/consultas" element={<ConsultasPage />} />
             <Route path="/caja" element={<CashPage />} />
             <Route path="/estadisticas" element={<StatisticsPage />} />
+            <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
             <Route path="/configuracion/:section" element={<SettingsPage />} />
             {/* FE-01: catch-all dentro del layout — muestra 404 con sidebar/header. */}

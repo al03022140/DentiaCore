@@ -24,6 +24,10 @@ import {
   getAppointmentActivity
 } from '../../shared/services/appointment-service';
 import CreateAppointmentModal from './components/CreateAppointmentModal';
+import ConsumeMaterialsModal from '../inventory/components/ConsumeMaterialsModal';
+import { revertInventoryConsume } from '../../shared/services/inventory-service';
+import { useAuth } from '../../app/auth/AuthContext';
+import { hasPermission } from '../../app/auth/permissions';
 import { calculateAgeYears } from '../../shared/utils/formatters';
 
 const formatTime = (dateStr) => {
@@ -108,13 +112,17 @@ const ConsultasPage = () => {
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [busyId, setBusyId] = useState(null);
-  // Actividad clínica de la cita seleccionada (sólo cuando es estado cerrado o EnCurso)
+  // Actividad clínica de la consulta seleccionada (sólo cuando es estado cerrado o EnCurso)
   const [activity, setActivity] = useState(null);
   const [activityLoading, setActivityLoading] = useState(false);
   // Modal "Terminar consulta" — requiere escribir "confirmo"
   const [endingAppointment, setEndingAppointment] = useState(null);
   const [endConfirmText, setEndConfirmText] = useState('');
   const [endingInFlight, setEndingInFlight] = useState(false);
+  // Materiales de inventario consumidos en la consulta seleccionada
+  const [showConsumeModal, setShowConsumeModal] = useState(false);
+  const { user } = useAuth();
+  const canConsumeInventory = hasPermission(user?.permissions || [], ['inventory.consume', 'inventory.manage']);
 
   const loadAgenda = useCallback(async (date) => {
     try {
@@ -139,11 +147,11 @@ const ConsultasPage = () => {
     const now = new Date();
     const isToday = startOfDay(currentDate).getTime() === startOfDay(now).getTime();
 
-    // Citas en estado activo (Pendiente/Confirmada/EnCurso). Se mantienen
+    // Consultas en estado activo (Pendiente/Confirmada/EnCurso). Se mantienen
     // gestionables aunque su hora haya pasado — ver upcomingConsultations.
     const active = agenda.filter(a => !['Cancelada', 'Pasada', 'NoShow'].includes(a.estado));
     // "Siguiente paciente" diverge a propósito de la lista "Próximas": aquí sí
-    // se exige hora futura (o EnCurso). Una cita de hoy ya atrasada sigue
+    // se exige hora futura (o EnCurso). Una consulta de hoy ya atrasada sigue
     // visible y accionable en la lista, pero anunciarla como "Siguiente" con
     // una hora que ya pasó sería engañoso.
     const upcoming = active.filter(a =>
@@ -151,7 +159,7 @@ const ConsultasPage = () => {
     );
     const closed = agenda.filter(a => ['Pasada', 'NoShow', 'Cancelada'].includes(a.estado));
 
-    // Conserva la selección del usuario si la cita sigue en la agenda, pero
+    // Conserva la selección del usuario si la consulta sigue en la agenda, pero
     // siempre toma la versión fresca (puede haber cambiado de estado, motivo, etc.).
     const refreshed = (prev) => prev ? agenda.find(a => a._id === prev._id) : null;
 
@@ -171,7 +179,7 @@ const ConsultasPage = () => {
     setSelectedConsultation(consultation);
   };
 
-  // Cargar actividad clínica cuando la cita seleccionada está en estado cerrado o EnCurso
+  // Cargar actividad clínica cuando la consulta seleccionada está en estado cerrado o EnCurso
   useEffect(() => {
     if (!selectedConsultation) {
       setActivity(null);
@@ -186,7 +194,7 @@ const ConsultasPage = () => {
     }
     let cancelled = false;
     // Limpiar de inmediato para evitar que se muestre la actividad de la
-    // cita anterior mientras llega la nueva (parece "no actualiza").
+    // consulta anterior mientras llega la nueva (parece "no actualiza").
     setActivity(null);
     setActivityLoading(true);
     (async () => {
@@ -196,7 +204,7 @@ const ConsultasPage = () => {
         setActivity(data);
       } catch (err) {
         if (cancelled) return;
-        console.warn('Error al cargar actividad de la cita:', err);
+        console.warn('Error al cargar actividad de la consulta:', err);
         setActivity(null);
       } finally {
         if (!cancelled) setActivityLoading(false);
@@ -235,6 +243,13 @@ const ConsultasPage = () => {
     // (updateAppointmentStatus es atómico sobre el estado de origen).
     if (busyId) return;
     const { confirmTitle, requireReason, reasonPrompt } = opts;
+    if (['Cancelada', 'NoShow'].includes(estado) && apt.materiales?.length > 0) {
+      const ok = window.confirm(
+        `Esta consulta tiene ${apt.materiales.length} material(es) de inventario ya registrados como consumidos. ` +
+        'Si no se usaron, revísalo en "Materiales utilizados" o en el Kardex antes de continuar (no se revierte solo).\n\n¿Continuar de todos modos?'
+      );
+      if (!ok) return;
+    }
     let motivo = null;
     if (requireReason) {
       motivo = window.prompt(reasonPrompt || 'Motivo:');
@@ -246,7 +261,7 @@ const ConsultasPage = () => {
     setBusyId(apt._id);
     try {
       await updateAppointmentStatus(apt._id, { estado, motivo: motivo ? motivo.trim() : undefined });
-      message.success(`Cita marcada como ${statusMap[estado]?.label || estado}`);
+      message.success(`Consulta marcada como ${statusMap[estado]?.label || estado}`);
       invalidateTodayAppointmentsCache();
       await loadAgenda(currentDate);
     } catch (err) {
@@ -294,10 +309,10 @@ const ConsultasPage = () => {
     setBusyId(apt._id);
     try {
       await deleteAppointment(apt._id, motivo.trim());
-      message.success('Cita eliminada');
+      message.success('Consulta eliminada');
       await loadAgenda(currentDate);
     } catch (err) {
-      message.error(err?.response?.data?.message || 'No se pudo eliminar la cita');
+      message.error(err?.response?.data?.message || 'No se pudo eliminar la consulta');
     } finally {
       setBusyId(null);
     }
@@ -308,7 +323,7 @@ const ConsultasPage = () => {
   };
 
   // Callback que llama el modal de Crear/Editar al terminar exitosamente.
-  // - Si la cita es para otro día, navegamos al día de la cita (antes
+  // - Si la consulta es para otro día, navegamos al día de la consulta (antes
   //   "desaparecía" porque la agenda seguía mostrando el día actual).
   // - Damos feedback del resultado de la sincronización a Google Calendar.
   const handleAppointmentSaved = ({ appointmentDate, gcalResult } = {}) => {
@@ -327,11 +342,11 @@ const ConsultasPage = () => {
     }
 
     if (gcalResult?.status === 'ok') {
-      message.success('Cita guardada y sincronizada con Google Calendar');
+      message.success('Consulta guardada y sincronizada con Google Calendar');
     } else if (gcalResult?.status === 'failed') {
-      message.warning('Cita guardada, pero no se pudo sincronizar con Google Calendar');
+      message.warning('Consulta guardada, pero no se pudo sincronizar con Google Calendar');
     } else {
-      message.success('Cita guardada');
+      message.success('Consulta guardada');
     }
   };
 
@@ -341,7 +356,7 @@ const ConsultasPage = () => {
     if (allowed.includes('confirmar')) items.push({
       key: 'confirmar',
       icon: <CheckOutlined />,
-      label: 'Confirmar cita',
+      label: 'Confirmar consulta',
       onClick: () => runStatusChange(apt, 'Confirmada')
     });
     if (allowed.includes('iniciar')) items.push({
@@ -354,7 +369,7 @@ const ConsultasPage = () => {
       key: 'atendida',
       icon: <CheckCircleOutlined />,
       label: 'Marcar terminada',
-      onClick: () => runStatusChange(apt, 'Pasada', { confirmTitle: '¿Marcar esta cita como terminada?' })
+      onClick: () => runStatusChange(apt, 'Pasada', { confirmTitle: '¿Marcar esta consulta como terminada?' })
     });
     if (allowed.includes('editar')) items.push({
       key: 'editar',
@@ -373,7 +388,7 @@ const ConsultasPage = () => {
     if (allowed.includes('cancelar')) items.push({
       key: 'cancelar',
       icon: <CloseCircleOutlined />,
-      label: 'Cancelar cita',
+      label: 'Cancelar consulta',
       danger: true,
       onClick: () => runStatusChange(apt, 'Cancelada', { requireReason: true, reasonPrompt: 'Motivo de cancelación:' })
     });
@@ -387,7 +402,7 @@ const ConsultasPage = () => {
     return items;
   };
 
-  // Próximas: toda cita en estado activo (Pendiente/Confirmada/EnCurso),
+  // Próximas: toda consulta en estado activo (Pendiente/Confirmada/EnCurso),
   // aunque su hora de inicio ya haya pasado. Antes se ocultaban las de hoy con
   // hora pasada y, como "Realizadas" sólo lista estados terminales, quedaban
   // invisibles: recepción no podía iniciarlas ni cancelarlas cuando el
@@ -522,19 +537,19 @@ const ConsultasPage = () => {
               />
               <div className="next-patient-info">
                 <span className="next-patient-time">
-                  {agendaIsEmpty ? 'Agenda vacía' : 'Sin citas pendientes'}
+                  {agendaIsEmpty ? 'Agenda vacía' : 'Sin consultas pendientes'}
                 </span>
                 <h2>
                   {agendaIsEmpty
-                    ? `No hay citas para ${dateLabel(currentDate).toLowerCase()}`
+                    ? `No hay consultas para ${dateLabel(currentDate).toLowerCase()}`
                     : 'No hay más pacientes pendientes'}
                 </h2>
                 <p className="next-patient-empty-caption">
                   {agendaIsEmpty
-                    ? 'Crea una cita con «Nueva cita» en la agenda.'
+                    ? 'Crea una consulta con «Nueva consulta» en la agenda.'
                     : upcomingConsultations.length > 0
-                      ? 'Quedan citas atrasadas en la agenda — puedes iniciarlas o cancelarlas desde la lista.'
-                      : 'Las citas restantes ya fueron atendidas o canceladas.'}
+                      ? 'Quedan consultas atrasadas en la agenda — puedes iniciarlas o cancelarlas desde la lista.'
+                      : 'Las consultas restantes ya fueron atendidas o canceladas.'}
                 </p>
               </div>
             </div>
@@ -548,11 +563,11 @@ const ConsultasPage = () => {
         >
           <div className="detail-header-info">
             <div>
-              <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Cita</h3>
+              <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Consulta</h3>
               <small>
                 {selectedConsultation
                   ? `Seleccionada: ${getPatientName(selectedConsultation)}`
-                  : (agendaIsEmpty ? 'No hay citas para este día' : 'Sin cita seleccionada')}
+                  : (agendaIsEmpty ? 'No hay consultas para este día' : 'Sin consulta seleccionada')}
               </small>
             </div>
             {selectedConsultation && (
@@ -569,13 +584,13 @@ const ConsultasPage = () => {
             <div className="selected-detail-panel__placeholder">
               <p className="consultas-empty-state__text">
                 {agendaIsEmpty
-                  ? 'Cuando agregues citas, podrás ver aquí motivo, servicios, totales e historial.'
-                  : 'Selecciona una cita de la agenda (pasada o futura) para ver su información completa.'}
+                  ? 'Cuando agregues consultas, podrás ver aquí motivo, servicios, totales e historial.'
+                  : 'Selecciona una consulta de la agenda (pasada o futura) para ver su información completa.'}
               </p>
             </div>
           ) : (
             <>
-            {/* Motivo + Procedimiento: si la cita seleccionada es la misma
+            {/* Motivo + Procedimiento: si la consulta seleccionada es la misma
                 que ya se muestra arriba en la card "Próxima/Siguiente", los
                 ocultamos aquí para no duplicar info. */}
             {String(selectedConsultation._id) !== String(nextPatient?._id) && (
@@ -598,6 +613,62 @@ const ConsultasPage = () => {
               <h4>Servicios a realizar</h4>
               {renderItems(selectedConsultation.items)}
             </div>
+
+            {/* Materiales de inventario consumidos en la consulta */}
+            {(['EnCurso', 'Pasada'].includes(selectedConsultation.estado) || (selectedConsultation.materiales || []).length > 0) && (
+              <div className="timeline-section consulta-materiales">
+                <div className="consulta-materiales__header">
+                  <h4>Materiales utilizados</h4>
+                  {canConsumeInventory && ['EnCurso', 'Pasada'].includes(selectedConsultation.estado) && (
+                    <Button size="small" onClick={() => setShowConsumeModal(true)}>
+                      Registrar materiales
+                    </Button>
+                  )}
+                </div>
+                {(selectedConsultation.materiales || []).length === 0 ? (
+                  <p className="consultas-inline-empty">Sin materiales registrados.</p>
+                ) : (
+                  <ul className="consulta-materiales__list">
+                    {selectedConsultation.materiales.map(m => (
+                      <li key={m._id}>
+                        <span>
+                          {m.nombre} — {m.cantidad} {m.unidad}
+                          {m.faltante > 0 && (
+                            <em className="consulta-materiales__faltante"> (faltaron {m.faltante})</em>
+                          )}
+                        </span>
+                        {canConsumeInventory && (
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            onClick={() => {
+                              Modal.confirm({
+                                title: '¿Revertir este material?',
+                                content: `${m.nombre} — ${m.cantidad} ${m.unidad}. Se repone al inventario (a sus mismos lotes) y queda una reversa en el kardex.`,
+                                okText: 'Revertir',
+                                cancelText: 'Cancelar',
+                                onOk: async () => {
+                                  try {
+                                    await revertInventoryConsume({ cita_id: selectedConsultation._id, material_id: m._id });
+                                    message.success('Material revertido');
+                                    loadAgenda(currentDate);
+                                  } catch (err) {
+                                    message.error(err?.response?.data?.message || 'No se pudo revertir');
+                                  }
+                                }
+                              });
+                            }}
+                          >
+                            Revertir
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {selectedConsultation.totalEstimado > 0 && (
               <div className="timeline-section">
@@ -630,7 +701,7 @@ const ConsultasPage = () => {
               </div>
             )}
 
-            {/* Actividad clínica registrada durante la cita (sólo cierre / curso) */}
+            {/* Actividad clínica registrada durante la consulta (sólo cierre / curso) */}
             {['EnCurso', 'Pasada', 'NoShow', 'Cancelada'].includes(selectedConsultation.estado) && (
               <div className="timeline-section consulta-activity">
                 <h4>Lo registrado en la consulta</h4>
@@ -646,7 +717,7 @@ const ConsultasPage = () => {
                     !activity.counts.charge &&
                     !activity.counts.directMovements
                   ) ? (
-                  <p className="consultas-inline-empty">Sin registros vinculados a esta cita.</p>
+                  <p className="consultas-inline-empty">Sin registros vinculados a esta consulta.</p>
                 ) : (
                   <div className="consulta-activity__grid">
                     {activity.evolutionNotes?.length > 0 && (
@@ -843,9 +914,9 @@ const ConsultasPage = () => {
             icon={<PlusCircleOutlined />}
             className="consultas-add-btn"
             onClick={() => setShowCreateModal(true)}
-            title="Nueva cita"
+            title="Nueva consulta"
           >
-            Nueva cita
+            Nueva consulta
           </Button>
         </div>
 
@@ -889,7 +960,7 @@ const ConsultasPage = () => {
                       className="consultation-actions-btn"
                       onClick={(e) => e.stopPropagation()}
                       disabled={busyId === apt._id}
-                      aria-label="Acciones de la cita"
+                      aria-label="Acciones de la consulta"
                     >
                       <MoreOutlined />
                     </button>
@@ -944,6 +1015,13 @@ const ConsultasPage = () => {
         onCreated={handleAppointmentSaved}
       />
 
+      <ConsumeMaterialsModal
+        visible={showConsumeModal}
+        appointment={selectedConsultation}
+        onClose={() => setShowConsumeModal(false)}
+        onSaved={() => loadAgenda(currentDate)}
+      />
+
       <Modal
         title="Terminar consulta"
         open={!!endingAppointment}
@@ -962,7 +1040,7 @@ const ConsultasPage = () => {
           <div className="end-consultation-modal">
             <p className="end-consultation-modal__hint">
               Estás por cerrar la consulta de{' '}
-              <strong>{getPatientName(endingAppointment)}</strong>. Esta acción marca la cita como{' '}
+              <strong>{getPatientName(endingAppointment)}</strong>. Esta acción marca la consulta como{' '}
               <strong>atendida</strong> y queda registrada con todo lo que agregaste durante la sesión.
             </p>
             <p className="end-consultation-modal__instruction">

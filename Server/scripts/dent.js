@@ -370,7 +370,11 @@ if (process.env.NODE_ENV !== 'test') {
                 // paciente sin él es COLLSCAN.
                 const Patient = require('../models/patient');
                 const Exam = require('../models/exam');
-                await ensureCriticalIndexes([Patient, Exam]);
+                // Inventario: el índice unique parcial de nombreNormalizado y
+                // el de lotes.caducidad tampoco se construyen solos en prod.
+                const InventoryItem = require('../models/inventoryItem');
+                const InventoryMovement = require('../models/inventoryMovement');
+                await ensureCriticalIndexes([Patient, Exam, InventoryItem, InventoryMovement]);
             } catch (idxErr) {
                 logger.warn('No se pudieron asegurar los índices al inicio: %s', idxErr?.message || idxErr);
             }

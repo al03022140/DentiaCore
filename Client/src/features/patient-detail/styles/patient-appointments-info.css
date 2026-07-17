@@ -163,3 +163,13 @@
     border-left: none;
   }
 }
+/* Materiales de inventario consumidos en la cita */
+.patient-appointments-info__materials {
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+
+.patient-appointments-info__materials ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}

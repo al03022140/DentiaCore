@@ -17,6 +17,7 @@ const patientChargeRoutes = require('../routes/patientChargeRoutes');
 const attachmentRoutes = require('../routes/attachmentRoutes');
 const auditRoutes = require('../routes/auditRoutes');
 const signingRoutes = require('../routes/signingRoutes');
+const inventoryRoutes = require('../routes/inventoryRoutes');
 const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
 const snapshotCapture = require('../middlewares/snapshotCapture');
@@ -95,6 +96,7 @@ const configureRoutes = () => {
   router.use('/patient-charges', patientChargeRoutes);
   router.use('/audit', auditRoutes);
   router.use('/sign', signingRoutes);
+  router.use('/inventory', inventoryRoutes);
 
   // Capturar rutas no encontradas
   router.use('*', (req, res) => {
