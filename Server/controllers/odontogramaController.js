@@ -112,7 +112,7 @@ const verificarOdontogramaInicial = async (req, res, next) => {
     const history = (doc?.history || []).filter(v => !v.deletedAt).map(v => ({
       id: v._id,
       imageUrl: v.imageUrl,
-      fecha: v.savedAt.toISOString(),
+      fecha: v.savedAt ? v.savedAt.toISOString() : null,
       datos: (v.datos || []).map(normalizeEntry)
     }));
 
@@ -299,7 +299,7 @@ const guardarOdontogramaInicial = async (req, res, next) => {
       datos: (odontograma.current.datos || []).map(normalizeEntry),
       history: odontograma.history.map(v => ({
         id: v._id,
-        fecha: v.savedAt.toISOString(),
+        fecha: v.savedAt ? v.savedAt.toISOString() : null,
         datos: (v.datos || []).map(normalizeEntry)
       })),
       updatedAt: odontograma.updatedAt
@@ -357,7 +357,7 @@ const obtenerHistorialInicial = async (req, res, next) => {
     const history = activeHistory.map(v => ({
       id: v._id,
       imageUrl: v.imageUrl,
-      fecha: v.savedAt.toISOString(),
+      fecha: v.savedAt ? v.savedAt.toISOString() : null,
       datos: (v.datos || []).map(normalizeEntry)
     }));
 
@@ -411,7 +411,7 @@ const obtenerSnapshotPorId = async (req, res, next) => {
       id: snapshot._id,
       imageUrl: snapshot.imageUrl,
       datos: (snapshot.datos || []).map(normalizeEntry),
-      fecha: snapshot.savedAt.toISOString()
+      fecha: snapshot.savedAt ? snapshot.savedAt.toISOString() : null
     });
   } catch (error) {
     next(error);

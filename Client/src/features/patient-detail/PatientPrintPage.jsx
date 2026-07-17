@@ -124,6 +124,9 @@ const PatientPrintPage = () => {
   // re-dispararía duplicando todas las cargas.
   const fetchedInitialRef = useRef(false);
   const [initialOdontogramLoadStatus, setInitialOdontogramLoadStatus] = useState('loading');
+  // Token de concurrencia del odontograma inicial (paridad con patient-detail):
+  // viaja como expectedUpdatedAt para que el server corte un re-guardado stale.
+  const [initialOdontogramUpdatedAt, setInitialOdontogramUpdatedAt] = useState(null);
   const [clinicalOdontogramData, setClinicalOdontogramData] = useState([]);
   // Token de concurrencia optimista (mismo contrato que patient-detail):
   // sin él, un guardado desde esta vista pisaba en silencio los cambios de
@@ -236,6 +239,7 @@ const PatientPrintPage = () => {
     setInitialOdontogramLoadStatus('loading');
     try {
       const { data } = await API.get(`/patients/${patientId}/odontograma-inicial`);
+      setInitialOdontogramUpdatedAt(data.updatedAt || null);
       if (data.exists) {
         const odontogramData = Array.isArray(data.datos) ? data.datos : Array.isArray(data.data) ? data.data : [];
         setInitialData(odontogramData);
@@ -254,17 +258,16 @@ const PatientPrintPage = () => {
     }
   }, [patientId, resetOdontogramState]);
 
-  const handleSaveSuccess = useCallback(async (datos, receivedHistory) => {
+  const handleSaveSuccess = useCallback(async (datos) => {
     setInitialData(datos || []);
     setInitialExists(true);
-    setOdontogramHistory(normalizeHistory(receivedHistory || []));
     setInitialOdontogramLoadStatus('saved');
     try {
       await checkInitialOdontogram(true);
     } catch (err) {
       console.error('Error al refrescar datos del odontograma inicial:', err);
     }
-  }, [normalizeHistory, checkInitialOdontogram]);
+  }, [checkInitialOdontogram]);
 
   const handleSaveClinicalCanvasData = useCallback(async (entryData) => {
     try {
@@ -284,7 +287,7 @@ const PatientPrintPage = () => {
 
   useEffect(() => {
     resetOdontogramState();
-    setFetchedInitial(false);
+    fetchedInitialRef.current = false;
     setInitialOdontogramLoadStatus('loading');
   }, [patientId, resetOdontogramState]);
 
@@ -451,6 +454,7 @@ const PatientPrintPage = () => {
                   initialSnapshotStatus={initialOdontogramLoadStatus}
                   onSaveSuccess={handleSaveSuccess}
                   areScriptsReady={areScriptsReadyState}
+                  updatedAt={initialOdontogramUpdatedAt}
                 />
               </OdontogramErrorBoundary>
             ) : !areScriptsReadyState && !initializationError ? (

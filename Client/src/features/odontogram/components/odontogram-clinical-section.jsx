@@ -489,7 +489,7 @@ const OdontogramClinicalSection = ({
         } finally {
              engine.processing = false;
         }
-    }, [clinicalData, isEngineInitialized, normalizeForEngine]);
+    }, [clinicalData, isEngineInitialized, normalizeForEngine, isSaving]);
 
     // Sincroniza la tabla del canvas con el estado del engine. Antes esto
     // corría dentro de setInterval(1000) → leía engine.getData() en medio
