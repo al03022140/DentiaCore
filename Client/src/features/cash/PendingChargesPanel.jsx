@@ -215,9 +215,8 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
                   .trim() || 'Paciente sin nombre'
               : 'Paciente desconocido';
             const age = patient ? calculateAgeYears(patient.fecha_nacimiento) : null;
-            const photo = patient?.photoURL || patient?.foto;
-            const photoUrl = photo
-              ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${encodeURIComponent(photo)}`
+            const photoUrl = patient?.photoURL
+              ? `${import.meta.env.VITE_API_URL || ''}${patient.photoURL}`
               : null;
             const appt = charge.appointmentId;
             const isQuickPaying = quickPayingId === charge._id;

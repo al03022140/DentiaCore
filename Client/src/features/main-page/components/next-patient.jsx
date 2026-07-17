@@ -110,9 +110,8 @@ const NextPatient = () => {
   const patientName = fullName
     || `${patient.nombre || ''} ${patient.apellidos || ''}`.trim()
     || 'Paciente';
-  const photo = patient.photoURL || patient.foto;
-  const patientImage = photo && patient._id
-    ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${patient._id}/${encodeURIComponent(photo)}`
+  const patientImage = patient.photoURL
+    ? `${import.meta.env.VITE_API_URL || ''}${patient.photoURL}`
     : null;
   const status = STATUS_MAP[nextPatient.estado] || { cssClass: 'waiting', label: nextPatient.estado };
   const countdown = formatCountdown(nextPatient.fecha_hora);

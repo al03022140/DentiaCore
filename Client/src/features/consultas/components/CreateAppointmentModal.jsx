@@ -62,7 +62,7 @@ const CreateAppointmentModal = ({
 
   // Load doctors & service catalog when modal opens.
   // Usamos /users/doctors (rol === 'doctor' o 'doctor_admin') porque sólo
-  // ellos atienden citas clínicas — administrador y superadmin gestionan
+  // ellos atienden consultas clínicas — administrador y superadmin gestionan
   // pero no son titulares de consultas.
   useEffect(() => {
     if (!visible) return;
@@ -97,7 +97,7 @@ const CreateAppointmentModal = ({
     if (!visible) return;
 
     if (appointment) {
-      // Modo edición: precargar desde la cita
+      // Modo edición: precargar desde la consulta
       setSelectedPatient(appointment.paciente_id || null);
       setPatientQuery('');
       setPatientResults([]);
@@ -223,7 +223,7 @@ const CreateAppointmentModal = ({
     if (!selectedPatient) return setError('Seleccione un paciente');
     if (!selectedDoctor) return setError('Seleccione un doctor');
     if (!fechaHora) return setError('Seleccione fecha y hora');
-    if (!motivo.trim()) return setError('Escriba un motivo para la cita');
+    if (!motivo.trim()) return setError('Escriba un motivo para la consulta');
 
     setSaving(true);
     try {
@@ -258,7 +258,7 @@ const CreateAppointmentModal = ({
         const end = new Date(start.getTime() + (Number(duracion) || 30) * 60_000);
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         gcalResult = await syncToGoogle({
-          summary: `Cita: ${patientName}${doctorName ? ` — Dr. ${doctorName}` : ''}`,
+          summary: `Consulta: ${patientName}${doctorName ? ` — Dr. ${doctorName}` : ''}`,
           description: [
             `Motivo: ${motivo.trim()}`,
             comentario.trim() ? `Procedimiento: ${comentario.trim()}` : null,
@@ -269,8 +269,8 @@ const CreateAppointmentModal = ({
         });
       }
 
-      // Pasamos la fecha de la cita para que el padre pueda navegar a ese
-      // día — antes la agenda recargaba sólo el día actual y la cita
+      // Pasamos la fecha de la consulta para que el padre pueda navegar a ese
+      // día — antes la agenda recargaba sólo el día actual y la consulta
       // "desaparecía" si era para otro día.
       onCreated?.({
         appointmentDate: new Date(fechaHora),
@@ -278,7 +278,7 @@ const CreateAppointmentModal = ({
       });
       onClose();
     } catch (err) {
-      // Si vino conflicto (409), informar de la cita en conflicto.
+      // Si vino conflicto (409), informar de la consulta en conflicto.
       // El backend distingue 'doctor' vs 'patient' en `conflictType`.
       const status = err?.response?.status;
       const data = err?.response?.data;
@@ -286,9 +286,9 @@ const CreateAppointmentModal = ({
         const c = data.conflict;
         const when = new Date(c.fecha_hora).toLocaleString('es-MX');
         const subject = data.conflictType === 'patient' ? 'El paciente' : 'El doctor';
-        setError(`${subject} ya tiene una cita el ${when} (${c.duracion} min) — ${c.motivo || 'otra cita'}`);
+        setError(`${subject} ya tiene una consulta el ${when} (${c.duracion} min) — ${c.motivo || 'otra consulta'}`);
       } else {
-        setError(data?.message || err?.message || 'Error al guardar la cita');
+        setError(data?.message || err?.message || 'Error al guardar la consulta');
       }
     } finally {
       setSaving(false);
@@ -301,7 +301,7 @@ const CreateAppointmentModal = ({
     <div className="cam-overlay" onClick={() => { if (!saving) onClose(); }}>
       <div className="cam-modal" onClick={e => e.stopPropagation()}>
         <div className="cam-header">
-          <h2>{isEditing ? 'Editar Cita' : 'Nueva Cita'}</h2>
+          <h2>{isEditing ? 'Editar Consulta' : 'Nueva Consulta'}</h2>
           <button className="cam-close-btn" onClick={() => { if (!saving) onClose(); }}>&times;</button>
         </div>
 
@@ -312,9 +312,9 @@ const CreateAppointmentModal = ({
             {selectedPatient ? (
               <div className={`cam-patient-card ${(fixedPatient || isEditing) ? 'cam-patient-card--fixed' : ''}`}>
                 <img
-                  src={(selectedPatient.photoURL || selectedPatient.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${selectedPatient._id}/${encodeURIComponent(selectedPatient.photoURL || selectedPatient.foto)}` : userNot}
+                  src={selectedPatient.photoURL ? `${import.meta.env.VITE_API_URL || ''}${selectedPatient.photoURL}` : userNot}
                   alt={getPatientFullName(selectedPatient)}
-                  className={`cam-patient-avatar${(selectedPatient.photoURL || selectedPatient.foto) ? '' : ' profile-default-avatar'}`}
+                  className={`cam-patient-avatar${selectedPatient.photoURL ? '' : ' profile-default-avatar'}`}
                   onError={e => {
                     e.target.src = userNot;
                     e.target.classList.add('profile-default-avatar');
@@ -346,9 +346,9 @@ const CreateAppointmentModal = ({
                     {patientResults.map(p => (
                       <li key={p._id} onClick={() => selectPatient(p)}>
                         <img
-                          src={(p.photoURL || p.foto) ? `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${encodeURIComponent(p.photoURL || p.foto)}` : userNot}
+                          src={p.photoURL ? `${import.meta.env.VITE_API_URL || ''}${p.photoURL}` : userNot}
                           alt={getPatientFullName(p)}
-                          className={`cam-result-avatar${(p.photoURL || p.foto) ? '' : ' profile-default-avatar'}`}
+                          className={`cam-result-avatar${p.photoURL ? '' : ' profile-default-avatar'}`}
                           onError={e => {
                             e.target.src = userNot;
                             e.target.classList.add('profile-default-avatar');
@@ -402,7 +402,7 @@ const CreateAppointmentModal = ({
                 value={duracion}
                 onChange={e => setDuracion(Number(e.target.value))}
               >
-                {/* Si la cita guardada tiene una duración fuera de los presets
+                {/* Si la consulta guardada tiene una duración fuera de los presets
                     (p.ej. 25 min de un import), inyectarla para que el select
                     refleje el valor real en vez de mostrar otro. */}
                 {(DURATION_PRESETS.includes(duracion) ? DURATION_PRESETS : [...DURATION_PRESETS, duracion].sort((a, b) => a - b)).map(d => (
@@ -414,7 +414,7 @@ const CreateAppointmentModal = ({
 
           {/* ── Motivo ── */}
           <div className="cam-section">
-            <label className="cam-label">Motivo de la cita</label>
+            <label className="cam-label">Motivo de la consulta</label>
             <input
               type="text"
               className="cam-input"
@@ -522,7 +522,7 @@ const CreateAppointmentModal = ({
           <button className="cam-btn cam-btn--primary" onClick={handleSave} disabled={saving}>
             {saving
               ? (isEditing ? 'Guardando...' : 'Creando...')
-              : (isEditing ? 'Guardar cambios' : 'Crear Cita')}
+              : (isEditing ? 'Guardar cambios' : 'Crear Consulta')}
           </button>
         </div>
       </div>

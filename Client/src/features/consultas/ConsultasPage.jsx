@@ -47,9 +47,8 @@ const getPatientName = (apt) => {
 
 const getPatientImage = (apt) => {
   const p = apt.paciente_id;
-  const photo = p?.photoURL || p?.foto;
-  if (!p || !photo) return null;
-  return `${import.meta.env.VITE_API_URL || ''}/uploads/pacientes/${p._id}/${encodeURIComponent(photo)}`;
+  if (!p || !p.photoURL) return null;
+  return `${import.meta.env.VITE_API_URL || ''}${p.photoURL}`;
 };
 
 const statusMap = {
