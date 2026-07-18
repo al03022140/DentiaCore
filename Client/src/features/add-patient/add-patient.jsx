@@ -8,6 +8,8 @@ import { message, Modal, Steps } from 'antd';
 import API from '../../shared/services/axios-instance';
 import { dataUrlToBlob } from '../../shared/utils/dataUrl';
 import { invalidatePatientsCache } from '../../shared/services/patient-service';
+import { detectIdentityChanges } from './identity-fields';
+import MotivoCambioModal from './components/motivo-cambio-modal';
 import { useDraftPersistence } from '../../shared/hooks/useDraftPersistence';
 import { validateFormat } from './validate-format';
 
@@ -113,6 +115,15 @@ class PatientValidationError extends Error {
     super(message);
     this.name = "PatientValidationError";
     this.details = details;
+  }
+}
+
+// Interrupción silenciosa del guardado: se cambió identidad y falta el
+// motivo — el modal lo pide y relanza el submit al confirmar.
+class MotivoPendienteError extends Error {
+  constructor() {
+    super("Motivo de cambio de identidad pendiente");
+    this.name = "MotivoPendienteError";
   }
 }
 
@@ -497,6 +508,13 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
   // re-renderice); el state se conserva para refrescar el botón.
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+
+  // 🪪 Motivo de cambio de identidad (NOM-004/024): el backend exige motivo
+  // cuando cambian nombre/fecha de nacimiento/sexo/documento (422
+  // MOTIVO_REQUERIDO). Se captura en un modal y viaja como campo FormData.
+  const [motivoModalOpen, setMotivoModalOpen] = useState(false);
+  const [pendingIdentityChanges, setPendingIdentityChanges] = useState([]);
+  const motivoRef = useRef('');
   // En el flujo modal, el padre puede desmontar este componente dentro de
   // `onSave()`. El `finally` del submit corre después y haría setState sobre
   // un componente desmontado (warning de React). Trackeamos el mount status
@@ -1134,6 +1152,18 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       throw new PatientValidationError("Errores de formato", formatErrors);
     }
 
+    // 🪪 Edición de identidad: si algún dato de identidad realmente cambió y
+    // aún no hay motivo capturado, pedirlo ANTES de enviar (el backend lo
+    // exigiría con 422 de todas formas — esto evita el round-trip).
+    if (patientToEdit) {
+      const identityChanges = detectIdentityChanges(patientData, patientToEdit);
+      if (identityChanges.length > 0 && !motivoRef.current.trim()) {
+        setPendingIdentityChanges(identityChanges);
+        setMotivoModalOpen(true);
+        throw new MotivoPendienteError();
+      }
+    }
+
     // Si hay una foto en base64, convertirla a archivo.
     // ⚠️ NO usar fetch(dataUrl) aquí: el <meta> CSP de index.html no permite
     // `data:` en connect-src, así que fetch() sobre el dataURL se bloquea con
@@ -1167,6 +1197,12 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     // Agregar todos los datos del paciente como JSON string
     formDataToSend.append('patientData', JSON.stringify(patientData));
 
+    // Motivo del cambio de identidad (si aplica): como campo FormData aparte,
+    // donde el auditLogger del backend lo lee (req.body.motivo).
+    if (patientToEdit && motivoRef.current.trim()) {
+      formDataToSend.append('motivo', motivoRef.current.trim());
+    }
+
     try {
       let res;
       // Timeout ampliado a 30s SÓLO para estas escrituras: el alta crea
@@ -1191,7 +1227,17 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       // Alta exitosa: descartar el borrador autoguardado para no ofrecer
       // recuperar un paciente que ya se creó.
       if (!patientToEdit) clearDraftRef.current?.();
-      message.success(patientToEdit ? "Paciente actualizado correctamente" : "Paciente guardado correctamente");
+      const usoMotivo = !!(patientToEdit && motivoRef.current.trim());
+      message.success(
+        patientToEdit
+          ? (usoMotivo
+              ? "Paciente actualizado — el cambio de identidad quedó registrado en la bitácora"
+              : "Paciente actualizado correctamente")
+          : "Paciente guardado correctamente"
+      );
+      // El motivo es de un solo uso: limpiar para la siguiente edición.
+      motivoRef.current = '';
+      setPendingIdentityChanges([]);
 
       // Solo navegar si no se está usando como modal
       if (!onSave) {
@@ -1209,6 +1255,16 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
       // paciente fue modificado por otro usuario. Mostrar mensaje claro
       // para que recargue antes de reintentar.
       const errCode = err?.response?.data?.code;
+
+      // El backend exige motivo para el cambio de identidad (red de seguridad
+      // por si la detección local no coincidió): abrir el modal en vez del
+      // modal de error genérico, y propagar para que el padre sepa que NO se
+      // guardó todavía.
+      if (errCode === 'MOTIVO_REQUERIDO') {
+        setPendingIdentityChanges(err.response?.data?.camposIdentidad || []);
+        setMotivoModalOpen(true);
+        throw err;
+      }
       // Timeout / sin respuesta del servidor: axios aborta (ECONNABORTED) o no
       // llegó respuesta (err.response undefined). Casi siempre es mongod lento o
       // caído en el equipo. El alta NO se completó, pero el formulario sigue
@@ -1253,6 +1309,20 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
     }
   };
 
+
+  /** Confirmación del motivo de cambio de identidad → reintenta el guardado */
+  const handleMotivoConfirm = (motivo) => {
+    motivoRef.current = motivo;
+    setMotivoModalOpen(false);
+    // Relanzar el submit con el motivo ya capturado (evento sintético).
+    handleSubmit({ preventDefault: () => {} });
+  };
+
+  const handleMotivoCancel = () => {
+    setMotivoModalOpen(false);
+    // Sin motivo no se guarda; el formulario conserva los cambios para que
+    // el usuario decida (reintentar pedirá el motivo de nuevo).
+  };
 
   /** Cancelar edición */
   const handleCancelEdit = (e) => {
@@ -1598,6 +1668,14 @@ const AddPatient = ({ initialPatientData, onSave, onCancel }) => {
               </button>
             </div>
           </form>
+
+          <MotivoCambioModal
+            open={motivoModalOpen}
+            camposCambiados={pendingIdentityChanges}
+            onConfirm={handleMotivoConfirm}
+            onCancel={handleMotivoCancel}
+            loading={isSubmitting}
+          />
         </div>
       </div>
     </div>

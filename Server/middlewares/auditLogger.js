@@ -88,13 +88,41 @@ function extractResourceId(req, responseBody) {
   return null;
 }
 
+// Campos técnicos que no cuentan como "editados" (metadatos de transporte).
+const NON_EDITABLE_META_FIELDS = new Set([
+  '_id', '__v', 'patientId', 'paciente', 'motivo', 'motivoSuperadmin',
+  'expectedUpdatedAt', 'patientData',
+]);
+
 /**
- * Detectar campos editados comparando body vs operación
+ * Cuerpo "efectivo" del request para auditoría: las escrituras de paciente
+ * viajan como FormData con `patientData` = JSON string (multer). Sin
+ * desempaquetarlo, camposEditados era ['patientData'] y el diff después
+ * quedaba como un blob de texto — traza NOM-024 inservible para el historial.
+ */
+function effectiveBody(req) {
+  const body = req.body;
+  if (!body || typeof body !== 'object') return null;
+  if (typeof body.patientData === 'string') {
+    try {
+      const parsed = JSON.parse(body.patientData);
+      if (parsed && typeof parsed === 'object') {
+        // motivo/expectedUpdatedAt pueden venir fuera del JSON (campos FormData)
+        return { ...parsed, ...body, patientData: undefined };
+      }
+    } catch (_e) { /* body malformado: se audita como venga */ }
+  }
+  return body;
+}
+
+/**
+ * Detectar campos editados a partir del cuerpo efectivo del request.
  */
 function detectEditedFields(req) {
-  if (!req.body || typeof req.body !== 'object') return undefined;
-  const keys = Object.keys(req.body).filter(k =>
-    !['_id', '__v', 'patientId', 'paciente'].includes(k)
+  const body = effectiveBody(req);
+  if (!body) return undefined;
+  const keys = Object.keys(body).filter(k =>
+    body[k] !== undefined && !NON_EDITABLE_META_FIELDS.has(k)
   );
   return keys.length > 0 ? keys : undefined;
 }
@@ -165,17 +193,23 @@ function auditLogger(opciones = {}) {
           const detalles = {};
           if (req._snapshotAntes && (method === 'PUT' || method === 'PATCH')) {
             detalles.antes = req._snapshotAntes;
-            if (camposEditados && req.body) {
+            const bodyEfectivo = effectiveBody(req);
+            if (camposEditados && bodyEfectivo) {
               const despues = {};
               for (const campo of camposEditados) {
-                if (req.body[campo] !== undefined) {
-                  despues[campo] = req.body[campo];
+                if (bodyEfectivo[campo] !== undefined) {
+                  despues[campo] = bodyEfectivo[campo];
                 }
               }
               if (Object.keys(despues).length > 0) {
                 detalles.despues = despues;
               }
             }
+          }
+          // Detalles adicionales que un controlador quiera anexar a la traza
+          // (p.ej. identidadEditadaConHCFirmada en updatePatient).
+          if (req._auditDetallesExtra && typeof req._auditDetallesExtra === 'object') {
+            Object.assign(detalles, req._auditDetallesExtra);
           }
 
           AuditLog.registrar({
@@ -241,6 +275,6 @@ auditLogger.registrarManual = function(req, evento, datos = {}) {
   });
 };
 
-auditLogger._internal = { extractPatientId, detectResourceType };
+auditLogger._internal = { extractPatientId, detectResourceType, effectiveBody, detectEditedFields };
 
 module.exports = auditLogger;

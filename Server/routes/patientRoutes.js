@@ -195,6 +195,19 @@ if (process.env.NODE_ENV !== 'production') {
 // Búsqueda server-side de pacientes — para inputs con debounce.
 router.get('/search', readLimiter, authorize(['patients.read', 'patients.read.basic']), filterPatientFields, patientCtrl.searchPatients);
 
+// ── Historial de cambios de la ficha (NOM-024 trazabilidad) ─────
+// Permiso `patients.read` (SIN aceptar el .basic): roles clínicos y admin
+// lo ven; recepción no — su permiso es patients.read.basic y la cobertura
+// jerárquica no aplica a la inversa. Solo lectura: la bitácora sigue
+// siendo append-only.
+router.get(
+  '/:id/change-history',
+  readLimiter,
+  validateId,
+  authorize(['patients.read']),
+  patientCtrl.getPatientChangeHistory
+);
+
 // ── Rutas de paciente específico ─────────────────────────────────
 router
   .route('/:id')

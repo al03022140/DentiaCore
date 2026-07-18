@@ -56,6 +56,7 @@ import PatientTreatmentPlan from './components/patient-treatment-plan.jsx';
 import PatientEvolutionNote from './components/patient-evolution-note.jsx';
 import PatientCashMovements from './components/patient-cash-movements.jsx';
 import PatientAttachments from './components/patient-attachments.jsx';
+import PatientChangeHistory from './components/patient-change-history.jsx';
 import CreateAppointmentModal from '../consultas/components/CreateAppointmentModal';
 import SignaturePadModal from '../../shared/components/SignaturePadModal.jsx';
 import DoctorSignStep from '../../shared/components/DoctorSignStep.jsx';
@@ -733,6 +734,19 @@ const PatientDetail = () => {
         </>
       ),
     },
+    // Historial de cambios de la ficha (NOM-024). Solo roles con
+    // patients.read completo (el backend aplica el mismo gate); recepción
+    // (patients.read.basic) no lo ve.
+    ...(hasPermission(user?.permissions, ['patients.read']) ? [{
+      key: 'change-history',
+      label: 'Historial de cambios',
+      children: (
+        <>
+          <h2 className="print-section-title">Historial de cambios</h2>
+          <PatientChangeHistory patientId={patientId} />
+        </>
+      ),
+    }] : []),
   ];
 
   return (

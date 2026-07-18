@@ -1,0 +1,111 @@
+/* Historial de cambios de la ficha (NOM-024) */
+
+.patient-change-history {
+  max-width: 900px;
+}
+
+.pch-intro {
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.pch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pch-entry {
+  border: 1px solid var(--border-color, #e3e3e3);
+  border-left: 3px solid var(--primary-color, #4a90d9);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg, #fff);
+}
+
+.pch-entry--alta {
+  border-left-color: var(--success-color, #52c41a);
+}
+
+.pch-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.pch-fecha {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.pch-usuario {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #666);
+}
+
+.pch-rol {
+  text-transform: capitalize;
+}
+
+.pch-motivo {
+  font-size: 0.88rem;
+  background: var(--highlight-bg, #fffbe6);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  margin: 0.35rem 0;
+}
+
+.pch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin-top: 0.35rem;
+}
+
+.pch-table th,
+.pch-table td {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border-color, #eee);
+  vertical-align: top;
+}
+
+.pch-table th {
+  color: var(--text-secondary, #888);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pch-antes {
+  color: var(--danger-color, #c0392b);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.pch-despues {
+  color: var(--success-text, #237804);
+  font-weight: 500;
+}
+
+.pch-empty {
+  color: var(--text-tertiary, #aaa);
+}
+
+.pch-tag-identidad {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.pch-error {
+  color: var(--danger-color, #c0392b);
+  padding: 1rem 0;
+}

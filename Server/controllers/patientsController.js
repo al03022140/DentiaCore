@@ -13,7 +13,13 @@ const { isJpegOrPng } = require('../utils/imageSignature');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { sanitizePatientForBasicRead, sanitizeAppointmentForBasicRead, BASIC_PATIENT_WRITE_FIELDS } = require('../middlewares/authorize');
 const { saveSignatureDataUrl, copyFirmaToSnapshot, verifySignatureImageHash } = require('../utils/saveSignatureImage');
-const { isHCConsentActive, findLockedFieldsInPayload } = require('../utils/hcConsent');
+const {
+    isHCConsentActive,
+    findClinicalLockedFieldsInPayload,
+    findIdentityFieldsInPayload,
+    IDENTITY_PATIENT_FIELDS,
+} = require('../utils/hcConsent');
+const AuditLog = require('../models/auditLog');
 const auditLogger = require('../middlewares/auditLogger');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 const { computeEvolutionNoteHash, evaluateNoteIntegrity } = require('../utils/signing');
@@ -739,6 +745,28 @@ const UPDATE_ALLOWED_FIELDS = [
     'datosNoCompartir'
 ];
 
+// ── Comparación de identidad (política de motivo obligatorio) ──────────────
+// Normaliza y compara el valor entrante contra el actual para decidir si un
+// campo de identidad REALMENTE cambió (el form de edición reenvía todo).
+const normStrForCompare = (v) => (v === undefined || v === null) ? '' : String(v).trim();
+function identityValueChanged(field, currentDoc, safeUpdate) {
+    const nuevo = safeUpdate[field];
+    const actual = currentDoc ? currentDoc[field] : undefined;
+    if (field === 'fecha_nacimiento') {
+        const aMs = actual ? new Date(actual).getTime() : null;
+        const bMs = nuevo ? new Date(nuevo).getTime() : null;
+        return aMs !== bMs;
+    }
+    if (field === 'documento') {
+        const aTipo = normStrForCompare(actual && actual.tipo);
+        const aNum = normStrForCompare(actual && actual.numero).toUpperCase();
+        const bTipo = normStrForCompare(nuevo && nuevo.tipo);
+        const bNum = normStrForCompare(nuevo && nuevo.numero).toUpperCase();
+        return aTipo !== bTipo || aNum !== bNum;
+    }
+    return normStrForCompare(actual) !== normStrForCompare(nuevo);
+}
+
 /** 🔹 Actualizar paciente */
 exports.updatePatient = async (req, res) => {
     // Si multer subió una foto nueva, queda en disco aunque el update falle
@@ -844,22 +872,37 @@ exports.updatePatient = async (req, res) => {
             if (updateData[key] !== undefined) safeUpdate[key] = updateData[key];
         }
 
-        // 🔒 HC firmada: bloquear cambios a secciones clínicas y datos del paciente
-        // NOM-004 §6.3: el expediente clínico no puede modificarse una vez
-        // atestado por el paciente. Para corregir, hay que revocar primero.
-        const lockedFieldsInPayload = findLockedFieldsInPayload(safeUpdate);
-        if (lockedFieldsInPayload.length > 0) {
-            const consentCheck = await Patient.findOne(
+        // 🔒 Política de edición por niveles (NOM-004/024):
+        //  - Secciones CLÍNICAS: congeladas mientras la HC esté firmada.
+        //    Para corregirlas hay que revocar el consentimiento (flujo actual).
+        //  - Datos de IDENTIDAD (nombre, fecha_nacimiento, sexo, documento):
+        //    editables SIN revocar, pero si cambian de verdad exigen `motivo`
+        //    obligatorio — el diff antes/después + motivo + autor quedan en la
+        //    cadena de auditoría HMAC (snapshotCapture + auditLogger).
+        //  - Datos administrativos (email, contacto, etc.): edición libre,
+        //    auditada automáticamente.
+        // La comparación de identidad se hace más abajo (identityChangedFields),
+        // DESPUÉS de normalizar fecha_nacimiento y documento, para no exigir
+        // motivo cuando el formulario reenvía el mismo valor sin cambiarlo.
+        const clinicalLockedInPayload = findClinicalLockedFieldsInPayload(safeUpdate);
+        const identityFieldsInPayload = findIdentityFieldsInPayload(safeUpdate);
+        let currentForPolicy = null;
+        if (clinicalLockedInPayload.length > 0 || identityFieldsInPayload.length > 0) {
+            const policyProjection = ['consentimientoHC', ...IDENTITY_PATIENT_FIELDS].join(' ');
+            currentForPolicy = await Patient.findOne(
                 { _id: req.params.id, deletedAt: null }
-            ).select('consentimientoHC').lean();
-            if (consentCheck && isHCConsentActive(consentCheck)) {
-                return res.status(409).json({
-                    message: 'La historia clínica está firmada por el paciente y no puede modificarse. ' +
-                             'Para corregir información clínica, primero revoque el consentimiento.',
-                    code: 'HC_CONSENT_LOCKED',
-                    lockedFields: lockedFieldsInPayload,
-                });
+            ).select(policyProjection).lean();
+            if (!currentForPolicy) {
+                return res.status(404).json({ message: 'Paciente no encontrado' });
             }
+        }
+        if (clinicalLockedInPayload.length > 0 && isHCConsentActive(currentForPolicy)) {
+            return res.status(409).json({
+                message: 'La historia clínica está firmada por el paciente y las secciones clínicas ' +
+                         'no pueden modificarse. Para corregir información clínica, primero revoque el consentimiento.',
+                code: 'HC_CONSENT_LOCKED',
+                lockedFields: clinicalLockedInPayload,
+            });
         }
 
         // Normalizar y validar fecha_nacimiento si se incluye
@@ -903,6 +946,39 @@ exports.updatePatient = async (req, res) => {
                 return res.status(400).json({ message: 'Número de documento es obligatorio' });
             }
             safeUpdate.documento.numero = norm;
+        }
+
+        // 🪪 Identidad: exigir motivo SOLO si el valor realmente cambia.
+        // (El formulario de edición reenvía la ficha completa, así que la mera
+        // presencia del campo no implica cambio.) Con valores ya normalizados.
+        const identityChangedFields = identityFieldsInPayload.filter(
+            (field) => identityValueChanged(field, currentForPolicy, safeUpdate)
+        );
+        if (identityChangedFields.length > 0) {
+            const motivoRaw = (req.body && typeof req.body.motivo === 'string' && req.body.motivo)
+                || (typeof updateData.motivo === 'string' && updateData.motivo)
+                || '';
+            const motivo = motivoRaw.trim();
+            if (motivo.length < 5) {
+                return res.status(422).json({
+                    message: 'Cambiar datos de identidad del paciente requiere un motivo (mínimo 5 caracteres). ' +
+                             'El cambio quedará registrado en la bitácora junto con el valor anterior.',
+                    code: 'MOTIVO_REQUERIDO',
+                    camposIdentidad: identityChangedFields,
+                });
+            }
+            // Exponer el motivo donde el auditLogger lo lee (req.body.motivo).
+            req.body.motivo = motivo;
+            // Marca explícita en la bitácora cuando la corrección de identidad
+            // ocurre con la HC firmada vigente (la firma conserva su hash
+            // original; la corrección queda como evento auditado, no como
+            // reescritura silenciosa).
+            if (isHCConsentActive(currentForPolicy)) {
+                req._auditDetallesExtra = {
+                    ...(req._auditDetallesExtra || {}),
+                    identidadEditadaConHCFirmada: true,
+                };
+            }
         }
 
         // Dup-check legacy-safe al cambiar el documento: excluye al propio
@@ -2650,3 +2726,153 @@ async function savePatientWithRetry(newPatient, maxAttempts = 5) {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📜 Historial de cambios de la ficha del paciente (NOM-024 trazabilidad)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Campos técnicos que nunca se muestran como "cambio" en el historial.
+const HISTORY_HIDDEN_FIELDS = new Set([
+    'patientData', 'expectedUpdatedAt', 'motivo', 'edad', '_id', '__v',
+    'createdAt', 'updatedAt', 'consentimientoHC', 'firma', 'foto',
+]);
+
+// Secciones cuyo contenido NO se vuelca al historial (son objetos/arreglos
+// clínicos grandes; mostrar el blob completo es ruido y expone de más).
+// Se reportan como "sección actualizada" sin valores.
+const HISTORY_SECTION_FIELDS = new Set([
+    'antecedentes_heredo_familiares', 'encuesta_medica', 'informacion_femenina',
+    'habitos_higiene', 'evaluacion_dental_oclusal', 'contactos_emergencia',
+    'contacto', 'notas_evolucion', 'planes_tratamiento', 'consultas',
+]);
+
+// Representación comparable/mostrable de un valor del historial.
+function historyRenderValue(campo, valor) {
+    if (valor === undefined || valor === null || valor === '') return null;
+    if (campo === 'documento' && typeof valor === 'object') {
+        const tipo = valor.tipo ? String(valor.tipo) : '';
+        const numero = valor.numero ? String(valor.numero) : '';
+        return [tipo, numero].filter(Boolean).join(' ') || null;
+    }
+    if (campo === 'fecha_nacimiento') {
+        const d = new Date(valor);
+        return Number.isNaN(d.getTime()) ? String(valor) : d.toISOString().slice(0, 10);
+    }
+    if (valor instanceof Date) return valor.toISOString();
+    if (typeof valor === 'object') return null; // secciones: sin volcado de contenido
+    return String(valor);
+}
+
+// Extrae el objeto "después" real de una entrada de auditoría, tolerando el
+// formato legacy donde el body llegaba como { patientData: '<json>' }.
+function historyUnwrapDespues(detalles) {
+    const despues = detalles && detalles.despues;
+    if (!despues || typeof despues !== 'object') return null;
+    if (typeof despues.patientData === 'string') {
+        try {
+            const parsed = JSON.parse(despues.patientData);
+            return (parsed && typeof parsed === 'object') ? parsed : null;
+        } catch (_e) { return null; }
+    }
+    return despues;
+}
+
+/**
+ * GET /patients/:id/change-history
+ * Historial de cambios de la ficha (diffs campo a campo del audit trail).
+ * Permiso: patients.read (roles clínicos y admin; recepción NO — solo tiene
+ * patients.read.basic). Los logs siguen siendo de solo lectura (NOM-024).
+ */
+exports.getPatientChangeHistory = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'ID de paciente inválido' });
+        }
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+
+        const filter = {
+            patientId: req.params.id,
+            resourceType: 'patient',
+            evento: { $in: ['creacion_registro', 'modificacion_registro'] },
+        };
+
+        const [logs, total] = await Promise.all([
+            AuditLog.find(filter)
+                .sort({ timestamp: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select('userName userRole evento motivo camposEditados detalles timestamp')
+                .lean(),
+            AuditLog.countDocuments(filter),
+        ]);
+
+        const entries = [];
+        for (const log of logs) {
+            if (log.evento === 'creacion_registro') {
+                entries.push({
+                    _id: log._id,
+                    fecha: log.timestamp,
+                    usuario: log.userName || 'Sistema',
+                    rol: log.userRole || null,
+                    evento: 'alta',
+                    motivo: log.motivo || null,
+                    cambios: [],
+                });
+                continue;
+            }
+
+            const antes = (log.detalles && log.detalles.antes && typeof log.detalles.antes === 'object')
+                ? log.detalles.antes : null;
+            const despues = historyUnwrapDespues(log.detalles);
+            const cambios = [];
+            if (despues) {
+                for (const campo of Object.keys(despues)) {
+                    if (HISTORY_HIDDEN_FIELDS.has(campo)) continue;
+                    const esSeccion = HISTORY_SECTION_FIELDS.has(campo);
+                    const valAntes = esSeccion ? null : historyRenderValue(campo, antes ? antes[campo] : undefined);
+                    const valDespues = esSeccion ? null : historyRenderValue(campo, despues[campo]);
+                    if (esSeccion) {
+                        // Sin snapshot no se puede saber si cambió; solo se
+                        // reporta la sección como tocada si hay snapshot y el
+                        // JSON difiere (comparación barata y conservadora).
+                        if (antes) {
+                            const a = JSON.stringify(antes[campo] ?? null);
+                            const b = JSON.stringify(despues[campo] ?? null);
+                            if (a === b) continue;
+                        }
+                        cambios.push({ campo, tipo: 'seccion', antes: null, despues: null, esIdentidad: false });
+                        continue;
+                    }
+                    // Escalares: incluir solo si el valor realmente cambió.
+                    if (antes && valAntes === valDespues) continue;
+                    cambios.push({
+                        campo,
+                        tipo: 'valor',
+                        antes: valAntes,
+                        despues: valDespues,
+                        esIdentidad: IDENTITY_PATIENT_FIELDS.has(campo),
+                    });
+                }
+            }
+            // Ediciones sin cambio efectivo (reenvío del form sin tocar nada)
+            // no aportan al historial.
+            if (cambios.length === 0) continue;
+            entries.push({
+                _id: log._id,
+                fecha: log.timestamp,
+                usuario: log.userName || 'Sistema',
+                rol: log.userRole || null,
+                evento: 'modificacion',
+                motivo: log.motivo || null,
+                hcFirmadaVigente: !!(log.detalles && log.detalles.identidadEditadaConHCFirmada),
+                cambios,
+            });
+        }
+
+        return res.json({ historial: entries, total, page, limit, pages: Math.ceil(total / limit) });
+    } catch (error) {
+        console.error('Error obteniendo historial de cambios del paciente:', error);
+        return res.status(500).json({ message: 'Error al obtener el historial de cambios' });
+    }
+};
