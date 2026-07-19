@@ -57,7 +57,7 @@ const basePatient = (overrides = {}) => ({
   apellido_paterno: 'López',
   apellido_materno: 'Santos',
   sexo: 'Femenino',
-  fecha_nacimiento: new Date('1990-05-10'),
+  fecha_nacimiento: new Date(1990, 4, 10), // local midnight, como parseAndValidateBirthDate (new Date('1990-05-10') sería UTC → falso "cambió")
   documento: { tipo: 'INE', numero: 'LOP900510' },
   email: 'maria@example.com',
   ruta_archivos: '/tmp/dentia-test-uploads/maria', // evita ensureUploadsPath en pre-save
@@ -165,12 +165,21 @@ describe('Edición de ficha por niveles (motivo de identidad) + historial', () =
 
   // ── Interacción con la HC firmada ────────────────────────────────────────
   describe('updatePatient — HC firmada: identidad editable con motivo, clínico bloqueado', () => {
-    const signedPatient = () => basePatient({
-      consentimientoHC: { firmadoEn: new Date(), contentHash: 'abc123' },
-    });
+    // El hook pre('validate') fuerza consentimientoHC a null en creación
+    // (defensa anti mass-assignment): un paciente NO puede nacer firmado.
+    // Se firma DESPUÉS, vía update directo (query middleware, no dispara el
+    // hook de documento) — igual que finalizeClinicalHistory en producción.
+    const createSignedPatient = async () => {
+      const p = await Patient.create(basePatient());
+      await Patient.updateOne(
+        { _id: p._id },
+        { $set: { 'consentimientoHC.firmadoEn': new Date(), 'consentimientoHC.contentHash': 'abc123' } }
+      );
+      return Patient.findById(p._id);
+    };
 
     test('sección clínica con HC firmada → 409 HC_CONSENT_LOCKED (sin cambio de comportamiento)', async () => {
-      const p = await Patient.create(signedPatient());
+      const p = await createSignedPatient();
       const res = mockRes();
       await patientsController.updatePatient(
         buildUpdateReq(p._id, { encuesta_medica: { alergias: 'penicilina' } }), res
@@ -181,7 +190,7 @@ describe('Edición de ficha por niveles (motivo de identidad) + historial', () =
     });
 
     test('identidad con HC firmada + motivo → 200 SIN revocar, con marca de auditoría', async () => {
-      const p = await Patient.create(signedPatient());
+      const p = await createSignedPatient();
       const res = mockRes();
       const req = buildUpdateReq(p._id, { apellido_paterno: 'Lopes' }, { motivo: 'Errata detectada al cotejar INE' });
       await patientsController.updatePatient(req, res);
@@ -196,7 +205,7 @@ describe('Edición de ficha por niveles (motivo de identidad) + historial', () =
     });
 
     test('identidad con HC firmada SIN motivo → 422 (no 409): el camino existe, falta el motivo', async () => {
-      const p = await Patient.create(signedPatient());
+      const p = await createSignedPatient();
       const res = mockRes();
       await patientsController.updatePatient(
         buildUpdateReq(p._id, { sexo: 'Masculino' }), res
