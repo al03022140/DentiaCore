@@ -48,7 +48,10 @@ const getPatientName = (apt) => {
 const getPatientImage = (apt) => {
   const p = apt.paciente_id;
   if (!p || !p.photoURL) return null;
-  return `${import.meta.env.VITE_API_URL || ''}${p.photoURL}`;
+  // URL RELATIVA a propósito: uploadsAuth autentica el <img> con la cookie
+  // httpOnly SOLO en mismo origen, y helmet (CORP: same-origin) bloquea la
+  // imagen si viene de otro origen. Mismo patrón que patient-info-header.
+  return p.photoURL;
 };
 
 const statusMap = {

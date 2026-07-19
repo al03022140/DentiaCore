@@ -312,7 +312,7 @@ const CreateAppointmentModal = ({
             {selectedPatient ? (
               <div className={`cam-patient-card ${(fixedPatient || isEditing) ? 'cam-patient-card--fixed' : ''}`}>
                 <img
-                  src={selectedPatient.photoURL ? `${import.meta.env.VITE_API_URL || ''}${selectedPatient.photoURL}` : userNot}
+                  src={selectedPatient.photoURL || userNot}
                   alt={getPatientFullName(selectedPatient)}
                   className={`cam-patient-avatar${selectedPatient.photoURL ? '' : ' profile-default-avatar'}`}
                   onError={e => {
@@ -346,7 +346,7 @@ const CreateAppointmentModal = ({
                     {patientResults.map(p => (
                       <li key={p._id} onClick={() => selectPatient(p)}>
                         <img
-                          src={p.photoURL ? `${import.meta.env.VITE_API_URL || ''}${p.photoURL}` : userNot}
+                          src={p.photoURL || userNot}
                           alt={getPatientFullName(p)}
                           className={`cam-result-avatar${p.photoURL ? '' : ' profile-default-avatar'}`}
                           onError={e => {

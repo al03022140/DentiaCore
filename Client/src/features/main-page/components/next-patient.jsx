@@ -110,9 +110,8 @@ const NextPatient = () => {
   const patientName = fullName
     || `${patient.nombre || ''} ${patient.apellidos || ''}`.trim()
     || 'Paciente';
-  const patientImage = patient.photoURL
-    ? `${import.meta.env.VITE_API_URL || ''}${patient.photoURL}`
-    : null;
+  // Relativa a propósito (cookie same-origin + helmet CORP) — ver ConsultasPage.
+  const patientImage = patient.photoURL || null;
   const status = STATUS_MAP[nextPatient.estado] || { cssClass: 'waiting', label: nextPatient.estado };
   const countdown = formatCountdown(nextPatient.fecha_hora);
   const dayLabel = formatRelativeDay(nextPatient.fecha_hora);
