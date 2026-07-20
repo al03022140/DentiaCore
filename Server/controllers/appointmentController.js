@@ -17,11 +17,14 @@ const { sanitizeAppointmentForBasicRead } = require('../middlewares/authorize');
 const DOCTOR_ROLES = new Set(['doctor', 'doctor_admin']);
 
 // ───────── Constantes ─────────
-// `sexo` se quitó del populate: es PII que NINGÚN consumidor del front usa
-// desde las citas (verificado). `fecha_nacimiento` se conserva porque la UI de
-// citas calcula la edad con ella (ConsultasPage y el modal en edición), y la
-// recepcionista está autorizada a verla por política (BASIC_PATIENT_FIELDS).
-const PATIENT_FIELDS = 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento';
+// `sexo` se mantiene FUERA del populate: es PII y la recepcionista NO está
+// autorizada a verla (sanitizeAppointmentForBasicRead no filtra campos del
+// paciente anidado, así que agregarlo lo filtraría a recepción). Si el home
+// necesita mostrar sexo, decidir primero la política de autorización.
+// `fecha_nacimiento` se conserva (la UI calcula edad). `paciente_id` (número
+// de expediente, no PII sensible; ya visible en patient-list para todos los
+// roles) se agregó para la tarjeta de Próximo Paciente del home.
+const PATIENT_FIELDS = 'primer_nombre otros_nombres apellido_paterno apellido_materno photoURL fecha_nacimiento paciente_id';
 const DOCTOR_FIELDS = 'nombre';
 const ESTADOS_VIVOS = ['Pendiente', 'Confirmada', 'EnCurso'];
 const ESTADOS_CERRADOS = ['Pasada', 'NoShow', 'Cancelada'];
