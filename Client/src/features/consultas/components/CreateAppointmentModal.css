@@ -57,7 +57,7 @@
 .cam-header h2 {
   margin: 0;
   font-family: var(--font-family-primary);
-  font-size: 1.25rem; /* 20px H2 */
+  font-size: var(--dc-fs-item); /* 20px H2 */
   font-weight: var(--font-weight-medium);
   color: var(--color-primary); /* Acento #084888 */
   letter-spacing: -0.01em;
@@ -69,7 +69,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--figma-radius-full);
-  font-size: 1.4rem;
+  font-size: var(--dc-fs-title);
   cursor: pointer;
   color: var(--figma-text-secondary);
   display: inline-flex;
@@ -122,7 +122,7 @@
 .cam-label {
   display: block;
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem; /* 13px label */
+  font-size: var(--dc-fs-meta); /* 13px label */
   font-weight: var(--font-weight-medium);
   color: var(--figma-text-primary);
   margin-bottom: 0.35rem;
@@ -135,7 +135,7 @@
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-sm); /* 8px input */
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary);
   background: var(--figma-bg-card);
   transition:
@@ -172,7 +172,7 @@
 .cam-searching {
   display: block;
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
   padding: 0.3rem 0;
 }
@@ -219,13 +219,13 @@
 .cam-result-age {
   display: block;
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
 }
 
 .cam-search-results li strong {
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-medium);
   color: var(--figma-text-primary);
   display: block;
@@ -271,7 +271,7 @@
 
 .cam-patient-info strong {
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem;
+  font-size: var(--dc-fs-body);
   font-weight: var(--font-weight-semibold);
   color: var(--figma-text-primary);
   letter-spacing: -0.005em;
@@ -279,7 +279,7 @@
 
 .cam-patient-info span {
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
 }
 
@@ -289,7 +289,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--figma-radius-full);
-  font-size: 1.25rem;
+  font-size: var(--dc-fs-item);
   color: var(--figma-text-secondary);
   cursor: pointer;
   display: inline-flex;
@@ -320,7 +320,7 @@
   background: var(--figma-bg-input);
   color: var(--figma-text-secondary);
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: all var(--figma-transition-fast);
@@ -344,7 +344,7 @@
 
 .cam-no-catalog {
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-secondary);
   margin: 0;
 }
@@ -359,7 +359,7 @@
 
 .cam-items-table th {
   text-align: left;
-  font-size: 0.6875rem;
+  font-size: var(--dc-fs-label);
   font-weight: var(--font-weight-semibold);
   color: var(--figma-text-secondary);
   padding: 0.5rem 0.5rem;
@@ -370,7 +370,7 @@
 
 .cam-items-table td {
   padding: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary);
   border-bottom: 1px solid var(--figma-border-default);
   vertical-align: middle;
@@ -380,7 +380,7 @@
 .cam-items-table tfoot td {
   border-bottom: none;
   padding-top: 0.75rem;
-  font-size: 0.9375rem;
+  font-size: var(--dc-fs-body);
   font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
 }
@@ -391,7 +391,7 @@
   border: 1px solid var(--figma-border-default);
   border-radius: var(--figma-radius-sm);
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary);
   background: var(--figma-bg-card);
   box-sizing: border-box;
@@ -410,7 +410,7 @@
   width: 24px;
   height: 24px;
   border-radius: var(--figma-radius-full);
-  font-size: 1.1rem;
+  font-size: var(--dc-fs-body);
   color: var(--figma-text-secondary);
   cursor: pointer;
   display: inline-flex;
@@ -434,7 +434,7 @@
   padding: 0.6rem 0.85rem;
   border-radius: var(--figma-radius-sm);
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   margin-top: 0.5rem;
   line-height: 1.4;
 }
@@ -453,7 +453,7 @@
   padding: 0.5rem 1.25rem;
   border-radius: var(--figma-radius-sm); /* 8px botón */
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   border: none;

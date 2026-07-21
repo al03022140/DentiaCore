@@ -298,6 +298,21 @@
   --text-nano: var(--font-weight-light) 0.625rem / 1.2 var(--font-family-primary);
   --text-pico: var(--font-weight-light) 0.5625rem / 1.2 var(--font-family-primary);
 
+  /* ═══════════════════════════════════════════════════════════════════
+     ESCALA TIPOGRÁFICA CANÓNICA (2026-07-21) — 6 niveles, nada más.
+     Derivada de las pantallas de referencia aprobadas por el dueño:
+     agenda del home, modal de nuevo evento, lista de pacientes y lista
+     de configuración. TODA pantalla nueva o normalizada usa SOLO estos
+     tamaños; los --text-* de arriba quedan como LEGACY (no usar en
+     código nuevo — se irán deprecando pantalla por pantalla).
+     ═══════════════════════════════════════════════════════════════════ */
+  --dc-fs-display: clamp(1.5rem, 2.5vw, 4.5rem); /* héroes: mes del calendario, título del expediente */
+  --dc-fs-title: 1.8rem;   /* títulos de sección (= h3 del expediente) */
+  --dc-fs-item: 1.3rem;    /* nombre/título de ítem (= cuerpo del expediente) */
+  --dc-fs-body: 1.1rem;    /* cuerpo, inputs, listas (= label-md del expediente) */
+  --dc-fs-meta: 0.95rem;   /* secundario: metadatos, hints, chips de info */
+  --dc-fs-label: 0.82rem;  /* badges, IDs, overlines */
+
   /* Tipografía compacta */
   --text-dense-lg: var(--font-weight-light) 0.9375rem / 1.35 var(--font-family-primary);
   --text-dense-md: var(--font-weight-light) 0.875rem / 1.35 var(--font-family-primary);
