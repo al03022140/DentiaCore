@@ -8,7 +8,7 @@
 
 .inventory-page__title {
   margin: 0 0 12px;
-  font-size: 1.6rem;
+  font-size: var(--dc-fs-title);
 }
 
 /* Tarjetas de alertas */
@@ -44,7 +44,7 @@
 }
 
 .inventory-alerts__count {
-  font-size: 1.4rem;
+  font-size: var(--dc-fs-item);
   font-weight: 700;
   line-height: 1.1;
 }
@@ -73,7 +73,7 @@
 
 /* Tabla */
 .inventory-item__name { font-weight: 600; }
-.inventory-item__category { font-size: 0.78rem; color: var(--color-text-muted); }
+.inventory-item__category { font-size: var(--dc-fs-label); color: var(--color-text-muted); }
 .inventory-stock--zero { color: var(--color-danger); font-weight: 700; }
 .inventory-muted { color: var(--color-text-muted); }
 
@@ -95,7 +95,7 @@
   flex-direction: column;
   gap: 4px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   flex: 1;
 }
 
@@ -122,25 +122,25 @@
 
 .inventory-form__fieldset legend {
   padding: 0 6px;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   width: auto;
 }
 
 .inventory-form__hint {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--dc-fs-label);
   color: var(--color-text-muted);
 }
 
-.inventory-option__meta { color: var(--color-text-muted); font-size: 0.8rem; }
+.inventory-option__meta { color: var(--color-text-muted); font-size: var(--dc-fs-meta); }
 
 /* Kardex */
 .inventory-kardex__loading { text-align: center; padding: 32px 0; }
 .inventory-kardex__main { width: 100%; }
-.inventory-kardex__saldo { color: var(--color-text-muted); font-size: 0.82rem; }
-.inventory-kardex__meta { color: var(--color-text-muted); font-size: 0.78rem; margin-top: 2px; }
-.inventory-kardex__motivo { font-size: 0.82rem; margin-top: 2px; }
+.inventory-kardex__saldo { color: var(--color-text-muted); font-size: var(--dc-fs-meta); }
+.inventory-kardex__meta { color: var(--color-text-muted); font-size: var(--dc-fs-label); margin-top: 2px; }
+.inventory-kardex__motivo { font-size: var(--dc-fs-meta); margin-top: 2px; }
 
 /* Kits */
 .inventory-kits__header {
@@ -153,7 +153,7 @@
 .inventory-kits__hint {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   flex: 1;
 }
 
@@ -168,7 +168,7 @@
 
 .inventory-consume__warning {
   margin: 0 0 6px;
-  font-size: 0.78rem;
+  font-size: var(--dc-fs-label);
   color: var(--color-warning);
 }
 

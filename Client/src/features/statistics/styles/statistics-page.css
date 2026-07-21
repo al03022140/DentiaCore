@@ -193,7 +193,7 @@
 }
 
 .chart-slot__caret {
-  font-size: 0.7rem;
+  font-size: var(--dc-fs-label);
   line-height: 1;
 }
 

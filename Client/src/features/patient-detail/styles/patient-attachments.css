@@ -17,7 +17,7 @@
 
 .patient-attachments__title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--dc-fs-body);
   font-weight: 600;
   color: var(--color-text-dark, #1f2a44);
   display: flex;
@@ -35,7 +35,7 @@
   border-radius: 999px;
   background: var(--color-primary-light, #d4e6f5);
   color: var(--color-primary, #1668c1);
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .patient-attachments__dropzone-icon {
-  font-size: 1.75rem;
+  font-size: var(--dc-fs-title);
   line-height: 1;
 }
 
@@ -85,10 +85,10 @@
 }
 .patient-attachments__dropzone-text strong {
   color: var(--color-text-dark, #1f2a44);
-  font-size: 0.95rem;
+  font-size: var(--dc-fs-meta);
 }
 .patient-attachments__dropzone-text span {
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   color: var(--color-text-muted, #6b7a90);
 }
 
@@ -117,7 +117,7 @@
 }
 
 .patient-attachments__meta-field label {
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   color: var(--color-text-muted, #6b7a90);
   font-weight: 500;
 }
@@ -201,7 +201,7 @@
   border-radius: 6px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  font-size: 0.95rem;
+  font-size: var(--dc-fs-meta);
   box-shadow: 0 2px 6px rgba(214, 59, 59, 0.3);
 }
 
@@ -214,7 +214,7 @@
 }
 
 .patient-attachments__card-name {
-  font-size: 0.88rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   color: var(--color-text-dark, #1f2a44);
   white-space: nowrap;
@@ -223,7 +223,7 @@
 }
 
 .patient-attachments__card-desc {
-  font-size: 0.78rem;
+  font-size: var(--dc-fs-label);
   color: var(--color-text-muted, #6b7a90);
   white-space: nowrap;
   overflow: hidden;
@@ -235,7 +235,7 @@
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.25rem;
-  font-size: 0.72rem;
+  font-size: var(--dc-fs-label);
   color: var(--color-text-muted, #6b7a90);
   align-items: center;
 }
@@ -245,7 +245,7 @@
   color: var(--color-primary, #1668c1);
   padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: var(--dc-fs-label);
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -260,7 +260,7 @@
   background: transparent;
   color: #c0392b;
   border: 1px solid transparent;
-  font-size: 0.78rem;
+  font-size: var(--dc-fs-label);
   font-weight: 600;
   padding: 0.25rem 0.55rem;
   border-radius: 6px;
@@ -318,7 +318,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   color: var(--color-text-muted, #6b7a90);
   flex-wrap: wrap;
   gap: 0.5rem;

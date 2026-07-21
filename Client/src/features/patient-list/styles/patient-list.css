@@ -135,7 +135,7 @@
   color: var(--color-primary);
   border-radius: 99px;
   padding: 1px 7px;
-  font-size: 0.74rem;
+  font-size: var(--dc-fs-label);
   font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1.45;
@@ -162,7 +162,7 @@
   border-top: 1px solid var(--color-border-medium);
   gap: 0 var(--figma-space-md);
   width: 100%;
-  font-size: 0.84rem;
+  font-size: var(--dc-fs-meta);
   line-height: 1.35;
   color: var(--color-text-secondary);
   overflow: hidden;
@@ -363,7 +363,7 @@
 
 .patient-list-wrapper .patient-info .patient-name-container {
   font-family: var(--font-family-primary) !important;
-  font-size: 1.22rem !important;
+  font-size: var(--dc-fs-item) !important;
   line-height: 1.25 !important;
   font-weight: var(--font-weight-normal) !important;
   color: var(--figma-text-primary) !important;

@@ -817,7 +817,7 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
 
 @media (max-width: 480px) {
   .add-patient-steps .ant-steps-item-title {
-    font-size: 0.75rem !important;
+    font-size: var(--dc-fs-label) !important;
   }
   .wizard-actions {
     flex-direction: column;
@@ -869,7 +869,7 @@ textarea[placeholder*="Describa el motivo principal"]::placeholder {
   }
   .add-patient-wrapper .add-patient-title {
     text-align: left;
-    font-size: 1.4rem;
+    font-size: var(--dc-fs-item);
     padding-left: 0;
     padding-right: 0;
   }

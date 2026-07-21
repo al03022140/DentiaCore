@@ -365,7 +365,7 @@
   background: var(--color-bg-light);
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-size: 20px;
+  font-size: var(--dc-fs-item);
   color: var(--color-text-dark);
   transition: background var(--transition-medium), color var(--transition-medium);
 }
@@ -390,7 +390,7 @@
   background: var(--color-bg-white);
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--dc-fs-body);
   color: var(--color-text-dark);
   position: absolute;
   top: var(--spacing-sm);
@@ -453,7 +453,7 @@
   right: var(--spacing-md);
   width: 36px;
   height: 36px;
-  font-size: 18px;
+  font-size: var(--dc-fs-body);
   z-index: 1003;
 }
 
@@ -557,7 +557,7 @@
   color: var(--color-primary);
   font-family: var(--font-family-primary, 'Montserrat', sans-serif);
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
   line-height: 1;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -650,7 +650,7 @@
 }
 
 .odontograma-table-container .ant-tabs-tab .ant-tabs-tab-btn {
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -685,7 +685,7 @@
 }
 
 .odontograma-saving-overlay__text {
-  font-size: 1.5rem;
+  font-size: var(--dc-fs-title);
   font-weight: var(--font-weight-medium);
   color: var(--color-primary);
 }
@@ -802,7 +802,7 @@
   border: 1px solid var(--color-green-200, #bbf7d0);
   border-radius: 999px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   white-space: nowrap;
   cursor: help;
 }
@@ -815,7 +815,7 @@
   padding: 0.4rem 0.85rem;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
 }
@@ -1051,7 +1051,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   margin: 0 !important;
@@ -1090,7 +1090,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   cursor: pointer;
@@ -1127,7 +1127,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   cursor: pointer;

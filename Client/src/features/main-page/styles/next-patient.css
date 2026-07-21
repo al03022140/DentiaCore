@@ -76,7 +76,7 @@
 }
 
 .np-card_title {
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--figma-text-primary, #1a1a1a);
@@ -94,7 +94,7 @@
   align-items: center;
   padding: 2px 8px;
   border-radius: 99px;
-  font-size: 0.72rem;
+  font-size: var(--dc-fs-label);
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.4;
@@ -164,7 +164,7 @@
 
 /* ID · edad — una sola línea, silenciosa (secundaria) */
 .np-card_meta {
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 500;
   color: var(--figma-text-secondary);
   letter-spacing: 0.005em;
@@ -191,7 +191,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.95rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   color: var(--figma-text-primary);
   white-space: nowrap;
@@ -213,7 +213,7 @@
   border-radius: 99px;
   background: var(--figma-bg-neutral-alt, rgba(0, 0, 0, 0.04));
   color: var(--figma-text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--dc-fs-label);
   font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
@@ -228,7 +228,7 @@
 /* ── Fila de alertas (solo si el backend entrega datos) ── */
 .np-card_row--alerts {
   color: var(--color-warning, #b45309);
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 500;
 }
 
@@ -264,7 +264,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   letter-spacing: -0.1px;
   color: var(--color-primary, #084888);
@@ -299,7 +299,7 @@
 }
 
 .np-home-card_eyebrow {
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--figma-text-primary, #1a1a1a);
@@ -368,5 +368,5 @@
 }
 
 @media (max-width: 480px) {
-  .np-card_name { font-size: 1.125rem; }
+  .np-card_name { font-size: var(--dc-fs-body); }
 }

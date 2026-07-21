@@ -21,7 +21,7 @@
   border: 2px solid var(--color-primary);
   background: transparent;
   color: var(--color-primary);
-  font-size: 1.25rem;
+  font-size: var(--dc-fs-item);
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -166,7 +166,7 @@
 /* Materiales de inventario consumidos en la cita */
 .patient-appointments-info__materials {
   margin-top: 4px;
-  font-size: 0.88rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .patient-appointments-info__materials ul {
