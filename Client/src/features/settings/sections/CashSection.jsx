@@ -209,7 +209,7 @@ const CashSection = () => {
             <option key={c.code} value={c.code}>{c.label}</option>
           ))}
         </select>
-        <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        <p style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--color-text-secondary)', marginTop: 4 }}>
           Esta moneda se aplica a todos los importes mostrados en Caja y en la ficha del paciente.
         </p>
       </div>
@@ -223,7 +223,7 @@ const CashSection = () => {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 padding: '4px 10px', background: 'var(--color-blue-500-12)',
-                borderRadius: 'var(--border-radius-full)', fontSize: '0.85rem',
+                borderRadius: 'var(--border-radius-full)', fontSize: 'var(--dc-fs-label)',
               }}
             >
               {cat}
@@ -264,7 +264,7 @@ const CashSection = () => {
 
       <div className="settings-form-group">
         <label>Catálogo de Servicios</label>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: '0 0 0.5rem' }}>
+        <p style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--color-text-secondary)', margin: '0 0 0.5rem' }}>
           Servicios disponibles para cobrar a pacientes. El precio puede ajustarse al momento de cobrar.
         </p>
         {serviceCatalog.length > 0 && (
@@ -275,7 +275,7 @@ const CashSection = () => {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '6px 12px', background: 'var(--color-blue-500-12)',
-                  borderRadius: 'var(--border-radius-md)', fontSize: '0.9rem',
+                  borderRadius: 'var(--border-radius-md)', fontSize: 'var(--dc-fs-meta)',
                 }}
               >
                 <span><strong>{svc.nombre}</strong> — {formatMoney(svc.precioDefault)}</span>
@@ -289,7 +289,7 @@ const CashSection = () => {
                   <button
                     type="button"
                     aria-label={`Quitar servicio ${svc.nombre}`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)', fontSize: '1rem' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--color-danger)', fontSize: 'var(--dc-fs-meta)' }}
                   >
                     ×
                   </button>

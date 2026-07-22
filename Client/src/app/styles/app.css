@@ -17,7 +17,13 @@
 
 .content {
   flex: 1;
-  padding: var(--figma-space-2xl);
+  /* Separación canónica de layout: mismo 12px (--figma-space-md) que separa
+     las cards lado a lado en patient-list (--pl-grid-column-gap).
+     Aplica igual arriba (card↔header), a los lados y abajo en TODAS las
+     páginas grandes (consultas, caja, inicio, pacientes, etc.), y coincide
+     con el gap card↔card interno de esas páginas. No reducir/aumentar en
+     breakpoints para mantener la equivalencia visual. */
+  padding: var(--figma-space-md);
   box-sizing: border-box;
   min-height: 0;
   overflow-y: auto;
@@ -46,7 +52,7 @@ body[data-pd-page="true"] .content {
 .home {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: var(--figma-gap-section);
+  gap: var(--figma-space-md);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -57,7 +63,8 @@ body[data-pd-page="true"] .content {
 .right-section {
   display: flex;
   flex-direction: column;
-  gap: var(--figma-gap-card-grid);
+  /* Card↔card vertical: mismo 12px que patient-list y el marco exterior */
+  gap: var(--figma-space-md);
   box-sizing: border-box;
   overflow: hidden;
   height: 100%;
@@ -111,18 +118,9 @@ td, th {
   }
 }
 
-@media (max-width: 1280px) {
-  .content {
-    padding: var(--figma-space-xl);
-  }
-}
-
 @media (max-width: 1024px) {
   .dashboard {
     margin-left: clamp(10rem, 16vw, var(--sidebar-width));
-  }
-  .content {
-    padding: var(--figma-space-lg);
   }
   .home {
     grid-template-columns: 1fr;
@@ -144,22 +142,5 @@ td, th {
 @media (max-width: 768px) {
   .dashboard {
     margin-left: 0;
-  }
-  .content {
-    padding: var(--figma-space-lg);
-  }
-  .home {
-    gap: var(--figma-gap-card-grid);
-  }
-}
-
-@media (max-width: 480px) {
-  .content {
-    padding: var(--figma-space-md);
-  }
-  .home,
-  .left-section,
-  .right-section {
-    gap: var(--figma-space-md);
   }
 }

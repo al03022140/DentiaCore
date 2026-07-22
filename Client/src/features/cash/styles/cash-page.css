@@ -20,7 +20,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: minmax(0, 4fr) minmax(0, 6fr);
-  gap: 1.5rem;
+  /* 12px: misma separación card↔card de patient-list (--pl-grid-column-gap) */
+  gap: var(--figma-space-md);
   width: 100%;
   height: 100%;
   box-sizing: border-box;
@@ -91,10 +92,10 @@
 
 .cash-card__title {
   margin: 0;
-  color: var(--color-primary); /* Acento azul DentiaCore — siempre en títulos */
+  color: var(--color-text-primary); /* Título de sección canónico: negro bold */
   font-family: var(--font-family-primary);
   font-size: var(--dc-fs-item); /* 20px */
-  font-weight: var(--font-weight-medium); /* 500 */
+  font-weight: var(--font-weight-semibold); /* 600 */
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
@@ -345,31 +346,22 @@
   font-size: var(--dc-fs-title) !important; /* 24px ícono — display data */
 }
 
-/* Ingresar — verde saturado (#4caf50) según rule del sistema */
+/* Ingresar — verde semántico del sistema (--color-success = colorSuccess
+   del tema antd, mismo verde que los estados de Inventario). */
 .action-button--income {
-  background-color: var(--color-green-700) !important; /* #4caf50 */
-  border-color: var(--color-green-700) !important;
+  background-color: var(--color-success) !important;
+  border-color: var(--color-success) !important;
   color: var(--figma-text-on-dark) !important;
 }
 
 .action-button--income:hover:not(:disabled) {
-  background-color: var(--color-green-600) !important;
-  border-color: var(--color-green-600) !important;
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.35) !important;
+  background-color: var(--color-success-hover) !important;
+  border-color: var(--color-success-hover) !important;
+  box-shadow: 0 4px 8px rgba(39, 174, 96, 0.35) !important;
 }
 
-/* Retirar — rojo saturado (#e53e3e) según rule del sistema */
-.cash-card .action-button.ant-btn-dangerous,
-.cash-card .action-button[disabled].ant-btn-dangerous {
-  background-color: var(--color-red-550) !important; /* #e53e3e */
-  border-color: var(--color-red-550) !important;
-}
-
-.cash-card .action-button.ant-btn-dangerous:hover:not(:disabled) {
-  background-color: var(--color-red-600) !important;
-  border-color: var(--color-red-600) !important;
-  box-shadow: 0 4px 8px rgba(229, 62, 62, 0.35) !important;
-}
+/* Retirar — sin override: el danger primary de antd ya usa colorError
+   (#e74c3c = --color-danger), el mismo rojo semántico del resto del sistema. */
 
 .action-button:disabled,
 .action-button[disabled] {
@@ -957,8 +949,8 @@
 
 @media (max-width: 600px) {
   .cash-page {
-    padding: 0.75rem;
-    gap: 1rem;
+    padding: 0;
+    gap: var(--figma-space-md);
   }
 
   .cash-card {

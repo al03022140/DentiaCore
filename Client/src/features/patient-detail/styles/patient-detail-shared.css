@@ -12,8 +12,8 @@
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-xl);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--color-border-medium);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
 }
 
 /* ===================================================================
@@ -58,8 +58,8 @@
 .patient-detail__section dl > div {
   background-color: var(--color-bg-light);
   border-radius: var(--border-radius-md);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--color-border-light);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
   padding: var(--spacing-md) var(--spacing-lg);
   display: flex;
   flex-direction: column;
@@ -158,7 +158,8 @@
   padding: var(--spacing-md);
   background: var(--color-background-subtle);
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
 }
 
 /* ===================================================================

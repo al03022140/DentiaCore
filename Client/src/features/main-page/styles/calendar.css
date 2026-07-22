@@ -15,7 +15,8 @@
   padding: var(--home-calendar-container-padding);
   border-radius: var(--calendar-border-radius);
   background-color: var(--calendar-background-color);
-  border: var(--home-calendar-container-border-width) solid var(--home-calendar-border-strong-color);
+  border: 1px solid var(--figma-border-default); /* contorno canónico, igual que las demás cards del home */
+  box-shadow: var(--figma-shadow-card); /* sombra canónica, igual que las demás cards del home */
   height: 100%;
   box-sizing: border-box;
   gap: 0;

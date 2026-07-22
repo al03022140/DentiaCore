@@ -23,7 +23,8 @@
   margin: 0 0 var(--spacing-md) 0;
   padding-bottom: var(--spacing-sm);
   border-bottom: 2px solid var(--color-primary-light);
-  flex: none;
+  flex: 1;
+  min-width: 0;
   order: 0;
 }
 
@@ -128,7 +129,7 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-xs);
+  margin-top: var(--spacing-lg);
 }
 
 /* History */
@@ -155,9 +156,10 @@
 
 .evolution-note-card {
   background: var(--color-bg-white);
-  border: 1px solid var(--color-neutral-500, var(--color-border-light));
+  border: 1px solid var(--figma-border-default);
   border-radius: var(--border-radius-md);
   padding: var(--spacing-lg);
+  box-shadow: var(--figma-shadow-card);
 }
 
 /* Header: título de la nota a la izquierda · firmas a la derecha */
@@ -398,6 +400,12 @@
   justify-content: center;
   gap: 0.25rem;
   position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
 .doctor-sig-stale {

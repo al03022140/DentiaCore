@@ -1,15 +1,32 @@
 /* ── Página de Inventario ─────────────────────────────────────── */
 
+/* Pass-through: el padding exterior lo aporta `.content`, igual que en
+   Configuración (.settings-page). Llena el alto de `.content` (flex column)
+   para que la card pueda estirarse hasta el borde de la pantalla. */
 .inventory-page {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-.inventory-page__title {
-  margin: 0 0 12px;
-  font-size: var(--dc-fs-title);
+/* Card contenedora — mismos tokens que la card de Configuración.
+   `flex: 1` la estira al máximo alto disponible sin salir de pantalla;
+   si el contenido crece más, la card crece y `.content` hace scroll. */
+.inventory-page__card {
+  flex: 1;
+  background-color: var(--figma-bg-card, var(--color-bg-white));
+  border-radius: var(--figma-radius-lg, var(--border-radius-lg));
+  padding: var(--figma-space-2xl);
+  box-shadow: var(--figma-shadow-card, 0 4px 14px rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--figma-border-default, var(--color-border-medium));
+  width: 100%;
+  box-sizing: border-box;
 }
+
 
 /* Tarjetas de alertas */
 .inventory-alerts {
@@ -72,6 +89,13 @@
 }
 
 /* Tabla */
+/* Contorno de la lista de ítems — misma convención que el resto de la app */
+.inventory-page .ant-table {
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
 .inventory-item__name { font-weight: 600; }
 .inventory-item__category { font-size: var(--dc-fs-label); color: var(--color-text-muted); }
 .inventory-stock--zero { color: var(--color-danger); font-weight: 700; }
@@ -173,7 +197,6 @@
 }
 
 @media (max-width: 640px) {
-  .inventory-page { padding: 12px; }
   .inventory-toolbar__actions { margin-left: 0; width: 100%; }
   .inventory-form__row { flex-direction: column; }
   .inventory-form__row--material { flex-direction: row; }

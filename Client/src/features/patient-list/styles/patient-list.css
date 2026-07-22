@@ -13,8 +13,9 @@
   /* Ritmo vertical del bloque de tarjetas (sin tocar cada tarjeta) */
   --pl-grid-row-gap: var(--spacing-sm);
   --pl-grid-column-gap: var(--figma-space-md);
-  /* Separación del grid completo respecto a búsqueda/barra de acciones (baja el bloque) */
-  --pl-grid-block-margin-top: var(--spacing-xxl);
+  /* Separación del grid respecto a la barra de acciones (Ordenar/Agregar):
+     mismo 12px que separa las cards entre sí y del marco exterior */
+  --pl-grid-block-margin-top: var(--figma-space-md);
   font-family: var(--font-family-primary);
   width: 100%;
 }
@@ -23,7 +24,8 @@
    igual que .home y .settings-page (evitar el "doble padding"). */
 .patient-list-wrapper .patient-list-container {
   overflow: visible;
-  padding: var(--figma-space-xs) 0 5.5rem 0;
+  /* Sin padding-top extra: .content ya aporta los 12px del marco */
+  padding: 0 0 5.5rem 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -422,8 +424,11 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin-top: var(--figma-space-md);
-  margin-bottom: var(--figma-space-sm);
+  /* Barra buscadora → botones: 12px exactos (el margin-bottom de
+     .search-container ya los aporta; sin sumar margen propio).
+     Botones → grid: los 12px los aporta --pl-grid-block-margin-top. */
+  margin-top: 0;
+  margin-bottom: 0;
   padding: 0;
   gap: var(--spacing-md);
 }

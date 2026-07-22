@@ -129,6 +129,12 @@
   letter-spacing: -0.005em;
 }
 
+/* Campos obligatorios (los que valida handleSave) */
+.cam-label--required::after {
+  content: ' *';
+  color: var(--color-danger);
+}
+
 .cam-input {
   width: 100%;
   padding: 0.55rem 0.75rem;

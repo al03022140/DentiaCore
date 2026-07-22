@@ -146,8 +146,9 @@
   display: flex;
   flex-direction: column;
   background: #fff;
-  border: 1px solid var(--color-border, #e0e6ee);
+  border: 1px solid var(--figma-border-default);
   border-radius: var(--border-radius-md, 10px);
+  box-shadow: var(--figma-shadow-card);
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
@@ -157,7 +158,7 @@
 .patient-attachments__card:hover,
 .patient-attachments__card:focus-visible {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(15, 30, 60, 0.08);
+  box-shadow: var(--figma-shadow-elevated);
   border-color: var(--color-primary, #1668c1);
 }
 

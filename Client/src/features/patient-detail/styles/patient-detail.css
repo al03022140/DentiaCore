@@ -54,37 +54,12 @@
 
 /* =========================
   INFORMACIÓN DEL PACIENTE
+  Los estilos de .patient-detail__info / __photo / __details viven en
+  patient-info-header.css (stylesheet dedicado del componente). Este
+  bloque quedó duplicado aquí y su `display: flex` en __info competía
+  con .patient-detail__top, forzando la grilla de datos a quedar al
+  lado en vez de abajo.
   ========================= */
-.patient-detail__info {
-  display: flex;
-  align-items: flex-start;
-  padding-bottom: var(--spacing-xxl);
-  border-bottom: 1px solid var(--color-border-medium);
-  margin-bottom: var(--spacing-xxl);
-}
-
-.patient-detail__photo img {
-  width: 8rem;
-  height: 8rem;
-  border-radius: var(--border-radius-circle);
-  object-fit: cover;
-  border: var(--card-border-width) solid var(--color-border-medium);
-  margin-right: var(--spacing-xxl);
-}
-
-.patient-detail__details h1 {
-  margin-bottom: var(--spacing-sm);
-  font: var(--pd-font-title);
-  color: var(--color-text-dark);
-}
-
-.patient-detail__details p {
-  margin: var(--spacing-xs) 0;
-  line-height: 1.5;
-  color: var(--color-text-dark);
-}
-
-/* Los estilos para strong y span están centralizados en patient-detail-shared.css */
 
 /* =========================
   TÍTULOS DE BLOQUE (ODONTO / PERIO)
@@ -111,8 +86,8 @@
   background-color: var(--color-bg-white);
   border-radius: var(--card-border-radius);
   padding: var(--spacing-xl);
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
 }
 
 /* Override para títulos H2 en info cards */

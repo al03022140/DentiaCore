@@ -368,8 +368,8 @@ const ProfessionalProfileSection = () => {
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
       {/* Dispositivo de firma — se aplica al pad de notas y al pad de aquí */}
-      <h3 style={{ marginBottom: '0.5rem' }}>Dispositivo de firma</h3>
-      <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '0.5rem' }}>Dispositivo de firma</h3>
+      <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)', fontSize: 'var(--dc-fs-label)' }}>
         Cómo se captura tu firma manuscrita. Selecciona el dispositivo que usas más seguido
         para que el pad se comporte mejor (tamaño del área, bloqueo de scroll, captura del lápiz).
       </p>
@@ -420,10 +420,10 @@ const ProfessionalProfileSection = () => {
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
       {/* Firma digital */}
-      <h3 style={{ marginBottom: '1rem' }}>Firma digital</h3>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '1rem' }}>Firma digital</h3>
       {firmaMsg && <div className={`settings-message ${firmaMsg.type}`}>{firmaMsg.text}</div>}
       {!previewSrc && hasFirma && serverPreviewLoading && (
-        <p style={{ margin: '0 0 1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+        <p style={{ margin: '0 0 1rem', color: 'var(--color-text-muted)', fontSize: 'var(--dc-fs-label)' }}>
           Cargando tu firma actual…
         </p>
       )}
@@ -448,7 +448,7 @@ const ProfessionalProfileSection = () => {
             <span style={{ fontWeight: 600, color: 'var(--color-text-dark)' }}>
               {localPreview ? 'Vista previa (recién guardada)' : 'Firma actual'}
             </span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            <span style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--color-text-muted)' }}>
               Esta es la firma que se usará al firmar con PIN en notas y consentimientos.
             </span>
             {hasFirma && (

@@ -131,7 +131,7 @@ const ClinicSection = () => {
 
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
-      <h3 style={{ marginBottom: '1rem' }}>Logo de la clínica</h3>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '1rem' }}>Logo de la clínica</h3>
       {hasLogo && logoPreview && (
         <div style={{ marginBottom: '1rem' }}>
           <img

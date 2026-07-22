@@ -308,7 +308,7 @@ const CreateAppointmentModal = ({
         <div className="cam-body">
           {/* ── Paciente ── */}
           <div className="cam-section">
-            <label className="cam-label">Paciente</label>
+            <label className="cam-label cam-label--required">Paciente</label>
             {selectedPatient ? (
               <div className={`cam-patient-card ${(fixedPatient || isEditing) ? 'cam-patient-card--fixed' : ''}`}>
                 <img
@@ -368,7 +368,7 @@ const CreateAppointmentModal = ({
 
           {/* ── Doctor ── */}
           <div className="cam-section">
-            <label className="cam-label">Doctor</label>
+            <label className="cam-label cam-label--required">Doctor</label>
             <select className="cam-input" value={selectedDoctor} onChange={e => setSelectedDoctor(e.target.value)}>
               <option value="">Seleccionar doctor...</option>
               {doctors.map(d => (
@@ -386,7 +386,7 @@ const CreateAppointmentModal = ({
           {/* ── Fecha, Hora y Duración ── */}
           <div className="cam-section cam-section--row">
             <div className="cam-section cam-section--grow">
-              <label className="cam-label">Fecha y Hora</label>
+              <label className="cam-label cam-label--required">Fecha y Hora</label>
               <input
                 type="datetime-local"
                 className="cam-input"
@@ -414,7 +414,7 @@ const CreateAppointmentModal = ({
 
           {/* ── Motivo ── */}
           <div className="cam-section">
-            <label className="cam-label">Motivo de la consulta</label>
+            <label className="cam-label cam-label--required">Motivo de la consulta</label>
             <input
               type="text"
               className="cam-input"

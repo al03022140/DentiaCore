@@ -150,10 +150,13 @@
   flex-grow: 1;
 }
 
-/* Nombre: protagonista, medido para no dominar */
+/* Nombre: misma tipografía que .patient-name-container de patient-list */
 .np-card_name {
-  font: 600 clamp(1.125rem, 1.45vw, 1.375rem) / 1.2 var(--figma-font-family);
-  letter-spacing: -0.02em;
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: var(--figma-text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -162,15 +165,33 @@
   text-transform: capitalize;
 }
 
-/* ID · edad — una sola línea, silenciosa (secundaria) */
+/* ID · edad — misma tipografía que .patient-bottom de patient-list */
 .np-card_meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--dc-fs-meta);
-  font-weight: 500;
+  font-weight: var(--font-weight-normal);
+  line-height: 1.35;
   color: var(--figma-text-secondary);
-  letter-spacing: 0.005em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ID como badge/pill — idéntico a .patient-id de patient-list */
+.np-card_id {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(8, 72, 136, 0.08);
+  color: var(--color-primary);
+  border-radius: 99px;
+  padding: 1px 7px;
+  font-size: var(--dc-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  white-space: nowrap;
 }
 
 /* ── Fila de la cita: hora fuerte + procedimiento como badge ligero ──

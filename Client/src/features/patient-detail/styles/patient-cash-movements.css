@@ -102,7 +102,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--border-radius-md);
   background: var(--color-bg-soft, #f7f9fc);
-  border: 1px solid var(--color-border-light, #e2e8f0);
+  border: 1px solid var(--figma-border-default);
 }
 
 .patient-cash-movements .cash-mov-total__label {
@@ -193,8 +193,9 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--border-radius-md);
   background: var(--color-bg-white, #fff);
-  border: 1px solid var(--color-border-light, #e2e8f0);
+  border: 1px solid var(--figma-border-default);
   border-left: 3px solid var(--color-border-medium, #cbd5e0);
+  box-shadow: var(--figma-shadow-card);
 }
 
 .patient-cash-movements .cash-mov-item--income {

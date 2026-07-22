@@ -252,7 +252,7 @@ const GoogleCalendarSection = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: '0.85rem',
+              padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: 'var(--dc-fs-label)',
               backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent)',
               border: '1px solid color-mix(in srgb, var(--color-success, #22c55e) 35%, transparent)',
               color: 'var(--color-success, #16a34a)',
@@ -263,7 +263,7 @@ const GoogleCalendarSection = () => {
               type="button"
               className="settings-btn-danger"
               onClick={handleDisconnect}
-              style={{ fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}
+              style={{ fontSize: 'var(--dc-fs-label)', padding: '0.3rem 0.7rem' }}
             >
               Desconectar
             </button>
@@ -291,7 +291,7 @@ const GoogleCalendarSection = () => {
           <div className="settings-form-group">
             <label>Calendario destino</label>
             {loadingCalendars ? (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Cargando calendarios…</p>
+              <p style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--text-secondary)' }}>Cargando calendarios…</p>
             ) : calendars.length > 0 ? (
               <>
                 <select
@@ -309,7 +309,7 @@ const GoogleCalendarSection = () => {
                 </p>
               </>
             ) : (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <p style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--text-secondary)' }}>
                 No se encontraron calendarios. Verifica que tu cuenta tenga al menos un calendario con permisos de escritura.
               </p>
             )}
@@ -317,7 +317,7 @@ const GoogleCalendarSection = () => {
 
           <div className="settings-form-group">
             <label>Sincronización automática</label>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: 'var(--dc-fs-label)', color: 'var(--text-secondary)' }}>
               Los eventos se sincronizan automáticamente cada 5 minutos mientras el calendario está abierto.
               Las citas creadas en el sistema se envían a Google Calendar en tiempo real.
             </p>

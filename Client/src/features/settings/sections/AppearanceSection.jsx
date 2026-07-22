@@ -33,8 +33,8 @@ const AppearanceSection = () => {
             />
             <img src={opt.icon} alt="" width="24" height="24" className="theme-icon" style={{ flexShrink: 0 }} />
             <div>
-              <div style={{ fontWeight: 500 }}>{opt.label}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{opt.desc}</div>
+              <div style={{ fontWeight: 600 }}>{opt.label}</div>
+              <div style={{ fontSize: 'var(--dc-fs-label)', fontWeight: 500, color: 'var(--color-text-muted)' }}>{opt.desc}</div>
             </div>
           </label>
         ))}

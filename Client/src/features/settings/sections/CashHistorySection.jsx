@@ -114,11 +114,11 @@ const CashHistorySection = () => {
           <ClockCircleOutlined /> {formatTime(s.startTime)}
           {s.endTime ? ` → ${formatTime(s.endTime)}` : ' → en curso'}
         </span>
-        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+        <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--dc-fs-label)' }}>
           <UserOutlined /> Abrió: <strong>{opener}</strong>
           {closer && <> · Cerró: <strong>{closer}</strong></>}
         </span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem', fontSize: '0.85rem' }}>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem', fontSize: 'var(--dc-fs-label)' }}>
           <Tooltip title="Saldo inicial">
             Inicio: <strong>{formatMoney(s.initialAmount)}</strong>
           </Tooltip>
@@ -147,7 +147,7 @@ const CashHistorySection = () => {
           gap: '0.25rem 0.5rem',
           padding: '0.5rem 0.25rem',
           borderBottom: '1px solid var(--color-border)',
-          fontSize: '0.88rem'
+          fontSize: 'var(--dc-fs-label)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -167,7 +167,7 @@ const CashHistorySection = () => {
         >
           {sign}{formatMoney(m.amount)}
         </div>
-        <div style={{ gridColumn: '1 / -1', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 'var(--dc-fs-label)', color: 'var(--color-text-secondary)' }}>
           {formatDateTime(m.date)} · {m.creadoPor?.nombre || 'usuario desconocido'}
         </div>
       </div>
@@ -200,7 +200,7 @@ const CashHistorySection = () => {
             marginBottom: '0.75rem',
             background: 'var(--color-blue-500-12)',
             borderRadius: 'var(--border-radius-md)',
-            fontSize: '0.85rem'
+            fontSize: 'var(--dc-fs-label)'
           }}
         >
           <div>
@@ -259,7 +259,7 @@ const CashHistorySection = () => {
         >
           <ReloadOutlined /> Recargar
         </button>
-        <span style={{ marginLeft: 'auto', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+        <span style={{ marginLeft: 'auto', color: 'var(--color-text-secondary)', fontSize: 'var(--dc-fs-label)' }}>
           {sessions.length === 0
             ? 'Sin sesiones'
             : `${sessions.length} ${sessions.length === 1 ? 'sesión' : 'sesiones'}`}

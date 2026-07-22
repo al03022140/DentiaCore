@@ -1,14 +1,24 @@
 .statistics-page {
   display: grid;
-  grid-template-columns: 74% 25%;
-  gap: 1.5rem;
+  /* fr en vez de %: el gap se descuenta antes de repartir, así 74%+25%+gap
+     no se pasa del 100% y el borde derecho del panel deja de recortarse. */
+  grid-template-columns: minmax(0, 74fr) minmax(0, 25fr);
+  /* 12px: misma separación card↔card de patient-list (--pl-grid-column-gap) */
+  gap: var(--figma-space-md);
   height: 100%;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
-  font: var(--pd-font-base);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
+  /* hidden: contiene la página en su propio alto (100%) para que el scroll
+     vertical viva solo en los paneles internos (.metrics-panel__list, etc.),
+     no en `.content`. El padding de abajo le da a la sombra/borde de las
+     cards que tocan el borde el espacio para pintarse sin recortarse. */
   overflow: hidden;
-  padding: 0;
+  padding: 0.4rem;
   /* Ancho del pill de temporalidad: la opción más ancha ("Semanal" / "Mensual") para que no mueva los chips de gráfica */
   --chart-granularity-trigger-width: 6.75rem;
 }
@@ -37,7 +47,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
+  gap: var(--figma-space-md);
   flex: 1 1 0;
   min-height: 0;
   align-content: stretch;
@@ -46,8 +56,8 @@
 .chart-slot {
   background: var(--color-bg-white);
   border-radius: var(--card-border-radius);
-  border: var(--card-border);
-  box-shadow: var(--card-shadow);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -73,7 +83,7 @@
 
 .chart-slot--filled:hover {
   border-color: var(--color-blue-500-25);
-  box-shadow: 0 0.4rem 1rem var(--color-blue-500-12);
+  box-shadow: var(--figma-shadow-elevated);
 }
 
 .chart-slot--active {
@@ -89,7 +99,10 @@
 }
 
 .slot-placeholder__headline {
-  font: var(--pd-font-section-body);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
   color: var(--color-text-secondary);
 }
 
@@ -150,15 +163,21 @@
 }
 
 .chart-slot__granularity-label {
-  font: var(--text-dense-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-label);
+  font-weight: var(--font-weight-light);
+  line-height: 1.3;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
 .chart-slot__title {
   margin: 0;
-  color: var(--color-primary);
-  font: var(--pd-font-label-md);
+  color: var(--color-text-primary); /* Título de sección canónico: negro bold */
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
 }
 
 .chart-slot__granularity {
@@ -175,7 +194,10 @@
   min-width: 0;
   flex-shrink: 0;
   cursor: pointer;
-  font: var(--text-dense-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-label);
+  font-weight: var(--font-weight-light);
+  line-height: 1.3;
   color: var(--color-text-secondary);
 }
 
@@ -236,7 +258,9 @@
   border-radius: 0.35rem;
   cursor: pointer;
   color: var(--color-text-secondary);
-  font: var(--text-dense-xs);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-label);
+  font-weight: var(--font-weight-light);
   line-height: 1.25;
 }
 
@@ -259,7 +283,9 @@
 /* Chips más compactos aquí para que Linea/Barra/Pastel/Heatmap quepan en una sola línea */
 .chart-slot__viz-options .viz-chip {
   padding: 0.12rem 0.35rem;
-  font: var(--text-dense-xs);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-label);
+  font-weight: var(--font-weight-light);
   line-height: 1.2;
 }
 
@@ -268,7 +294,10 @@
   background: var(--color-neutral-250);
   border-radius: 999px;
   padding: 0.18rem 0.5rem;
-  font: var(--text-dense-xs);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-label);
+  font-weight: var(--font-weight-light);
+  line-height: 1.2;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -307,7 +336,10 @@
   line-height: 1;
   border-radius: 999px;
   cursor: pointer;
-  font: var(--pd-font-section-body);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
   opacity: 0.5;
   transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
@@ -341,7 +373,10 @@
   align-items: center;
   gap: 0.65rem;
   color: var(--color-primary);
-  font: var(--pd-font-section-body);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
 }
 
 .chart-slot__state {
@@ -364,7 +399,10 @@
   color: var(--color-text-muted);
   text-align: center;
   margin-top: 0.75rem;
-  font: var(--pd-font-body-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.5;
 }
 
 .chart-slot__status-text--error {
@@ -379,7 +417,10 @@
   background: var(--color-bg-white);
   color: var(--color-primary);
   cursor: pointer;
-  font: var(--pd-font-section-body);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.6;
 }
 
 .chart-slot__retry:hover {
@@ -402,8 +443,8 @@
   flex-direction: column;
   background: var(--color-bg-white);
   border-radius: var(--card-border-radius);
-  border: var(--card-border);
-  box-shadow: var(--card-shadow);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
   padding: 1.25rem;
   min-width: 0;
   min-height: 0;
@@ -429,15 +470,25 @@
   flex-shrink: 0;
 }
 
+/* Título de sección canónico: negro bold; divisor neutro (no azul),
+   mismo patrón que .cash-card__header. */
 .metrics-panel__header h3 {
-  margin: 0;
-  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--figma-border-default);
 }
 
 .metrics-panel__header p {
   margin: 0.25rem 0 1rem;
   color: var(--color-text-muted);
-  font: var(--pd-font-body-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-light);
+  line-height: 1.5;
 }
 
 .metrics-panel__list {
@@ -483,8 +534,8 @@
   background: var(--color-neutral-300);
   border-radius: var(--card-border-radius);
   padding: 1rem;
-  border: var(--card-border);
-  box-shadow: var(--card-shadow);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
   cursor: grab;
   display: flex;
   flex-direction: column;
@@ -498,7 +549,7 @@
 
 .metrics-card:hover {
   border-color: var(--color-blue-500-25);
-  box-shadow: 0 0.4rem 1rem var(--color-blue-500-12);
+  box-shadow: var(--figma-shadow-elevated);
 }
 
 .metrics-card:active {
@@ -516,7 +567,10 @@
 
 .metrics-card__header h4 {
   margin: 0;
-  font: var(--pd-font-label-md);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-body);
+  font-weight: var(--font-weight-light);
+  line-height: 1.4;
   color: var(--color-text-primary);
   flex: 1 1 auto;
   min-width: 0;
@@ -529,7 +583,10 @@
   color: var(--color-primary);
   border-radius: 999px;
   padding: 0.25rem 0.55rem;
-  font: var(--pd-font-label-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-meta);
+  font-weight: var(--font-weight-light);
+  line-height: 1.4;
   flex: 0 1 auto;
   max-width: 100%;
   white-space: nowrap;
@@ -552,7 +609,8 @@
   background: var(--color-bg-white);
   border-radius: 999px;
   padding: 0.25rem 0.65rem;
-  font: var(--pd-font-label-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 0.01em;
@@ -596,7 +654,10 @@
 
 .metrics-card__description {
   margin: 0;
-  font: var(--pd-font-label-sm);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-meta);
+  font-weight: var(--font-weight-light);
+  line-height: 1.4;
   color: var(--color-text-secondary);
 }
 

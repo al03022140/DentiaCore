@@ -101,7 +101,7 @@ const AppointmentsSection = () => {
         <label>Días laborales</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {DAYS.map((d) => (
-            <label key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.9rem' }}>
+            <label key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--dc-fs-meta)' }}>
               <input type="checkbox" checked={workDays.includes(d.key)} onChange={() => toggleDay(d.key)} />
               {d.label}
             </label>
