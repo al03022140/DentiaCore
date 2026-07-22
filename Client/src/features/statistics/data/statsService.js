@@ -15,15 +15,22 @@ const CHART_TYPE_MAP = {
 
 // Paleta alineada con `Client/src/features/main-page/components/patient-stats.jsx`
 // para que las gráficas de Estadísticas se vean iguales que el widget del Home.
+// El teal original (75,192,192) es un cian — mismo canal G y B que el azul de
+// al lado — y se confundía con él. Reemplazado por un rosa/magenta (hue
+// ~330°, lejos de azul/naranja/morado): se descartó el rojo porque connota
+// alerta/pérdida y estas series no son negativas por naturaleza.
+// bg al 25% se diluye casi a blanco (los colores terminaban como pasteles
+// casi idénticos en luminosidad, solo el tono cambiaba) — subido a 55% para
+// que el color de cada serie se note de verdad en barras/áreas de línea.
 const COLOR_PALETTE = [
-  { bg: 'rgba(75, 192, 192, 0.25)',  border: 'rgba(75, 192, 192, 1)'  },
-  { bg: 'rgba(54, 162, 235, 0.25)',  border: 'rgba(54, 162, 235, 1)'  },
-  { bg: 'rgba(255, 159, 64, 0.25)',  border: 'rgba(255, 159, 64, 1)'  },
-  { bg: 'rgba(153, 102, 255, 0.25)', border: 'rgba(153, 102, 255, 1)' }
+  { bg: 'rgba(236, 72, 153, 0.55)',  border: 'rgba(236, 72, 153, 1)'  },
+  { bg: 'rgba(54, 162, 235, 0.55)',  border: 'rgba(54, 162, 235, 1)'  },
+  { bg: 'rgba(255, 159, 64, 0.55)',  border: 'rgba(255, 159, 64, 1)'  },
+  { bg: 'rgba(153, 102, 255, 0.55)', border: 'rgba(153, 102, 255, 1)' }
 ];
 
 const PIE_PALETTE = [
-  'rgba(75, 192, 192, 0.85)',
+  'rgba(236, 72, 153, 0.85)',
   'rgba(54, 162, 235, 0.85)',
   'rgba(255, 159, 64, 0.85)',
   'rgba(153, 102, 255, 0.85)'

@@ -16,11 +16,15 @@ const STAT_OPTIONS = [
   { key: 'cashbox-performance', endpoint: '/stats/cashbox-performance', label: 'Caja por Turno',         type: 'bar' },
 ];
 
+// Mismo ajuste que en statsService.js: teal (75,192,192, un cian que se
+// confundía con el azul de al lado) reemplazado por rosa/magenta — se
+// descartó el rojo por su connotación de alerta/pérdida — y bg subido de
+// 25%→55% (a 25% se diluía casi a blanco y los colores se veían casi iguales).
 const PALETTE = [
-  { bg: 'rgba(75, 192, 192, 0.25)',  border: 'rgba(75, 192, 192, 1)'  },
-  { bg: 'rgba(54, 162, 235, 0.25)',  border: 'rgba(54, 162, 235, 1)'  },
-  { bg: 'rgba(255, 159, 64, 0.25)',  border: 'rgba(255, 159, 64, 1)'  },
-  { bg: 'rgba(153, 102, 255, 0.25)', border: 'rgba(153, 102, 255, 1)' },
+  { bg: 'rgba(236, 72, 153, 0.55)',  border: 'rgba(236, 72, 153, 1)'  },
+  { bg: 'rgba(54, 162, 235, 0.55)',  border: 'rgba(54, 162, 235, 1)'  },
+  { bg: 'rgba(255, 159, 64, 0.55)',  border: 'rgba(255, 159, 64, 1)'  },
+  { bg: 'rgba(153, 102, 255, 0.55)', border: 'rgba(153, 102, 255, 1)' },
 ];
 
 const PatientStats = () => {
