@@ -40,6 +40,8 @@ const PatientCashMovements = ({ patientId }) => {
   // Modal de pago / abono sobre un cobro pendiente (click en card de pendientes).
   const [payCharge, setPayCharge] = useState(null);
   const [payAmount, setPayAmount] = useState('');
+  // Vista previa en vivo: saldo que quedaría tras aplicar el monto escrito
+  const abonoPreview = round2(parseFloat(payAmount) || 0);
   const [payMethod, setPayMethod] = useState('CASH');
   const [payConfirmText, setPayConfirmText] = useState('');
   const [registeringPayment, setRegisteringPayment] = useState(false);
@@ -499,9 +501,19 @@ const PatientCashMovements = ({ patientId }) => {
               <p><strong>Ya pagado:</strong> {formatMoney(payCharge.totalPagado)}</p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente:</strong> {formatMoney(payCharge.saldoPendiente)}
+                {abonoPreview > 0 && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, payCharge.saldoPendiente - abonoPreview)))}
+                  </span>
+                )}
               </p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente total del paciente:</strong> {formatMoney(totalPendingAmount)}
+                {abonoPreview > 0 && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, totalPendingAmount - abonoPreview)))}
+                  </span>
+                )}
               </p>
             </div>
 

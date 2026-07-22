@@ -21,6 +21,8 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
   const [quickPayingId, setQuickPayingId] = useState(null);
   const [payModalCharge, setPayModalCharge] = useState(null);
   const [payAmount, setPayAmount] = useState('');
+  // Vista previa en vivo: saldo que quedaría tras aplicar el monto escrito
+  const abonoPreview = round2(parseFloat(payAmount) || 0);
   const [payMethod, setPayMethod] = useState('CASH');
   const [payConfirmText, setPayConfirmText] = useState('');
   const [registeringPayment, setRegisteringPayment] = useState(false);
@@ -321,10 +323,20 @@ const PendingChargesPanel = ({ refreshTrigger, isBoxOpen = true }) => {
               <p><strong>Ya pagado:</strong> {formatMoney(payModalCharge.totalPagado)}</p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente:</strong> {formatMoney(payModalCharge.saldoPendiente)}
+                {abonoPreview > 0 && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, payModalCharge.saldoPendiente - abonoPreview)))}
+                  </span>
+                )}
               </p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente total del paciente:</strong>{' '}
                 {patientPendingTotal === null ? 'Calculando…' : formatMoney(patientPendingTotal)}
+                {abonoPreview > 0 && patientPendingTotal !== null && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, patientPendingTotal - abonoPreview)))}
+                  </span>
+                )}
               </p>
             </div>
 

@@ -42,6 +42,13 @@ const PatientChargesCard = ({ patientId }) => {
 
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH');
+  // Vista previa en vivo: saldo que quedaría tras aplicar el monto escrito
+  const abonoPreview = round2(parseFloat(payAmount) || 0);
+  const patientPendingTotal = round2(
+    charges
+      .filter(c => !c.cancelado)
+      .reduce((sum, c) => sum + (Number(c.saldoPendiente) || 0), 0)
+  );
   const [payConfirmText, setPayConfirmText] = useState('');
 
   const [cancelMotivo, setCancelMotivo] = useState('');
@@ -478,14 +485,20 @@ const PatientChargesCard = ({ patientId }) => {
               <p><strong>Ya pagado:</strong> {formatMoney(selectedCharge.totalPagado)}</p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente:</strong> {formatMoney(selectedCharge.saldoPendiente)}
+                {abonoPreview > 0 && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, selectedCharge.saldoPendiente - abonoPreview)))}
+                  </span>
+                )}
               </p>
               <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                 <strong>Saldo pendiente total del paciente:</strong>{' '}
-                {formatMoney(round2(
-                  charges
-                    .filter(c => !c.cancelado)
-                    .reduce((sum, c) => sum + (Number(c.saldoPendiente) || 0), 0)
-                ))}
+                {formatMoney(patientPendingTotal)}
+                {abonoPreview > 0 && (
+                  <span style={{ color: 'var(--color-success)' }}>
+                    {' '}→ quedaría {formatMoney(round2(Math.max(0, patientPendingTotal - abonoPreview)))}
+                  </span>
+                )}
               </p>
             </div>
 
