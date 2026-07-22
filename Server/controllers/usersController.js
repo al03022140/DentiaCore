@@ -77,7 +77,14 @@ const sanitizeUser = (user) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await Usuario.find().sort({ createdAt: -1 }).select('-contraseña');
-    res.json(users.map(sanitizeUser));
+    // rolePermissions = lo que otorga el rol (sin overrides individuales). La UI
+    // de "Por Usuario" lo usa para mostrar como activos-bloqueados los permisos
+    // que ya trae el rol y dejar editables solo los adicionales.
+    const { rolePermissionOverrides } = await ClinicSettings.getSettings();
+    res.json(users.map((u) => ({
+      ...sanitizeUser(u),
+      rolePermissions: getEffectivePermissions({ rol: u.rol, permissions: [] }, rolePermissionOverrides),
+    })));
   } catch (_error) {
     res.status(500).json({ message: 'Error al obtener usuarios' });
   }

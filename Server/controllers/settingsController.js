@@ -398,6 +398,12 @@ exports.updateUserPermissions = async (req, res) => {
       return res.status(400).json({ message: 'ID de usuario inválido' });
     }
     const { permissions } = req.body;
+    // Permisos del rol revocados para este usuario (grant/deny). Restar acceso
+    // no es escalada, así que no pasa por validatePermissionAssignment; solo lo
+    // saneamos a un array de strings.
+    const deniedPermissions = Array.isArray(req.body.deniedPermissions)
+      ? req.body.deniedPermissions.filter((p) => typeof p === 'string')
+      : [];
 
     const targetUser = await Usuario.findById(userId).select('rol permissions');
     if (!targetUser) return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -414,7 +420,7 @@ exports.updateUserPermissions = async (req, res) => {
       return res.status(403).json({ message: check.message });
     }
 
-    const user = await Usuario.findByIdAndUpdate(userId, { $set: { permissions } }, { new: true })
+    const user = await Usuario.findByIdAndUpdate(userId, { $set: { permissions, deniedPermissions } }, { new: true })
       .select('-contraseña -refreshTokenHash -previousRefreshTokenHash -pinHash -passwordResetToken');
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
     res.json(user);

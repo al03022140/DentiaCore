@@ -260,7 +260,12 @@ const getEffectivePermissions = (user, roleOverrides) => {
   // Roles editables (doctor/asistente/recepcionista): el override, si existe, es
   // autoritativo y puede tanto agregar como QUITAR permisos.
   const rolePermissions = override !== null ? override : base;
-  return mergePermissions(rolePermissions, user.permissions || []);
+  const granted = mergePermissions(rolePermissions, user.permissions || []);
+
+  // Grant/deny por usuario: los permisos revocados individualmente se restan al
+  // final. Solo aplica a roles editables (arriba los protegidos ya retornaron).
+  const denied = user.deniedPermissions || [];
+  return denied.length ? granted.filter((p) => !denied.includes(p)) : granted;
 };
 
 /**

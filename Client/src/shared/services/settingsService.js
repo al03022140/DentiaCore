@@ -53,8 +53,8 @@ export const updateRolePermissions = async (role, permissions) => {
 
 // ── User Permission Overrides ────────────────────────────────
 
-export const updateUserPermissions = async (userId, permissions) => {
-  const { data } = await API.patch(`/settings/user-permissions/${encodeURIComponent(userId)}`, { permissions });
+export const updateUserPermissions = async (userId, permissions, deniedPermissions = []) => {
+  const { data } = await API.patch(`/settings/user-permissions/${encodeURIComponent(userId)}`, { permissions, deniedPermissions });
   return data;
 };
 
