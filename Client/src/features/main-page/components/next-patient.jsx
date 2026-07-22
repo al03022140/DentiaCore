@@ -192,8 +192,8 @@ const NextPatient = () => {
           <span className="np-card_name" title={patientName}>{patientName}</span>
           {(clinicId || edad != null || sexo) && (
             <span className="np-card_meta">
+              {clinicId && <span className="np-card_id">{clinicId}</span>}
               {[
-                clinicId ? `ID ${clinicId}` : null,
                 edad != null ? `${edad} años` : null,
                 sexo,
               ].filter(Boolean).join(' · ')}

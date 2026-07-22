@@ -561,7 +561,7 @@ const StatisticsPage = () => {
 
       <aside className="statistics-page__right">
         <header className="metrics-panel__header">
-          <h3>Metricas disponibles</h3>
+          <h3>Métricas</h3>
           <p>Arrastra para componer el tablero.</p>
         </header>
         <div className="metrics-panel__list" role="list">

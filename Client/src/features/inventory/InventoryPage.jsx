@@ -292,15 +292,15 @@ const InventoryPage = () => {
 
   return (
     <div className="inventory-page">
-      <h1 className="inventory-page__title">Inventario</h1>
-
-      <Tabs
-        defaultActiveKey="inventario"
-        items={[
-          { key: 'inventario', label: 'Inventario', children: inventarioTab },
-          { key: 'kits', label: 'Kits de procedimiento', children: <KitsPanel items={items} canManage={canManage} /> }
-        ]}
-      />
+      <section className="inventory-page__card">
+        <Tabs
+          defaultActiveKey="inventario"
+          items={[
+            { key: 'inventario', label: 'Inventario', children: inventarioTab },
+            { key: 'kits', label: 'Kits de procedimiento', children: <KitsPanel items={items} canManage={canManage} /> }
+          ]}
+        />
+      </section>
 
       <ItemFormModal
         visible={showItemForm}
