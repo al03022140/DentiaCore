@@ -96,8 +96,43 @@
   overflow: hidden;
 }
 
+/* Separadores verticales entre títulos del header — antd ya los trae, pero
+   muy tenues (rgba 0.06) sobre el gris claro del header; se refuerzan. */
+.inventory-page .ant-table-thead > tr > th::before {
+  background-color: var(--figma-border-default) !important;
+  height: 1.92em !important;
+}
+
+/* Mismo separador en el cuerpo — línea corta centrada, no de borde a
+   borde, igual que la del header (no un border-right de arriba a abajo). */
+.inventory-page .ant-table-tbody > tr > td:not(:last-child) {
+  position: relative;
+}
+
+.inventory-page .ant-table-tbody > tr > td:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 1.92em;
+  background-color: var(--figma-border-default);
+  transform: translateY(-50%);
+}
+
+/* Columnas que van juntas visualmente: sin separador a su derecha
+   (Stock+Unidad, Estado+botones de acciones) */
+.inventory-page .ant-table-thead > tr > th.inventory-col-nodivider::before,
+.inventory-page .ant-table-tbody > tr > td.inventory-col-nodivider::before {
+  display: none !important;
+}
+
 .inventory-item__name { font-weight: 600; }
 .inventory-item__category { font-size: var(--dc-fs-label); color: var(--color-text-muted); }
+
+/* Dígitos de ancho fijo en toda la tabla: stock, mínimo y fechas alinean */
+.inventory-page .ant-table { font-variant-numeric: tabular-nums; }
+
 .inventory-stock--zero { color: var(--color-danger); font-weight: 700; }
 .inventory-muted { color: var(--color-text-muted); }
 
@@ -200,4 +235,298 @@
   .inventory-toolbar__actions { margin-left: 0; width: 100%; }
   .inventory-form__row { flex-direction: column; }
   .inventory-form__row--material { flex-direction: row; }
+}
+
+/* ══ Modo oscuro ══════════════════════════════════════════════════
+   El CSS propio ya voltea solo (tokens --figma-*/--color-*). Lo de abajo
+   cubre SOLO los componentes antd page-level, que ignoran data-theme
+   porque antdTheme (app.jsx) es estático en claro. Mismo patrón scoped
+   que cash-page.css. Modales y dropdowns de Select NO van aquí: heredan
+   las reglas globales que ya viven en cash-page.css. */
+
+/* — Tabla — */
+[data-theme="dark"] .inventory-page .ant-table {
+  background: var(--figma-bg-card) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+/* Sin contorno en dark (pedido del dueño): fuera borde y cualquier anillo
+   residual (outline/sombra) en todas las capas que abrazan la tabla. */
+[data-theme="dark"] .inventory-page .ant-table,
+[data-theme="dark"] .inventory-page .ant-table-wrapper,
+[data-theme="dark"] .inventory-page .ant-table-container {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Separadores verticales del header (th::before) — en dark salen claros */
+[data-theme="dark"] .inventory-page .ant-table-thead > tr > th::before {
+  background-color: var(--figma-border-default) !important;
+}
+
+/* Cinturón: ninguna capa envolvente de la tabla conserva blanco estático */
+[data-theme="dark"] .inventory-page .ant-table-wrapper,
+[data-theme="dark"] .inventory-page .ant-spin-nested-loading,
+[data-theme="dark"] .inventory-page .ant-spin-container,
+[data-theme="dark"] .inventory-page .ant-table-container,
+[data-theme="dark"] .inventory-page .ant-table-content,
+[data-theme="dark"] .inventory-page .ant-table-content > table {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-thead > tr > th {
+  background: var(--figma-bg-neutral) !important;
+  color: var(--figma-text-primary) !important;
+  border-bottom: 1px solid var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-thead th.ant-table-column-has-sorters:hover {
+  background: var(--figma-bg-neutral-alt) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-column-sorter {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-tbody > tr > td {
+  background: var(--figma-bg-card) !important;
+  border-bottom: 1px solid var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+/* antd tiñe la columna ordenada; en dark se iguala al resto */
+[data-theme="dark"] .inventory-page .ant-table-tbody > tr > td.ant-table-column-sort {
+  background: var(--figma-bg-card) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-tbody > tr:hover > td,
+[data-theme="dark"] .inventory-page .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+  background: var(--figma-bg-neutral) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-table-placeholder > td {
+  background: var(--figma-bg-card) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-empty-description {
+  color: var(--figma-text-secondary) !important;
+}
+
+/* Paginación */
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-item {
+  background: transparent !important;
+  border-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-item a,
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-item-active {
+  border-color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-item-active a {
+  color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-pagination .ant-pagination-disabled .ant-pagination-item-link {
+  color: var(--color-text-disabled) !important;
+}
+
+/* — Toolbar: buscador — */
+[data-theme="dark"] .inventory-page .ant-input-affix-wrapper,
+[data-theme="dark"] .inventory-page .ant-input {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-input-affix-wrapper .ant-input {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-input::placeholder {
+  color: var(--figma-text-secondary) !important;
+  opacity: 0.75 !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-input-group-addon {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+}
+
+/* — Toolbar: select de categoría (el dropdown es global, ya cubierto) — */
+[data-theme="dark"] .inventory-page .ant-select-selector {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-select-selection-item {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-select-selection-placeholder {
+  color: var(--figma-text-secondary) !important;
+  opacity: 0.75 !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-select-arrow {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-select-clear {
+  background: var(--figma-bg-input) !important;
+  color: var(--figma-text-secondary) !important;
+}
+
+/* — Botones — (el rojo de borrar conserva su color: solo se le oscurece el fondo) */
+[data-theme="dark"] .inventory-page .ant-btn-default {
+  background: var(--figma-bg-input) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-btn-default:not(.ant-btn-dangerous) {
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-btn-default:not(.ant-btn-dangerous):not(:disabled):hover {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+/* "Entrada" (primary ghost): el colorPrimary estático (#084888) es ilegible
+   sobre fondo oscuro; se re-mapea al primary de dark (#4a9eff vía token) */
+[data-theme="dark"] .inventory-page .ant-btn-primary.ant-btn-background-ghost {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+/* — Tags de estado — los presets de antd traen fondos pastel que deslumbran
+   en dark; se re-tiñen translúcidos. Base neutra primero ("Inactivo"),
+   colores después (ganan por especificidad). */
+[data-theme="dark"] .inventory-page .ant-tag {
+  background: var(--figma-bg-neutral) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tag-red {
+  background: rgba(231, 76, 60, 0.16) !important;
+  border-color: rgba(231, 76, 60, 0.45) !important;
+  color: #ff8b81 !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tag-volcano {
+  background: rgba(250, 84, 28, 0.16) !important;
+  border-color: rgba(250, 84, 28, 0.45) !important;
+  color: #ff9c6e !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tag-orange {
+  background: rgba(243, 156, 18, 0.16) !important;
+  border-color: rgba(243, 156, 18, 0.45) !important;
+  color: #ffc069 !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tag-gold {
+  background: rgba(250, 173, 20, 0.16) !important;
+  border-color: rgba(250, 173, 20, 0.5) !important;
+  color: #ffd666 !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tag-green {
+  background: rgba(39, 174, 96, 0.16) !important;
+  border-color: rgba(39, 174, 96, 0.5) !important;
+  color: #7ce0a5 !important;
+}
+
+/* — Popconfirm (borrar ítem) — renderiza en <body>, no se puede scopear a la
+   página. Global a propósito: mismo precedente que las reglas .ant-modal
+   globales de cash-page.css. */
+[data-theme="dark"] .ant-popover .ant-popover-inner {
+  background: var(--figma-bg-card) !important;
+  box-shadow: var(--figma-shadow-elevated) !important;
+}
+
+[data-theme="dark"] .ant-popover .ant-popover-arrow::before {
+  background: var(--figma-bg-card) !important;
+}
+
+[data-theme="dark"] .ant-popover .ant-popover-title,
+[data-theme="dark"] .ant-popover .ant-popconfirm-message-title {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-popover .ant-popover-inner-content,
+[data-theme="dark"] .ant-popover .ant-popconfirm-description {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-popover .ant-btn-default {
+  background: var(--figma-bg-input) !important;
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+/* — Drawer del Kardex — también portaled a <body>; mínimos para que no
+   salga blanco. Los detalles internos (tags/list) se afinan al verlo. */
+[data-theme="dark"] .ant-drawer .ant-drawer-content {
+  background: var(--figma-bg-card) !important;
+}
+
+[data-theme="dark"] .ant-drawer .ant-drawer-header {
+  border-bottom: 1px solid var(--figma-border-default) !important;
+}
+
+[data-theme="dark"] .ant-drawer .ant-drawer-title {
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-drawer .ant-drawer-close {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-drawer .ant-list-item {
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+/* — Tabs (Inventario / Kits) — el label usa el colorText estático (negro) */
+[data-theme="dark"] .inventory-page .ant-tabs-tab .ant-tabs-tab-btn {
+  color: var(--figma-text-secondary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tabs-tab:hover .ant-tabs-tab-btn,
+[data-theme="dark"] .inventory-page .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .inventory-page .ant-tabs-ink-bar {
+  background: var(--color-primary) !important;
+}
+
+/* La "línea blanca" sobre la tabla: divisor de las tabs (colorSplit claro) */
+[data-theme="dark"] .inventory-page .ant-tabs-nav::before {
+  border-bottom-color: var(--figma-border-default) !important;
+}
+
+/* — Botones en el CUERPO de modales — cash-page.css solo cubrió el footer
+   (.ant-modal-footer); "+ Agregar material" y la ✕ del kit viven en el body.
+   Global a propósito (mismo precedente): beneficia a todos los modales. */
+[data-theme="dark"] .ant-modal .ant-btn-default {
+  background: var(--figma-bg-input) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-btn-default:not(.ant-btn-dangerous) {
+  border-color: var(--figma-border-default) !important;
+  color: var(--figma-text-primary) !important;
+}
+
+[data-theme="dark"] .ant-modal .ant-btn-default:not(.ant-btn-dangerous):not(:disabled):hover {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
 }

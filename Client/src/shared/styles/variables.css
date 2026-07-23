@@ -720,6 +720,11 @@
    DARK MODE TOKENS
    ========================= */
 [data-theme="dark"] {
+  /* Scrollbars y controles nativos en oscuro — sin esto el navegador los
+     pinta claros y parecen bordes/franjas blancas junto a tablas y paneles
+     (print-light-mode.css lo fuerza a claro al imprimir, y gana ahí). */
+  color-scheme: dark;
+
   /* Paleta principal */
   --color-primary: #4a9eff;
   --color-primary-hover: #6bb3ff;
