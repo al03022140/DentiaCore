@@ -1099,11 +1099,15 @@
   border-bottom: 2px solid var(--color-primary);
 }
 
+/* ID del paciente dentro del header (--dc-fs-title): el 0.9em es proporcional
+   a propósito (~1.62rem, un pelo menor que el nombre). NO mapear a un token
+   fijo: --dc-fs-label/meta lo encogerían a la mitad. Escala canónica = el
+   padre; este em cabalga sobre ella. */
 .trace-patient-id {
   font-weight: normal;
   color: var(--color-text-muted);
   margin-left: 0.5rem;
-  font-size: 0.9em;
+  font-size: 0.9em; /* proporcional al header canónico, no un valor suelto */
 }
 
 .trace-role-badge {
