@@ -49,10 +49,15 @@
   flex-grow: 1; /* Ocupa el espacio restante */
 }
 
-/* Nombre del paciente */
+/* Nombre del paciente — héroe canónico: mismo token --dc-fs-display que el mes
+   del calendario (variables.css lo designa para "título del expediente").
+   Antes: --pd-font-title (4rem fijo, 64px); ahora responsivo y coherente. */
 .patient-detail__details h1 {
   margin-bottom: 0.5rem;
-  font: var(--pd-font-title);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-display);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.1;
   color: var(--color-text-dark);
 }
 
