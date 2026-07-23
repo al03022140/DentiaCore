@@ -4,10 +4,13 @@ const dotenv = require('dotenv');
 // Cargar primero Server/.env y luego sobreescribir con el .env raíz para asegurar credenciales de Google
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+// Lector único de configuración (DEPLOYMENT_MODE fase 1) — requiere dotenv ya cargado
+const config = require('../config/env');
 
 // O-2: fijar TZ del proceso — sin esto, los cortes de caja y timestamps de
 // auditoría dependen de la TZ del SO donde corra el server (silencioso si
 // difiere de la de la clínica). Respeta un TZ explícito del .env si existe.
+// eslint-disable-next-line no-process-env -- escritura deliberada: default de TZ del proceso
 process.env.TZ = process.env.TZ || 'America/Mexico_City';
 
 // Importaciones principales
@@ -49,8 +52,8 @@ const app = express();
 // despliega DETRÁS de un reverse-proxy (nginx/Caddy con HTTPS), poner
 // TRUST_PROXY=1 (o el nº de saltos) para que req.ip lea X-Forwarded-For y el
 // rate limiting no agrupe a todos los usuarios bajo la IP del proxy.
-if (process.env.TRUST_PROXY) {
-    const tp = process.env.TRUST_PROXY;
+if (config.server.trustProxy) {
+    const tp = config.server.trustProxy;
     app.set('trust proxy', /^\d+$/.test(tp) ? parseInt(tp, 10) : tp);
 }
 
@@ -93,7 +96,7 @@ app.use(cors({
             'http://localhost:5173',  // Vite dev server
             'http://localhost:5174',  // Vite dev server alternativo
             'http://localhost:5002',  // Backend (para peticiones del mismo origen)
-            process.env.CLIENT_URL    // URL del cliente desde .env
+            config.server.clientUrl    // URL del cliente desde .env
         ].filter(Boolean); // Eliminar valores undefined/null
         
         // Permitir peticiones sin origen (Postman, curl, mismo origen). Con
@@ -134,7 +137,7 @@ morgan.token('urlSafe', (req) => {
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 });
-const morganFormat = process.env.NODE_ENV === 'production'
+const morganFormat = config.isProd
   ? ':remote-addr - :remote-user [:date[clf]] ":method :urlSafe HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'
   : ':method :urlSafe :status :response-time ms - :res[content-length]';
 app.use(morgan(morganFormat, { stream: logger.stream }));
@@ -174,7 +177,7 @@ app.use('/uploads', uploadsAuth, express.static(uploadsBase, {
 app.use(express.static(path.join(__dirname, '../../Client/dist')));
 
 // 5) Endpoints de debug (async/await) - SOLO EN DESARROLLO
-if (process.env.NODE_ENV !== 'production') {
+if (!config.isProd) {
 app.get('/api/debug/uploads/:id/odontograma-inicial', async (req, res, next) => {
     const dir = path.join(uploadsBase, 'pacientes', req.params.id, 'odontograma-inicial');
     const staticPath = uploadsBase;
@@ -335,7 +338,7 @@ app.use((err, req, res, next) => {
     logger.error('❌ Error interno', { err });
     res.status(500).json({
         message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'production' ? undefined : err.message
+        error: config.isProd ? undefined : err.message
     });
 });
 
@@ -346,7 +349,7 @@ app.get('*', (req, res) => {
 
 // 10) Conectar DB y arrancar servidor (omitido en tests)
 let server;
-if (process.env.NODE_ENV !== 'test') {
+if (!config.isTest) {
     (async () => {
         try {
             // Esperar a que la DB esté conectada ANTES de arrancar el servidor
@@ -384,14 +387,14 @@ if (process.env.NODE_ENV !== 'test') {
         }
 
         // Definir puerto del servidor con preferencia a PORT del entorno
-        const envPort = Number(process.env.PORT);
+        const envPort = Number(config.server.port);
         const PORT = Number.isInteger(envPort) && envPort > 0 ? envPort : 5002;
-        const host = process.env.HOST || '0.0.0.0';
+        const host = config.server.host || '0.0.0.0';
         const displayHost = host === '0.0.0.0' ? 'localhost' : host;
 
         server = app.listen(PORT, host, () => {
             logger.info('🔥 Servidor corriendo en http://%s:%d', displayHost, PORT);
-            logger.info(`🔗 API accesible en ${process.env.API_URL || `http://localhost:${PORT}`}`);
+            logger.info(`🔗 API accesible en ${config.server.apiUrl || `http://localhost:${PORT}`}`);
         });
 
         // 11) Graceful shutdown

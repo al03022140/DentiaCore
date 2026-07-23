@@ -22,6 +22,7 @@
 const crypto = require('crypto');
 const { PERIODONTOGRAM_CONFIG } = require('../config/periodontogram-config');
 const { computePeriodontalStatistics } = require('../../Client/src/shared/stats/periodontal-stats-core.cjs');
+const config = require('../config/env');
 // Caras canónicas reutilizables en validación/estadísticas
 const CANON_FACES = ['vestibularSuperior', 'palatinoSuperior', 'vestibularInferior', 'lingualInferior'];
 
@@ -711,7 +712,7 @@ class UniversalToothValidator {
 
     statisticsCache.set(cacheKey, statistics, dataHash);
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (!config.isProd) {
       console.log('[VALIDATION] Estadísticas calculadas exitosamente según especificaciones SEPA', {
         presentTeeth: statistics.presentTeeth,
         totalCasillasPosibles,

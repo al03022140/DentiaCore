@@ -22,6 +22,7 @@ const authenticate = require('../middlewares/authenticate');
 const auditLogger = require('../middlewares/auditLogger');
 const snapshotCapture = require('../middlewares/snapshotCapture');
 const validarCapturaExtemporanea = require('../middlewares/capturaExtemporanea');
+const config = require('./env');
 
 // Configuración de rutas
 const configureRoutes = () => {
@@ -57,7 +58,7 @@ const configureRoutes = () => {
   });
 
   // Ruta de métricas (solo en desarrollo)
-  if (process.env.NODE_ENV === 'development') {
+  if (config.isDev) {
     router.get('/metrics', (req, res) => {
       res.json({
         memory: process.memoryUsage(),

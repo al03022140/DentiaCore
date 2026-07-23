@@ -1,5 +1,6 @@
 // Import required models and dependencies
 const Patient = require('../models/patient.js');
+const config = require('../config/env');
 const { devError } = require('../utils/httpError');
 const Appointment = require('../models/appointment.js');
 const Periodontogram = require('../models/periodontogram.js');
@@ -19,7 +20,7 @@ const { resolvePatientAppointmentId } = require('../utils/appointmentValidation'
 const { computeEvolutionNoteHash, evaluateNoteIntegrity } = require('../utils/signing');
 
 // Logs informativos sólo en desarrollo (los errores siempre se loggean).
-const DEBUG_LOGS = process.env.NODE_ENV !== 'production';
+const DEBUG_LOGS = !config.isProd;
 const debugLog = (...args) => { if (DEBUG_LOGS) console.log(...args); };
 
 // Utilidad compartida: calcular edad a partir de fecha de nacimiento
@@ -37,7 +38,7 @@ const calcularEdad = (fechaNacimiento) => {
 // 🔥 Función temporal para desarrollo - Borrar todos los pacientes
 exports.deleteAllPatients = async (req, res) => {
     // 🚫 BLOQUEADO fuera de modo desarrollo
-    if (process.env.NODE_ENV !== 'development') {
+    if (!config.isDev) {
         return res.status(403).json({ message: 'Función deshabilitada en producción' });
     }
 

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
+const config = require('../config/env');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
 // Espera utilitaria (promesa)
@@ -11,7 +12,7 @@ const connectDB = async (options = {}) => {
         return;
     }
 
-    const uri = options.uri || process.env.MONGODB_URI;
+    const uri = options.uri || config.db.uri;
     const maxRetries = Number.isInteger(options.maxRetries) ? options.maxRetries : 5;
     const baseDelayMs = Number.isInteger(options.baseDelayMs) ? options.baseDelayMs : 1000; // 1s base
     const exitOnFail = options.exitOnFail !== undefined ? options.exitOnFail : true;

@@ -11,11 +11,12 @@ const OdontogramaHistory = require('../models/odontogramaHistory');
 const { hasPermission, getEffectivePermissions, isAdminRole } = require('../utils/permissions');
 const { resolvePatientAppointmentId } = require('../utils/appointmentValidation');
 const { computeIntegrityHash } = require('../utils/integrity');
+const config = require('../config/env');
 
 // Logging gated por NODE_ENV: los console.log informativos filtraban
 // patientId y otros datos a stdout en producción. console.error y
 // console.warn se mantienen siempre activos.
-const debugLog = process.env.NODE_ENV !== 'production' ? console.log.bind(console) : () => {};
+const debugLog = !config.isProd ? console.log.bind(console) : () => {};
 
 // ——— Constantes de tipo de odontograma ————————————————————————————————————————————————
 const TYPE_INITIAL = 'initial';
@@ -1034,7 +1035,7 @@ const manejarError = (err, req, res, next) => {
     name: err.name,
     message: err.message,
     code: err.code,
-    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
+    stack: !config.isProd ? err.stack : undefined
   });
 
   if (req.file && req.file.path) {

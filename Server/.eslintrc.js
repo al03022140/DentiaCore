@@ -22,6 +22,9 @@ module.exports = {
     sourceType: 'module'
   },
   rules: {
+    // DEPLOYMENT_MODE fase 1: process.env se lee SOLO en config/env.js.
+    // (dent.js tiene 1 excepción inline documentada: la escritura de TZ.)
+    'no-process-env': 'error',
     // ── Convenciones de Nomenclatura ──────────────────────────────
     
     // Variables y funciones en camelCase
@@ -141,6 +144,11 @@ module.exports = {
   
   // ── Configuraciones específicas por tipo de archivo ──────────
   overrides: [
+    {
+      // Único lector legítimo de process.env (DEPLOYMENT_MODE fase 1)
+      files: ['config/env.js'],
+      rules: { 'no-process-env': 'off' },
+    },
     {
       // Archivos de configuración
       files: ['*.config.js', 'config/*.js'],

@@ -1,3 +1,4 @@
+const config = require('../config/env');
 /**
  * O-1 (docs/PLAN_CIERRE_V1.md): canal de alerta mínimo — POST de un mensaje
  * a ALERT_WEBHOOK_URL (compatible con Slack/Discord/ntfy.sh/cualquier
@@ -9,7 +10,7 @@
  */
 
 async function sendAlert(title, detail = {}) {
-  const url = process.env.ALERT_WEBHOOK_URL;
+  const url = config.ops.alertWebhookUrl;
   if (!url) return false;
   try {
     const res = await fetch(url, {

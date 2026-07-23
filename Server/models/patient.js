@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const fs = require('fs');
 const { resolveUploadsPath, ensureUploadsPath } = require('../utils/uploads');
+const config = require('../config/env');
 
 // Función para generar un número de 4 dígitos
 function generate4Digits() {
@@ -662,7 +663,7 @@ const PatientSchema = new mongoose.Schema({
     collection: 'patients',
     versionKey: false,
     // Configuración de índices automáticos
-    autoIndex: process.env.NODE_ENV !== 'production'
+    autoIndex: !config.isProd
 });
 
 // ─── Virtuales mejorados ───────────────────────────────────────────────────────

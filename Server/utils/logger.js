@@ -2,9 +2,10 @@ const { createLogger, format, transports } = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
 const fsExtra = require('fs-extra');
+const config = require('../config/env');
 
-const logsDir = process.env.LOGS_DIR
-  ? path.resolve(process.env.LOGS_DIR)
+const logsDir = config.ops.logsDir
+  ? path.resolve(config.ops.logsDir)
   : path.join(__dirname, '../logs');
 
 fsExtra.ensureDirSync(logsDir);
@@ -16,7 +17,7 @@ const logFormat = format.printf(({ level, message, timestamp, stack, ...meta }) 
 });
 
 const logger = createLogger({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  level: config.ops.logLevel || (config.isProd ? 'info' : 'debug'),
   format: format.combine(
     format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     format.errors({ stack: true }),
@@ -40,7 +41,7 @@ const logger = createLogger({
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
-      maxFiles: process.env.LOG_MAX_FILES || '14d'
+      maxFiles: config.ops.logMaxFiles || '14d'
     })
   ],
   exceptionHandlers: [
@@ -50,7 +51,7 @@ const logger = createLogger({
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
-      maxFiles: process.env.LOG_MAX_FILES || '30d'
+      maxFiles: config.ops.logMaxFiles || '30d'
     })
   ],
   rejectionHandlers: [
@@ -60,7 +61,7 @@ const logger = createLogger({
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
-      maxFiles: process.env.LOG_MAX_FILES || '30d'
+      maxFiles: config.ops.logMaxFiles || '30d'
     })
   ],
   exitOnError: false
