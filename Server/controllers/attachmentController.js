@@ -92,27 +92,39 @@ exports.createAttachment = async (req, res) => {
 };
 
 // DELETE /api/patients/:id/attachments/:attachmentId
+// Soft-delete (NOM-004): los adjuntos clínicos —consentimientos firmados,
+// radiografías, estudios— son parte del expediente y deben conservarse durante
+// el periodo legal de retención. Antes esto hacía `fs.remove` + `deleteOne`:
+// destruía físicamente documentos firmados sin dejar forma de reconstruir qué
+// se borró. Ahora se marca deletedAt/deletedBy/deleteReason —igual que la
+// cascada de deletePatient— y NO se toca el archivo en disco. `listAttachments`
+// ya filtra `deletedAt: null`, así que desaparece del expediente igual que antes.
 exports.deleteAttachment = async (req, res) => {
   try {
     const { id: patientId, attachmentId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(patientId) || !mongoose.Types.ObjectId.isValid(attachmentId)) {
       return res.status(400).json({ message: 'ID inválido' });
     }
-    const doc = await PatientAttachment.findOne({ _id: attachmentId, patientId });
+    const doc = await PatientAttachment.findOne({ _id: attachmentId, patientId, deletedAt: null });
     if (!doc) {
       return res.status(404).json({ message: 'Adjunto no encontrado' });
     }
 
-    // Borrar el archivo de disco — ignoramos error si ya no existe.
-    const relative = doc.url.replace(/^\/uploads\//, '');
-    const fullPath = path.join(uploadsBase, relative);
-    // Defensa contra path traversal: el path resuelto debe quedar dentro de uploadsBase.
-    const resolved = path.resolve(fullPath);
-    if (resolved.startsWith(path.resolve(uploadsBase))) {
-      await fs.remove(resolved).catch(() => {});
-    }
+    // ponytail: el archivo en disco se conserva a propósito (retención NOM-004).
+    // Upgrade path: purgado por lote cuando venza la ventana de retención legal.
+    doc.deletedAt = new Date();
+    doc.deletedBy = req.user?.id || null;
+    doc.deleteReason = (req.body?.motivo || 'Eliminado desde el expediente').toString().slice(0, 500);
+    await doc.save({ validateModifiedOnly: true });
 
-    await PatientAttachment.deleteOne({ _id: attachmentId });
+    // El middleware auditLogger ya emite el evento `soft_delete` (NOM-024) al
+    // responder 2xx; aquí solo le anexamos QUÉ documento fue, sin escritura extra.
+    req._auditDetallesExtra = {
+      attachmentId,
+      originalName: doc.originalName,
+      categoria: doc.categoria,
+    };
+
     res.json({ success: true });
   } catch (err) {
     console.error('Error eliminando adjunto:', err);
