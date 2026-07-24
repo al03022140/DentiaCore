@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { message } from 'antd';
 import './styles/statistics-page.css';
 import ChartRenderer from './components/ChartRenderer';
 import { fetchMetricData } from './data/statsService';
@@ -209,12 +210,17 @@ const StatisticsPage = () => {
 
     setLayout(prevLayout => {
       const nextSlots = [...prevLayout];
+      // Si se recarga la MISMA métrica (cambio de temporalidad/visualización),
+      // conservamos la gráfica anterior visible bajo un velo de carga en vez de
+      // desmontarla a spinner — sin salto de layout ni parpadeo.
+      const current = prevLayout[slotIndex];
+      const previousData = current && current.metricId === metricId ? current.data : null;
       nextSlots[slotIndex] = {
         metricId,
         granularity,
         visualization,
         status: 'loading',
-        data: null,
+        data: previousData,
         error: null,
         requestId
       };
@@ -263,6 +269,33 @@ const StatisticsPage = () => {
   const announce = useCallback(message => {
     setAnnouncement(message);
   }, []);
+
+  // Alternativa al drag (touch no soporta drag HTML5; teclado tampoco):
+  // click o Enter/Espacio sobre una métrica la coloca en el primer slot libre.
+  const placeMetricInFirstEmptySlot = (metricId) => {
+    if (!availableMetricIds.includes(metricId)) {
+      return;
+    }
+    const metricDefinition = metricMap.get(metricId);
+    if (!metricDefinition) {
+      return;
+    }
+    const slotIndex = layout.findIndex(slot => slot === null);
+    if (slotIndex === -1) {
+      message.info('Los 4 slots están ocupados. Quita una gráfica para agregar otra.');
+      announce('Todos los slots están ocupados. Quita una gráfica para agregar otra.');
+      return;
+    }
+
+    startDataFetch(
+      slotIndex,
+      metricId,
+      metricDefinition.temporalities[0],
+      metricDefinition.visualizations[0]
+    );
+    setAvailableMetricIds(prevIds => sortMetricIds(prevIds.filter(id => id !== metricId)));
+    announce(`Métrica ${metricDefinition.title} colocada en slot ${slotIndex + 1}.`);
+  };
 
   const handleDragStart = (event, metricId) => {
     setDraggedMetricId(metricId);
@@ -411,18 +444,28 @@ const StatisticsPage = () => {
           onDragLeave={() => setHighlightSlotKey(null)}
           role="button"
           tabIndex={0}
-          aria-label="Slot vacio. Arrastra una metrica para asignarla"
+          aria-label="Slot vacío. Arrastra una métrica o haz clic en una de la lista para asignarla"
           aria-dropeffect="move"
         >
           <div className="slot-placeholder">
-            <span className="slot-placeholder__headline">Asignar grafica</span>
-            <span className="slot-placeholder__caption">Arrastra una metrica desde la derecha</span>
+            <span className="slot-placeholder__headline">Asignar gráfica</span>
+            <span className="slot-placeholder__caption">Arrastra una métrica aquí, o haz clic en una de la lista</span>
           </div>
         </div>
       );
     }
 
     const metric = getMetric(slotData.metricId);
+
+    // Un endpoint puede responder 200 con labels/datasets vacíos (ej. sin
+    // tratamientos registrados): antes se dibujaba un canvas en blanco.
+    const slotHasData = Boolean(
+      slotData.data
+      && slotData.data.labels?.length > 0
+      && slotData.data.datasets?.some(ds => Array.isArray(ds.data) && ds.data.length > 0)
+    );
+    // Recargando la misma métrica con gráfica previa visible → velo, no spinner.
+    const isReloading = slotData.status === 'loading' && slotHasData;
 
     return (
       <div
@@ -513,7 +556,7 @@ const StatisticsPage = () => {
           </div>
         </div>
         <div className="chart-slot__body">
-          {slotData.status === 'loading' && (
+          {slotData.status === 'loading' && !slotHasData && (
             <div className="chart-slot__loader" role="status" aria-live="polite">
               <span className="chart-slot__spinner" aria-hidden="true" />
               <span>Cargando datos...</span>
@@ -533,12 +576,25 @@ const StatisticsPage = () => {
               </button>
             </div>
           )}
-          {slotData.status === 'ready' && slotData.data && (
+          {(slotData.status === 'ready' || isReloading) && slotHasData && (
             <ChartRenderer
               chartType={slotData.data.chartType}
               labels={slotData.data.labels}
               datasets={slotData.data.datasets}
             />
+          )}
+          {isReloading && (
+            <div className="chart-slot__reloading" role="status" aria-live="polite" aria-label="Actualizando datos">
+              <span className="chart-slot__spinner" aria-hidden="true" />
+            </div>
+          )}
+          {slotData.status === 'ready' && !slotHasData && (
+            <div className="chart-slot__state">
+              <p className="chart-slot__status-text">Sin datos en este periodo.</p>
+              <p className="chart-slot__status-hint">
+                Prueba otra temporalidad, o vuelve cuando haya actividad registrada.
+              </p>
+            </div>
           )}
           {slotData.status === 'idle' && !slotData.data && (
             <div className="chart-slot__status-text">Selecciona una configuracion para ver datos.</div>
@@ -554,7 +610,9 @@ const StatisticsPage = () => {
         {announcement || ' '}
       </div>
       <div className="statistics-page__left">
-        <div className="statistics-chart-grid">
+        {/* --dragging: mientras se arrastra una métrica, los slots se marcan
+            como destinos válidos (los vacíos con más énfasis). */}
+        <div className={`statistics-chart-grid${draggedMetricId ? ' statistics-chart-grid--dragging' : ''}`}>
           {Array.from({ length: SLOT_COUNT }, (_, index) => renderSlot(index))}
         </div>
       </div>
@@ -562,7 +620,7 @@ const StatisticsPage = () => {
       <aside className="statistics-page__right">
         <header className="metrics-panel__header">
           <h3>Métricas</h3>
-          <p>Arrastra para componer el tablero.</p>
+          <p>Arrastra una métrica a un slot, o haz clic para enviarla al primer slot libre.</p>
         </header>
         <div className="metrics-panel__list" role="list">
           {availableMetricIds.map(metricId => {
@@ -574,6 +632,13 @@ const StatisticsPage = () => {
                 draggable
                 onDragStart={event => handleDragStart(event, metricId)}
                 onDragEnd={handleDragEnd}
+                onClick={() => placeMetricInFirstEmptySlot(metricId)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    placeMetricInFirstEmptySlot(metricId);
+                  }
+                }}
                 tabIndex={0}
                 role="listitem"
                 aria-grabbed={draggedMetricId === metricId}
