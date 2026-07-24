@@ -67,12 +67,32 @@
   overflow: hidden;
 }
 
+/* Borde punteado: los slots vacíos leen como zona de soltar, no como tarjeta.
+   Sin cursor pointer — el slot en sí no tiene acción de clic (la acción vive
+   en las tarjetas de métrica: clic = primer slot libre). */
 .chart-slot--empty {
   align-items: center;
   justify-content: center;
   text-align: center;
-  cursor: pointer;
+  border-style: dashed;
+  cursor: default;
   padding: 1rem;
+}
+
+/* Mientras se arrastra una métrica, TODOS los slots son destinos válidos
+   (soltar sobre uno lleno la reemplaza); los vacíos se enfatizan más. */
+.statistics-chart-grid--dragging .chart-slot {
+  border-style: dashed;
+  border-color: var(--color-blue-500-25);
+}
+
+.statistics-chart-grid--dragging .chart-slot--empty {
+  border-color: var(--color-primary);
+  background: var(--color-blue-500-08);
+}
+
+.statistics-chart-grid--dragging .chart-slot--empty .slot-placeholder {
+  color: var(--color-primary);
 }
 
 /* Menú de temporalidad: position absolute bajo el botón; overflow en slot/controles lo recortaba */
@@ -280,7 +300,7 @@
   max-width: none;
 }
 
-/* Chips más compactos aquí para que Linea/Barra/Pastel/Heatmap quepan en una sola línea */
+/* Chips más compactos aquí para que Linea/Barra/Pastel quepan en una sola línea */
 .chart-slot__viz-options .viz-chip {
   padding: 0.12rem 0.35rem;
   font-family: var(--font-family-primary);
@@ -358,6 +378,7 @@
 }
 
 .chart-slot__body {
+  position: relative; /* ancla del velo de recarga */
   flex: 1;
   display: flex;
   align-items: center;
@@ -366,6 +387,18 @@
   padding-top: 0.75rem;
   overflow: hidden;
   border-radius: 0 0 calc(var(--card-border-radius) - 2px) calc(var(--card-border-radius) - 2px);
+}
+
+/* Recarga de la misma métrica: velo translúcido sobre la gráfica anterior en
+   vez de desmontarla a spinner (sin parpadeo ni salto de layout). */
+.chart-slot__reloading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-bg-white) 55%, transparent);
+  z-index: 1;
 }
 
 .chart-slot__loader {
@@ -407,6 +440,12 @@
 
 .chart-slot__status-text--error {
   color: var(--color-danger);
+}
+
+.chart-slot__status-hint {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font: var(--pd-font-label-sm);
 }
 
 .chart-slot__retry {
@@ -556,6 +595,12 @@
   cursor: grabbing;
 }
 
+/* Las tarjetas son focuseables (tabIndex) y accionables con Enter/Espacio */
+.metrics-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .metrics-card__header {
   display: flex;
   flex-wrap: wrap;
@@ -698,5 +743,29 @@
 
   .statistics-page__right {
     order: -1;
+  }
+}
+
+/* Angosto: 4 gráficas en 2 columnas quedan ilegibles → una columna con altura
+   mínima por gráfica, y la página pasa a scroll vertical (el alto fijo 100%
+   con overflow hidden recortaba los slots de abajo). */
+@media (max-width: 700px) {
+  .statistics-page {
+    height: auto;
+    overflow: visible;
+  }
+
+  .statistics-chart-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .chart-slot {
+    min-height: 16rem;
+  }
+
+  .statistics-page__right {
+    height: auto;
+    max-height: 45vh;
   }
 }
