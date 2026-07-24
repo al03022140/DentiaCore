@@ -37,7 +37,11 @@ const antdTheme = {
     colorBorder: '#e8e8e8',
     borderRadius: 8,
     fontFamily: "'Montserrat', sans-serif",
-    fontSize: 14,
+    // Alineado a la escala tipográfica canónica: 15.2px = --dc-fs-meta
+    // (0.95rem). Gobierna tablas, inputs, tags y modales de antd
+    // (Inventario, Caja, etc.), que antes vivían en su 14px por defecto
+    // fuera del sistema. antd deriva fontSizeLG/SM de este valor.
+    fontSize: 15.2,
     controlHeight: 36,
     boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
   },

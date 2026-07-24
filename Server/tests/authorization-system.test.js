@@ -960,4 +960,32 @@ describe('getEffectivePermissions: overrides y roles protegidos', () => {
     expect(perms).toContain('cash.read');
     expect(perms).toContain('cash.manage');
   });
+
+  // ── Grant/deny por usuario (deniedPermissions) ──
+  test('rol editable (doctor): deniedPermissions revoca un permiso del rol', () => {
+    const base = getEffectivePermissions({ rol: 'doctor', permissions: [] });
+    const target = base[0];
+    const perms = getEffectivePermissions({ rol: 'doctor', permissions: [], deniedPermissions: [target] });
+    expect(perms).not.toContain(target);
+    expect(perms).toEqual(base.filter((p) => p !== target));
+  });
+
+  test('rol editable (doctor): permissions añade extras y deniedPermissions resta del rol', () => {
+    const base = getEffectivePermissions({ rol: 'doctor', permissions: [] });
+    const target = base[0];
+    const perms = getEffectivePermissions({
+      rol: 'doctor',
+      permissions: ['cash.read'],   // extra que el rol no otorga
+      deniedPermissions: [target],  // revoca uno del rol
+    });
+    expect(perms).toContain('cash.read');
+    expect(perms).not.toContain(target);
+  });
+
+  test('rol protegido (administrador): deniedPermissions se ignora (base inalienable)', () => {
+    const user = { rol: 'administrador', permissions: [], deniedPermissions: ['cash.read', 'cash.manage'] };
+    const perms = getEffectivePermissions(user);
+    expect(perms).toContain('cash.read');
+    expect(perms).toContain('cash.manage');
+  });
 });

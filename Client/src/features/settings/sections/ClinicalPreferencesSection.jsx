@@ -79,7 +79,7 @@ const ClinicalPreferencesSection = () => {
 
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
-      <h3 style={{ marginBottom: '1rem' }}>Plantillas de notas de evolución</h3>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '1rem' }}>Plantillas de notas de evolución</h3>
       <NoteTemplateEditor />
     </div>
   );

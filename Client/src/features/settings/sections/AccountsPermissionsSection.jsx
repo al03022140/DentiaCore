@@ -141,6 +141,11 @@ const ROLES = [
   { id: 'asistente',     label: 'Asistente',     desc: 'Apoyo clínico bajo supervisión directa del doctor (captura en borrador).' },
 ];
 
+// Roles cuya base es inalienable (espejo de OVERRIDE_PROTECTED_ROLES en
+// Server/utils/permissions.js): sus permisos del rol NO se pueden revocar por
+// usuario, así que en la UI quedan bloqueados.
+const PROTECTED_ROLES = ['superadmin', 'administrador', 'doctor_admin'];
+
 // Agrupar permisos por categoría (preserva el orden de PERMISSIONS_META)
 const buildGroups = () => {
   const map = new Map();
@@ -170,6 +175,7 @@ const AccountsPermissionsSection = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userPerms, setUserPerms] = useState([]);
+  const [deniedPerms, setDeniedPerms] = useState([]);
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(true);
   // Tab inicial: la primera disponible para el usuario actual.
@@ -242,10 +248,20 @@ const AccountsPermissionsSection = () => {
   // ── User permission toggle ──
   const selectUser = (u) => {
     setSelectedUser(u);
-    setUserPerms(u.permissions || []);
+    setUserPerms(u.permissions || []);         // extras aditivos
+    setDeniedPerms(u.deniedPermissions || []); // permisos del rol revocados
   };
 
   const toggleUserPerm = (perm) => {
+    const roleSet = selectedUser?.rolePermissions || [];
+    if (roleSet.includes(perm)) {
+      // Permiso heredado del rol: en roles protegidos queda bloqueado; en los
+      // editables se puede revocar/restaurar (grant/deny).
+      if (PROTECTED_ROLES.includes(selectedUser?.rol)) return;
+      setDeniedPerms((prev) => prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]);
+      return;
+    }
+    // Permiso extra (aditivo, no viene del rol).
     setUserPerms((prev) => prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]);
   };
 
@@ -254,7 +270,13 @@ const AccountsPermissionsSection = () => {
     setMsg(null);
     setSavingUser(true);
     try {
-      await updateUserPermissions(selectedUser._id || selectedUser.id, userPerms);
+      const uid = selectedUser._id || selectedUser.id;
+      await updateUserPermissions(uid, userPerms, deniedPerms);
+      // Reflejar lo guardado en el estado local para que reseleccionar al mismo
+      // usuario muestre lo actual sin re-pedir la lista.
+      const patch = { permissions: userPerms, deniedPermissions: deniedPerms };
+      setUsers((prev) => prev.map((u) => ((u._id || u.id) === uid ? { ...u, ...patch } : u)));
+      setSelectedUser((prev) => ({ ...prev, ...patch }));
       setMsg({ type: 'success', text: `Permisos de ${selectedUser.nombre} actualizados` });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar' });
@@ -396,11 +418,33 @@ const AccountsPermissionsSection = () => {
             </select>
           </div>
 
-          {selectedUser && (
+          {selectedUser && (() => {
+            const roleSet = selectedUser.rolePermissions || [];
+            const roleLocked = PROTECTED_ROLES.includes(selectedUser.rol);
+            const roleLabel = ROLES.find((r) => r.id === selectedUser.rol)?.label || selectedUser.rol;
+            const extraCount = userPerms.filter((p) => !roleSet.includes(p)).length;
+            const revokedCount = deniedPerms.filter((p) => roleSet.includes(p)).length;
+            return (
             <div className="perm-user">
-              <h4 className="perm-user-title">Permisos individuales de {selectedUser.nombre}</h4>
+              <h4 className="perm-user-title">Permisos de {selectedUser.nombre}</h4>
+              <div className="perm-user-summary">
+                <span className="perm-user-role">Rol: <strong>{roleLabel}</strong></span>
+                <span className="perm-user-chip perm-user-chip--extra">+{extraCount} extra</span>
+                {revokedCount > 0 && (
+                  <span className="perm-user-chip perm-user-chip--revoked">
+                    −{revokedCount} revocado{revokedCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
               <p className="perm-user-hint">
-                Estos permisos se suman a los del rol <strong>{selectedUser.rol}</strong>.
+                {roleLocked ? (
+                  <>Los permisos <strong>Rol</strong> vienen del rol <strong>{roleLabel}</strong>, que es
+                  protegido y no se le pueden quitar. Solo puedes <strong>añadir</strong> extras.</>
+                ) : (
+                  <>Los toggles reflejan lo que <strong>{selectedUser.nombre}</strong> tiene ahora.
+                  Puedes <strong>quitar</strong> un permiso que venga del rol (queda revocado solo para
+                  esta persona) o <strong>añadir</strong> extras. Para cambiarlo a todos, edita «Por Rol».</>
+                )}
               </p>
               {permGroups.map((group) => (
                 <div key={group.name} className="perm-group">
@@ -408,17 +452,29 @@ const AccountsPermissionsSection = () => {
                   <ul className="perm-toggle-list">
                     {group.perms.map((perm) => {
                       const meta = PERMISSIONS_META[perm];
-                      const isOn = userPerms.includes(perm);
+                      const fromRole = roleSet.includes(perm);
+                      const denied = fromRole && deniedPerms.includes(perm);
+                      const isExtra = !fromRole && userPerms.includes(perm);
+                      const isOn = fromRole ? !denied : userPerms.includes(perm);
                       return (
                         <li key={perm} className="perm-toggle">
                           <div className="perm-toggle-info">
-                            <span className="perm-toggle-title">{meta.label}</span>
+                            <span className="perm-toggle-title">
+                              {meta.label}
+                              {fromRole && (
+                                <span className={`perm-toggle-badge${denied ? ' perm-toggle-badge--revoked' : ''}`}>
+                                  {denied ? 'Rol · revocado' : 'Rol'}
+                                </span>
+                              )}
+                              {isExtra && <span className="perm-toggle-badge perm-toggle-badge--extra">Extra</span>}
+                            </span>
                             <span className="perm-toggle-desc">{meta.desc}</span>
                           </div>
                           <label className="settings-switch">
                             <input
                               type="checkbox"
                               checked={isOn}
+                              disabled={fromRole && roleLocked}
                               onChange={() => toggleUserPerm(perm)}
                             />
                             <span className="slider" />
@@ -433,7 +489,8 @@ const AccountsPermissionsSection = () => {
                 <button className="settings-btn-primary" onClick={saveUserPerms} disabled={savingUser}>{savingUser ? 'Guardando…' : 'Guardar permisos'}</button>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>

@@ -26,7 +26,7 @@
   border: 2px solid var(--color-primary);
   background: transparent;
   color: var(--color-primary);
-  font-size: 1.25rem;
+  font-size: var(--dc-fs-item);
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -44,7 +44,7 @@
 /* Visual card heredada de .patient-detail__empty-message (shared).
    Solo se sobreescribe font-size; el padding/bg/sombra vienen del shared. */
 .patient-charges-card__empty {
-  font-size: 0.95rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .patient-charges-card__list {
@@ -57,7 +57,7 @@
 
 /* Date group */
 .charges-date-group__label {
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   color: var(--color-text-secondary);
   padding-bottom: 0.25rem;
@@ -70,11 +70,12 @@
   background: var(--color-bg-secondary, var(--color-surface-elevated));
   border-radius: var(--border-radius-md);
   padding: 0.75rem 1rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--figma-border-default);
+  box-shadow: var(--figma-shadow-card);
 }
 
 .charge-card__appointment {
-  font-size: 0.8rem;
+  font-size: var(--dc-fs-meta);
   color: var(--color-text-secondary);
   margin-bottom: 0.4rem;
   font-style: italic;
@@ -89,7 +90,7 @@
 .charge-card__items li {
   display: flex;
   justify-content: space-between;
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
   padding: 2px 0;
 }
 
@@ -108,7 +109,7 @@
   align-items: center;
   padding-top: 0.5rem;
   border-top: 1px solid var(--color-border);
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
   flex-wrap: wrap;
   gap: 0.25rem;
 }
@@ -119,7 +120,7 @@
 }
 
 .charge-card__balance {
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .charge-card__balance--pending {
@@ -135,7 +136,7 @@
 .charge-card__pay-btn {
   margin-top: 0.5rem;
   padding: 4px 12px;
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   border: 1px solid var(--color-primary);
   background: transparent;
   color: var(--color-primary);
@@ -165,7 +166,7 @@
 
 .charge-card__cancel-btn {
   padding: 4px 12px;
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   border: 1px solid var(--color-danger);
   background: transparent;
   color: var(--color-danger);
@@ -198,7 +199,7 @@
 
 .add-charge-modal__items th {
   text-align: left;
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   color: var(--color-text-secondary);
   padding: 4px 6px;
   border-bottom: 1px solid var(--color-border);
@@ -206,7 +207,7 @@
 
 .add-charge-modal__items td {
   padding: 4px 6px;
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .add-charge-modal__items input {
@@ -214,21 +215,21 @@
   padding: 4px 6px;
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-sm, 4px);
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .add-charge-modal__items .remove-item-btn {
   background: none;
   border: none;
   color: var(--color-danger);
-  font-size: 1.1rem;
+  font-size: var(--dc-fs-body);
   cursor: pointer;
   font-weight: 700;
 }
 
 .add-charge-modal__total {
   text-align: right;
-  font-size: 1.05rem;
+  font-size: var(--dc-fs-body);
   font-weight: 700;
   margin: 0.5rem 0;
 }
@@ -241,7 +242,7 @@
 
 .add-charge-modal__confirm-section label {
   display: block;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   margin-bottom: 0.25rem;
   color: var(--color-text-secondary);
 }
@@ -252,5 +253,5 @@
 
 .payment-modal__summary p {
   margin: 0.25rem 0;
-  font-size: 0.95rem;
+  font-size: var(--dc-fs-meta);
 }

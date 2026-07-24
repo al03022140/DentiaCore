@@ -3,6 +3,12 @@ import PropTypes from 'prop-types';
 import { Modal, Input, InputNumber, AutoComplete, Switch, message } from 'antd';
 import { createInventoryItem, updateInventoryItem } from '../../../shared/services/inventory-service';
 
+/* Sugerencias de unidad de conteo; el campo sigue aceptando texto libre */
+const UNIDADES_COMUNES = [
+  'pieza', 'jeringa', 'cartucho', 'ampolleta', 'caja', 'frasco',
+  'tubo', 'sobre', 'par', 'rollo', 'ml', 'g'
+];
+
 /**
  * Alta/edición de un ítem del catálogo.
  * En alta permite capturar un stock inicial (lote) en el mismo paso.
@@ -131,11 +137,16 @@ const ItemFormModal = ({ visible, onClose, onSaved, item = null, categorias = []
           </label>
           <label className="inventory-form__label">
             Unidad
-            <Input
+            <AutoComplete
               value={unidad}
-              onChange={e => setUnidad(e.target.value)}
+              onChange={setUnidad}
+              options={UNIDADES_COMUNES.map(u => ({ value: u }))}
+              filterOption={(input, option) =>
+                option.value.toLowerCase().includes(input.toLowerCase())
+              }
               placeholder="pieza, cartucho, caja, ml…"
               maxLength={30}
+              style={{ width: '100%' }}
             />
           </label>
         </div>

@@ -106,7 +106,7 @@ const NoteTemplateEditor = () => {
       )}
 
       {/* Create/Edit form */}
-      <h4 style={{ marginBottom: 'var(--spacing-md)' }}>
+      <h4 style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--dc-fs-body)' }}>
         {editingId ? 'Editar plantilla' : 'Nueva plantilla'}
       </h4>
       <form onSubmit={handleSave}>

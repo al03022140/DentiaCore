@@ -20,7 +20,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: minmax(0, 4fr) minmax(0, 6fr);
-  gap: 1.5rem;
+  /* 12px: misma separación card↔card de patient-list (--pl-grid-column-gap) */
+  gap: var(--figma-space-md);
   width: 100%;
   height: 100%;
   box-sizing: border-box;
@@ -91,10 +92,10 @@
 
 .cash-card__title {
   margin: 0;
-  color: var(--color-primary); /* Acento azul DentiaCore — siempre en títulos */
+  color: var(--color-text-primary); /* Título de sección canónico: negro bold */
   font-family: var(--font-family-primary);
-  font-size: 1.25rem; /* 20px */
-  font-weight: var(--font-weight-medium); /* 500 */
+  font-size: var(--dc-fs-item); /* 20px */
+  font-weight: var(--font-weight-semibold); /* 600 */
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
@@ -142,7 +143,7 @@
 .cash-dashboard__view-toggle .ant-segmented-item {
   border-radius: var(--figma-radius-full) !important;
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-medium);
   color: var(--figma-text-secondary);
   transition: all var(--figma-transition-fast);
@@ -183,7 +184,7 @@
 
 .balance-amount {
   font-family: var(--font-family-primary);
-  font-size: 1.625rem; /* 26px — stat display compacto */
+  font-size: var(--dc-fs-title); /* 26px — stat display compacto */
   font-weight: var(--font-weight-bold);
   line-height: 1.15;
   color: var(--figma-text-primary);
@@ -197,7 +198,7 @@
 
 .balance-label {
   font-family: var(--font-family-primary);
-  font-size: 0.7rem;
+  font-size: var(--dc-fs-label);
   font-weight: var(--font-weight-normal);
   color: var(--figma-text-secondary);
   margin-top: 0.2rem;
@@ -218,7 +219,7 @@
   background: var(--figma-bg-input);
   border-radius: var(--figma-radius-sm);
   font-family: var(--font-family-primary);
-  font-size: 0.6875rem; /* 11px */
+  font-size: var(--dc-fs-label); /* 11px */
   color: var(--figma-text-secondary);
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
@@ -258,7 +259,7 @@
 
 .cash-dashboard-card .filter-container .ant-radio-button-wrapper {
   padding: 0.28rem 0.85rem !important;
-  font-size: 0.8125rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1.35 !important;
 }
 
@@ -278,7 +279,7 @@
   background: var(--figma-bg-input) !important; /* #f3f3f5 */
   color: var(--figma-text-secondary) !important;
   font-family: var(--font-family-primary) !important;
-  font-size: 0.875rem !important; /* 14px — label */
+  font-size: var(--dc-fs-meta) !important; /* 14px — label */
   font-weight: var(--font-weight-medium) !important;
   padding: 0.4rem 1.1rem !important;
   height: auto !important;
@@ -321,7 +322,7 @@
   height: 5rem !important;
   width: 10rem !important;
   font-family: var(--font-family-primary) !important;
-  font-size: 0.875rem !important; /* 14px label */
+  font-size: var(--dc-fs-meta) !important; /* 14px label */
   font-weight: var(--font-weight-medium) !important;
   border-radius: var(--figma-radius-sm) !important; /* 8px botones */
   border: none !important;
@@ -342,34 +343,25 @@
 }
 
 .action-button .anticon {
-  font-size: 1.5rem !important; /* 24px ícono — display data */
+  font-size: var(--dc-fs-title) !important; /* 24px ícono — display data */
 }
 
-/* Ingresar — verde saturado (#4caf50) según rule del sistema */
+/* Ingresar — verde semántico del sistema (--color-success = colorSuccess
+   del tema antd, mismo verde que los estados de Inventario). */
 .action-button--income {
-  background-color: var(--color-green-700) !important; /* #4caf50 */
-  border-color: var(--color-green-700) !important;
+  background-color: var(--color-success) !important;
+  border-color: var(--color-success) !important;
   color: var(--figma-text-on-dark) !important;
 }
 
 .action-button--income:hover:not(:disabled) {
-  background-color: var(--color-green-600) !important;
-  border-color: var(--color-green-600) !important;
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.35) !important;
+  background-color: var(--color-success-hover) !important;
+  border-color: var(--color-success-hover) !important;
+  box-shadow: 0 4px 8px rgba(39, 174, 96, 0.35) !important;
 }
 
-/* Retirar — rojo saturado (#e53e3e) según rule del sistema */
-.cash-card .action-button.ant-btn-dangerous,
-.cash-card .action-button[disabled].ant-btn-dangerous {
-  background-color: var(--color-red-550) !important; /* #e53e3e */
-  border-color: var(--color-red-550) !important;
-}
-
-.cash-card .action-button.ant-btn-dangerous:hover:not(:disabled) {
-  background-color: var(--color-red-600) !important;
-  border-color: var(--color-red-600) !important;
-  box-shadow: 0 4px 8px rgba(229, 62, 62, 0.35) !important;
-}
+/* Retirar — sin override: el danger primary de antd ya usa colorError
+   (#e74c3c = --color-danger), el mismo rojo semántico del resto del sistema. */
 
 .action-button:disabled,
 .action-button[disabled] {
@@ -382,7 +374,7 @@
 .cash-card .ant-card-extra .ant-btn-link,
 .cash-card__extra .ant-btn-link {
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-medium);
   padding: 0.25rem 0.5rem;
   height: auto;
@@ -492,7 +484,7 @@
   align-items: baseline;
   gap: 1rem;
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem; /* 15px body */
+  font-size: var(--dc-fs-meta); /* 15px body */
   font-weight: var(--font-weight-medium);
   color: var(--figma-text-primary);
 }
@@ -527,7 +519,7 @@
 
 .movement-patient-name {
   font-family: var(--font-family-primary) !important;
-  font-size: 0.875rem !important;
+  font-size: var(--dc-fs-meta) !important;
   color: var(--figma-text-secondary) !important;
 }
 
@@ -535,7 +527,7 @@
 .cash-card .ant-tag {
   border-radius: var(--figma-radius-sm); /* 8px */
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   font-weight: var(--font-weight-medium);
   padding: 0.15rem 0.55rem;
   line-height: 1.4;
@@ -555,7 +547,7 @@
   align-items: center;
   gap: 0.2rem;
   font-family: var(--font-family-primary);
-  font-size: 0.6875rem;
+  font-size: var(--dc-fs-label);
   font-weight: var(--font-weight-medium);
   color: var(--color-primary);
   background: var(--cash-brand-tint);
@@ -566,7 +558,7 @@
 }
 
 .movement-edit-badge .anticon {
-  font-size: 0.65rem;
+  font-size: var(--dc-fs-label);
 }
 
 /* Tooltip del historial (override AntD) */
@@ -591,7 +583,7 @@
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
   margin-bottom: 0.55rem;
@@ -610,14 +602,14 @@
 .movement-edit-history__head {
   display: flex;
   justify-content: space-between;
-  font-size: 0.7rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .movement-edit-history__reason {
   font-style: italic;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary);
   margin-bottom: 0.3rem;
 }
@@ -626,7 +618,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
 }
 
@@ -648,7 +640,7 @@
   padding: 0.5rem 0.75rem;
   background: var(--figma-bg-input);
   border-radius: var(--figma-radius-sm);
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
 }
 
 .edit-movement__history {
@@ -661,7 +653,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
   margin-bottom: 0.5rem;
@@ -677,14 +669,14 @@
 }
 
 .edit-movement__history-head {
-  font-size: 0.7rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
   margin-bottom: 0.2rem;
 }
 
 .edit-movement__history-reason {
   font-style: italic;
-  font-size: 0.8125rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary);
   margin-bottom: 0.25rem;
 }
@@ -692,7 +684,7 @@
 .edit-movement__history-entry ul {
   margin: 0;
   padding-left: 1rem;
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -700,7 +692,7 @@
 /* Pie de auditoría */
 .movement-audit {
   font-family: var(--font-family-primary);
-  font-size: 0.6875rem; /* 11px */
+  font-size: var(--dc-fs-label); /* 11px */
   color: var(--figma-text-secondary);
   margin-top: 0.2rem;
   display: flex;
@@ -712,7 +704,7 @@
 /* ── Cobros Pendientes de Citas ── */
 .pending-charges-panel__count {
   font-family: var(--font-family-primary);
-  font-size: 0.75rem; /* 12px */
+  font-size: var(--dc-fs-label); /* 12px */
   font-weight: var(--font-weight-medium);
   color: var(--color-primary);
   background: var(--cash-brand-tint); /* Pill primaria — tinte azul DentiaCore */
@@ -723,7 +715,7 @@
 
 .pending-charges-panel__empty {
   font-family: var(--font-family-primary);
-  font-size: 0.875rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-secondary);
   text-align: center;
   padding: 1rem 0;
@@ -795,7 +787,7 @@
 .pending-charge-item__pay {
   padding: 4px 12px;
   font-family: var(--font-family-primary);
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-medium);
   border-radius: var(--border-radius-md);
   cursor: pointer;
@@ -848,7 +840,7 @@
 
 .pending-charge-item__name {
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem; /* 15px body */
+  font-size: var(--dc-fs-meta); /* 15px body */
   font-weight: var(--font-weight-semibold);
   color: var(--figma-text-primary);
   display: flex;
@@ -857,14 +849,14 @@
 }
 
 .pending-charge-item__age {
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
   font-weight: var(--font-weight-normal);
 }
 
 .pending-charge-item__appt {
   font-family: var(--font-family-primary);
-  font-size: 0.8125rem; /* 13px */
+  font-size: var(--dc-fs-meta); /* 13px */
   color: var(--figma-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -882,7 +874,7 @@
 
 .pending-charge-item__items li {
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--figma-text-secondary);
 }
 
@@ -902,7 +894,7 @@
 
 .pending-charge-item__total {
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-semibold);
   color: var(--figma-text-primary);
   font-variant-numeric: tabular-nums;
@@ -910,7 +902,7 @@
 
 .pending-charge-item__pending {
   font-family: var(--font-family-primary);
-  font-size: 0.75rem;
+  font-size: var(--dc-fs-label);
   color: var(--color-warning); /* ámbar — aviso/pendiente */
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
@@ -957,8 +949,8 @@
 
 @media (max-width: 600px) {
   .cash-page {
-    padding: 0.75rem;
-    gap: 1rem;
+    padding: 0;
+    gap: var(--figma-space-md);
   }
 
   .cash-card {
@@ -976,7 +968,7 @@
   }
 
   .balance-amount {
-    font-size: 1.5rem;
+    font-size: var(--dc-fs-title);
   }
 }
 
@@ -992,7 +984,7 @@
 .open-box-modal__hint {
   margin: 0;
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem;
+  font-size: var(--dc-fs-meta);
   font-weight: var(--font-weight-normal);
   color: var(--figma-text-secondary);
   line-height: 1.5;
@@ -1028,7 +1020,7 @@
 
 .ant-modal-title {
   font-family: var(--font-family-primary) !important;
-  font-size: 1.25rem !important; /* 20px */
+  font-size: var(--dc-fs-item) !important; /* 20px */
   font-weight: var(--font-weight-medium) !important;
   color: var(--color-primary) !important; /* Acento azul DentiaCore */
   line-height: 1.3 !important;
@@ -1036,7 +1028,7 @@
 
 .ant-modal .ant-form-item-label > label {
   font-family: var(--font-family-primary) !important;
-  font-size: 0.875rem !important;
+  font-size: var(--dc-fs-meta) !important;
   font-weight: var(--font-weight-medium) !important;
   color: var(--figma-text-primary) !important;
 }
@@ -1081,7 +1073,7 @@
 .ant-modal .ant-radio-button-wrapper {
   font-family: var(--font-family-primary) !important;
   font-weight: var(--font-weight-medium) !important;
-  font-size: 0.875rem !important;
+  font-size: var(--dc-fs-meta) !important;
 }
 
 .ant-modal .ant-radio-button-wrapper-checked.ant-radio-button-wrapper-checked {

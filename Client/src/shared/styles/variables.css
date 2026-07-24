@@ -298,6 +298,21 @@
   --text-nano: var(--font-weight-light) 0.625rem / 1.2 var(--font-family-primary);
   --text-pico: var(--font-weight-light) 0.5625rem / 1.2 var(--font-family-primary);
 
+  /* ═══════════════════════════════════════════════════════════════════
+     ESCALA TIPOGRÁFICA CANÓNICA (2026-07-21) — 6 niveles, nada más.
+     Derivada de las pantallas de referencia aprobadas por el dueño:
+     agenda del home, modal de nuevo evento, lista de pacientes y lista
+     de configuración. TODA pantalla nueva o normalizada usa SOLO estos
+     tamaños; los --text-* de arriba quedan como LEGACY (no usar en
+     código nuevo — se irán deprecando pantalla por pantalla).
+     ═══════════════════════════════════════════════════════════════════ */
+  --dc-fs-display: clamp(1.5rem, 2.5vw, 4.5rem); /* héroes: mes del calendario, título del expediente */
+  --dc-fs-title: 1.8rem;   /* títulos de sección (= h3 del expediente) */
+  --dc-fs-item: 1.3rem;    /* nombre/título de ítem (= cuerpo del expediente) */
+  --dc-fs-body: 1.1rem;    /* cuerpo, inputs, listas (= label-md del expediente) */
+  --dc-fs-meta: 0.95rem;   /* secundario: metadatos, hints, chips de info */
+  --dc-fs-label: 0.82rem;  /* badges, IDs, overlines */
+
   /* Tipografía compacta */
   --text-dense-lg: var(--font-weight-light) 0.9375rem / 1.35 var(--font-family-primary);
   --text-dense-md: var(--font-weight-light) 0.875rem / 1.35 var(--font-family-primary);
@@ -349,7 +364,7 @@
   --pd-font-body-sm: var(--font-weight-light) 1.3rem / 1.5 var(--font-family-primary);
   --pd-font-label-md: var(--font-weight-light) 1.1rem / 1.4 var(--font-family-primary);
   --pd-font-label-sm: var(--font-weight-light) 1rem / 1.4 var(--font-family-primary);
-  --pd-font-title: var(--font-weight-normal) 4rem / 1.1 var(--font-family-primary);
+  /* --pd-font-title eliminado: el nombre del expediente ahora usa --dc-fs-display (héroe canónico) */
   --pd-font-section-title: var(--font-weight-normal) 3.5rem / 1.2 var(--font-family-primary);
   --pd-font-card-list: var(--font-weight-light) 1.3rem / 1.5 var(--font-family-primary);
 
@@ -496,7 +511,6 @@
   --home-calendar-border-radius: 1rem;
   --home-calendar-gap: 1.5rem;
   --home-calendar-container-padding: 1rem;
-  --home-calendar-container-border-width: 2px;
   --home-calendar-border-width: 1px;
   --home-calendar-container-height: 55vh;
   --home-calendar-day-display-padding: 0.5rem 1rem;
@@ -706,6 +720,11 @@
    DARK MODE TOKENS
    ========================= */
 [data-theme="dark"] {
+  /* Scrollbars y controles nativos en oscuro — sin esto el navegador los
+     pinta claros y parecen bordes/franjas blancas junto a tablas y paneles
+     (print-light-mode.css lo fuerza a claro al imprimir, y gana ahí). */
+  color-scheme: dark;
+
   /* Paleta principal */
   --color-primary: #4a9eff;
   --color-primary-hover: #6bb3ff;

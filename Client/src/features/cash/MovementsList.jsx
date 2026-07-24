@@ -261,6 +261,7 @@ const MovementsList = ({ refreshTrigger, onMovementUpdated, isBoxOpen = true }) 
                 <List.Item.Meta
                   avatar={
                     <Avatar
+                      src={item.type === 'INCOME' ? (item.patientId?.photoURL || undefined) : undefined}
                       icon={item.type === 'INCOME' ? <UserOutlined /> : <DollarCircleOutlined />}
                       className={item.type === 'INCOME' ? 'movement-avatar--income' : 'movement-avatar--expense'}
                     />

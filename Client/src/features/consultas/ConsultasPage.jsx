@@ -565,7 +565,7 @@ const ConsultasPage = () => {
         >
           <div className="detail-header-info">
             <div>
-              <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Detalle de Consulta</h3>
+              <h3 style={{ margin: 0, color: 'var(--color-text-primary)', fontWeight: 600 }}>Detalle de Consulta</h3>
               <small>
                 {selectedConsultation
                   ? `Seleccionada: ${getPatientName(selectedConsultation)}`

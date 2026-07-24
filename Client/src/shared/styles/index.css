@@ -106,7 +106,7 @@ code {
   --btn-disabled-text: var(--figma-text-secondary);
   --btn-disabled-border: var(--figma-border-default);
   --btn-padding: 0.5rem 1.25rem;
-  --btn-radius: 6px;
+  --btn-radius: 8px; /* mismo radio que el tema antd (borderRadius: 8) */
   --btn-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
   display: inline-flex;
   align-items: center;
@@ -119,7 +119,7 @@ code {
   color: var(--btn-text);
   font-family: var(--font-family-primary, 'Montserrat', sans-serif);
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta); /* 0.95rem — mismo cuerpo que botones antd */
   line-height: 1;
   height: auto;
   cursor: pointer;

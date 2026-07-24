@@ -54,37 +54,12 @@
 
 /* =========================
   INFORMACIÓN DEL PACIENTE
+  Los estilos de .patient-detail__info / __photo / __details viven en
+  patient-info-header.css (stylesheet dedicado del componente). Este
+  bloque quedó duplicado aquí y su `display: flex` en __info competía
+  con .patient-detail__top, forzando la grilla de datos a quedar al
+  lado en vez de abajo.
   ========================= */
-.patient-detail__info {
-  display: flex;
-  align-items: flex-start;
-  padding-bottom: var(--spacing-xxl);
-  border-bottom: 1px solid var(--color-border-medium);
-  margin-bottom: var(--spacing-xxl);
-}
-
-.patient-detail__photo img {
-  width: 8rem;
-  height: 8rem;
-  border-radius: var(--border-radius-circle);
-  object-fit: cover;
-  border: var(--card-border-width) solid var(--color-border-medium);
-  margin-right: var(--spacing-xxl);
-}
-
-.patient-detail__details h1 {
-  margin-bottom: var(--spacing-sm);
-  font: var(--pd-font-title);
-  color: var(--color-text-dark);
-}
-
-.patient-detail__details p {
-  margin: var(--spacing-xs) 0;
-  line-height: 1.5;
-  color: var(--color-text-dark);
-}
-
-/* Los estilos para strong y span están centralizados en patient-detail-shared.css */
 
 /* =========================
   TÍTULOS DE BLOQUE (ODONTO / PERIO)
@@ -111,8 +86,8 @@
   background-color: var(--color-bg-white);
   border-radius: var(--card-border-radius);
   padding: var(--spacing-xl);
-  box-shadow: var(--card-shadow);
-  border: var(--card-border);
+  box-shadow: var(--figma-shadow-card);
+  border: 1px solid var(--figma-border-default);
 }
 
 /* Override para títulos H2 en info cards */
@@ -365,7 +340,7 @@
   background: var(--color-bg-light);
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-size: 20px;
+  font-size: var(--dc-fs-item);
   color: var(--color-text-dark);
   transition: background var(--transition-medium), color var(--transition-medium);
 }
@@ -390,7 +365,7 @@
   background: var(--color-bg-white);
   border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--dc-fs-body);
   color: var(--color-text-dark);
   position: absolute;
   top: var(--spacing-sm);
@@ -453,7 +428,7 @@
   right: var(--spacing-md);
   width: 36px;
   height: 36px;
-  font-size: 18px;
+  font-size: var(--dc-fs-body);
   z-index: 1003;
 }
 
@@ -557,7 +532,7 @@
   color: var(--color-primary);
   font-family: var(--font-family-primary, 'Montserrat', sans-serif);
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: var(--dc-fs-meta);
   line-height: 1;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -650,7 +625,7 @@
 }
 
 .odontograma-table-container .ant-tabs-tab .ant-tabs-tab-btn {
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -685,7 +660,7 @@
 }
 
 .odontograma-saving-overlay__text {
-  font-size: 1.5rem;
+  font-size: var(--dc-fs-title);
   font-weight: var(--font-weight-medium);
   color: var(--color-primary);
 }
@@ -802,7 +777,7 @@
   border: 1px solid var(--color-green-200, #bbf7d0);
   border-radius: 999px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   white-space: nowrap;
   cursor: help;
 }
@@ -815,7 +790,7 @@
   padding: 0.4rem 0.85rem;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--dc-fs-meta);
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
 }
@@ -1051,7 +1026,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   margin: 0 !important;
@@ -1090,7 +1065,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   cursor: pointer;
@@ -1127,7 +1102,7 @@
   border-radius: 6px !important;
   font-family: var(--font-family-primary, 'Montserrat', sans-serif) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: var(--dc-fs-meta) !important;
   line-height: 1 !important;
   height: auto !important;
   cursor: pointer;

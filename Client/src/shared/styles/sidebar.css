@@ -83,7 +83,11 @@
 .sidebar-wrapper .sidebar ul li a {
   text-decoration: none;
   color: var(--text-color);
-  font: var(--font-weight-normal) clamp(1.15rem, 1.45vw, 1.45rem) / 1.4 var(--font-family-primary);
+  /* Nav: escala canónica --dc-fs-item (1.3rem, = centro del clamp anterior) */
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-item);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.4;
   display: flex;
   align-items: center;
   padding: 0.6rem 0.875rem;

@@ -4,8 +4,20 @@ import { PlusCircleOutlined, MinusCircleOutlined, ExclamationCircleFilled, Searc
 import { addMovement, closeBox } from '../../shared/services/cashService';
 import { getAllPatients } from '../../shared/services/patient-service';
 import { formatMoneyCompact as formatMXN } from '../../shared/utils/money';
+import userNot from '../../assets/images/icons/Profile Default.svg';
 
 const { confirm } = Modal;
+
+// Avatar circular chico para las opciones del buscador de paciente.
+// photoURL viene del backend como ruta servible relativa (mismo contrato
+// que el resto de las vistas — cookie same-origin, sin VITE_API_URL).
+const OPTION_AVATAR_STYLE = {
+  width: 24,
+  height: 24,
+  borderRadius: '50%',
+  objectFit: 'cover',
+  flexShrink: 0,
+};
 
 const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBox }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,8 +203,26 @@ const ActionsPanel = ({ isBoxOpen, onMovementAdded, onBoxClosed, onRequestOpenBo
                 }
                 options={patients.map(p => ({
                   value: p._id,
-                  label: `${p.primer_nombre || ''} ${p.apellido_paterno || ''}`.trim()
+                  label: `${p.primer_nombre || ''} ${p.apellido_paterno || ''}`.trim(),
+                  photoURL: p.photoURL || null
                 }))}
+                optionRender={(option) => (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <img
+                      src={option.data.photoURL || userNot}
+                      alt=""
+                      style={OPTION_AVATAR_STYLE}
+                      className={option.data.photoURL ? undefined : 'profile-default-avatar'}
+                      onError={(e) => {
+                        e.target.src = userNot;
+                        e.target.classList.add('profile-default-avatar');
+                      }}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {option.data.label}
+                    </span>
+                  </span>
+                )}
               />
             </Form.Item>
           )}

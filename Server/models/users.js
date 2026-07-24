@@ -38,6 +38,14 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  // Permisos del rol REVOCADos para este usuario en concreto (grant/deny).
+  // Se restan al final de los permisos efectivos. Solo aplican a roles
+  // editables; la base de los roles protegidos es inalienable (ver
+  // getEffectivePermissions en utils/permissions.js).
+  deniedPermissions: {
+    type: [String],
+    default: []
+  },
   active: {
     type: Boolean,
     default: true

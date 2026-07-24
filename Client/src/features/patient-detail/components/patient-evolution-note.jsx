@@ -4,6 +4,7 @@ import API from '../../../shared/services/axios-instance.js';
 import SignatureBadge from '../../../shared/components/SignatureBadge.jsx';
 import SignaturePadModal from '../../../shared/components/SignaturePadModal.jsx';
 import DoctorSignStep from '../../../shared/components/DoctorSignStep.jsx';
+import ImagePreviewModal from '../../../shared/components/ImagePreviewModal.jsx';
 import { useAuth } from '../../../app/auth/AuthContext.jsx';
 import { hasPermission } from '../../../app/auth/permissions';
 import { useCurrentAppointment } from '../../../shared/contexts/AppointmentContext.jsx';
@@ -104,6 +105,9 @@ const PatientEvolutionNote = ({
   const [signStep, setSignStep] = useState(null);
   const [signTarget, setSignTarget] = useState(null);
   const [patientSigDataUrl, setPatientSigDataUrl] = useState(null);
+
+  // Vista previa de una firma ya guardada (thumbnail del historial) — { src, alt, title } | null
+  const [sigPreview, setSigPreview] = useState(null);
 
   // Edición inline de un BORRADOR propio (PATCH /evolution-note/:noteId). El
   // server exige creador-o-admin y estado BORRADOR; aquí solo se muestra al
@@ -646,16 +650,19 @@ const PatientEvolutionNote = ({
                       <div className="evolution-note-card__sig-slot">
                         <span className="evolution-note-card__sig-label">Doctor</span>
                         {n.doctorFirmaUrl ? (
-                          <a
-                            href={n.doctorFirmaUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
                             className="doctor-sig-link"
                             title={[
                               n.firmadoPor?.nombre ? `Firmada por ${n.firmadoPor.nombre}` : 'Firmada',
                               n.firmadoEn ? `el ${new Date(n.firmadoEn).toLocaleString()}` : '',
                               n.doctorFirmaMethod === 'pin' ? '(firmada con PIN)' : '(firmada con pad)',
                             ].filter(Boolean).join(' ')}
+                            onClick={() => setSigPreview({
+                              src: n.doctorFirmaUrl,
+                              alt: 'Firma del doctor',
+                              title: 'Firma del doctor'
+                            })}
                           >
                             <img
                               src={n.doctorFirmaUrl}
@@ -665,7 +672,7 @@ const PatientEvolutionNote = ({
                             {n.firmaDesactualizada && (
                               <span className="doctor-sig-stale" title="La nota fue modificada tras firmar — firma desactualizada">⚠</span>
                             )}
-                          </a>
+                          </button>
                         ) : (
                           <SignatureBadge
                             firmadoPor={n.firmadoPor}
@@ -680,19 +687,22 @@ const PatientEvolutionNote = ({
                       <div className="evolution-note-card__sig-slot">
                         <span className="evolution-note-card__sig-label">Paciente</span>
                         {n.pacienteFirmaUrl ? (
-                          <a
-                            href={n.pacienteFirmaUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
                             className="patient-sig-link"
                             title={`Firmada ${n.pacienteFirmadoEn ? new Date(n.pacienteFirmadoEn).toLocaleString() : ''}`}
+                            onClick={() => setSigPreview({
+                              src: n.pacienteFirmaUrl,
+                              alt: 'Firma del paciente',
+                              title: 'Firma del paciente'
+                            })}
                           >
                             <img
                               src={n.pacienteFirmaUrl}
                               alt="Firma del paciente"
                               className="patient-sig-thumb"
                             />
-                          </a>
+                          </button>
                         ) : (
                           <span className="patient-sig-missing">— sin firma —</span>
                         )}
@@ -921,6 +931,14 @@ const PatientEvolutionNote = ({
           : 'Pídale al doctor que firme con su PIN para que la nota sea oficial.'}
         consentText={doctorConsentText}
         loading={loading}
+      />
+
+      <ImagePreviewModal
+        open={!!sigPreview}
+        onClose={() => setSigPreview(null)}
+        src={sigPreview?.src}
+        alt={sigPreview?.alt}
+        title={sigPreview?.title}
       />
     </section>
   );

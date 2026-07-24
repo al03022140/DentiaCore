@@ -23,7 +23,7 @@
 }
 
 .patient-stats-title {
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   font-weight: 600;
   color: var(--figma-text-primary, #1a1a1a);
   white-space: nowrap;
@@ -92,7 +92,7 @@
   background: none;
   border: none;
   text-align: left;
-  font-size: 0.82rem;
+  font-size: var(--dc-fs-meta);
   color: var(--figma-text-primary, #1a1a1a);
   cursor: pointer;
   transition: background-color 0.1s;

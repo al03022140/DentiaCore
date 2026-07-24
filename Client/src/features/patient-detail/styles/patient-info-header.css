@@ -17,11 +17,16 @@
 
 /* Contenedor principal de la sección de información */
 .patient-detail__info {
-  display: flex;
-  align-items: flex-start;
   padding-bottom: 2rem;
   border-bottom: 1px solid var(--color-border-medium);
   margin-bottom: 2rem;
+}
+
+/* Fila foto + identidad: la foto se centra verticalmente solo contra
+   nombre/subtítulo/citas, no contra la grilla de datos de abajo. */
+.patient-detail__top {
+  display: flex;
+  align-items: center;
 }
 
 /* Estilos para la foto del paciente */
@@ -34,15 +39,25 @@
   margin-right: 2rem;
 }
 
+/* Solo la foto real (no la silueta default) abre la vista previa */
+.patient-detail__photo img:not(.profile-default-avatar) {
+  cursor: pointer;
+}
+
 /* Contenedor de los detalles textuales */
 .patient-detail__details {
   flex-grow: 1; /* Ocupa el espacio restante */
 }
 
-/* Nombre del paciente */
+/* Nombre del paciente — héroe canónico: mismo token --dc-fs-display que el mes
+   del calendario (variables.css lo designa para "título del expediente").
+   Antes: --pd-font-title (4rem fijo, 64px); ahora responsivo y coherente. */
 .patient-detail__details h1 {
   margin-bottom: 0.5rem;
-  font: var(--pd-font-title);
+  font-family: var(--font-family-primary);
+  font-size: var(--dc-fs-display);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.1;
   color: var(--color-text-dark);
 }
 
@@ -55,6 +70,62 @@
 
 /* Los estilos para strong y span están centralizados en patient-detail-shared.css */
 
+/* Subtítulo: edad • sexo • # de paciente — misma letra que "Última cita" */
+.patient-detail__details .patient-detail__subline {
+  margin: 0.4rem 0 0.85rem;
+  font: var(--pd-font-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-dark);
+}
+
+/* Última / próxima cita */
+.patient-detail__citas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.patient-detail__details .patient-detail__cita {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+/* Grilla de datos administrativos (2 columnas) — indentada para alinear
+   con el texto de arriba (nombre/subtítulo), no con la foto. */
+.patient-detail__meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 2.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  margin-left: calc(130px + 2rem);
+  border-top: 1px solid var(--figma-border-default);
+}
+
+/* Mismo tamaño/estilo que el resto de la ficha (label negro + valor gris,
+   --pd-font-base): flujo de texto normal, sin flex ni ellipsis — así un
+   valor largo (el ID BD) se envuelve en vez de desaparecer. */
+.patient-detail__meta-item {
+  margin: 0;
+  min-width: 0;
+  font: var(--pd-font-base);
+}
+
+.patient-detail__meta-item strong {
+  color: var(--color-text-black);
+  font-weight: var(--font-weight-medium);
+  margin-right: 5px;
+}
+
+.patient-detail__meta-item span {
+  color: var(--color-neutral-680);
+  font-weight: var(--font-weight-normal);
+  overflow-wrap: break-word;
+}
+
 /* =========================
    RESPONSIVO
    ========================= */
@@ -62,11 +133,13 @@
 /* Tablet / laptop pequeño (≤960px): apilar foto y detalles */
 @media (max-width: 960px) {
   .patient-detail__info {
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .patient-detail__top {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding-bottom: 1.5rem;
-    margin-bottom: 1.5rem;
   }
   .patient-detail__photo img {
     margin-right: 0;
@@ -76,6 +149,16 @@
   }
   .patient-detail__details {
     width: 100%;
+  }
+  .patient-detail__meta-grid {
+    grid-template-columns: 1fr;
+    margin-left: 0;
+  }
+  .patient-detail__cita {
+    justify-content: center;
+  }
+  .patient-detail__meta-item {
+    text-align: center;
   }
 }
 

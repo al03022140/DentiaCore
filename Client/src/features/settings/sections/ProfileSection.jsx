@@ -114,7 +114,7 @@ const ProfileSection = () => {
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
       {/* Cambio de contraseña */}
-      <h3 style={{ marginBottom: '1rem' }}>Cambiar contraseña</h3>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '1rem' }}>Cambiar contraseña</h3>
       <form onSubmit={handlePasswordChange}>
         {pwMsg && <div className={`settings-message ${pwMsg.type}`}>{pwMsg.text}</div>}
         <div className="settings-form-group">
@@ -140,7 +140,7 @@ const ProfileSection = () => {
       <hr style={{ margin: '2rem 0', borderColor: 'var(--color-border-light)' }} />
 
       {/* Cambio de PIN */}
-      <h3 style={{ marginBottom: '1rem' }}>Cambiar PIN de acceso rápido</h3>
+      <h3 className="settings-subsection-title" style={{ marginBottom: '1rem' }}>Cambiar PIN de acceso rápido</h3>
       <form onSubmit={handlePinChange}>
         {pinMsg && <div className={`settings-message ${pinMsg.type}`}>{pinMsg.text}</div>}
         <div className="settings-form-group">

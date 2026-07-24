@@ -137,19 +137,24 @@ const InventoryPage = () => {
       title: 'Stock',
       dataIndex: 'stockTotal',
       key: 'stockTotal',
-      align: 'right',
+      align: 'center',
+      className: 'inventory-col-nodivider',
       sorter: (a, b) => a.stockTotal - b.stockTotal,
-      render: (v, r) => (
-        <span className={v === 0 ? 'inventory-stock--zero' : ''}>
-          {v} <span className="inventory-muted">{r.unidad}</span>
-        </span>
+      render: v => (
+        <span className={v === 0 ? 'inventory-stock--zero' : ''}>{v}</span>
       )
+    },
+    {
+      title: 'Unidad',
+      dataIndex: 'unidad',
+      key: 'unidad',
+      render: v => <span className="inventory-muted">{v}</span>
     },
     {
       title: 'Mínimo',
       dataIndex: 'stockMinimo',
       key: 'stockMinimo',
-      align: 'right',
+      align: 'center',
       responsive: ['md'],
       render: v => v || <span className="inventory-muted">—</span>
     },
@@ -157,6 +162,7 @@ const InventoryPage = () => {
       title: 'Próxima caducidad',
       dataIndex: 'proximaCaducidad',
       key: 'proximaCaducidad',
+      align: 'center',
       responsive: ['md'],
       sorter: (a, b) => {
         if (!a.proximaCaducidad && !b.proximaCaducidad) return 0;
@@ -169,6 +175,8 @@ const InventoryPage = () => {
     {
       title: 'Estado',
       key: 'estado',
+      align: 'center',
+      className: 'inventory-col-nodivider',
       render: (_, r) => renderEstado(r)
     },
     {
@@ -292,15 +300,15 @@ const InventoryPage = () => {
 
   return (
     <div className="inventory-page">
-      <h1 className="inventory-page__title">Inventario</h1>
-
-      <Tabs
-        defaultActiveKey="inventario"
-        items={[
-          { key: 'inventario', label: 'Inventario', children: inventarioTab },
-          { key: 'kits', label: 'Kits de procedimiento', children: <KitsPanel items={items} canManage={canManage} /> }
-        ]}
-      />
+      <section className="inventory-page__card">
+        <Tabs
+          defaultActiveKey="inventario"
+          items={[
+            { key: 'inventario', label: 'Inventario', children: inventarioTab },
+            { key: 'kits', label: 'Kits de procedimiento', children: <KitsPanel items={items} canManage={canManage} /> }
+          ]}
+        />
+      </section>
 
       <ItemFormModal
         visible={showItemForm}
