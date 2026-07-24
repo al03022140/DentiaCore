@@ -4,6 +4,8 @@
    Configuración (.settings-page). Llena el alto de `.content` (flex column)
    para que la card pueda estirarse hasta el borde de la pantalla. */
 .inventory-page {
+  /* Tinte de marca (focus glow de la búsqueda), mismo valor que cash/patient-list */
+  --inv-brand-glow: rgba(8, 72, 136, 0.10);
   width: 100%;
   min-height: 100%;
   margin: 0;
@@ -70,22 +72,58 @@
 .inventory-alerts__card--orange .inventory-alerts__count { color: var(--color-warning); }
 .inventory-alerts__card--gold .inventory-alerts__count { color: var(--color-warning); }
 
-/* Toolbar */
-.inventory-toolbar {
+/* ── Búsqueda centrada tipo píldora (receta de patient-list) ── */
+.inventory-search-container {
+  width: 100%;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 14px;
+  justify-content: center;
+  margin-bottom: var(--figma-space-md);
 }
 
-.inventory-toolbar__search { max-width: 280px; }
-.inventory-toolbar__select { min-width: 170px; }
+.inventory-search-input {
+  width: min(100%, 52rem);
+  min-height: 2.75rem;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font-size: var(--dc-fs-body);
+  font-family: var(--font-family-primary);
+  color: var(--figma-text-primary);
+  border: 1px solid var(--figma-border-default);
+  border-radius: var(--figma-radius-full);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--figma-bg-card);
+  box-sizing: border-box;
+}
 
-.inventory-toolbar__actions {
-  margin-left: auto;
+.inventory-search-input::placeholder {
+  color: var(--figma-text-secondary);
+}
+
+.inventory-search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--inv-brand-glow);
+}
+
+/* ── Fila de acciones (primaria derecha, filtro izquierda — como pacientes) ── */
+.inventory-actions {
   display: flex;
-  gap: 8px;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: var(--figma-space-md) 0 var(--figma-space-sm);
+  gap: var(--spacing-md);
+}
+
+.inventory-actions__buttons {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.inventory-category-select {
+  min-width: 12rem;
 }
 
 /* Tabla */
@@ -232,7 +270,8 @@
 }
 
 @media (max-width: 640px) {
-  .inventory-toolbar__actions { margin-left: 0; width: 100%; }
+  .inventory-actions__buttons { width: 100%; }
+  .inventory-category-select { width: 100%; }
   .inventory-form__row { flex-direction: column; }
   .inventory-form__row--material { flex-direction: row; }
 }

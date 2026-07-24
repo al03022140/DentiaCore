@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Table, Tag, Input, Select, Tabs, Popconfirm, message, Tooltip } from 'antd';
+import { Button, Table, Tag, Select, Tabs, Popconfirm, message, Tooltip } from 'antd';
 import { useAuth } from '../../app/auth/AuthContext';
 import { hasPermission } from '../../app/auth/permissions';
 import {
@@ -254,35 +254,49 @@ const InventoryPage = () => {
 
   const inventarioTab = (
     <>
-      {alertCards}
-
-      <div className="inventory-toolbar">
-        <Input.Search
-          placeholder="Buscar ítem…"
+      {/* Búsqueda centrada tipo píldora — mismo patrón que la lista de pacientes */}
+      <div className="inventory-search-container">
+        <input
+          type="text"
+          placeholder="Buscar ítem..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          allowClear
-          className="inventory-toolbar__search"
+          className="inventory-search-input"
+          aria-label="Buscar ítem"
         />
+      </div>
+
+      {/* Fila de acciones: primaria a la derecha, filtro a la izquierda (como pacientes) */}
+      <div className="inventory-actions">
+        {canManage && (
+          <div className="inventory-actions__buttons">
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => { setLotEntryItem(null); setShowLotEntry(true); }}
+            >
+              Registrar entrada
+            </button>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => { setEditingItem(null); setShowItemForm(true); }}
+            >
+              + Nuevo ítem
+            </button>
+          </div>
+        )}
         <Select
           placeholder="Categoría"
           value={categoria}
           onChange={setCategoria}
           options={categorias.map(c => ({ value: c, label: c }))}
           allowClear
-          className="inventory-toolbar__select"
+          className="inventory-category-select"
         />
-        {canManage && (
-          <div className="inventory-toolbar__actions">
-            <Button onClick={() => { setLotEntryItem(null); setShowLotEntry(true); }}>
-              Registrar entrada
-            </Button>
-            <Button type="primary" onClick={() => { setEditingItem(null); setShowItemForm(true); }}>
-              Nuevo ítem
-            </Button>
-          </div>
-        )}
       </div>
+
+      {alertCards}
 
       <Table
         dataSource={items}
