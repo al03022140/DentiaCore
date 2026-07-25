@@ -1,3 +1,4 @@
+const config = require('./env');
 /**
  * 🦷 CONFIGURACIÓN CENTRALIZADA DEL PERIODONTOGRAMA - BACKEND
  * 
@@ -96,7 +97,7 @@ const MOLAR_TEETH = [16, 17, 18, 26, 27, 28, 36, 37, 38, 46, 47, 48];
  * Configuración de validación
  */
 const VALIDATION_CONFIG = {
-  STRICT_MODE: process.env.NODE_ENV === 'production',
+  STRICT_MODE: config.isProd,
   AUTO_SANITIZE: true,
   LOG_WARNINGS: true,
   LOG_ERRORS: true,
@@ -117,10 +118,10 @@ const CACHE_CONFIG = {
  * Configuración de logging
  */
 const LOGGING_CONFIG = {
-  ENABLED: process.env.NODE_ENV !== 'production',
-  LEVEL: process.env.LOG_LEVEL || 'info',
+  ENABLED: !config.isProd,
+  LEVEL: config.ops.logLevel || 'info',
   INCLUDE_TIMESTAMP: true,
-  INCLUDE_DATA: process.env.NODE_ENV !== 'production'
+  INCLUDE_DATA: !config.isProd
 };
 
 /**

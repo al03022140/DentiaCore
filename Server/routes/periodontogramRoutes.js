@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const periodontogramController = require('../controllers/periodontogramController');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { authorize, requireClinicalRole } = require('../middlewares/authorize');
+const config = require('../config/env');
 
 // mergeParams: true permite acceder a req.params.id del padre (el id del paciente)
 const router = express.Router({ mergeParams: true });
@@ -11,7 +12,7 @@ const router = express.Router({ mergeParams: true });
 
 
 // Bypass total en dev (StrictMode + hot-reload agotan el cap en minutos).
-const skipInDev = (req) => process.env.NODE_ENV !== 'production';
+const skipInDev = (req) => !config.isProd;
 const keyByIpAndUser = (req) => {
   const ip = req.ip;
   const userId = req.user?._id || req.user?.id || '';

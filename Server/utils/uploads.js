@@ -1,8 +1,9 @@
 const path = require('path');
 const fsExtra = require('fs-extra');
+const config = require('../config/env');
 
 function getUploadsBase() {
-  const envBase = process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim();
+  const envBase = config.storage.uploadsDir && config.storage.uploadsDir.trim();
   if (envBase) {
     return path.resolve(__dirname, '..', envBase);
   }

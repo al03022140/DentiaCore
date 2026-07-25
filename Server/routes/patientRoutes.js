@@ -1,4 +1,5 @@
 const express = require('express');
+const config = require('../config/env');
 const router = express.Router();
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -188,7 +189,7 @@ router
 // Bulk-delete: SOLO en dev/test. El controller también gatea por
 // NODE_ENV (devuelve 403 si llega en prod), pero no exponer la ruta
 // elimina la entrada en auditorías de superficie.
-if (process.env.NODE_ENV !== 'production') {
+if (!config.isProd) {
   router.delete('/', writeLimiter, authorize(['patients.delete']), patientCtrl.deleteAllPatients);
 }
 

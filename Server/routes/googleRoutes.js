@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const config = require('../config/env');
 const express = require('express');
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
 const OAUTH_STATE_COOKIE = 'g_oauth_state';
 const buildStateCookieOptions = () => ({
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: config.isProd,
     // 'lax' (no 'strict'): la cookie debe viajar en la navegación top-level de
     // vuelta desde accounts.google.com al callback; 'strict' la bloquearía.
     sameSite: 'lax',
@@ -107,7 +108,7 @@ router.get('/auth/userinfo', oauthLimiter, async (req, res) => {
 router.get('/auth/url', oauthLimiter, (req, res) => {
     try {
         // Guard: fail fast if Google credentials are not configured
-        if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        if (!config.google.clientId || !config.google.clientSecret) {
             return res.status(503).json({
                 error: 'Google Calendar no está configurado. Agrega GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el archivo Server/.env para habilitar esta función.'
             });
@@ -168,9 +169,9 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
 
         const tokens = await postToken({
             code,
-            client_id: process.env.GOOGLE_CLIENT_ID,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET,
-            redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+            client_id: config.google.clientId,
+            client_secret: config.google.clientSecret,
+            redirect_uri: config.google.redirectUri,
             grant_type: 'authorization_code',
         });
         // REST devuelve expires_in (s); googleapis daba expiry_date (ms epoch).
@@ -178,7 +179,7 @@ router.get('/oauth2callback', oauthLimiter, async (req, res, _next) => {
         rememberProcessedCode(code);
         
         // Redirigir al frontend con tokens en cookies httpOnly en lugar de URL params
-        const isProduction = process.env.NODE_ENV === 'production';
+        const isProduction = config.isProd;
         const cookieOptions = {
           httpOnly: true,
           secure: isProduction,
@@ -305,8 +306,8 @@ router.post('/refresh-token', oauthLimiter, authenticate, async (req, res) => {
 
         const credentials = await postToken({
             refresh_token: refreshToken,
-            client_id: process.env.GOOGLE_CLIENT_ID,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            client_id: config.google.clientId,
+            client_secret: config.google.clientSecret,
             grant_type: 'refresh_token',
         });
 
@@ -317,7 +318,7 @@ router.post('/refresh-token', oauthLimiter, authenticate, async (req, res) => {
 
         // Si Google rotó el refresh token, actualizamos la cookie httpOnly.
         if (credentials.refresh_token && credentials.refresh_token !== refreshToken) {
-            const isProduction = process.env.NODE_ENV === 'production';
+            const isProduction = config.isProd;
             res.cookie('google_refresh_token', credentials.refresh_token, {
                 httpOnly: true,
                 secure: isProduction,
@@ -344,7 +345,7 @@ module.exports = router;
  
  // Helper para obtener una sola URL de cliente válida (toma la primera si hay múltiples)
  function getClientUrl() {
-     const env = process.env.CLIENT_URL || 'http://localhost:5173';
+     const env = config.server.clientUrl || 'http://localhost:5173';
      if (env.includes(',')) {
          const first = env.split(',').map(u => u.trim()).filter(Boolean)[0];
          return first || 'http://localhost:5173';
@@ -354,7 +355,7 @@ module.exports = router;
  
  // Helper: obtener lista de orígenes de cliente permitidos desde env
  function getAllowedClientUrls() {
-     const env = process.env.CLIENT_URL || 'http://localhost:5173';
+     const env = config.server.clientUrl || 'http://localhost:5173';
      return env.split(',').map(u => u.trim()).filter(Boolean);
  }
  
@@ -431,8 +432,8 @@ module.exports = router;
 // ── Google OAuth2 / Calendar v3 vía REST (reemplazo de googleapis) ───────────
 function buildAuthUrl(state) {
     const params = new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        client_id: config.google.clientId,
+        redirect_uri: config.google.redirectUri,
         response_type: 'code',
         scope: SCOPES.join(' '),
         access_type: 'offline',          // solicita refresh_token

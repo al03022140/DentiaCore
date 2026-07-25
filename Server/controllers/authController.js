@@ -5,6 +5,7 @@ const { getEffectivePermissions } = require('../utils/permissions');
 const auditLogger = require('../middlewares/auditLogger');
 const { hashToken, generateSecureToken, getJwtSecret, validatePasswordStrength } = require('../utils/crypto');
 const logger = require('../utils/logger');
+const config = require('../config/env');
 
 let bcrypt;
 try {
@@ -33,9 +34,9 @@ const getDummyPasswordHash = () => {
   return _dummyPasswordHashPromise;
 };
 
-const getAccessTtl = () => process.env.JWT_ACCESS_TTL || '15m';
-const getRefreshTtl = () => process.env.JWT_REFRESH_TTL || '7d';
-const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
+const getAccessTtl = () => config.security.jwtAccessTtl;
+const getRefreshTtl = () => config.security.jwtRefreshTtl;
+const getJwtIssuer = () => config.security.jwtIssuer;
 
 const parseDurationToMs = (value) => {
   if (!value) return 0;
@@ -60,8 +61,9 @@ const buildCookieOptions = () => {
   // cookies de Google OAuth, que ya derivan secure de NODE_ENV). Así, si se
   // despliega con HTTPS y alguien olvida COOKIE_SECURE=true, el refresh token
   // no viaja por HTTP en claro. COOKIE_SECURE permite forzarlo también en dev.
-  const secure = process.env.NODE_ENV === 'production'
-    || String(process.env.COOKIE_SECURE || 'false').toLowerCase() === 'true';
+  // MISMA semántica que siempre (isProd ⇒ secure, OR flag explícito).
+  // Fase 2 de DEPLOYMENT_MODE la derivará del modo (cloud ⇒ true; local ⇒ flag).
+  const secure = config.isProd || config.security.cookieSecureFlag;
   return {
     httpOnly: true,
     sameSite: 'lax',
@@ -481,7 +483,7 @@ const forgotPassword = async (req, res, next) => {
 
     // Log the reset request (token is logged server-side only for admin retrieval in dev)
     logger.info(`Password reset requested for ${user.email}. Token expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`);
-    if (process.env.NODE_ENV !== 'production') {
+    if (!config.isProd) {
       logger.info(`[DEV ONLY] Reset token for ${user.email}: ${rawToken}`);
     }
 

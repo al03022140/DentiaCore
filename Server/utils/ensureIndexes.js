@@ -5,7 +5,7 @@ const logger = require('./logger');
  *
  * ¿Por qué no `Model.syncIndexes()` / `createIndexes()` a secas?
  * En instalaciones de producción `autoIndex` está apagado
- * (`models/patient.js`: `autoIndex: process.env.NODE_ENV !== 'production'`),
+ * (`models/patient.js`: `autoIndex: !config.isProd` — ver config/env.js),
  * así que los índices declarados (incl. los ÚNICOS de `paciente_id` y
  * `documento.numero`) NUNCA se construyen solos. En una BD legacy que arrancó
  * en producción desde el día 1, esos índices no existen y la colección pudo

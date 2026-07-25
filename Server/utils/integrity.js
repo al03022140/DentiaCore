@@ -10,6 +10,7 @@
  * sin campos de auditoría/metadatos) para que sea determinista.
  */
 const crypto = require('crypto');
+const config = require('../config/env');
 
 // ── Campos clínicos por tipo de recurso ─────────────────────────
 // Solo estos campos participan en el hash de integridad del documento.
@@ -188,13 +189,13 @@ function computeEntryHash(logData) {
 let _auditSecretWarned = false;
 
 function getAuditHmacSecret() {
-  const secret = process.env.AUDIT_HMAC_SECRET;
+  const secret = config.security.auditHmacSecret;
 
   if (secret && secret.length >= 32) {
     return secret;
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (config.isProd) {
     throw new Error(
       'FATAL: AUDIT_HMAC_SECRET must be set (≥32 chars) in production. ' +
       'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'

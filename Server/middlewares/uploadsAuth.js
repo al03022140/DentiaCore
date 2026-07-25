@@ -8,8 +8,9 @@ const {
 } = require('../utils/permissions');
 const Usuario = require('../models/users');
 const ClinicSettings = require('../models/clinicSettings');
+const config = require('../config/env');
 
-const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
+const getJwtIssuer = () => config.security.jwtIssuer;
 
 /**
  * Gate de autenticación + AUTORIZACIÓN para los archivos de /uploads (PHI).

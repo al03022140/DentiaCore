@@ -7,6 +7,7 @@ const { isAdminRole } = require('../utils/permissions');
 const PeriodontogramValidationMiddleware = require('../middlewares/periodontogramValidation');
 const { validatePeriodontogramData } = require('../schemas/unified-periodontogram-schema');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
+const config = require('../config/env');
 const {
   adaptTeethFromClientPayload,
   normalizeFurcaInTeeth,
@@ -17,7 +18,7 @@ const {
 // req.body / payload / validatedData (mediciones del paciente) a stdout incluso
 // en producción. Se gatean con NODE_ENV. console.error/console.warn se mantienen
 // siempre activos para no perder diagnóstico de fallos.
-const debugLog = process.env.NODE_ENV !== 'production' ? console.log.bind(console) : () => {};
+const debugLog = !config.isProd ? console.log.bind(console) : () => {};
 
 // Helper local: detectar claves legacy no canónicas en cualquier nivel del payload
 // Se evita duplicación: no existe helper similar en utils ni middleware de este controlador

@@ -13,6 +13,7 @@ const mongoose = require('mongoose');
 
 const PeriodontogramHistory = require('../models/periodontogramHistory');
 const Periodontogram = require('../models/periodontogram');
+const config = require('../config/env');
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -22,7 +23,7 @@ function makeTimestampFromDate(date) {
 }
 
 async function run() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/DentiaCore';
+  const uri = config.db.uri || 'mongodb://localhost:27017/DentiaCore';
   console.log(`Conectando a MongoDB: ${uri}`);
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
 

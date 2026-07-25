@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const config = require('../config/env');
 const { PERIODONTOGRAM_CONFIG, MEASUREMENT_LIMITS } = require('../config/periodontogram-config');
 const { UniversalToothValidator } = require('../utils/UniversalToothValidator');
 
@@ -507,7 +508,7 @@ const PeriodontogramSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'periodontograms',
   // Optimizaciones de rendimiento
-  autoIndex: process.env.NODE_ENV !== 'production',
+  autoIndex: !config.isProd,
   bufferCommands: false
   // 'bufferMaxEntries' se eliminó: fue removida en Mongoose 6+ (aquí v7) y se ignora
   // silenciosamente como opción de esquema.

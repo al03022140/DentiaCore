@@ -15,6 +15,7 @@
  */
 
 const rateLimit = require('express-rate-limit');
+const config = require('../config/env');
 
 /* ─── helpers ──────────────────────────────────────────────────── */
 
@@ -42,7 +43,7 @@ const keyByIpAndUser = (req) => {
  * que en pocas horas agota el cap de 15 min y bloquea al desarrollador.
  * En producción el limiter funciona normal.
  */
-const skipInDev = (req) => process.env.NODE_ENV !== 'production';
+const skipInDev = (req) => !config.isProd;
 
 /* ─── 1. Global API limiter ────────────────────────────────────── */
 
@@ -150,7 +151,7 @@ const BLOCKED_UA_PATTERNS = [
 
 const botGuard = (req, res, next) => {
   // Allow requests with no origin in development (Postman, curl)
-  if (process.env.NODE_ENV !== 'production') {
+  if (!config.isProd) {
     return next();
   }
 

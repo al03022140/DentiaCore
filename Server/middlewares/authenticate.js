@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { getJwtSecret } = require('../utils/crypto');
+const config = require('../config/env');
 
-const getJwtIssuer = () => process.env.JWT_ISSUER || 'dentia-core';
+const getJwtIssuer = () => config.security.jwtIssuer;
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization || '';

@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const config = require('../config/env');
 
 /**
  * Hash a token using SHA-256 for secure storage (e.g., refresh tokens, reset tokens).
@@ -22,13 +23,13 @@ const generateSecureToken = (bytes = 32) => {
 let _ephemeralSecret = null;
 
 const getJwtSecret = () => {
-  const secret = process.env.JWT_SECRET;
+  const secret = config.security.jwtSecret;
 
   if (secret && secret !== 'dev-secret' && secret.length >= 32) {
     return secret;
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (config.isProd) {
     throw new Error(
       'FATAL: JWT_SECRET must be set to a strong value (≥32 chars) in production. ' +
       'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
