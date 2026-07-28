@@ -70,3 +70,22 @@ jobs:
       - name: Lint client (estricto)
         working-directory: Client
         run: npm run lint
+
+  audit:
+    name: npm audit (deps de runtime)
+    runs-on: ubuntu-latest
+    # Gate de seguridad de dependencias (fase de endurecimiento).
+    # Solo bloquea por vulnerabilidades HIGH+ en dependencias de RUNTIME
+    # (--omit=dev): el toolchain de dev (jest/eslint) no viaja a producción
+    # y sus majors se actualizan por decisión, no por gate.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit server (runtime)
+        working-directory: Server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit client (runtime)
+        working-directory: Client
+        run: npm audit --omit=dev --audit-level=high
