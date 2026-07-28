@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs-extra');
 
 const { resolveUploadsPath } = require('../utils/uploads');
+const { verifyUploadSignature } = require('../utils/fileSignature');
 const attachmentCtrl = require('../controllers/attachmentController');
 const checkPatient = require('../middlewares/checkPatient');
 const { authorize, requireClinicalRole } = require('../middlewares/authorize');
@@ -106,6 +107,7 @@ router
     authorize(['patients.update']),
     uploadAttachment.single('file'),
     handleMulterError,
+    verifyUploadSignature,
     attachmentCtrl.createAttachment
   );
 

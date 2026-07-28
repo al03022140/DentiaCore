@@ -5,6 +5,7 @@ const settingsController = require('../controllers/settingsController');
 const { authorize, requireClinicalRole, requireSignerRole } = require('../middlewares/authorize');
 const uploadFirma = require('../middlewares/uploadFirma');
 const uploadLogo = require('../middlewares/uploadLogo');
+const { verifyUploadSignature } = require('../utils/fileSignature');
 const ClinicSettings = require('../models/clinicSettings');
 
 const router = express.Router();
@@ -86,6 +87,7 @@ router.post(
   authorize(['settings.update']),
   uploadLogo.single('logo'),
   uploadLogo.handleMulterError,
+  verifyUploadSignature,
   settingsController.uploadLogo
 );
 router.delete('/logo', authorize(['settings.update']), settingsController.deleteLogo);
@@ -108,7 +110,7 @@ router.patch('/me/pin', sensitiveActionRateLimit, settingsController.changeMyPin
 // ni firma. Antes `requireClinicalRole` lo permitía (vía isAdminRole), por lo
 // que el admin podía subir firma; `requireSignerRole` lo bloquea.
 router.patch('/me/professional-profile', requireSignerRole, settingsController.updateProfessionalProfile);
-router.post('/me/firma', requireSignerRole, uploadFirma.single('firma'), uploadFirma.handleMulterError, settingsController.uploadFirma);
+router.post('/me/firma', requireSignerRole, uploadFirma.single('firma'), uploadFirma.handleMulterError, verifyUploadSignature, settingsController.uploadFirma);
 router.delete('/me/firma', requireSignerRole, settingsController.deleteFirma);
 
 // ── Get firma of a specific user ─────────────────────────────────
