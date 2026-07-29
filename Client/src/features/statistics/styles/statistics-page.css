@@ -154,14 +154,43 @@
   overflow: visible;
 }
 
-/* Una sola fila de chips junto a Temporalidad (sin 2+1 en varias líneas) */
+/* Una sola fila de chips junto a Temporalidad (sin 2+1 en varias líneas).
+   overflow-x:auto (no visible): con 3 chips (Linea/Barra/Pastel) el
+   contenido excede el espacio disponible en la grilla de 2 columnas y
+   `overflow:visible` (heredado para no recortar el menú de Temporalidad,
+   ver .chart-slot--filled) dejaba "Pastel" sangrando bajo la tarjeta
+   vecina en vez de ser alcanzable. El menú de Temporalidad es hermano de
+   este contenedor (no descendiente), así que no le afecta. */
 .chart-slot__viz-scroll {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-blue-500-25) transparent;
+}
+
+.chart-slot__viz-scroll::-webkit-scrollbar {
+  height: 0.35rem;
+}
+
+.chart-slot__viz-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chart-slot__viz-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-blue-500-25);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.chart-slot__viz-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+  background-clip: padding-box;
 }
 
 .chart-slot__title-block {
