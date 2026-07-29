@@ -217,7 +217,7 @@
   min-width: 18.75rem;
 }
 
-.odontograma-table h3 {
+.odontograma-table-container h3 {
   margin-bottom: var(--spacing-sm);
   color: var(--color-neutral-1100);
   font: var(--pd-font-odontograma-table-title);
@@ -227,7 +227,10 @@
 .odontograma-flex-container {
   display: flex;
   gap: var(--spacing-sm);
-  align-items: flex-start;
+  /* stretch: la tabla toma la misma altura que el canvas (su hermano flex),
+     en vez de un `height` fijo en rem que nunca coincidía con el alto real
+     del canvas (que varía con el ancho disponible vía aspect-ratio). */
+  align-items: stretch;
 }
 
 .odontograma-image-container {
@@ -454,8 +457,12 @@
 .odontograma-table-container {
   width: 18rem !important;
   flex-shrink: 0;
-  height: 43rem;
-  overflow-y: hidden;
+  /* Sin height fija: `align-items: stretch` del padre (.odontograma-flex-container)
+     le da la misma altura que el canvas. min-height:0 permite encogerse por
+     debajo de su contenido; overflow-y:auto scrollea si el contenido (muchos
+     daños) supera esa altura. */
+  min-height: 0;
+  overflow-y: auto;
   overflow-x: hidden;
   border: var(--border-radius-sm) solid var(--color-neutral-175);
   padding: var(--spacing-xs);
@@ -729,7 +736,7 @@
   color: var(--color-text-primary);
 }
 
-[data-theme="dark"] .patient-detail_odontograma .odontograma-table h3 {
+[data-theme="dark"] .patient-detail_odontograma .odontograma-table-container h3 {
   color: var(--color-text-strong);
 }
 

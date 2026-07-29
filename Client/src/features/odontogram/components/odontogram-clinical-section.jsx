@@ -746,6 +746,7 @@ const OdontogramClinicalSection = ({
                     )}
                   </div>
                   <div className="odontograma-table-container">
+                    <h3>Daños marcados</h3>
                    <Table
                      columns={odontogramColumns}
                      dataSource={tableData}
