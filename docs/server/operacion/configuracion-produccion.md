@@ -22,7 +22,26 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - [ ] `AUDIT_HMAC_SECRET` — ≥32 chars. Protege la integridad/no-repudio del audit log (NOM-024). Sin esto, el server **no arranca** en producción.
 - [ ] `ENCRYPTION_KEY` — si se usa cifrado de datos en reposo.
 
-> Si rotas `JWT_SECRET`, todas las sesiones se invalidan (los usuarios re-inician sesión). `AUDIT_HMAC_SECRET` NO debe rotarse a la ligera: invalidaría la verificación de los HMAC de auditoría ya escritos.
+> Si rotas `JWT_SECRET`, todas las sesiones se invalidan (los usuarios re-inician sesión).
+
+### Rotación de `AUDIT_HMAC_SECRET` (key ring R-1)
+
+Cada entrada del audit log guarda la huella (`keyId`) de la clave que la selló;
+la verificación elige la clave por esa huella. Rotar NO invalida la historia y
+no requiere migraciones ni tocar Mongo:
+
+1. Añade el valor actual de `AUDIT_HMAC_SECRET` al final de
+   `AUDIT_HMAC_RETIRED_SECRETS` (lista separada por comas — esas claves solo
+   verifican, nunca firman).
+2. Genera un `AUDIT_HMAC_SECRET` nuevo (comando de arriba).
+3. Reinicia el servicio y corre `npm run verify:audit` como aceptación.
+
+⚠️ **NUNCA elimines una clave de `AUDIT_HMAC_RETIRED_SECRETS` mientras existan
+entradas firmadas con ella.** Si se elimina, `verify:audit` reportará rupturas
+`unknown_key` sobre esas entradas — es la señal de "falta una clave histórica
+en el `.env`", NO de corrupción de datos: se corrige restaurando la clave a la
+lista. El server tampoco arranca si el ring es ambiguo (una misma clave listada
+dos veces, o una retirada igual a la activa).
 
 ## 3. Cookies / HTTPS
 

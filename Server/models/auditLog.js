@@ -9,7 +9,7 @@
  * Ver roles.MD §5 para la lista completa de eventos.
  */
 const mongoose = require('mongoose');
-const { computeEntryHash } = require('../utils/integrity');
+const { computeEntryHash, getAuditKeyRing } = require('../utils/integrity');
 const { redactSecrets } = require('../utils/redact');
 
 const auditLogSchema = new mongoose.Schema({
@@ -160,6 +160,14 @@ const auditLogSchema = new mongoose.Schema({
     default: null
   },
 
+  // Key ring R-1: huella de la clave que selló esta entrada. Metadato de
+  // enrutamiento (FUERA del payload del HMAC): la verificación busca la clave
+  // por este id, así rotar AUDIT_HMAC_SECRET no invalida la historia.
+  keyId: {
+    type: String,
+    default: null
+  },
+
   // ── Encadenamiento (tamper-evidence anti-borrado) ─────────────
   // Secuencia monotónica + hash del eslabón anterior. Borrar o truncar
   // entradas rompe la cadena y lo detecta verifyAuditChain. `seq` único
@@ -238,7 +246,9 @@ auditLogSchema.statics.registrar = async function(data) {
 
     let entryHash = null;
     try {
-      entryHash = computeEntryHash(entryData);
+      const ring = getAuditKeyRing();
+      entryHash = computeEntryHash(entryData, ring.activeSecret);
+      entryData.keyId = ring.activeKeyId;
     } catch (err) {
       console.error('[AuditLog] Error computing entryHash:', err.message);
     }
@@ -273,14 +283,23 @@ auditLogSchema.statics.verifyChain = async function(opts = {}) {
   const entries = await query.lean();
 
   const breaks = [];
+  const ring = getAuditKeyRing();
   let prevHash = null;
   let prevSeq = null;
 
   for (const e of entries) {
     // 1) ¿el entryHash recomputa? (detecta edición de cualquier campo sellado)
-    const recomputed = computeEntryHash(e);
-    if (recomputed !== e.entryHash) {
-      breaks.push({ seq: e.seq, _id: e._id, type: 'hash_mismatch' });
+    //    Key ring R-1: ring.resolve es el único responsable de elegir clave.
+    //    keyId desconocido = clave fuera del ring → ruptura propia (falta una
+    //    clave histórica en .env), no un hash_mismatch engañoso.
+    const secret = ring.resolve(e);
+    if (!secret) {
+      breaks.push({ seq: e.seq, _id: e._id, type: 'unknown_key', keyId: e.keyId });
+    } else {
+      const recomputed = computeEntryHash(e, secret);
+      if (recomputed !== e.entryHash) {
+        breaks.push({ seq: e.seq, _id: e._id, type: 'hash_mismatch' });
+      }
     }
     // 2) ¿encadena con el anterior? (detecta borrado/reordenamiento)
     if (prevSeq !== null) {

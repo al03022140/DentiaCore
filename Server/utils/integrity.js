@@ -153,10 +153,11 @@ function computeIntegrityHash(doc, resourceType) {
  * Si no está configurada en desarrollo, genera un warning y usa un fallback.
  *
  * @param {object} logData - Objeto con los datos del log ANTES de insertar
+ * @param {string} [secretOverride] - Clave a usar (key ring); default: la activa
  * @returns {string} HMAC hex
  */
-function computeEntryHash(logData) {
-  const secret = getAuditHmacSecret();
+function computeEntryHash(logData, secretOverride) {
+  const secret = secretOverride || getAuditHmacSecret();
 
   // El HMAC cubre TODA la evidencia sensible, no solo los 6 campos básicos.
   // Antes quedaban fuera `detalles` (diff antes/después), `motivo`,
@@ -214,6 +215,78 @@ function getAuditHmacSecret() {
   return 'dev-audit-hmac-secret-NOT-FOR-PRODUCTION';
 }
 
+// ── Key ring (R-1) ──────────────────────────────────────────────
+// Rotar AUDIT_HMAC_SECRET ya no invalida la historia: cada entrada guarda el
+// `keyId` (huella de la clave que la selló) y la verificación busca esa clave
+// en el ring. Rotación = 2 pasos en Server/.env, CERO re-sellado:
+//   1. añadir el valor actual de AUDIT_HMAC_SECRET a AUDIT_HMAC_RETIRED_SECRETS
+//      (lista separada por comas — solo verifican, nunca firman);
+//   2. generar un AUDIT_HMAC_SECRET nuevo y reiniciar.
+//
+// El keyId se DERIVA de la clave (sha256 truncado), nunca se configura a mano:
+// imposible desalinear id↔clave. Va FUERA del payload del HMAC: es metadato de
+// enrutamiento, y así backfillearlo (migración 0008) no altera ningún sello.
+// Manipular el keyId de una entrada hace que la verificación use otra clave y
+// el hash no recompute; recomputar un sello rompe el prevHash del siguiente
+// eslabón. Limitación asumida: una clave RETIRADA comprometida permite
+// re-sellar la última entrada (sin eslabón siguiente que la delate) — con
+// clave única ese mismo compromiso rompía la historia completa.
+
+function keyFingerprint(secret) {
+  return crypto.createHash('sha256').update(secret).digest('hex').slice(0, 12);
+}
+
+/**
+ * Ring de claves del audit log. Se construye en vivo desde el .env (sin caché:
+ * los getters de config/env.js leen process.env y los tests rotan claves).
+ *
+ * `resolve(entry)` es la ÚNICA función responsable de elegir la clave de
+ * verificación de una entrada: por keyId si lo tiene, `legacySecret` si no
+ * (entradas pre-0008; hoy es la activa — si algún día deja de serlo, se cambia
+ * solo aquí), y null si el keyId no está en el ring (clave retirada eliminada
+ * del .env → `unknown_key` en verifyChain, comportamiento esperado, no
+ * corrupción).
+ *
+ * Fail-fast: un ring ambiguo (misma clave dos veces, o colisión de huella)
+ * impide arrancar — nunca verificar contra un ring que no sabe qué clave es cuál.
+ *
+ * @returns {{ activeKeyId: string, activeSecret: string, legacySecret: string,
+ *             byId: Map<string,string>, resolve: (entry: {keyId?: string}) => string|null }}
+ */
+function getAuditKeyRing() {
+  const activeSecret = getAuditHmacSecret();
+  const activeKeyId = keyFingerprint(activeSecret);
+  const retired = (config.security.auditHmacRetiredSecrets || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 32);
+
+  const byId = new Map([[activeKeyId, activeSecret]]);
+  for (const s of retired) {
+    const id = keyFingerprint(s);
+    if (byId.has(id)) {
+      throw new Error(
+        `FATAL: ring de claves de auditoría ambiguo — la huella ${id} aparece dos veces ` +
+        '(clave repetida en AUDIT_HMAC_RETIRED_SECRETS, o retirada igual a la activa). ' +
+        'Corrige Server/.env antes de arrancar.'
+      );
+    }
+    byId.set(id, s);
+  }
+
+  const legacySecret = activeSecret;
+  return {
+    activeKeyId,
+    activeSecret,
+    legacySecret,
+    byId,
+    resolve(entry) {
+      if (!entry?.keyId) return legacySecret;
+      return byId.get(entry.keyId) ?? null;
+    },
+  };
+}
+
 module.exports = {
   computeIntegrityHash,
   computeEntryHash,
@@ -221,4 +294,6 @@ module.exports = {
   SIGNABLE_FIELDS,
   // Expuesto para validar al arranque (fail-fast en producción).
   getAuditHmacSecret,
+  getAuditKeyRing,
+  keyFingerprint,
 };

@@ -54,6 +54,8 @@ const config = {
       return String(process.env.COOKIE_SECURE || 'false').toLowerCase() === 'true';
     },
     get auditHmacSecret() { return process.env.AUDIT_HMAC_SECRET; },
+    // Key ring R-1: claves retiradas (separadas por comas) — solo verifican.
+    get auditHmacRetiredSecrets() { return process.env.AUDIT_HMAC_RETIRED_SECRETS; },
   },
 
   storage: {
