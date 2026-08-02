@@ -409,3 +409,115 @@ El estado no vive solo en documentos "vivos": está también en `periodontogramH
 | 3 Campos | §14.2 alias no aplica en queries/aggregations | Migrar dato físico primero; cambiar `$campo` en lockstep |
 | 4 Datos | §14.4 reconciliación por `firmadoEn`; §14.5 historial+archivados | Usar `reconcileStatus()`; incluir `periodontogramHistory` y versiones |
 | 7 Retiro | §14.5 | No restringir enum hasta migrar también historial/archivados |
+
+---
+
+## 15. Restricción de integridad NOM-024 (firmas) — campos firmados CONGELADOS
+
+Esta es la restricción **más crítica** de toda la migración y la que el plan original no contemplaba. Afecta a cualquier campo que forme parte de un documento clínico firmado.
+
+### 15.1 El problema
+
+Los documentos clínicos firmados guardan un `contentHash` (SHA-256) calculado sobre un subconjunto de campos definido en `Server/utils/integrity.js` → `SIGNABLE_FIELDS`. La verificación recalcula ese hash y lo compara; si difiere, marca `firmaDesactualizada` (firma inválida). Hoy esos campos se hashean **con sus nombres y valores actuales en español**:
+
+```js
+// Server/utils/integrity.js — SIGNABLE_FIELDS (extracto)
+patient:        ['primer_nombre','apellido_paterno','fecha_nacimiento','sexo', ...],
+examen:         ['paciente_id','doctor_id','tipo_examen','estado', ...],
+receta:         ['paciente_id','doctor_id','fecha','medicamentos','estado','notas'],
+periodontograma:['patient','initial','current','status'],
+cita:           ['paciente_id','doctor_id','fecha_hora','duracion_minutos','estado','motivo', ...],
+```
+
+Consecuencia: **renombrar un campo** (`apellido_paterno` → `lastNamePaternal`) o **canonicalizar un enum** (`'Pendiente'` → `'PENDING'`) que esté en esta lista **cambia el hash recalculado → invalida TODAS las firmas existentes** de ese tipo de documento. En un expediente con valor legal (NOM-024 / firma electrónica) eso es inaceptable.
+
+Subtleza adicional del flujo de firma: el hash se calcula sobre un **snapshot** justo antes de setear `firmadoEn`/`estadoRegistro`. Por eso un campo firmable **no puede derivarse** de `firmadoEn` (que se setea después): la verificación recalcularía distinto. Esto es lo que hace inseguro convertir `status` de periodontograma en un virtual derivado de `firmadoEn`.
+
+### 15.2 Decisión: NO se normalizan los campos firmados
+
+Por esta restricción, la estrategia adoptada es **excluir de la normalización todos los campos que aparecen en `SIGNABLE_FIELDS`**. Esos campos clínicos firmados se dejan **CONGELADOS en su forma original (en español)** — no se renombran ni se canonicalizan sus enums. La normalización se limita a campos **NO firmados** (p. ej. el dominio caja: `cashMovement`, `boxSession`, `patientCharge`, que no son documentos firmados y ya se migraron a `enums.js`).
+
+Ventaja: las firmas NOM-024 nunca se tocan → cero riesgo sobre expedientes legales. Costo aceptado: los modelos firmados quedan permanentemente "mixtos" (campos en español junto a código en inglés). Es un trade-off deliberado a favor de la seguridad de los datos.
+
+**Campos que NO se deben renombrar ni canonicalizar** (excepción legítima al estándar, para PRs y linter): todos los listados en `SIGNABLE_FIELDS` de `Server/utils/integrity.js`.
+
+### 15.3 Si algún día se decide migrar un campo firmado
+
+No a la ligera. Requeriría primero una **capa de compatibilidad de hash** (hashear sobre la representación legacy: mapear nombres/valores nuevos → originales antes de calcular el hash), con tests que prueben hash byte-idéntico, y recién entonces migrar código y datos (Fases 3-4) con las trampas de Mongoose del §14 en mente. Se prototipó esa capa y **se revirtió por innecesaria** bajo la decisión de §15.2; queda en el historial de git (commit de Fase 1) como referencia si el criterio cambia.
+
+### 15.4 Impacto en periodontograma
+
+El `status` de periodontograma está en `SIGNABLE_FIELDS.periodontograma`, así que **no se toca**: ni se vuelve virtual ni se deriva de `firmadoEn` (rompería firmas). El doble estado `status` (firmado, congelado) / `estadoRegistro` (no firmado) se documenta como **inconsistencia conocida** y se deja como está; cualquier unificación quedaría sujeta a §15.3.
+
+---
+
+## 16. Runbook de día de migración (datos en producción)
+
+Procedimiento para correr una migración de datos contra la base de una clínica **en producción** (cualquier migración de Fase 4: renombre de campos, canonicalización de enums, etc.).
+
+> **Regla de oro:** la automatización/agente trabaja sobre **copias**; el disparo final sobre la base viva lo hace una **persona**, con backup y rollback en mano. Toda migración es *backup-first*, **idempotente** y **reversible**. Contexto actual: hay **una** clínica en producción — es a la vez tu único entorno real y tu mayor riesgo, así que el ensayo en copia (§16.4) no es opcional.
+
+### 16.1 Roles
+
+| Rol | Hace | NO hace |
+|-----|------|---------|
+| Agente (Opus / Cowork / Claude Code) | Escribe scripts + tests; corre y re-corre la migración sobre **copias**/datos sintéticos; ayuda a verificar y a redactar el post-mortem | Tener credenciales de escritura a prod; disparar la corrida final; "arreglar" en vivo |
+| Persona responsable | Revisa los scripts; **dispara** la corrida en prod; decide *go/no-go* y *rollback* | — |
+
+### 16.2 Precondiciones (antes del día) — todo o se pospone
+
+- [ ] Código de la fase mergeado; CI en verde (tests + lint del módulo migrado).
+- [ ] El módulo a migrar **no toca campos firmados** (§15.2); si los tocara, primero hay que construir la capa de compatibilidad de hash (§15.3). Capas de compatibilidad de Mongoose (alias/getters) registradas para los campos NO firmados que se renombren (§3, §6).
+- [ ] Script en `Server/migrations/NNNN-*.js`: idempotente, con `up()` y registro de migraciones aplicadas (§7).
+- [ ] Ensayo en copia ya realizado con éxito al menos una vez (§16.4).
+- [ ] Plan de rollback escrito (§16.7).
+- [ ] Ventana de mantenimiento acordada con la clínica y avisada.
+- [ ] Espacio en disco para **2** backups.
+
+### 16.3 Pre-flight (el día)
+
+- [ ] Confirmar versión actual de la app y del esquema.
+- [ ] Confirmar que nadie escribirá durante la ventana (fin de jornada).
+- [ ] A la mano: credenciales, `npm run backup:db`, comando de restore, y este runbook.
+
+### 16.4 Ensayo en copia (obligatorio, sin tocar prod)
+
+1. Backup fresco de prod: `npm run backup:db`.
+2. Restaurar ese backup en una base **copia** (otra instancia, aislada; anonimizada si la maneja un agente).
+3. Correr la migración sobre la copia.
+4. Verificar (§16.5) sobre la copia.
+5. Correr la migración una **segunda vez** sobre la copia → no debe cambiar nada (prueba de idempotencia).
+6. Solo si todo pasa → *go*.
+
+### 16.5 Verificación (sobre copia, y luego sobre prod)
+
+- [ ] Conteos antes/después coinciden con lo esperado (N migrados, **0** perdidos).
+- [ ] Spot-check: abrir varios registros y confirmar que el dato migró bien.
+- [ ] **Integridad NOM-024:** los documentos firmados siguen verificando — `firmaDesactualizada` **NO** se dispara. Como no se tocan campos firmados (§15.2), no debería cambiar; **si una firma se invalida → ABORTAR.**
+- [ ] La app arranca y los flujos clave funcionan: login, ver expediente, caja, firma.
+- [ ] Sin errores nuevos en logs.
+- [ ] Suite de tests en verde contra la copia migrada.
+
+### 16.6 Corrida en producción (la dispara una persona)
+
+1. Poner la app en mantenimiento (detener writes; `pm2 stop` del server o modo lectura).
+2. Backup fresco **otra vez** (el definitivo pre-cambio).
+3. Correr el **mismo** script ya ensayado.
+4. Verificar (§16.5) sobre prod.
+5. Levantar la app en la nueva versión.
+6. Monitoreo activo los primeros minutos/horas: logs, flujos clave, reportes de la clínica.
+
+### 16.7 Rollback
+
+Disparar si: la verificación falla, se invalidan firmas, la app no levanta, o hay errores en flujos críticos.
+
+1. Detener la app.
+2. Restaurar el backup pre-cambio.
+3. Redesplegar la versión anterior de la app.
+4. Confirmar que la clínica opera normal.
+5. Post-mortem antes de reintentar.
+
+### 16.8 Frontera del agente (resumen)
+
+- ✅ Escribe scripts, tests y codemods; corre/re-corre la migración sobre copias; ayuda a verificar y documentar.
+- ❌ No tiene credenciales de escritura a prod; no dispara la corrida final; no improvisa sobre datos reales.

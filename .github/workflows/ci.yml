@@ -43,3 +43,49 @@ jobs:
       - name: Run client tests
         working-directory: Client
         run: npm test
+
+  lint:
+    name: Lint (naming / normalización)
+    runs-on: ubuntu-latest
+    # Gate ESTRICTO (Fase 0 de normalización). Hoy queda en rojo a propósito:
+    # hay ~583 violaciones legacy que se resuelven en las fases de migración
+    # (ver docs/normalizacion/). El objetivo es que el número baje hasta 0.
+    # continue-on-error: no bloquea merges mientras las ~583 violaciones bajan
+    # a 0 — el check queda visible (rojo) en cada PR sin ser obligatorio.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install server deps
+        working-directory: Server
+        run: npm ci
+      - name: Lint server (estricto)
+        working-directory: Server
+        run: npm run lint
+      - name: Install client deps
+        working-directory: Client
+        run: npm ci
+      - name: Lint client (estricto)
+        working-directory: Client
+        run: npm run lint
+
+  audit:
+    name: npm audit (deps de runtime)
+    runs-on: ubuntu-latest
+    # Gate de seguridad de dependencias (fase de endurecimiento).
+    # Solo bloquea por vulnerabilidades HIGH+ en dependencias de RUNTIME
+    # (--omit=dev): el toolchain de dev (jest/eslint) no viaja a producción
+    # y sus majors se actualizan por decisión, no por gate.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit server (runtime)
+        working-directory: Server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit client (runtime)
+        working-directory: Client
+        run: npm audit --omit=dev --audit-level=high
