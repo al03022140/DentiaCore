@@ -10,6 +10,7 @@
  */
 const mongoose = require('mongoose');
 const { computeEntryHash } = require('../utils/integrity');
+const { redactSecrets } = require('../utils/redact');
 
 const auditLogSchema = new mongoose.Schema({
   // ── Quién ─────────────────────────────────────────────────────
@@ -215,6 +216,11 @@ auditLogSchema.index({ seq: 1 }, { unique: true, sparse: true });
  */
 auditLogSchema.statics.registrar = async function(data) {
   const timestamp = data.timestamp || new Date();
+  // Redactar secretos ANTES de sellar: una vez dentro del entryHash, un
+  // secreto es imposible de limpiar sin re-sellar la cadena (migración 0007).
+  if (data.detalles) {
+    data = { ...data, detalles: redactSecrets(data.detalles) };
+  }
   // Reintentos: bajo escritura concurrente dos entradas podrían leer el mismo
   // "último" eslabón; el índice único en `seq` hace fallar a la segunda
   // (E11000) y reintentamos con el nuevo último. Serializa la cadena sin huecos.

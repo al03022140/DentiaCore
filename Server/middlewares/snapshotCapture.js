@@ -9,6 +9,7 @@
  * No bloqueante: si falla la captura, el request sigue normalmente.
  */
 const mongoose = require('mongoose');
+const { SNAPSHOT_EXCLUDE_PROJECTION } = require('../utils/redact');
 
 // ── Mapa de patrón de ruta → modelo Mongoose ────────────────────
 const ROUTE_MODEL_MAP = [
@@ -73,8 +74,10 @@ function snapshotCapture(req, res, next) {
       if (docId) {
         // Si es un sub-campo, proyectamos SOLO ese campo (no traemos todo el
         // documento del paciente). Reduce carga y evita arrastrar datos ajenos.
+        // Documento completo: excluir secretos (contraseña/pin/tokens de
+        // Usuario) — que nunca lleguen al snapshot ni al audit log.
         doc = await model
-          .findById(docId, subField ? { [subField]: 1 } : undefined)
+          .findById(docId, subField ? { [subField]: 1 } : SNAPSHOT_EXCLUDE_PROJECTION)
           .lean()
           .maxTimeMS(3000);
       } else if (lookupField && lookupValue) {
