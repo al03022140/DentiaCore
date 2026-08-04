@@ -106,6 +106,31 @@ function checkDisk(minGb) {
   }
 }
 
+// Prueba de restauración (P0.5): un backup solo cuenta si se demostró
+// restaurable. restore-test.js corre mensualmente (cron/schtasks) y deja
+// marcador; aquí alertamos si falló o si lleva demasiado sin correr.
+const RESTORE_MARKER = path.join(ROOT, 'backups', 'restore-test-last.json');
+
+function checkRestoreTest(maxAgeDays = 40) {
+  if (!fs.existsSync(RESTORE_MARKER)) {
+    return { ok: true, message: 'Prueba de restauración aún sin correr (la programación mensual la creará) — omitida.' };
+  }
+  let marker;
+  try {
+    marker = JSON.parse(fs.readFileSync(RESTORE_MARKER, 'utf8'));
+  } catch (e) {
+    return { ok: false, message: `restore-test-last.json corrupto: ${e.message}` };
+  }
+  if (!marker.pass) {
+    return { ok: false, message: `La última prueba de restauración FALLÓ (${marker.timestamp}) — el backup NO está demostrado restaurable. Corre: npm run restore:test` };
+  }
+  const ageDays = (Date.now() - new Date(marker.timestamp).getTime()) / 86_400_000;
+  if (!Number.isFinite(ageDays) || ageDays > maxAgeDays) {
+    return { ok: false, message: `Última prueba de restauración PASS hace ${ageDays.toFixed(0)} días (límite ${maxAgeDays}).` };
+  }
+  return { ok: true, message: `Última prueba de restauración PASS hace ${ageDays.toFixed(1)} días (${marker.backup}).` };
+}
+
 // Espejo (BACKUP_MIRROR_DIR): si está configurado y la última corrida no pudo
 // copiar al segundo medio (USB desconectado, NAS caído), hay que enterarse —
 // un espejo que falla en silencio es no tener espejo.
@@ -133,6 +158,7 @@ async function main() {
   const results = {
     backup: checkBackup(args.maxBackupAgeHours),
     mirror: checkMirror(),
+    restoreTest: checkRestoreTest(),
     health: await checkHealthEndpoint(),
     disk: checkDisk(args.minDiskGb),
   };

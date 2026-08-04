@@ -1,9 +1,15 @@
 // Cargar variables de entorno priorizando Server/.env y usando root .env como respaldo
 const path = require('path');
 const dotenv = require('dotenv');
-// Cargar primero Server/.env y luego sobreescribir con el .env raíz para asegurar credenciales de Google
+// Server/.env manda; el .env raíz solo RELLENA huecos (respaldo legacy de
+// credenciales Google). Sin override: dotenv nunca pisa variables ya presentes
+// en process.env, así que un entorno real (PM2, restore-test.js con
+// MONGODB_URI/PORT propios) siempre gana. El `override: true` anterior hacía
+// exactamente lo contrario a este comentario: el .env raíz pisaba TODO,
+// incluido el env del proceso — restore-test arrancaba el server contra la BD
+// de desarrollo en vez de la restaurada.
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 // Lector único de configuración (DEPLOYMENT_MODE fase 1) — requiere dotenv ya cargado
 const config = require('../config/env');
 

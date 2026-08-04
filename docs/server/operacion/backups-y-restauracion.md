@@ -52,27 +52,33 @@ schtasks /Create /SC DAILY /ST 03:00 /TN "DentiaCore-Backup" ^
 
 ## 3. Probar la restauración (OBLIGATORIO antes de producción)
 
-La prueba se hace contra una **BD scratch**, nunca contra producción. El script es *dry-run* por defecto (muestra el plan); `--force` ejecuta.
+**Automatizada (P0.5):** una copia solo cuenta como backup si se demostró
+**restaurable y funcional** — no basta con que Mongo importe el BSON.
 
 ```bash
-# 1) Ver el plan (no toca nada):
-npm run restore:db -- backups/DentiaCore_<ts>.tar.gz \
-  --uri="mongodb://127.0.0.1:27017/DentiaCore_restore_test"
-
-# 2) Ejecutar la prueba en la BD scratch:
-npm run restore:db -- backups/DentiaCore_<ts>.tar.gz \
-  --uri="mongodb://127.0.0.1:27017/DentiaCore_restore_test" --drop --force
+npm run restore:test    # PASS/FAIL de punta a punta con el último par de backups
 ```
 
-**Verificar tras restaurar (criterios de éxito):**
+`scripts/restore-test.js` ejecuta el criterio de aceptación completo, en una BD
+temporal que borra al terminar:
 
-- Conteos por colección coinciden con producción (`patients`, `appointments`, `cashmovements`, `auditlogs`, …).
-- Abrir algunos expedientes restaurados y confirmar que los datos están completos.
-- **Firmas NOM-024:** los documentos firmados siguen verificando (`firmaDesactualizada` no se dispara).
-- **Cadena de auditoría NOM-024:** `npm run verify:audit -- --uri="mongodb://127.0.0.1:27017/DentiaCore_restore_test"` da `✅ Cadena íntegra`. Un `❌ Cadena ROTA` con `hash_mismatch` masivo significa que el `AUDIT_HMAC_SECRET` del `.env` no es el que selló los datos.
-- La app levanta apuntada a la BD scratch y los flujos clave funcionan.
+1. Restaura el backup de BD (`restore-db.js --drop --force`).
+2. Extrae el backup de uploads a un directorio temporal.
+3. **Arranca el servidor real** contra la restauración y espera `/api/health` OK.
+4. Verifica la cadena de auditoría NOM-024 (`verify-audit-chain.js`).
+5. `migrate:dry` (pendientes = informativo; error = FAIL).
+6. Documentos críticos: pacientes/usuarios/citas presentes y con forma válida.
+7. **Filesystem:** cada archivo referenciado por la BD (adjuntos, firmas de
+   usuario, fotos de perfil) existe y es legible — nada de BD perfecta con
+   adjuntos en 404. Huérfanos en disco se reportan como informativo.
 
-Cuando la prueba pase, **borra la BD scratch**. Repite esta prueba periódicamente (p. ej. mensual) y tras cualquier cambio de esquema.
+El resultado queda en `backups/restore-test-last.json`; `check-health.js`
+alerta si la última prueba falló o lleva >40 días sin correr, y un FAIL manda
+alerta por `ALERT_WEBHOOK_URL`. Los instaladores la programan mensualmente
+(cron día 1 4am / tarea `DentiaCore-RestoreTest`). Repítela manualmente tras
+cualquier cambio de esquema.
+
+**Manual (inspección puntual):** `npm run restore:db -- backups/DentiaCore_<ts>.tar.gz --uri="mongodb://127.0.0.1:27017/DentiaCore_restore_test" --drop --force` (sin `--force` es dry-run y solo muestra el plan). Un `❌ Cadena ROTA` con `hash_mismatch` masivo al verificar significa que el `AUDIT_HMAC_SECRET` del `.env` no es el que selló los datos.
 
 ---
 

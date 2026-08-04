@@ -552,9 +552,10 @@ if command -v crontab >/dev/null 2>&1; then
         mkdir -p "$REPO_ROOT/backups"
         NEW_CRON="$EXISTING_CRON
 0 3 * * * cd $REPO_ROOT && /usr/bin/env node scripts/backup-db.js --keep=14 >> backups/backup.log 2>&1 $CRON_TAG
-0 */4 * * * cd $REPO_ROOT && /usr/bin/env node scripts/check-health.js >> backups/health-check.log 2>&1 $CRON_TAG"
+0 */4 * * * cd $REPO_ROOT && /usr/bin/env node scripts/check-health.js >> backups/health-check.log 2>&1 $CRON_TAG
+0 4 1 * * cd $REPO_ROOT && /usr/bin/env node scripts/restore-test.js >> backups/restore-test.log 2>&1 $CRON_TAG"
         if echo "$NEW_CRON" | crontab - 2>/dev/null; then
-            print_ok "Backup diario (3am) y chequeo de salud (cada 4h) registrados en cron."
+            print_ok "Backup diario (3am), chequeo de salud (cada 4h) y prueba de restauración (mensual, día 1 4am) registrados en cron."
         else
             print_warn "No se pudo registrar cron automáticamente (¿permisos?). Agrega manualmente con 'crontab -e':"
             echo "    0 3 * * * cd $REPO_ROOT && node scripts/backup-db.js --keep=14"

@@ -412,11 +412,20 @@ try {
         Register-ScheduledTask -TaskName 'DentiaCore-HealthCheck' -Action $HealthAction -Trigger $HealthTrigger `
             -Description 'Chequeo de salud (backup/DB/disco) de DentiaCore' -Force | Out-Null
 
-        Write-Ok "Backup diario (3am) y chequeo de salud (cada 4h) registrados en el Programador de Tareas."
+        # P0.5: prueba mensual de restauración — un backup solo cuenta si se
+        # demostró restaurable (restaura en BD temporal, arranca el server,
+        # verifica cadena NOM-024, documentos y uploads; PASS/FAIL).
+        $RestoreAction = New-ScheduledTaskAction -Execute $NodeExe -Argument 'scripts\restore-test.js' -WorkingDirectory $RepoRoot
+        $RestoreTrigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 4 -DaysOfWeek Sunday -At 4am
+        Register-ScheduledTask -TaskName 'DentiaCore-RestoreTest' -Action $RestoreAction -Trigger $RestoreTrigger `
+            -Description 'Prueba mensual de restauracion de backups de DentiaCore (P0.5)' -Force | Out-Null
+
+        Write-Ok "Backup diario (3am), chequeo de salud (cada 4h) y prueba de restauracion (cada 4 semanas) registrados en el Programador de Tareas."
     } catch {
         Write-Warn "No se pudo registrar el Programador de Tareas ($($_.Exception.Message)). Agrega manualmente:"
         Write-Host "    schtasks /create /tn DentiaCore-Backup /tr `"node $RepoRoot\scripts\backup-db.js --keep=14`" /sc daily /st 03:00"
         Write-Host "    schtasks /create /tn DentiaCore-HealthCheck /tr `"node $RepoRoot\scripts\check-health.js`" /sc hourly /mo 4"
+        Write-Host "    schtasks /create /tn DentiaCore-RestoreTest /tr `"node $RepoRoot\scripts\restore-test.js`" /sc monthly /d 1 /st 04:00"
     }
 
     Run-NpmInstall $RepoRoot
