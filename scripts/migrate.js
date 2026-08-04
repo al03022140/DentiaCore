@@ -95,7 +95,9 @@ function parseArgs(argv) {
 
 function runBackup() {
   console.log('📦 Backup previo (backup-first)…');
-  const res = spawnSync('node', [path.join('scripts', 'backup-db.js'), '--keep=30'], {
+  // --no-uploads: las migraciones tocan la BD, no los archivos — y el update
+  // (update.sh/update.ps1) ya respalda uploads vía el backup completo previo.
+  const res = spawnSync('node', [path.join('scripts', 'backup-db.js'), '--keep=30', '--no-uploads'], {
     cwd: ROOT,
     stdio: ['ignore', 'inherit', 'inherit'],
   });

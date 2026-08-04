@@ -23,29 +23,9 @@ echo " DentiaCore — Actualización de instalación existente"
 echo "======================================================"
 
 echo ""
-echo "[1/5] Respaldo de base de datos..."
+echo "[1/5] Respaldo de base de datos y uploads..."
+# backup-db.js respalda BD + uploads (best-effort) y rota por familia.
 node scripts/backup-db.js --keep=10
-
-echo ""
-echo "[1/5] Respaldo de uploads (best-effort)..."
-UPLOADS_DIR_RAW="$(grep -E '^UPLOADS_DIR=' Server/.env 2>/dev/null | head -n1 | cut -d= -f2-)"
-UPLOADS_DIR_RAW="${UPLOADS_DIR_RAW%\"}"; UPLOADS_DIR_RAW="${UPLOADS_DIR_RAW#\"}"
-if [ -n "$UPLOADS_DIR_RAW" ]; then
-  UPLOADS_DIR="$ROOT/Server/$UPLOADS_DIR_RAW"
-else
-  UPLOADS_DIR="$ROOT/Server/uploads"
-fi
-if [ -d "$UPLOADS_DIR" ]; then
-  mkdir -p "$ROOT/backups"
-  UPLOADS_BACKUP="$ROOT/backups/uploads_$(date +%Y-%m-%d_%H%M%S).tar.gz"
-  if tar -czf "$UPLOADS_BACKUP" -C "$(dirname "$UPLOADS_DIR")" "$(basename "$UPLOADS_DIR")"; then
-    echo "✅ Uploads respaldados en $UPLOADS_BACKUP"
-  else
-    echo "⚠️  No se pudo respaldar uploads — continúa el update (la BD ya está respaldada)."
-  fi
-else
-  echo "⚠️  No se encontró la carpeta de uploads ($UPLOADS_DIR) — se omite este respaldo."
-fi
 
 echo ""
 echo "[2/5] Verificando migraciones pendientes (dry-run, no toca datos)..."

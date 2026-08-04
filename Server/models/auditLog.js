@@ -247,7 +247,7 @@ auditLogSchema.statics.registrar = async function(data) {
     let entryHash = null;
     try {
       const ring = getAuditKeyRing();
-      entryHash = computeEntryHash(entryData, ring.activeSecret);
+      entryHash = ring.sign(entryData);
       entryData.keyId = ring.activeKeyId;
     } catch (err) {
       console.error('[AuditLog] Error computing entryHash:', err.message);

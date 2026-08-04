@@ -25,36 +25,12 @@ Write-Host "======================================================" -ForegroundC
 Write-Host " DentiaCore - Actualizacion de instalacion existente" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 
-Write-Step "[1/5] Respaldo de base de datos..."
+# backup-db.js respalda BD + uploads (best-effort) y rota por familia.
+Write-Step "[1/5] Respaldo de base de datos y uploads..."
 node scripts/backup-db.js --keep=10
 if ($LASTEXITCODE -ne 0) {
     Write-Err "El respaldo de base de datos fallo. Update ABORTADO antes de tocar datos."
     exit 1
-}
-
-Write-Step "[1/5] Respaldo de uploads (best-effort)..."
-$UploadsDir = Join-Path $Root 'Server\uploads'
-$EnvFile = Join-Path $Root 'Server\.env'
-if (Test-Path $EnvFile) {
-    $EnvLine = Get-Content $EnvFile | Where-Object { $_ -match '^UPLOADS_DIR=' } | Select-Object -First 1
-    if ($EnvLine) {
-        $Custom = ($EnvLine -split '=', 2)[1].Trim('"', " ")
-        if ($Custom) { $UploadsDir = Join-Path $Root "Server\$Custom" }
-    }
-}
-if (Test-Path $UploadsDir) {
-    $BackupsDir = Join-Path $Root 'backups'
-    New-Item -ItemType Directory -Force -Path $BackupsDir | Out-Null
-    $Stamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
-    $UploadsBackup = Join-Path $BackupsDir "uploads_$Stamp.zip"
-    try {
-        Compress-Archive -Path $UploadsDir -DestinationPath $UploadsBackup -Force
-        Write-Ok "Uploads respaldados en $UploadsBackup"
-    } catch {
-        Write-Warn "No se pudo respaldar uploads ($($_.Exception.Message)) - continua el update (la BD ya esta respaldada)."
-    }
-} else {
-    Write-Warn "No se encontro la carpeta de uploads ($UploadsDir) - se omite este respaldo."
 }
 
 Write-Step "[2/5] Verificando migraciones pendientes (dry-run, no toca datos)..."

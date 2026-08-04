@@ -237,21 +237,24 @@ function keyFingerprint(secret) {
 }
 
 /**
- * Ring de claves del audit log. Se construye en vivo desde el .env (sin caché:
- * los getters de config/env.js leen process.env y los tests rotan claves).
+ * Ring de claves del audit log — CONTRATO (interface AuditKeyRing):
  *
- * `resolve(entry)` es la ÚNICA función responsable de elegir la clave de
- * verificación de una entrada: por keyId si lo tiene, `legacySecret` si no
- * (entradas pre-0008; hoy es la activa — si algún día deja de serlo, se cambia
- * solo aquí), y null si el keyId no está en el ring (clave retirada eliminada
- * del .env → `unknown_key` en verifyChain, comportamiento esperado, no
- * corrupción).
+ *   activeKeyId    huella de la clave activa — la que llevan las entradas nuevas
+ *   activeSecret   la ÚNICA clave que firma
+ *   legacySecret   clave para entradas sin keyId (pre-0008). Hoy = la activa;
+ *                  si algún día deja de serlo, se cambia SOLO aquí
+ *   byId           Map huella → clave (activa + retiradas). Las retiradas
+ *                  (AUDIT_HMAC_RETIRED_SECRETS) solo verifican, nunca firman
+ *   resolve(entry) única puerta de selección de clave de verificación:
+ *                  con keyId → byId; sin keyId → legacySecret; keyId fuera del
+ *                  ring → null (verifyChain lo reporta como `unknown_key`:
+ *                  "falta una clave histórica en .env", no corrupción)
+ *   sign(logData)  HMAC de una entrada con la clave activa
  *
- * Fail-fast: un ring ambiguo (misma clave dos veces, o colisión de huella)
- * impide arrancar — nunca verificar contra un ring que no sabe qué clave es cuál.
- *
- * @returns {{ activeKeyId: string, activeSecret: string, legacySecret: string,
- *             byId: Map<string,string>, resolve: (entry: {keyId?: string}) => string|null }}
+ * Se construye en vivo desde el .env (sin caché: los getters de config/env.js
+ * leen process.env y los tests rotan claves). Fail-fast: un ring ambiguo
+ * (misma clave dos veces, o colisión de huella) impide arrancar — nunca
+ * verificar contra un ring que no sabe qué clave es cuál.
  */
 function getAuditKeyRing() {
   const activeSecret = getAuditHmacSecret();
@@ -283,6 +286,9 @@ function getAuditKeyRing() {
     resolve(entry) {
       if (!entry?.keyId) return legacySecret;
       return byId.get(entry.keyId) ?? null;
+    },
+    sign(logData) {
+      return computeEntryHash(logData, activeSecret);
     },
   };
 }

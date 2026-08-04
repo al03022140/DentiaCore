@@ -163,20 +163,74 @@ function findMongodump(argv) {
   return null;
 }
 
-function rotateBackups(keepN) {
+// Rotación POR FAMILIA (prefijo): los dumps de BD (<dbName>_*) y los
+// respaldos de uploads (uploads_*) rotan por separado — antes competían por
+// el mismo cupo --keep=N y un update podía desplazar dumps de BD del historial.
+function rotateBackups(keepN, prefix, baseDir = BACKUP_BASE) {
   if (!Number.isFinite(keepN) || keepN <= 0) return;
-  const files = fs.readdirSync(BACKUP_BASE)
-    .map((name) => ({ name, mtime: fs.statSync(path.join(BACKUP_BASE, name)).mtimeMs }))
-    .filter((e) => /\.(tar\.gz|tgz)$/.test(e.name) || fs.statSync(path.join(BACKUP_BASE, e.name)).isDirectory())
+  const files = fs.readdirSync(baseDir)
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => ({ name, mtime: fs.statSync(path.join(baseDir, name)).mtimeMs }))
+    .filter((e) => /\.(tar\.gz|tgz|zip)$/.test(e.name) || fs.statSync(path.join(baseDir, e.name)).isDirectory())
     .sort((a, b) => b.mtime - a.mtime);
   for (const old of files.slice(keepN)) {
-    const fullPath = path.join(BACKUP_BASE, old.name);
+    const fullPath = path.join(baseDir, old.name);
     try {
       fs.rmSync(fullPath, { recursive: true, force: true });
       console.log(`🗑  Rotado: ${old.name}`);
     } catch (e) {
       console.warn(`⚠️  No se pudo borrar ${old.name}: ${e.message}`);
     }
+  }
+}
+
+// Uploads (radiografías, adjuntos, firmas — PHI) al MISMO ritmo que la BD.
+// Antes solo se respaldaban durante update.sh/update.ps1: el backup diario
+// programado dejaba fuera los archivos clínicos. Best-effort: si falla, el
+// backup de BD sigue valiendo (se reporta, no aborta).
+function backupUploads(ts) {
+  const rel = loadEnvValue('UPLOADS_DIR') || 'uploads';
+  const dir = path.isAbsolute(rel) ? rel : path.join(ROOT, 'Server', rel);
+  if (!fs.existsSync(dir)) {
+    console.warn(`⚠️  No se encontró la carpeta de uploads (${dir}) — se omite ese respaldo.`);
+    return null;
+  }
+  const archive = path.join(BACKUP_BASE, `uploads_${ts}.tar.gz`);
+  console.log('⏳ Respaldando uploads…');
+  // tar existe en macOS/Linux y en Windows 10+ (bsdtar en System32) — la misma
+  // dependencia que ya usa la compresión del dump.
+  const tar = spawnSync('tar', ['-czf', archive, '-C', path.dirname(dir), path.basename(dir)], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  if (tar.status !== 0) {
+    console.warn('⚠️  Respaldo de uploads falló — el backup de BD sigue siendo válido.');
+    try { fs.rmSync(archive, { force: true }); } catch { /* ignore */ }
+    return null;
+  }
+  return archive;
+}
+
+// Copia espejo a un segundo medio (USB/NAS): BACKUP_MIRROR_DIR en Server/.env.
+// "Al menos una copia fuera del equipo" (NOM-024/LFPDPPP) — hasta ahora era
+// solo una instrucción en el doc, sin tooling ni monitoreo. El resultado se
+// registra en last-success.json y check-health.js alerta si falla.
+function mirrorBackups(files, keepN, dbName) {
+  const dir = loadEnvValue('BACKUP_MIRROR_DIR');
+  if (!dir) return { configured: false };
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    for (const f of files) {
+      if (f && fs.existsSync(f) && fs.statSync(f).isFile()) {
+        fs.copyFileSync(f, path.join(dir, path.basename(f)));
+      }
+    }
+    if (keepN) {
+      rotateBackups(keepN, `${dbName}_`, dir);
+      rotateBackups(keepN, 'uploads_', dir);
+    }
+    return { configured: true, ok: true, dir };
+  } catch (e) {
+    return { configured: true, ok: false, dir, error: e.message };
   }
 }
 
@@ -212,9 +266,10 @@ function printSecretBackupReminder() {
 // ── Main ───────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { compress: true, keep: null };
+  const args = { compress: true, keep: null, uploads: true };
   for (const a of argv) {
     if (a === '--no-compress') args.compress = false;
+    else if (a === '--no-uploads') args.uploads = false;
     else if (a.startsWith('--keep=')) {
       const n = Number(a.slice('--keep='.length));
       if (Number.isFinite(n) && n > 0) args.keep = n;
@@ -225,9 +280,13 @@ function parseArgs(argv) {
       console.log('');
       console.log('Opciones:');
       console.log('  --no-compress         No comprimir el dump (deja la carpeta cruda)');
-      console.log('  --keep=N              Conservar solo los N backups más recientes');
+      console.log('  --no-uploads          No respaldar la carpeta de uploads (solo BD)');
+      console.log('  --keep=N              Conservar solo los N backups más recientes (por familia)');
       console.log('  --mongodump=PATH      Path explícito al binario de mongodump');
       console.log('  -h, --help            Muestra esta ayuda');
+      console.log('');
+      console.log('Con BACKUP_MIRROR_DIR en Server/.env, copia además los respaldos a ese');
+      console.log('directorio (USB/NAS) y aplica ahí la misma rotación.');
       process.exit(0);
     }
   }
@@ -305,9 +364,20 @@ function main() {
     }
   }
 
-  // 4) Rotación opcional
+  // 3b) Uploads (PHI) — mismo ritmo que la BD; best-effort
+  const uploadsPath = args.uploads ? backupUploads(ts) : null;
+
+  // 4) Rotación opcional, por familia (BD y uploads no compiten por el cupo)
   if (args.keep) {
-    rotateBackups(args.keep);
+    rotateBackups(args.keep, `${dbName}_`);
+    rotateBackups(args.keep, 'uploads_');
+  }
+
+  // 4b) Espejo a segundo medio (opcional: BACKUP_MIRROR_DIR en Server/.env)
+  const mirror = mirrorBackups([finalPath, uploadsPath], args.keep, dbName);
+  if (mirror.configured) {
+    if (mirror.ok) console.log(`🪞 Espejo actualizado: ${mirror.dir}`);
+    else console.warn(`⚠️  Espejo falló (${mirror.dir}): ${mirror.error} — check-health lo alertará.`);
   }
 
   // 5) Reporte
@@ -322,13 +392,20 @@ function main() {
   } catch {
     console.log(`✅ Backup listo: ${finalPath}`);
   }
+  if (uploadsPath) console.log(`✅ Uploads: ${uploadsPath}`);
 
   // O-1: marcador de última corrida exitosa — scripts/check-health.js lo lee
   // para alertar si el backup automático dejó de correr o falla en silencio.
   try {
     fs.writeFileSync(
       path.join(BACKUP_BASE, 'last-success.json'),
-      JSON.stringify({ timestamp: new Date().toISOString(), path: finalPath, dbName }, null, 2)
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        path: finalPath,
+        uploadsPath,
+        dbName,
+        mirror,
+      }, null, 2)
     );
   } catch (e) {
     console.warn(`⚠️  No se pudo escribir last-success.json: ${e.message}`);

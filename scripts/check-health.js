@@ -106,10 +106,33 @@ function checkDisk(minGb) {
   }
 }
 
+// Espejo (BACKUP_MIRROR_DIR): si está configurado y la última corrida no pudo
+// copiar al segundo medio (USB desconectado, NAS caído), hay que enterarse —
+// un espejo que falla en silencio es no tener espejo.
+function checkMirror() {
+  if (!fs.existsSync(BACKUP_MARKER)) {
+    return { ok: true, message: 'Sin marcador de backup aún — espejo omitido.' };
+  }
+  let marker;
+  try {
+    marker = JSON.parse(fs.readFileSync(BACKUP_MARKER, 'utf8'));
+  } catch {
+    return { ok: true, message: 'Marcador ilegible — el chequeo de backup ya lo reporta.' };
+  }
+  if (!marker?.mirror?.configured) {
+    return { ok: true, message: 'Espejo no configurado (BACKUP_MIRROR_DIR) — omitido.' };
+  }
+  if (marker.mirror.ok) {
+    return { ok: true, message: `Espejo OK en ${marker.mirror.dir}.` };
+  }
+  return { ok: false, message: `El espejo a ${marker.mirror.dir} falló en la última corrida: ${marker.mirror.error || 'sin detalle'}.` };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const results = {
     backup: checkBackup(args.maxBackupAgeHours),
+    mirror: checkMirror(),
     health: await checkHealthEndpoint(),
     disk: checkDisk(args.minDiskGb),
   };

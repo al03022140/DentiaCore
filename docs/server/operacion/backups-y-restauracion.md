@@ -12,11 +12,19 @@
 ## 1. Hacer un backup
 
 ```bash
-npm run backup:db                 # → backups/<db>_<ts>.tar.gz
-npm run backup:db -- --keep=14    # conserva solo los 14 más recientes (rotación)
+npm run backup:db                 # → backups/<db>_<ts>.tar.gz + backups/uploads_<ts>.tar.gz
+npm run backup:db -- --keep=14    # conserva solo los 14 más recientes POR FAMILIA
+npm run backup:db -- --no-uploads # solo BD (lo usa migrate.js en su backup-first)
 ```
 
-Usa `mongodump` (parte de las MongoDB Database Tools). Si no está instalado, el script indica cómo hacerlo según el SO.
+Respalda la **BD** (`mongodump`, MongoDB Database Tools) y la carpeta de
+**uploads** (radiografías, adjuntos, firmas — PHI) en el mismo paso. La
+rotación `--keep=N` cuenta por separado los dumps de BD y los de uploads.
+
+**Copia fuera del equipo (obligatoria):** configura `BACKUP_MIRROR_DIR` en
+`Server/.env` apuntando a un USB/NAS montado. Cada corrida copia ahí ambos
+respaldos y aplica la misma rotación; si el espejo falla (medio desconectado),
+`check-health.js` lo alerta — un espejo que falla en silencio es no tener espejo.
 
 ---
 
@@ -24,8 +32,8 @@ Usa `mongodump` (parte de las MongoDB Database Tools). Si no está instalado, el
 
 **Ya no hace falta configurarlo a mano (O-1):** `install.sh`/`install.ps1` registran automáticamente, en cada instalación:
 
-- Backup diario (3am): `node scripts/backup-db.js --keep=14`. Cada corrida exitosa actualiza `backups/last-success.json`.
-- Chequeo de salud cada 4h: `node scripts/check-health.js` — verifica que el backup no esté viejo/ausente, que `/api/health` reporte la DB conectada, y disco libre. Ver [Server/README.md](../../../Server/README.md#-respaldo-monitoreo-y-recuperación) para configurar `ALERT_WEBHOOK_URL` y recibir alertas activas (Slack/Discord/ntfy.sh).
+- Backup diario (3am): `node scripts/backup-db.js --keep=14` — BD + uploads + espejo (si `BACKUP_MIRROR_DIR` está configurado). Cada corrida exitosa actualiza `backups/last-success.json`.
+- Chequeo de salud cada 4h: `node scripts/check-health.js` — verifica que el backup no esté viejo/ausente, que el **espejo** no haya fallado en la última corrida, que `/api/health` reporte la DB conectada, y disco libre. Ver [Server/README.md](../../../Server/README.md#-respaldo-monitoreo-y-recuperación) para configurar `ALERT_WEBHOOK_URL` y recibir alertas activas (Slack/Discord/ntfy.sh).
 
 Verificar que quedó registrado: `crontab -l` (macOS/Linux) o `schtasks /query /tn DentiaCore-Backup` (Windows).
 
